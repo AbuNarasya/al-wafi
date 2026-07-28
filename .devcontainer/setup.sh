@@ -30,7 +30,20 @@ if ! php -m | grep -qi '^pdo_pgsql$'; then
         sudo apt-get install -y libpq-dev
     fi
 
-    sudo docker-php-ext-install pdo_pgsql
+    # -E mempertahankan PHP_INI_DIR; tanpa itu langkah "enable" di akhir gagal
+    # dengan "cannot create /conf.d/…: Directory nonexistent" meski kompilasinya
+    # sendiri sukses. `|| true` supaya kegagalan enable tak menghentikan skrip —
+    # penanganannya ada di bawah.
+    sudo -E docker-php-ext-install pdo_pgsql || true
+
+    # Kalau ekstensinya terkompilasi tapi belum aktif, tulis sendiri berkas
+    # pengaktifnya ke folder conf.d milik PHP.
+    if ! php -m | grep -qi '^pdo_pgsql$'; then
+        INI_DIR="${PHP_INI_DIR:-/usr/local/etc/php}/conf.d"
+        echo "    Mengaktifkan pdo_pgsql lewat ${INI_DIR}"
+        sudo mkdir -p "$INI_DIR"
+        echo "extension=pdo_pgsql.so" | sudo tee "$INI_DIR/docker-php-ext-pdo_pgsql.ini" >/dev/null
+    fi
 fi
 
 if php -m | grep -qi '^pdo_pgsql$'; then
