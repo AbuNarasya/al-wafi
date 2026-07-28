@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 #
 # Penyiapan sekali jalan saat codespace dibuat.
+#
+# URUTAN ITU PENTING: `php artisan` apa pun baru bisa dipanggil SETELAH
+# `composer install`, karena artisan memuat vendor/autoload.php. Versi pertama
+# skrip ini memanggil key:generate lebih dulu dan mati di situ — akibatnya
+# dependensi tak pernah terpasang dan port 8000 menjawab 502.
 set -e
 
-echo "==> 1/6 Memastikan ekstensi PHP untuk PostgreSQL"
+echo "==> 1/7 Memastikan ekstensi PHP untuk PostgreSQL"
 # Image devcontainer PHP belum tentu membawa pdo_pgsql. Dua jalur pemasangan
 # dicoba berurutan agar tak bergantung pada isi image.
 if ! php -m | grep -qi '^pdo_pgsql$'; then
@@ -17,20 +22,22 @@ if ! php -m | grep -qi '^pdo_pgsql$'; then
 fi
 php -m | grep -qi '^pdo_pgsql$' && echo "    pdo_pgsql siap."
 
-echo "==> 2/6 Menyiapkan berkas .env"
-# .env tak ikut git (berisi rahasia), jadi dibuat dari contoh. Alamat database
+echo "==> 2/7 Menyiapkan berkas .env"
+# .env tak ikut git (berisi rahasia), jadi disalin dari contoh. Alamat database
 # TIDAK perlu ditulis di sini — sudah datang sebagai environment variable.
 [ -f .env ] || cp .env.example .env
-php artisan key:generate --force
 
-echo "==> 3/6 Memasang dependensi PHP"
+echo "==> 3/7 Memasang dependensi PHP (beberapa menit)"
 composer install --no-interaction --prefer-dist
 
-echo "==> 4/6 Membangun tampilan (CSS & JavaScript)"
+echo "==> 4/7 Membuat kunci aplikasi"
+php artisan key:generate --force
+
+echo "==> 5/7 Membangun tampilan (CSS & JavaScript)"
 npm ci
 npm run build
 
-echo "==> 5/6 Menunggu database siap"
+echo "==> 6/7 Menunggu database siap"
 for i in $(seq 1 30); do
     if php -r 'new PDO("pgsql:host=db;port=5432;dbname=alwafi", "alwafi", "alwafi");' 2>/dev/null; then
         echo "    Database menjawab."
@@ -39,12 +46,14 @@ for i in $(seq 1 30); do
     sleep 2
 done
 
-echo "==> 6/6 Membuat tabel & mengisi data awal"
+echo "==> 7/7 Membuat tabel & mengisi data awal"
 php artisan migrate --force
 php artisan db:seed --force
 
 echo
 echo "============================================================"
-echo " Selesai. Buka tab PORTS di bawah, klik alamat port 8000."
+echo " Selesai. Jalankan server:"
+echo "   bash .devcontainer/start-server.sh"
+echo " lalu buka tab PORTS, klik ikon globe pada port 8000."
 echo " Login:  admin  /  admin123"
 echo "============================================================"
