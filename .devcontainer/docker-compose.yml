@@ -6,7 +6,10 @@
 
 services:
   app:
-    image: mcr.microsoft.com/devcontainers/php:1-8.3-bookworm
+    # PHP 8.4, BUKAN 8.3: composer.lock mengunci Symfony 8.1 yang menuntut
+    # PHP >= 8.4.1 (lock dibuat di mesin pengembang ber-PHP 8.5). Dengan 8.3,
+    # `composer install` menolak sejak awal.
+    image: mcr.microsoft.com/devcontainers/php:1-8.4-bookworm
     volumes:
       - ../..:/workspaces:cached
     command: sleep infinity

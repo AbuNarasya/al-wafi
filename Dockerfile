@@ -26,7 +26,10 @@ COPY . .
 RUN composer dump-autoload --optimize --no-dev
 
 # ---------- 3. Runtime ----------
-FROM php:8.3-cli
+# PHP 8.4, BUKAN 8.3: composer.lock mengunci Symfony 8.1 yang menuntut
+# PHP >= 8.4.1. composer.json memang menulis "^8.3", tetapi lock-lah yang
+# menentukan saat `composer install` dijalankan.
+FROM php:8.4-cli
 
 # pdo_pgsql (database), intl & zip (ekspor Excel/CSV), gd (gambar di PDF dompdf),
 # bcmath (hitungan uang), opcache (percepat cold start yang jadi masalah di Render).
