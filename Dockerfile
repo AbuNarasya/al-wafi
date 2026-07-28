@@ -1,0 +1,52 @@
+# syntax=docker/dockerfile:1
+#
+# Image untuk deploy UJI COBA di Render (paket gratis).
+#
+# Render tak punya runtime PHP bawaan (hanya Node/Python/Ruby/Go), jadi aplikasi
+# dikemas sebagai container. Tiga tahap agar build ulang tetap cepat: aset Vite,
+# dependensi Composer, lalu runtime PHP yang ramping.
+
+# ---------- 1. Aset (Vite + Tailwind 4) ----------
+# Seluruh sumber disalin, bukan cuma resources/: Tailwind 4 memindai berkas Blade
+# & PHP untuk menentukan kelas yang dipakai. Kalau hanya resources/ yang ada,
+# separuh kelas hilang dari CSS hasil build.
+FROM node:22-alpine AS assets
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# ---------- 2. Dependensi PHP ----------
+FROM composer:2 AS vendor
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction
+COPY . .
+RUN composer dump-autoload --optimize --no-dev
+
+# ---------- 3. Runtime ----------
+FROM php:8.3-cli
+
+# pdo_pgsql (database), intl & zip (ekspor Excel/CSV), gd (gambar di PDF dompdf),
+# bcmath (hitungan uang), opcache (percepat cold start yang jadi masalah di Render).
+COPY --from=mlocati/php-extension-installer:latest /usr/bin/install-php-extensions /usr/local/bin/
+RUN install-php-extensions pdo_pgsql intl zip gd bcmath opcache
+
+WORKDIR /app
+COPY --from=vendor /app ./
+COPY --from=assets /app/public/build ./public/build
+
+# Direktori kerja Laravel dibuat ulang karena .dockerignore mengosongkan isinya.
+RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views \
+             storage/logs storage/app/private bootstrap/cache \
+    && chmod -R 777 storage bootstrap/cache
+
+COPY docker/start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+
+# Render menyuntikkan $PORT sendiri; nilai ini hanya cadangan saat dijalankan lokal.
+ENV PORT=10000
+EXPOSE 10000
+
+CMD ["/usr/local/bin/start.sh"]

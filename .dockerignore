@@ -1,0 +1,24 @@
+.git
+.github
+node_modules
+vendor
+public/build
+public/hot
+public/storage
+
+# Rahasia lokal tak boleh ikut ke image — env diisi lewat dashboard Render.
+.env
+.env.*
+
+# Isi direktori kerja dibuat ulang oleh Dockerfile.
+storage/logs
+storage/framework/cache
+storage/framework/sessions
+storage/framework/views
+storage/app/public
+
+tests
+.phpunit.cache
+.phpunit.result.cache
+AUDIT-KONVERSI.md
+DEPLOY-RENDER.md

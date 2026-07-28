@@ -1,0 +1,52 @@
+@import 'tailwindcss';
+
+[x-cloak] { display: none !important; }
+
+/* Border input LEBIH JELAS di semua modul.
+   Tailwind preflight men-set border-width:0 → input yang hanya punya utilitas
+   warna (mis. `border-gray-300` tanpa `border`) tampil TANPA garis. Karena itu
+   kita beri SEMUA kontrol form (kecuali checkbox/radio) garis 1px gray-400 by
+   default. Fokus (focus:border-brand, spesifisitas (0,2,0)) tetap menang;
+   error (border-red-400) & warna eksplisit lain tetap dihormati lewat aturan
+   kelas di bawah. Border kartu/tabel (div/table) tidak tersentuh. */
+@layer base {
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    select,
+    textarea {
+        border-width: 1px;
+        border-style: solid;
+        border-color: #9ca3af; /* gray-400 */
+    }
+}
+input.border-gray-200, select.border-gray-200, textarea.border-gray-200,
+input.border-gray-300, select.border-gray-300, textarea.border-gray-300 {
+    border-color: #9ca3af; /* gray-400 */
+}
+
+/* NOMINAL RUPIAH — dipakai directive @rp (lihat AppServiceProvider).
+   "Rp" tidak boleh terpisah dari angkanya saat kolom sempit (dulu terlihat di
+   Neraca: "Rp" naik satu baris sendiri), dan digit dibuat lebar-sama agar
+   kolom angka lurus meski font utama proporsional. Kelas didefinisikan sendiri
+   (bukan utilitas Tailwind) supaya tak pernah terbuang saat build. */
+.rp {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Ciri khas AL Wafi: biru brand + aksen kuning emas (dari materi PPSB).
+       brand = biru dominan (sidebar/tombol/tautan); accent = emas untuk sorotan
+       (menu aktif, badge, CTA). Port dari tailwind.config.js app asli. */
+    --color-brand: #164a9e;
+    --color-brand-dark: #0e3168;
+    --color-brand-soft: #e8edf6;
+    --color-accent: #f8c400;
+    --color-accent-dark: #d9a900;
+    --color-accent-soft: #fff6d6;
+}

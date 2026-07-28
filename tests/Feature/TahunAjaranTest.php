@@ -1,0 +1,110 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Exceptions\AppException;
+use App\Models\BusinessUnit;
+use App\Models\CoaDetail;
+use App\Models\CoaGroup;
+use App\Models\JalurPendaftaran;
+use App\Models\TahunAjaran;
+use App\Services\Modules\JenisBiayaService;
+use App\Services\Modules\SantriService;
+use App\Services\Modules\TahunAjaranService;
+use App\Services\Modules\WaliService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+/** Master Tahun Ajaran: default unik, hapus terlindungi, dan gerbang registrasi per TA. */
+class TahunAjaranTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        CoaGroup::create(['kode_grup' => 'ZZTA', 'nama_grup' => 'TA']);
+        CoaDetail::create(['kode_coa' => '4.ZZTA.REG', 'nama_coa' => 'Pendapatan Registrasi', 'kode_grup' => 'ZZTA', 'jenis_saldo' => 'kredit']);
+        BusinessUnit::create(['kode_unit' => 'ZZTAU', 'nama_unit' => 'Unit']);
+    }
+
+    public function test_default_pendaftaran_hanya_satu(): void
+    {
+        $svc = new TahunAjaranService;
+        $a = $svc->create(['kode' => '2026/2027', 'status' => 'aktif', 'default_pendaftaran' => true]);
+        $b = $svc->create(['kode' => '2027/2028', 'status' => 'aktif', 'default_pendaftaran' => true]);
+
+        $this->assertFalse($a->refresh()->default_pendaftaran);
+        $this->assertTrue($b->refresh()->default_pendaftaran);
+        $this->assertSame('2027/2028', $svc->defaultPendaftaran()->kode);
+
+        // TA nonaktif tak boleh jadi default.
+        $this->expectException(AppException::class);
+        $svc->update($b->id, ['status' => 'nonaktif', 'default_pendaftaran' => true]);
+    }
+
+    public function test_hapus_terlindungi_bila_dirujuk(): void
+    {
+        $svc = new TahunAjaranService;
+        $ta = $svc->create(['kode' => '2026/2027', 'status' => 'aktif']);
+        JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler', 'tahun_ajaran' => '2026/2027']);
+
+        try {
+            $svc->remove($ta->id);
+            $this->fail('harus 409');
+        } catch (AppException $e) {
+            $this->assertSame(409, $e->status);
+        }
+
+        JalurPendaftaran::destroy('reguler');
+        $svc->remove($ta->id);
+        $this->assertDatabaseMissing('tahun_ajaran', ['kode' => '2026/2027']);
+    }
+
+    public function test_registrasi_memakai_jenis_biaya_dan_jalur_per_ta(): void
+    {
+        $svc = new TahunAjaranService;
+        $svc->create(['kode' => '2026/2027', 'status' => 'aktif', 'default_pendaftaran' => true]);
+        $svc->create(['kode' => '2027/2028', 'status' => 'aktif']);
+        JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler', 'tahun_ajaran' => '2026/2027']);
+        JalurPendaftaran::create(['kode' => 'reguler28', 'nama' => 'Reguler', 'tahun_ajaran' => '2027/2028']);
+        // Registrasi 500rb utk TA 26/27, 750rb utk TA 27/28.
+        (new JenisBiayaService)->create(['kode' => 'REG27', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => '4.ZZTA.REG', 'kode_unit' => 'ZZTAU', 'tahun_ajaran' => '2026/2027']);
+        (new JenisBiayaService)->create(['kode' => 'REG28', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '750000', 'kode_coa_pendapatan' => '4.ZZTA.REG', 'kode_unit' => 'ZZTAU', 'tahun_ajaran' => '2027/2028']);
+        $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '08321']);
+
+        $santriSvc = new SantriService;
+
+        // Tanpa TA → ditolak.
+        try {
+            $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'A', 'jenis_kelamin' => 'L', 'jalur' => 'reguler']);
+            $this->fail('harus 422');
+        } catch (AppException $e) {
+            $this->assertStringContainsString('Tahun ajaran wajib', $e->getMessage());
+        }
+
+        // Jalur TA lain → ditolak.
+        try {
+            $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'A', 'jenis_kelamin' => 'L', 'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler28']);
+            $this->fail('harus 422');
+        } catch (AppException $e) {
+            $this->assertStringContainsString('bukan 2026/2027', $e->getMessage());
+        }
+
+        // TA 27/28 → tagihan registrasi memakai jenis biaya TA itu (750rb).
+        $santri = $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'A', 'jenis_kelamin' => 'L', 'tahun_ajaran' => '2027/2028', 'jalur' => 'reguler28']);
+        $this->assertSame('2027/2028', $santri->tahun_ajaran);
+        $this->assertSame(750000.0, (float) $santri->tagihan()->first()->nominal);
+        $this->assertSame('REG28', $santri->tagihan()->first()->kode_jenis);
+    }
+
+    public function test_kode_ta_tidak_bisa_diubah(): void
+    {
+        $svc = new TahunAjaranService;
+        $ta = $svc->create(['kode' => '2026/2027', 'status' => 'aktif']);
+        $svc->update($ta->id, ['kode' => '2030/2031', 'status' => 'aktif', 'keterangan' => 'ubah']);
+
+        $this->assertSame('2026/2027', $ta->refresh()->kode);
+        $this->assertSame('ubah', $ta->keterangan);
+    }
+}

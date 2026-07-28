@@ -1,0 +1,78 @@
+# Blueprint Render — deploy UJI COBA paket gratis.
+#
+# Pakai lewat Render → New → Blueprint, arahkan ke repo ini. Database dan web
+# service dibuat sekaligus dan kredensial DB tersambung otomatis (fromDatabase),
+# jadi tak ada password yang perlu disalin-tempel.
+#
+# BATAS PAKET GRATIS yang melekat pada berkas ini:
+#   • web service TIDUR setelah 15 menit menganggur (akses berikutnya ± 1 menit)
+#   • TIDAK ada disk permanen → bukti pembayaran & berkas santri hilang saat
+#     restart/deploy ulang
+#   • TIDAK ada cron/worker → reminder tagihan harian tak berjalan otomatis
+#     (tombol "Kirim Reminder Sekarang" tetap bisa dipakai manual)
+#   • database gratis berumur terbatas lalu dihapus Render
+
+databases:
+  - name: alwafi-db
+    plan: free
+    databaseName: alwafi
+    user: alwafi
+
+services:
+  - type: web
+    name: alwafi
+    runtime: docker
+    plan: free
+    healthCheckPath: /up
+    envVars:
+      # Isi manual saat blueprint dijalankan: `php artisan key:generate --show`
+      - key: APP_KEY
+        sync: false
+      # Isi dengan URL service setelah dibuat, mis. https://alwafi.onrender.com
+      - key: APP_URL
+        sync: false
+
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      # Log ke stderr agar terbaca di panel Render; storage/logs tidak persisten.
+      - key: LOG_CHANNEL
+        value: stderr
+
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromDatabase:
+          name: alwafi-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: alwafi-db
+          property: port
+      - key: DB_DATABASE
+        fromDatabase:
+          name: alwafi-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: alwafi-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: alwafi-db
+          property: password
+
+      # Sesi, cache, dan antrean sudah memakai database — aman di lingkungan
+      # tanpa disk permanen.
+      - key: SESSION_DRIVER
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+
+      # Mengisi data awal + pengguna admin tiap kali container menyala. Ubah ke
+      # "false" setelah Anda mengganti password admin, agar tak dikembalikan lagi.
+      - key: SEED_ON_DEPLOY
+        value: "true"
