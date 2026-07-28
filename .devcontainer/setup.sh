@@ -13,20 +13,24 @@ echo "==> 1/7 Memastikan ekstensi PHP untuk PostgreSQL"
 # lewat apt-get, karena image devcontainer membawa repositori Yarn yang kunci
 # GPG-nya kedaluwarsa — `apt-get update` gagal dan menyeret skrip ini ikut mati.
 if ! php -m | grep -qi '^pdo_pgsql$'; then
-    if ! command -v install-php-extensions >/dev/null 2>&1; then
-        echo "    Mengunduh pemasang ekstensi…"
-        sudo curl -sSLf -o /usr/local/bin/install-php-extensions \
-            https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions
-        sudo chmod +x /usr/local/bin/install-php-extensions
+    # Sumber PHP dikembalikan ke keadaan bersih lebih dulu. Build yang pernah
+    # gagal meninggalkan berkas objek setengah jadi, dan percobaan berikutnya
+    # memakainya ulang lalu berhenti dengan "not a valid libtool object".
+    if command -v docker-php-source >/dev/null 2>&1; then
+        echo "    Membersihkan sisa build sebelumnya…"
+        sudo docker-php-source delete || true
+        sudo docker-php-source extract || true
     fi
-    sudo install-php-extensions pdo_pgsql || {
-        # Cadangan: apt, dengan repositori Yarn yang bermasalah dilumpuhkan dulu.
-        echo "    Beralih ke cara cadangan (apt)…"
+
+    # libpq-dev diperlukan saat kompilasi; repositori Yarn di image ini kunci
+    # GPG-nya kedaluwarsa sehingga apt-get update gagal — dibuang dulu.
+    if ! dpkg -s libpq-dev >/dev/null 2>&1; then
         sudo rm -f /etc/apt/sources.list.d/yarn.list
         sudo apt-get update -y
         sudo apt-get install -y libpq-dev
-        sudo docker-php-ext-install pdo_pgsql
-    }
+    fi
+
+    sudo docker-php-ext-install pdo_pgsql
 fi
 
 if php -m | grep -qi '^pdo_pgsql$'; then
