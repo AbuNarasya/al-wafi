@@ -12,9 +12,19 @@ kartu:
 ## 1. Database di Neon
 
 1. Daftar di [neon.com](https://neon.com) (bisa lewat akun GitHub).
-2. **Create project** — nama bebas, region pilih yang terdekat (Singapore).
-3. Buka **Connection Details**, salin nilai-nilai ini; sebentar lagi dipakai:
-   `Host`, `Database`, `User`, `Password`.
+2. **Create project** — nama bebas, versi Postgres samakan dengan yang dipakai
+   di komputer (18), **Neon Auth dibiarkan mati**.
+3. **Region: pilih AWS US East**, bukan Singapore.
+
+   Ini kontra-intuitif tetapi penting. Yang menentukan kecepatan bukan jarak
+   Anda ke database, melainkan jarak **aplikasi** ke database: satu halaman
+   Laravel memanggil database belasan kali, sedangkan pengguna hanya satu kali
+   bolak-balik per halaman. Karena Space berjalan di server Hugging Face di
+   Amerika Serikat, database yang diletakkan di Singapura membuat tiap halaman
+   terasa lambat meski aplikasinya sehat.
+
+4. Buka **Connection Details**, salin nilai-nilai ini sebelum menutup halaman
+   (password hanya ditampilkan sekali): `Host`, `Database`, `User`, `Password`.
 
 Host Neon berbentuk seperti `ep-xxx-123456.ap-southeast-1.aws.neon.tech`.
 
