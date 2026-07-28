@@ -22,3 +22,5 @@ tests
 .phpunit.result.cache
 AUDIT-KONVERSI.md
 DEPLOY-RENDER.md
+HUGGINGFACE.md
+CODESPACES.md

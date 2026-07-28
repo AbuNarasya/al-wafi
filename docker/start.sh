@@ -31,5 +31,5 @@ set -e
 # (rute '/' yang mengalihkan ke dashboard), dan Laravel menolak men-serialisasi
 # closure — route:cache akan gagal dan menggagalkan deploy.
 
-echo "→ Menyalakan server di port ${PORT:-10000}…"
-exec php artisan serve --host=0.0.0.0 --port="${PORT:-10000}"
+echo "→ Menyalakan server di port ${PORT:-7860}…"
+exec php artisan serve --host=0.0.0.0 --port="${PORT:-7860}"

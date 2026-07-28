@@ -48,8 +48,10 @@ RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/fra
 COPY docker/start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
 
-# Render menyuntikkan $PORT sendiri; nilai ini hanya cadangan saat dijalankan lokal.
-ENV PORT=10000
-EXPOSE 10000
+# 7860 = port yang ditunggu Hugging Face Spaces (lihat app_port di README.md).
+# Render menyuntikkan $PORT sendiri saat runtime, jadi nilai bawaan ini tak
+# mengganggu — start.sh selalu memakai $PORT bila ada.
+ENV PORT=7860
+EXPOSE 7860
 
 CMD ["/usr/local/bin/start.sh"]
