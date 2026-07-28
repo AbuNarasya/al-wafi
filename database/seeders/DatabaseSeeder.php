@@ -40,6 +40,7 @@ class DatabaseSeeder extends Seeder
         $this->seedUnitBisnis();
         $this->seedBagian();
         $this->seedApprovalFlows();
+        $this->seedTahunAjaran();   // WAJIB sebelum jalur: jalur merujuk padanya
         $this->seedJalurPendaftaran();
         $this->seedAdmin();
         $this->seedCompanySettings();
@@ -240,18 +241,50 @@ class DatabaseSeeder extends Seeder
     }
 
     /**
+     * Tahun ajaran awal — dibuat dari tahun berjalan, mis. "2026/2027", dan
+     * ditandai sebagai default form pendaftaran.
+     *
+     * WAJIB ADA: jalur pendaftaran, jenis biaya, potongan gelombang, dan target
+     * santri semuanya merujuk ke sini lewat foreign key. Tanpa baris ini, seeder
+     * gagal di database yang benar-benar baru — persis yang terjadi saat aplikasi
+     * pertama kali dipasang di server.
+     */
+    private function seedTahunAjaran(): string
+    {
+        $tahun = now()->year;
+        $kode = "{$tahun}/".($tahun + 1);
+
+        \App\Models\TahunAjaran::updateOrCreate(
+            ['kode' => $kode],
+            ['kode' => $kode, 'status' => 'aktif', 'default_pendaftaran' => true],
+        );
+
+        return $kode;
+    }
+
+    /**
      * Jalur pendaftaran default (reguler/tahfizh/beasiswa) — master terkelola.
      * `reguler` adalah jalur bawaan (default nilai santri.jalur).
+     *
+     * Tiap baris terikat satu tahun ajaran (kolom wajib, ber-FK), jadi TA-nya
+     * diambil dari yang ditandai default; kalau belum ada, dibuatkan dulu.
      */
     private function seedJalurPendaftaran(): void
     {
+        $ta = \App\Models\TahunAjaran::where('default_pendaftaran', true)->value('kode')
+            ?? \App\Models\TahunAjaran::orderByDesc('kode')->value('kode')
+            ?? $this->seedTahunAjaran();
+
         $jalur = [
             ['kode' => 'reguler', 'nama' => 'Reguler', 'keterangan' => 'Jalur pendaftaran umum.'],
             ['kode' => 'tahfizh', 'nama' => 'Tahfizh', 'keterangan' => 'Jalur program tahfizh Al-Qur\'an.'],
             ['kode' => 'beasiswa', 'nama' => 'Beasiswa', 'keterangan' => 'Jalur beasiswa / keringanan.'],
         ];
         foreach ($jalur as $j) {
-            \App\Models\JalurPendaftaran::updateOrCreate(['kode' => $j['kode']], $j);
+            \App\Models\JalurPendaftaran::updateOrCreate(
+                ['kode' => $j['kode']],
+                $j + ['tahun_ajaran' => $ta],
+            );
         }
     }
 

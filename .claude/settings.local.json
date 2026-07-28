@@ -226,7 +226,9 @@
       "Bash(git ls-tree *)",
       "PowerShell($os = Get-CimInstance Win32_OperatingSystem; \"$\\($os.Caption\\) | versi $\\(\\(Get-ItemProperty 'HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion'\\).DisplayVersion\\) | build $\\($os.BuildNumber\\)\"; \"Arsitektur: $\\($os.OSArchitecture\\)\"; $wsl = Get-Command wsl -ErrorAction SilentlyContinue; if \\($wsl\\) { \"WSL terpasang: ya\" } else { \"WSL terpasang: tidak\" })",
       "Bash(bash -n .devcontainer/setup.sh)",
-      "Bash(bash -n .devcontainer/start-server.sh)"
+      "Bash(bash -n .devcontainer/start-server.sh)",
+      "Bash(DB_DATABASE=al_wafi_php_test C:/php/php.exe artisan migrate:fresh --seed --force)",
+      "Bash(DB_DATABASE=al_wafi_php_test C:/php/php.exe artisan tinker '--execute= *)"
     ]
   }
 }
