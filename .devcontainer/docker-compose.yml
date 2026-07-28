@@ -1,0 +1,39 @@
+# Dua kontainer: aplikasi (PHP) dan database (PostgreSQL).
+#
+# Kredensial database sengaja ditaruh sebagai environment variable, BUKAN di
+# .env. Laravel mendahulukan environment variable asli daripada isi .env, jadi
+# tak ada risiko .env hasil salinan menimpa alamat database yang benar.
+
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/php:1-8.3-bookworm
+    volumes:
+      - ../..:/workspaces:cached
+    command: sleep infinity
+    depends_on:
+      - db
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_DATABASE: alwafi
+      DB_USERNAME: alwafi
+      DB_PASSWORD: alwafi
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: alwafi
+      POSTGRES_USER: alwafi
+      POSTGRES_PASSWORD: alwafi
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
