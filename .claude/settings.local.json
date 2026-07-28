@@ -223,7 +223,8 @@
       "Bash(grep -E \"^\\(Dockerfile|render\\\\.yaml|docker/start\\\\.sh|DEPLOY-RENDER\\\\.md\\)$\")",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git ls-tree *)"
+      "Bash(git ls-tree *)",
+      "PowerShell($os = Get-CimInstance Win32_OperatingSystem; \"$\\($os.Caption\\) | versi $\\(\\(Get-ItemProperty 'HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion'\\).DisplayVersion\\) | build $\\($os.BuildNumber\\)\"; \"Arsitektur: $\\($os.OSArchitecture\\)\"; $wsl = Get-Command wsl -ErrorAction SilentlyContinue; if \\($wsl\\) { \"WSL terpasang: ya\" } else { \"WSL terpasang: tidak\" })"
     ]
   }
 }
