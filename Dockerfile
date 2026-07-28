@@ -23,7 +23,16 @@ WORKDIR /app
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction
 COPY . .
-RUN composer dump-autoload --optimize --no-dev
+
+# Direktori kerja dibuat dulu: .dockerignore mengecualikan isinya, sedangkan
+# `dump-autoload` memicu `artisan package:discover` yang menuntut folder cache
+# Blade ada — tanpa ini build berhenti dengan "Please provide a valid cache path".
+# --no-scripts dipakai sebagai pengaman kedua: manifes paket toh dibangun ulang
+# sendiri saat aplikasi pertama kali jalan.
+RUN mkdir -p bootstrap/cache \
+             storage/framework/cache/data storage/framework/sessions storage/framework/views \
+             storage/logs \
+    && composer dump-autoload --optimize --no-dev --no-scripts
 
 # ---------- 3. Runtime ----------
 # PHP 8.4, BUKAN 8.3: composer.lock mengunci Symfony 8.1 yang menuntut
