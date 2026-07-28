@@ -9,18 +9,32 @@
 set -e
 
 echo "==> 1/7 Memastikan ekstensi PHP untuk PostgreSQL"
-# Image devcontainer PHP belum tentu membawa pdo_pgsql. Dua jalur pemasangan
-# dicoba berurutan agar tak bergantung pada isi image.
+# Jalur utama: install-php-extensions (unduh sekali, ~200 KB). Sengaja TIDAK
+# lewat apt-get, karena image devcontainer membawa repositori Yarn yang kunci
+# GPG-nya kedaluwarsa — `apt-get update` gagal dan menyeret skrip ini ikut mati.
 if ! php -m | grep -qi '^pdo_pgsql$'; then
-    if command -v install-php-extensions >/dev/null 2>&1; then
-        sudo install-php-extensions pdo_pgsql
-    else
+    if ! command -v install-php-extensions >/dev/null 2>&1; then
+        echo "    Mengunduh pemasang ekstensi…"
+        sudo curl -sSLf -o /usr/local/bin/install-php-extensions \
+            https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions
+        sudo chmod +x /usr/local/bin/install-php-extensions
+    fi
+    sudo install-php-extensions pdo_pgsql || {
+        # Cadangan: apt, dengan repositori Yarn yang bermasalah dilumpuhkan dulu.
+        echo "    Beralih ke cara cadangan (apt)…"
+        sudo rm -f /etc/apt/sources.list.d/yarn.list
         sudo apt-get update -y
         sudo apt-get install -y libpq-dev
         sudo docker-php-ext-install pdo_pgsql
-    fi
+    }
 fi
-php -m | grep -qi '^pdo_pgsql$' && echo "    pdo_pgsql siap."
+
+if php -m | grep -qi '^pdo_pgsql$'; then
+    echo "    pdo_pgsql siap."
+else
+    echo "    GAGAL memasang pdo_pgsql — hentikan dan laporkan pesan di atas."
+    exit 1
+fi
 
 echo "==> 2/7 Menyiapkan berkas .env"
 # .env tak ikut git (berisi rahasia), jadi disalin dari contoh. Alamat database
