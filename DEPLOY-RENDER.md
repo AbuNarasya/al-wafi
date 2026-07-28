@@ -29,16 +29,17 @@ Salin hasilnya (berawalan `base64:`) — dipakai di langkah berikutnya.
 
 ## 3. Buat layanan di Render
 
-Render → **New → Blueprint**, arahkan ke repo tadi. `render.yaml` akan membuat
-dua hal sekaligus: PostgreSQL gratis dan web service Docker, dengan kredensial
-database tersambung otomatis.
+Render → **New → Blueprint**, arahkan ke repo tadi. `render.yaml` membuat satu
+web service Docker di region **Ohio**, dengan database mengarah ke **Neon**
+(bukan PostgreSQL bawaan Render, yang berumur terbatas lalu dihapus).
 
-Render akan menanyakan dua nilai yang sengaja tidak disimpan di repo:
+Render akan menanyakan tiga nilai yang sengaja tidak disimpan di repo:
 
-| Variabel  | Isi                                                        |
-| --------- | ---------------------------------------------------------- |
-| `APP_KEY` | hasil langkah 2                                             |
-| `APP_URL` | `https://<nama-service>.onrender.com` (isi setelah dibuat)  |
+| Variabel      | Isi                                                        |
+| ------------- | ---------------------------------------------------------- |
+| `APP_KEY`     | hasil langkah 2                                             |
+| `APP_URL`     | `https://<nama-service>.onrender.com` (isi setelah dibuat)  |
+| `DB_PASSWORD` | password dari dashboard Neon                                |
 
 Build pertama sekitar 3–5 menit. Migrasi dijalankan otomatis saat container
 menyala (lihat `docker/start.sh`).

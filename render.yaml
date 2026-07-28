@@ -1,35 +1,34 @@
-# Blueprint Render — deploy UJI COBA paket gratis.
+# Blueprint Render — deploy uji coba paket gratis.
 #
-# Pakai lewat Render → New → Blueprint, arahkan ke repo ini. Database dan web
-# service dibuat sekaligus dan kredensial DB tersambung otomatis (fromDatabase),
-# jadi tak ada password yang perlu disalin-tempel.
+# Pakai lewat Render → New → Blueprint, arahkan ke repo ini.
 #
-# BATAS PAKET GRATIS yang melekat pada berkas ini:
-#   • web service TIDUR setelah 15 menit menganggur (akses berikutnya ± 1 menit)
+# DATABASE MEMAKAI NEON, bukan PostgreSQL bawaan Render. Alasannya: database
+# gratis Render berumur terbatas lalu DIHAPUS, sedangkan Neon bertahan. Region
+# service sengaja dipatok "ohio" agar sedekat mungkin dengan Neon di us-east-1 —
+# satu halaman Laravel memanggil database belasan kali, jadi jarak antar-keduanya
+# jauh lebih menentukan daripada jarak pengguna ke server.
+#
+# BATAS PAKET GRATIS yang melekat:
+#   • service TIDUR setelah 15 menit menganggur (akses berikutnya ± 1 menit)
 #   • TIDAK ada disk permanen → bukti pembayaran & berkas santri hilang saat
-#     restart/deploy ulang
+#     restart/deploy ulang (data di database tetap aman karena ada di Neon)
 #   • TIDAK ada cron/worker → reminder tagihan harian tak berjalan otomatis
 #     (tombol "Kirim Reminder Sekarang" tetap bisa dipakai manual)
-#   • database gratis berumur terbatas lalu dihapus Render
-
-databases:
-  - name: alwafi-db
-    plan: free
-    databaseName: alwafi
-    user: alwafi
 
 services:
   - type: web
     name: alwafi
     runtime: docker
     plan: free
+    region: ohio
     healthCheckPath: /up
     envVars:
-      # Isi manual saat blueprint dijalankan: `php artisan key:generate --show`
+      # Ditanyakan Render saat blueprint dijalankan (tidak disimpan di repo).
       - key: APP_KEY
         sync: false
-      # Isi dengan URL service setelah dibuat, mis. https://alwafi.onrender.com
       - key: APP_URL
+        sync: false
+      - key: DB_PASSWORD
         sync: false
 
       - key: APP_ENV
@@ -43,28 +42,18 @@ services:
       - key: DB_CONNECTION
         value: pgsql
       - key: DB_HOST
-        fromDatabase:
-          name: alwafi-db
-          property: host
+        value: ep-blue-cloud-aur0k9mn.c-10.us-east-1.aws.neon.tech
       - key: DB_PORT
-        fromDatabase:
-          name: alwafi-db
-          property: port
+        value: "5432"
       - key: DB_DATABASE
-        fromDatabase:
-          name: alwafi-db
-          property: database
+        value: neondb
       - key: DB_USERNAME
-        fromDatabase:
-          name: alwafi-db
-          property: user
-      - key: DB_PASSWORD
-        fromDatabase:
-          name: alwafi-db
-          property: password
+        value: neondb_owner
+      # Neon menolak koneksi tanpa SSL.
+      - key: DB_SSLMODE
+        value: require
 
-      # Sesi, cache, dan antrean sudah memakai database — aman di lingkungan
-      # tanpa disk permanen.
+      # Sesi, cache, dan antrean memakai database — aman tanpa disk permanen.
       - key: SESSION_DRIVER
         value: database
       - key: CACHE_STORE
