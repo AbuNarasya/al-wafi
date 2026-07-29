@@ -101,7 +101,11 @@ final class Navigation
         ['url' => '/period-close', 'label' => 'Tutup Buku Periode', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'period-close'],
         ['url' => '/export', 'label' => 'Export Data', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'reports'],
 
-        // ---- 5. PPSB & Kesantrian ----
+        // ---- 5. PPSB & Kependidikan ----
+        // CATATAN: label grupnya "KEPENDIDIKAN", tetapi URL (/kesantrian/…) dan
+        // kode modul (`pembayaran-kesantrian`) sengaja TIDAK ikut diganti —
+        // kode modul tersimpan di `hak_akses_modul`, jadi menggantinya akan
+        // memutus hak akses yang sudah diberikan ke pengguna.
         ['url' => '/ppsb/tahun-ajaran', 'label' => 'Tahun Ajaran', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'tahun-ajaran'],
         // Jalur mendahului Jenis Biaya: tarif dibedakan per jalur, jadi jalurnya
         // harus sudah ada sebelum jenis biaya diisi.
@@ -115,11 +119,11 @@ final class Navigation
         ['url' => '/ppsb/angsuran-uang-pangkal', 'label' => 'Angsuran Uang Pangkal', 'group' => 'PPSB', 'sub' => 'Data Master', 'modul' => 'angsuran-uang-pangkal'],
         ['url' => '/ppsb/pembayaran', 'label' => 'Pembayaran Registrasi & Uang Pangkal', 'group' => 'PPSB', 'sub' => 'Transaksi', 'modul' => 'pembayaran-ppsb'],
         ['url' => '/rekap-pembayaran', 'label' => 'Rekap Pembayaran Santri', 'group' => 'PPSB', 'sub' => 'Transaksi', 'modul' => 'rekap-pembayaran'],
-        ['url' => '/kesantrian/santri', 'label' => 'Santri', 'group' => 'KESANTRIAN', 'sub' => 'Master', 'modul' => 'santri'],
-        ['url' => '/kesantrian/pembayaran', 'label' => 'Pembayaran SPP & Tagihan Lain', 'group' => 'KESANTRIAN', 'sub' => 'Transaksi', 'modul' => 'pembayaran-kesantrian'],
-        ['url' => '/kesantrian/spp', 'label' => 'SPP', 'group' => 'KESANTRIAN', 'sub' => 'Transaksi', 'modul' => 'spp'],
-        ['url' => '/kesantrian/dompet', 'label' => 'Dompet & Tabungan', 'group' => 'KESANTRIAN', 'sub' => 'Transaksi', 'modul' => 'dompet'],
-        ['url' => '/rekap-pembayaran', 'label' => 'Rekap Pembayaran Santri', 'group' => 'KESANTRIAN', 'sub' => 'Transaksi', 'modul' => 'rekap-pembayaran'],
+        ['url' => '/kesantrian/santri', 'label' => 'Santri', 'group' => 'KEPENDIDIKAN', 'sub' => 'Master', 'modul' => 'santri'],
+        ['url' => '/kesantrian/pembayaran', 'label' => 'Pembayaran SPP & Tagihan Lain', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'pembayaran-kesantrian'],
+        ['url' => '/kesantrian/spp', 'label' => 'SPP', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'spp'],
+        ['url' => '/kesantrian/dompet', 'label' => 'Dompet & Tabungan', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'dompet'],
+        ['url' => '/rekap-pembayaran', 'label' => 'Rekap Pembayaran Santri', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'rekap-pembayaran'],
 
         // ---- 6. Sistem ----
         ['url' => '/approvals', 'label' => 'Persetujuan Saya', 'group' => 'SISTEM'],
@@ -127,13 +131,13 @@ final class Navigation
         // rutenya (404) & fiturnya belum diport. Lihat catatan di ModulRegistry.
     ];
 
-    public const GROUP_ORDER = ['', 'SETTING AWAL', 'ANGGARAN', 'PENGAJUAN PEMBAYARAN', 'KEUANGAN', 'PPSB', 'KESANTRIAN', 'SISTEM'];
+    public const GROUP_ORDER = ['', 'SETTING AWAL', 'ANGGARAN', 'PENGAJUAN PEMBAYARAN', 'KEUANGAN', 'PPSB', 'KEPENDIDIKAN', 'SISTEM'];
 
     public const SUB_ORDER = [
         'PENGAJUAN PEMBAYARAN' => ['Buat Pengajuan', 'Pengajuan'],
         'KEUANGAN' => ['Vendor & Customer', 'Aset & Persediaan', 'Transaksi', 'Laporan', 'Kontrol'],
         'PPSB' => ['Setting Awal', 'Data Master', 'Transaksi'],
-        'KESANTRIAN' => ['Master', 'Transaksi'],
+        'KEPENDIDIKAN' => ['Master', 'Transaksi'],
     ];
 
     /** URL item yang paling cocok dengan path sekarang (prefix terpanjang). */

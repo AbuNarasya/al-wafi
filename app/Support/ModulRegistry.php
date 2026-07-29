@@ -92,11 +92,11 @@ final class ModulRegistry
         ['kode' => 'pembayaran-ppsb', 'nama' => 'Pembayaran Registrasi & Uang Pangkal', 'grup' => 'PPSB', 'sub' => 'Transaksi'],
         ['kode' => 'rekap-pembayaran', 'nama' => 'Rekap Pembayaran Santri', 'grup' => 'PPSB', 'sub' => 'Transaksi'],
 
-        // ---- Kesantrian ----
-        ['kode' => 'pembayaran-kesantrian', 'nama' => 'Pembayaran SPP & Tagihan Lain', 'grup' => 'KESANTRIAN', 'sub' => 'Transaksi'],
-        ['kode' => 'dompet', 'nama' => 'Dompet & Tabungan Santri', 'grup' => 'KESANTRIAN', 'sub' => 'Transaksi'],
-        ['kode' => 'spp', 'nama' => 'SPP (Tarif, Penerbitan Tagihan, Prabayar)', 'grup' => 'KESANTRIAN', 'sub' => 'Transaksi'],
-        ['kode' => 'tagihan-lain', 'nama' => 'Tagihan Lain-lain (seragam, kegiatan, denda)', 'grup' => 'KESANTRIAN', 'sub' => 'Transaksi'],
+        // ---- Kependidikan (kode modulnya tetap `…-kesantrian`, lihat Navigation) ----
+        ['kode' => 'pembayaran-kesantrian', 'nama' => 'Pembayaran SPP & Tagihan Lain', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
+        ['kode' => 'dompet', 'nama' => 'Dompet & Tabungan Santri', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
+        ['kode' => 'spp', 'nama' => 'SPP (Tarif, Penerbitan Tagihan, Prabayar)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
+        ['kode' => 'tagihan-lain', 'nama' => 'Tagihan Lain-lain (seragam, kegiatan, denda)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
 
         // ---- Sistem ----
         // 'void-approvals' DIBUANG 2026-07-28: menunya menunjuk /void-approvals
@@ -121,7 +121,7 @@ final class ModulRegistry
         'PENGAJUAN PEMBAYARAN',
         'KEUANGAN',
         'PPSB',
-        'KESANTRIAN',
+        'KEPENDIDIKAN',
         'SISTEM',
         'TANPA MENU',
     ];
@@ -131,7 +131,7 @@ final class ModulRegistry
         'PENGAJUAN PEMBAYARAN' => ['Pengajuan'],
         'KEUANGAN' => ['Vendor & Customer', 'Aset & Persediaan', 'Transaksi', 'Laporan', 'Kontrol'],
         'PPSB' => ['Setting Awal', 'Data Master', 'Transaksi'],
-        'KESANTRIAN' => ['Transaksi'],
+        'KEPENDIDIKAN' => ['Transaksi'],
     ];
 
     /**

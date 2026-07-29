@@ -31,7 +31,9 @@ class PembayaranSantriService
 
     private const LABEL_LINGKUP = [
         'ppsb' => 'PPSB (registrasi, uang pangkal & perlengkapan)',
-        'kesantrian' => 'Kesantrian (SPP & tagihan lain)',
+        // Label yang DIBACA pemakai — mengikuti nama menunya (kini Kependidikan).
+        // Kunci lingkupnya sendiri tetap 'kesantrian': dipakai di URL & kode modul.
+        'kesantrian' => 'Kependidikan (SPP & tagihan lain)',
     ];
 
     /** Langkah 1 — PPSB mencatat setoran. Tidak ada jurnal. */
