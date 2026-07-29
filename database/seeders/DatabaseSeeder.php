@@ -40,8 +40,8 @@ class DatabaseSeeder extends Seeder
         $this->seedUnitBisnis();
         $this->seedBagian();
         $this->seedApprovalFlows();
-        $this->seedTahunAjaran();   // WAJIB sebelum jalur: jalur merujuk padanya
-        $this->seedJalurPendaftaran();
+        $this->seedTahunAjaran();
+        $this->seedJalurPendaftaran(); // tak lagi merujuk tahun ajaran (jalur lintas T.A)
         $this->seedAdmin();
         $this->seedCompanySettings();
 
@@ -266,25 +266,22 @@ class DatabaseSeeder extends Seeder
      * Jalur pendaftaran default (reguler/tahfizh/beasiswa) — master terkelola.
      * `reguler` adalah jalur bawaan (default nilai santri.jalur).
      *
-     * Tiap baris terikat satu tahun ajaran (kolom wajib, ber-FK), jadi TA-nya
-     * diambil dari yang ditandai default; kalau belum ada, dibuatkan dulu.
+     * Jalur BERLAKU LINTAS TAHUN AJARAN sejak migration
+     * `2025_01_09_000001_jalur_pendaftaran_lintas_tahun_ajaran` membuang kolom
+     * `tahun_ajaran`-nya. Seeder ini dulu masih mengisi kolom itu dan itulah yang
+     * MENGGAGALKAN DEPLOY: migrate berhasil membuang kolomnya, lalu db:seed
+     * menabrak "column tahun_ajaran does not exist" dan container berhenti.
+     * Yang berbeda per tahun adalah TARIF-nya, dan itu milik `jenis_biaya`.
      */
     private function seedJalurPendaftaran(): void
     {
-        $ta = \App\Models\TahunAjaran::where('default_pendaftaran', true)->value('kode')
-            ?? \App\Models\TahunAjaran::orderByDesc('kode')->value('kode')
-            ?? $this->seedTahunAjaran();
-
         $jalur = [
             ['kode' => 'reguler', 'nama' => 'Reguler', 'keterangan' => 'Jalur pendaftaran umum.'],
             ['kode' => 'tahfizh', 'nama' => 'Tahfizh', 'keterangan' => 'Jalur program tahfizh Al-Qur\'an.'],
             ['kode' => 'beasiswa', 'nama' => 'Beasiswa', 'keterangan' => 'Jalur beasiswa / keringanan.'],
         ];
         foreach ($jalur as $j) {
-            \App\Models\JalurPendaftaran::updateOrCreate(
-                ['kode' => $j['kode']],
-                $j + ['tahun_ajaran' => $ta],
-            );
+            \App\Models\JalurPendaftaran::updateOrCreate(['kode' => $j['kode']], $j);
         }
     }
 
