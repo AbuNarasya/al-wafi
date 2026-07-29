@@ -98,6 +98,11 @@ class SantriService
         if (! empty($data['id_wali']) && $data['id_wali'] !== $lama->id_wali && ! Wali::find($data['id_wali'])) {
             throw new AppException(400, 'Wali tidak ditemukan.');
         }
+        // Tingkat diperiksa terhadap jenjang yang AKAN berlaku, bukan yang lama:
+        // keduanya bisa berubah dalam satu kiriman (mis. naik ke SMP tingkat 1).
+        if (array_key_exists('tingkat', $data) && $data['tingkat'] !== null && $data['tingkat'] !== '') {
+            $this->pastikanTingkatSah((string) ($data['kode_jenjang'] ?? $lama->kode_jenjang), $data['tingkat']);
+        }
         $lama->update($data);
 
         return $lama;

@@ -483,6 +483,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/santri/create', 'create')->name('santri.create')->middleware('hakakses:santri,buat');
         Route::post('/santri', 'store')->name('santri.store')->middleware('hakakses:santri,buat');
         Route::get('/santri/{id}', 'show')->name('santri.show')->middleware('hakakses:santri,lihat')->whereNumber('id');
+        // Sunting data santri. Yang PPSB (jalur, gelombang, tahun ajaran) &
+        // status sengaja tak ikut — lihat SantriController::update().
+        Route::get('/santri/{id}/edit', 'edit')->name('santri.edit')->middleware('hakakses:santri,ubah')->whereNumber('id');
+        Route::put('/santri/{id}', 'update')->name('santri.update')->middleware('hakakses:santri,ubah')->whereNumber('id');
         Route::post('/santri/{id}/aksi/{aksi}', 'aksi')->name('santri.aksi')->middleware('hakakses:santri,ubah')->whereNumber('id');
     });
 

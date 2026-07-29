@@ -114,6 +114,65 @@ class SantriController extends Controller
         };
     }
 
+    public function edit(int $id): View
+    {
+        $santri = Santri::findOrFail($id);
+
+        return view('santri.edit', [
+            'santri' => $santri,
+            'waliOptions' => Wali::where('status', 'aktif')->orderBy('nama')->get()
+                ->mapWithKeys(fn ($w) => [$w->id => "{$w->nama} ({$w->telepon})"])->all(),
+            'kembali' => route('santri.show', $santri->id),
+        ]);
+    }
+
+    /**
+     * Simpan suntingan data santri.
+     *
+     * YANG SENGAJA TIDAK BISA DISUNTING DI SINI, beserta alasannya:
+     *  • `status` — punya mesin transisi sendiri (Tahap) dengan pemeriksaan
+     *    berjenjang; mengubahnya lewat form biasa akan melompati semuanya.
+     *  • `jalur`, `gelombang`, `tahun_ajaran` — ketiganya menentukan tarif yang
+     *    dipakai saat tagihan TERBIT. Mengubahnya belakangan tidak menghitung
+     *    ulang tagihan yang sudah ada, jadi data santri dan tagihannya akan
+     *    saling bertentangan tanpa pesan apa pun. Potongan gelombang bahkan
+     *    sudah terlanjur melekat pada tagihan uang pangkalnya.
+     *  • `no_pendaftaran` — nomor dokumen yang sudah tercetak & dirujuk.
+     *  • `nominal_spp` — sudah punya jalurnya sendiri (SPP → nominal khusus).
+     */
+    public function update(Request $request, int $id): RedirectResponse
+    {
+        $santri = Santri::findOrFail($id);
+
+        $data = $request->validate([
+            'id_wali' => ['required', 'integer', 'exists:wali,id'],
+            'nama' => ['required', 'string', 'max:255'],
+            'jenis_kelamin' => ['required', 'in:L,P'],
+            'tempat_lahir' => ['nullable', 'string', 'max:255'],
+            'tanggal_lahir' => ['nullable', 'date'],
+            // NIS terbit saat daftar ulang; boleh dikoreksi bila salah ketik,
+            // tetapi tak boleh bentrok dengan santri lain.
+            'nis' => ['nullable', 'string', 'max:255', Rule::unique('santri', 'nis')->ignore($santri->id)],
+            'nisn' => ['nullable', 'string', 'max:255'],
+            'kode_jenjang' => ['required', 'string', Rule::exists('jenjang', 'kode')->where('status', 'aktif')],
+            'tingkat' => ['required', 'integer', 'min:1'],
+            'asal_sekolah' => ['nullable', 'string', 'max:255'],
+            'alamat_sekolah_asal' => ['nullable', 'string'],
+            'kepala_sekolah_asal' => ['nullable', 'string', 'max:255'],
+            'cp_kepala_sekolah_asal' => ['nullable', 'string', 'max:255'],
+            'sumber_informasi' => ['nullable', Rule::exists('sumber_informasi', 'kode')->where('status', 'aktif')],
+            'sumber_informasi_lain' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        try {
+            $this->service->update($id, $data);
+        } catch (AppException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('santri.show', $id)->with('status', 'Data santri diperbarui.');
+    }
+
     /**
      * Tautan "Kembali" pada halaman detail — halaman ini dipakai DUA daftar
      * (Calon Santri di PPSB, Santri di Kependidikan), jadi tujuannya tak boleh
