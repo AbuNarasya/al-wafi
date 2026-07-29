@@ -162,6 +162,34 @@ class TingkatJenjangTest extends TestCase
         $this->assertContains('Santri MA', collect(Navigation::items())->pluck('label')->all());
     }
 
+    /**
+     * Halaman detail dipakai DUA daftar; tombol Kembali dulu dipaku ke Calon
+     * Santri, sehingga membuka santri aktif lalu menekannya melemparkan orang
+     * ke daftar PPSB — daftar yang bahkan tak memuat santri itu.
+     */
+    public function test_tombol_kembali_mengikuti_daftar_asalnya(): void
+    {
+        $this->daftar(['kode_jenjang' => 'SDTQ', 'tingkat' => 4])->assertSessionHasNoErrors();
+        $santri = Santri::firstOrFail();
+
+        // Calon santri → kembali ke daftar PPSB.
+        $this->actingAs($this->admin)->get(route('santri.show', $santri->id))->assertOk()
+            ->assertSee(route('santri.calon'), false);
+
+        // Santri aktif → kembali ke daftar Kependidikan, membawa jenjangnya
+        // supaya mendarat di menu yang sama dengan asalnya.
+        $santri->update(['status' => 'aktif']);
+        $this->actingAs($this->admin)->get(route('santri.show', $santri->id))->assertOk()
+            ->assertSee(route('santri.aktif', ['jenjang' => 'SDTQ']), false);
+
+        // Bila datang dari daftar bersaring, halaman ASAL yang dipakai —
+        // pencarian & nomor halaman tak hilang.
+        $asal = route('santri.aktif', ['jenjang' => 'SDTQ', 'q' => 'Zaid', 'page' => 2]);
+        $this->actingAs($this->admin)
+            ->get(route('santri.show', $santri->id), ['referer' => $asal])
+            ->assertOk()->assertSee(htmlspecialchars($asal), false);
+    }
+
     public function test_daftar_santri_tersaring_per_jenjang(): void
     {
         $this->daftar(['kode_jenjang' => 'SMP', 'tingkat' => 1])->assertSessionHasNoErrors();

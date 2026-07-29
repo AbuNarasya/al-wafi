@@ -115,6 +115,30 @@ class SantriController extends Controller
     }
 
     /**
+     * Tautan "Kembali" pada halaman detail — halaman ini dipakai DUA daftar
+     * (Calon Santri di PPSB, Santri di Kependidikan), jadi tujuannya tak boleh
+     * dipaku ke salah satunya.
+     *
+     * Diutamakan halaman ASAL supaya pencarian, penyaring, dan nomor halaman
+     * tak hilang; hanya diterima bila memang salah satu daftar santri, agar
+     * Referer dari mana pun tidak bisa mengarahkan tombol ini ke sembarang URL.
+     * Kalau tak ada, jatuh ke daftar yang sesuai status santrinya — untuk santri
+     * aktif sekalian membawa penyaring jenjangnya, yang persis menu asalnya.
+     */
+    private function tautanKembali(Santri $santri): string
+    {
+        $asal = url()->previous();
+        $path = parse_url($asal, PHP_URL_PATH) ?? '';
+        if (in_array($path, ['/ppsb/calon-santri', '/kesantrian/santri'], true)) {
+            return $asal;
+        }
+
+        return in_array($santri->status, self::CALON, true)
+            ? route('santri.calon')
+            : route('santri.aktif', array_filter(['jenjang' => $santri->kode_jenjang]));
+    }
+
+    /**
      * Opsi penyaring Tingkat: [1 => 'Tingkat 1', …].
      *
      * @return array<int,string>
@@ -281,6 +305,7 @@ class SantriController extends Controller
             'nominalDefaultUangPangkal' => $nominalDefaultUangPangkal,
             'nominalDefaultPerlengkapan' => $nominalDefaultPerlengkapan,
             'opsiTingkat' => \App\Models\Jenjang::find($santri->kode_jenjang)?->opsiTingkat() ?? [],
+            'kembali' => $this->tautanKembali($santri),
             'koreksiUangPangkal' => $koreksiUangPangkal,
             'koreksiPerlengkapan' => $koreksiPerlengkapan,
             'keluarAktif' => $keluarAktif,
