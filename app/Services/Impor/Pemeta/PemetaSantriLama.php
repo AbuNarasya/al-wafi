@@ -93,6 +93,9 @@ class PemetaSantriLama implements Pemeta
             'nama' => ['wajib' => true, 'contoh' => 'Ahmad Fauzi', 'ket' => 'Nama lengkap.'],
             'jenis_kelamin' => ['wajib' => true, 'contoh' => 'L', 'ket' => 'L atau P.'],
             'kode_jenjang' => ['wajib' => true, 'contoh' => 'SMP', 'ket' => 'Harus ada di master Jenjang.'],
+            // Tingkat WAJIB: tanpa itu proses kenaikan tahun depan tak tahu harus
+            // menaikkan dari mana, dan ratusan santri harus diisi satu per satu.
+            'tingkat' => ['wajib' => true, 'contoh' => '2', 'ket' => 'Tingkat/kelas yang sedang dijalani. Harus dalam jangkauan jenjangnya (lihat Jumlah Tingkat di master Jenjang).'],
             'tahun_ajaran' => ['wajib' => true, 'contoh' => '2026/2027', 'ket' => 'T.A yang sedang dijalani.'],
             'jalur' => ['wajib' => true, 'contoh' => 'LAMA', 'ket' => 'Kode jalur dari master. Disarankan jalur khusus "Santri Lama".'],
             'wali_nama' => ['wajib' => true, 'contoh' => 'Bapak Fauzi', 'ket' => 'Dibuat otomatis bila belum ada.'],
@@ -200,9 +203,22 @@ class PemetaSantriLama implements Pemeta
             return $this->masalah('Jenis kelamin harus L atau P.');
         }
 
-        $jenjang = trim($baris['kode_jenjang'] ?? '');
-        if (! Jenjang::whereKey($jenjang)->exists()) {
-            return $this->masalah("Jenjang \"{$jenjang}\" tidak ada di master Jenjang.");
+        $kodeJenjang = trim($baris['kode_jenjang'] ?? '');
+        $jenjang = Jenjang::find($kodeJenjang);
+        if (! $jenjang) {
+            return $this->masalah("Jenjang \"{$kodeJenjang}\" tidak ada di master Jenjang.");
+        }
+
+        // Tingkat dibatasi jenjangnya — aturan yang sama dengan form pendaftaran.
+        $tingkat = trim($baris['tingkat'] ?? '');
+        if ($tingkat === '' || ! ctype_digit($tingkat)) {
+            return $this->masalah('Tingkat kosong atau bukan angka bulat.');
+        }
+        if (! $jenjang->jumlah_tingkat) {
+            return $this->masalah("Jumlah tingkat jenjang \"{$jenjang->nama}\" belum diisi di master Jenjang, jadi tingkat santri tak bisa diperiksa.");
+        }
+        if ((int) $tingkat < 1 || (int) $tingkat > $jenjang->jumlah_tingkat) {
+            return $this->masalah("Tingkat {$tingkat} tidak ada di jenjang \"{$jenjang->nama}\" (hanya tingkat 1–{$jenjang->jumlah_tingkat}).");
         }
 
         $ta = trim($baris['tahun_ajaran'] ?? '');
@@ -278,6 +294,7 @@ class PemetaSantriLama implements Pemeta
                 'tanggal_lahir' => $this->kosongJadiNull($b['tanggal_lahir'] ?? ''),
                 'nisn' => $this->kosongJadiNull($b['nisn'] ?? ''),
                 'kode_jenjang' => trim($b['kode_jenjang']),
+                'tingkat' => (int) trim($b['tingkat']),
                 'angkatan' => ($a = trim($b['angkatan'] ?? '')) !== '' ? (int) $a : null,
                 'tahun_ajaran' => trim($b['tahun_ajaran']),
                 'jalur' => trim($b['jalur']),

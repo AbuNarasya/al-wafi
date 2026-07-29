@@ -53,7 +53,7 @@ class ImporDataAwalTest extends TestCase
             'kode_level' => 'L1', 'is_admin' => true, 'status' => 'aktif',
         ]);
 
-        Jenjang::create(['kode' => 'SMP', 'nama' => 'SMP']);
+        Jenjang::create(['kode' => 'SMP', 'nama' => 'SMP', 'jumlah_tingkat' => 3]);
         TahunAjaran::create(['kode' => self::TA, 'nama' => 'TA Uji']);
         JalurPendaftaran::create(['kode' => 'LAMA', 'nama' => 'Santri Lama', 'status' => 'aktif']);
 
@@ -76,7 +76,7 @@ class ImporDataAwalTest extends TestCase
 
     private function csv(array $baris): string
     {
-        $kolom = ['nis', 'nama', 'jenis_kelamin', 'kode_jenjang', 'tahun_ajaran', 'jalur', 'wali_nama', 'wali_telepon', 'tunggakan_spp', 'ket_tunggakan_spp'];
+        $kolom = ['nis', 'nama', 'jenis_kelamin', 'kode_jenjang', 'tingkat', 'tahun_ajaran', 'jalur', 'wali_nama', 'wali_telepon', 'tunggakan_spp', 'ket_tunggakan_spp'];
         $isi = implode(',', $kolom)."\n";
         foreach ($baris as $b) {
             $isi .= implode(',', array_map(fn ($k) => $b[$k] ?? '', $kolom))."\n";
@@ -102,7 +102,7 @@ class ImporDataAwalTest extends TestCase
     {
         return array_merge([
             'nis' => '230015', 'nama' => 'Ahmad Fauzi', 'jenis_kelamin' => 'L',
-            'kode_jenjang' => 'SMP', 'tahun_ajaran' => self::TA, 'jalur' => 'LAMA',
+            'kode_jenjang' => 'SMP', 'tingkat' => 2, 'tahun_ajaran' => self::TA, 'jalur' => 'LAMA',
             'wali_nama' => 'Bapak Fauzi', 'wali_telepon' => '08123456789',
         ], $ganti);
     }
@@ -126,9 +126,9 @@ class ImporDataAwalTest extends TestCase
         }
 
         $path = $this->berkasIsi(
-            "nis,nama,jenis_kelamin,kode_jenjang,tahun_ajaran,jalur,wali_nama,wali_telepon,"
+            "nis,nama,jenis_kelamin,kode_jenjang,tingkat,tahun_ajaran,jalur,wali_nama,wali_telepon,"
             ."tunggakan_spp,tunggakan_uang_pangkal,tunggakan_daftar_ulang,tunggakan_lain,ket_tunggakan_lain\n"
-            ."230099,Ahmad,L,SMP,".self::TA.",LAMA,Bapak Ahmad,08129999999,1500000,5000000,750000,300000,Seragam\n"
+            ."230099,Ahmad,L,SMP,2,".self::TA.",LAMA,Bapak Ahmad,08129999999,1500000,5000000,750000,300000,Seragam\n"
         );
         $param = [
             'jenis_tunggakan_spp' => $kode['SPP'], 'jenis_tunggakan_uang_pangkal' => $kode['UP'],
@@ -153,12 +153,52 @@ class ImporDataAwalTest extends TestCase
         $this->assertSame(0, JournalEntry::count());
     }
 
+    /**
+     * Tingkat ikut terimpor & dibatasi jenjangnya.
+     *
+     * Wajib karena proses kenaikan tahun berikutnya bertumpu padanya: tanpa
+     * tingkat, ratusan santri hasil impor harus diisi satu per satu lewat
+     * halaman detail sebelum bisa dinaikkan.
+     */
+    public function test_tingkat_terimpor_dan_dibatasi_jenjangnya(): void
+    {
+        $path = $this->berkas([$this->barisSah(['tingkat' => 3])]);
+        app(ImporSaldoAwal::class)->jalankan('santri-lama', $path, $this->param());
+
+        $this->assertSame(3, Santri::firstOrFail()->tingkat);
+
+        // SMP hanya 1–3; tingkat 5 ditolak, begitu pula yang kosong.
+        $hasil = app(ImporSaldoAwal::class)->pratinjau('santri-lama', $this->berkas([
+            $this->barisSah(['nis' => '230031', 'tingkat' => 5]),
+            $this->barisSah(['nis' => '230032', 'tingkat' => '']),
+        ]), $this->param());
+
+        $this->assertSame(2, $hasil['masalah']);
+        $alasan = collect($hasil['baris_masalah'])->pluck('alasan')->join(' | ');
+        $this->assertStringContainsString('hanya tingkat 1–3', $alasan);
+        $this->assertStringContainsString('Tingkat kosong', $alasan);
+        $this->assertSame(1, Santri::count(), 'baris bermasalah tak menambah santri');
+    }
+
+    /** Jenjang yang jumlah tingkatnya belum diisi → pesan menuntun, bukan lolos diam-diam. */
+    public function test_jenjang_tanpa_jumlah_tingkat_ditolak_saat_impor(): void
+    {
+        Jenjang::create(['kode' => 'MA', 'nama' => 'MA']); // jumlah_tingkat kosong
+
+        $hasil = app(ImporSaldoAwal::class)->pratinjau('santri-lama', $this->berkas([
+            $this->barisSah(['kode_jenjang' => 'MA', 'tingkat' => 1]),
+        ]), $this->param());
+
+        $this->assertSame(1, $hasil['masalah']);
+        $this->assertStringContainsString('Jumlah tingkat jenjang "MA" belum diisi', $hasil['baris_masalah'][0]['alasan']);
+    }
+
     /** Nilai terisi tetapi jenis biayanya belum dipilih → ditolak, bukan diam-diam hilang. */
     public function test_tunggakan_baru_tanpa_jenis_biaya_ditolak(): void
     {
         $path = $this->berkasIsi(
-            "nis,nama,jenis_kelamin,kode_jenjang,tahun_ajaran,jalur,wali_nama,wali_telepon,tunggakan_daftar_ulang\n"
-            ."230098,Budi,L,SMP,".self::TA.",LAMA,Bapak Budi,08128888888,750000\n"
+            "nis,nama,jenis_kelamin,kode_jenjang,tingkat,tahun_ajaran,jalur,wali_nama,wali_telepon,tunggakan_daftar_ulang\n"
+            ."230098,Budi,L,SMP,2,".self::TA.",LAMA,Bapak Budi,08128888888,750000\n"
         );
 
         $hasil = app(ImporSaldoAwal::class)->pratinjau('santri-lama', $path, $this->param());
@@ -265,8 +305,8 @@ class ImporDataAwalTest extends TestCase
     public function test_pemisah_titik_koma_ikut_terbaca(): void
     {
         $path = sys_get_temp_dir().'/impor-uji-'.uniqid().'.csv';
-        file_put_contents($path, "\xEF\xBB\xBFnis;nama;jenis_kelamin;kode_jenjang;tahun_ajaran;jalur;wali_nama;wali_telepon\n"
-            ."230021;Excel Indonesia;L;SMP;".self::TA.";LAMA;Wali Excel;08999\n");
+        file_put_contents($path, "\xEF\xBB\xBFnis;nama;jenis_kelamin;kode_jenjang;tingkat;tahun_ajaran;jalur;wali_nama;wali_telepon\n"
+            ."230021;Excel Indonesia;L;SMP;2;".self::TA.";LAMA;Wali Excel;08999\n");
 
         $hasil = app(ImporSaldoAwal::class)->pratinjau('santri-lama', $path, $this->param());
         $this->assertSame(1, $hasil['siap'], 'berkas Excel berpemisah titik koma harus tetap terbaca');
