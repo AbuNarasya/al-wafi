@@ -107,6 +107,67 @@ class ImporDataAwalTest extends TestCase
         ], $ganti);
     }
 
+    /**
+     * Empat jenis tunggakan (SPP, uang pangkal, daftar ulang, tagihan lain)
+     * masing-masing jadi TAGIHAN SENDIRI, supaya pelunasannya bisa dipisah dan
+     * ketahuan mana yang lunas duluan.
+     */
+    public function test_empat_jenis_tunggakan_jadi_tagihan_terpisah(): void
+    {
+        // Satu jenis biaya per komponen, semuanya berakun piutang.
+        $kode = [];
+        foreach (['SPP' => 'Tunggakan SPP', 'UP' => 'Tunggakan Uang Pangkal', 'DU' => 'Tunggakan Daftar Ulang', 'LN' => 'Tunggakan Lain'] as $k => $nama) {
+            JenisBiaya::create([
+                'kode' => "ZZ{$k}", 'nama' => $nama, 'tipe' => 'lain', 'tahun_ajaran' => self::TA,
+                'nominal' => 0, 'kode_coa_pendapatan' => '4.ZZIM.1', 'kode_coa_piutang' => '1.ZZIM.1',
+                'kode_unit' => 'ZZUNIT', 'status' => 'aktif',
+            ]);
+            $kode[$k] = "ZZ{$k}";
+        }
+
+        $path = $this->berkasIsi(
+            "nis,nama,jenis_kelamin,kode_jenjang,tahun_ajaran,jalur,wali_nama,wali_telepon,"
+            ."tunggakan_spp,tunggakan_uang_pangkal,tunggakan_daftar_ulang,tunggakan_lain,ket_tunggakan_lain\n"
+            ."230099,Ahmad,L,SMP,".self::TA.",LAMA,Bapak Ahmad,08129999999,1500000,5000000,750000,300000,Seragam\n"
+        );
+        $param = [
+            'jenis_tunggakan_spp' => $kode['SPP'], 'jenis_tunggakan_uang_pangkal' => $kode['UP'],
+            'jenis_tunggakan_daftar_ulang' => $kode['DU'], 'jenis_tunggakan_lain' => $kode['LN'],
+        ];
+
+        $hasil = app(ImporSaldoAwal::class)->jalankan('santri-lama', $path, $param);
+
+        $this->assertSame(['santri' => 1, 'wali' => 1, 'tagihan' => 4], $hasil['tersimpan']);
+        $santri = Santri::where('nis', '230099')->firstOrFail();
+        $tagihan = TagihanSantri::where('id_santri', $santri->id)->get()->keyBy('kode_jenis');
+
+        $this->assertSame(1500000.0, (float) $tagihan[$kode['SPP']]->nominal);
+        $this->assertSame(5000000.0, (float) $tagihan[$kode['UP']]->nominal);
+        $this->assertSame(750000.0, (float) $tagihan[$kode['DU']]->nominal);
+        $this->assertSame(300000.0, (float) $tagihan[$kode['LN']]->nominal);
+        $this->assertSame('Seragam', $tagihan[$kode['LN']]->keterangan);
+        // Keterangan bawaan dipakai bila kolomnya tak diisi.
+        $this->assertSame('Tunggakan daftar ulang', $tagihan[$kode['DU']]->keterangan);
+        // Semuanya bertanda sudah akrual & tetap tanpa jurnal.
+        $this->assertTrue($tagihan->every(fn ($t) => (bool) $t->sudah_akrual));
+        $this->assertSame(0, JournalEntry::count());
+    }
+
+    /** Nilai terisi tetapi jenis biayanya belum dipilih → ditolak, bukan diam-diam hilang. */
+    public function test_tunggakan_baru_tanpa_jenis_biaya_ditolak(): void
+    {
+        $path = $this->berkasIsi(
+            "nis,nama,jenis_kelamin,kode_jenjang,tahun_ajaran,jalur,wali_nama,wali_telepon,tunggakan_daftar_ulang\n"
+            ."230098,Budi,L,SMP,".self::TA.",LAMA,Bapak Budi,08128888888,750000\n"
+        );
+
+        $hasil = app(ImporSaldoAwal::class)->pratinjau('santri-lama', $path, $this->param());
+
+        $this->assertSame(1, $hasil['masalah']);
+        $this->assertStringContainsString('tunggakan_daftar_ulang', $hasil['baris_masalah'][0]['alasan']);
+        $this->assertSame(0, Santri::count());
+    }
+
     public function test_santri_lama_masuk_sebagai_aktif_tanpa_registrasi_dan_tanpa_jurnal(): void
     {
         $path = $this->berkas([$this->barisSah()]);

@@ -32,6 +32,42 @@ class PemetaSantriLama implements Pemeta
 {
     use \App\Services\Impor\BantuanPemeta;
 
+    /**
+     * Jenis tunggakan yang bisa dibawa santri lama, mengikuti daftar Tipe Biaya.
+     * Kunci menentukan nama kolom (`tunggakan_{kunci}`, `ket_tunggakan_{kunci}`)
+     * dan nama parameternya (`jenis_tunggakan_{kunci}`) — ditulis sekali di sini
+     * supaya menambah jenis berikutnya tak perlu menyunting tiga tempat.
+     *
+     * Registrasi sengaja TIDAK ada: biaya pendaftaran dibayar di awal, tak
+     * mungkin menjadi tunggakan santri yang sudah bersekolah.
+     */
+    private const TUNGGAKAN = [
+        'spp' => [
+            'label' => 'SPP',
+            'contoh' => '1500000',
+            'contoh_ket' => 'Tunggakan SPP Jan-Jun 2026',
+            'bawaan_ket' => 'Tunggakan SPP',
+        ],
+        'uang_pangkal' => [
+            'label' => 'Uang Pangkal',
+            'contoh' => '5000000',
+            'contoh_ket' => 'Sisa uang pangkal angkatan 2023',
+            'bawaan_ket' => 'Sisa uang pangkal',
+        ],
+        'daftar_ulang' => [
+            'label' => 'Daftar Ulang',
+            'contoh' => '750000',
+            'contoh_ket' => 'Daftar ulang T.A 2026/2027',
+            'bawaan_ket' => 'Tunggakan daftar ulang',
+        ],
+        'lain' => [
+            'label' => 'Tagihan Lain',
+            'contoh' => '300000',
+            'contoh_ket' => 'Seragam & buku',
+            'bawaan_ket' => 'Tunggakan lain-lain',
+        ],
+    ];
+
     public static function kunci(): string
     {
         return 'santri-lama';
@@ -46,12 +82,13 @@ class PemetaSantriLama implements Pemeta
     {
         return 'Santri yang sudah bersekolah sebelum aplikasi ini dipakai. Ditulis langsung '
             .'berstatus aktif dengan NIS aslinya — tanpa tagihan registrasi dan tanpa jurnal. '
-            .'Tunggakannya ikut dibuat bila kolomnya diisi.';
+            .'Tunggakannya ikut dibuat bila kolomnya diisi: SPP, uang pangkal, daftar ulang, '
+            .'dan tagihan lain — satu tagihan per jenis, jadi pelunasannya bisa dipisah.';
     }
 
     public function kolom(): array
     {
-        return [
+        $kolom = [
             'nis' => ['wajib' => true, 'contoh' => '230015', 'ket' => 'NIS asli santri. Harus unik.'],
             'nama' => ['wajib' => true, 'contoh' => 'Ahmad Fauzi', 'ket' => 'Nama lengkap.'],
             'jenis_kelamin' => ['wajib' => true, 'contoh' => 'L', 'ket' => 'L atau P.'],
@@ -64,37 +101,56 @@ class PemetaSantriLama implements Pemeta
             'tempat_lahir' => ['wajib' => false, 'contoh' => 'Bogor', 'ket' => ''],
             'tanggal_lahir' => ['wajib' => false, 'contoh' => '2011-05-17', 'ket' => 'Format YYYY-MM-DD.'],
             'nisn' => ['wajib' => false, 'contoh' => '0071234567', 'ket' => ''],
-            'tunggakan_spp' => ['wajib' => false, 'contoh' => '1500000', 'ket' => 'Sisa tunggakan SPP. Kosong atau 0 = tidak ada.'],
-            'ket_tunggakan_spp' => ['wajib' => false, 'contoh' => 'Tunggakan SPP Jan-Jun 2026', 'ket' => 'Keterangan yang tampil di tagihan.'],
-            'tunggakan_uang_pangkal' => ['wajib' => false, 'contoh' => '5000000', 'ket' => 'Sisa uang pangkal yang belum dibayar.'],
-            'ket_tunggakan_uang_pangkal' => ['wajib' => false, 'contoh' => 'Sisa uang pangkal angkatan 2023', 'ket' => ''],
         ];
+
+        // Empat pasang kolom tunggakan — semuanya opsional; yang kosong/0 tidak
+        // menerbitkan tagihan apa pun.
+        foreach (self::TUNGGAKAN as $k => $t) {
+            $kolom["tunggakan_{$k}"] = [
+                'wajib' => false, 'contoh' => $t['contoh'],
+                'ket' => "Sisa tunggakan {$t['label']} yang belum dibayar. Kosong atau 0 = tidak ada.",
+            ];
+            $kolom["ket_tunggakan_{$k}"] = [
+                'wajib' => false, 'contoh' => $t['contoh_ket'],
+                'ket' => 'Keterangan yang tampil di tagihan.',
+            ];
+        }
+
+        return $kolom;
     }
 
     public function parameter(): array
     {
-        // Tunggakan lama JANGAN memakai jenis biaya SPP yang berjalan — nanti
-        // tercampur dengan SPP bulanan. Pilih jenis berperilaku "lain" khusus
-        // saldo awal, dan jenis itu WAJIB punya akun piutang karena itulah yang
-        // dikredit saat wali membayar.
-        $opsi = JenisBiaya::whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku('lain'))
+        // Syarat mutlak: jenis biayanya WAJIB punya akun piutang, karena itulah
+        // yang dikredit saat wali membayar tunggakan. Perilakunya sendiri tidak
+        // dibatasi — daftar Tipe Biaya tiap pesantren berbeda, dan memaksa
+        // "harus berperilaku lain" membuat tunggakan SPP/uang pangkal tak bisa
+        // ditunjuk ke jenis biayanya yang sebenarnya. Konsekuensi memilih jenis
+        // yang MASIH BERJALAN disebutkan di keterangan tiap isian.
+        $opsi = JenisBiaya::whereNotNull('kode_coa_piutang')
             ->where('status', 'aktif')->orderBy('kode')
-            ->get()->mapWithKeys(fn ($j) => [$j->kode => "{$j->kode} — {$j->nama}"])->all();
+            ->get()->mapWithKeys(fn ($j) => [
+                $j->kode => "{$j->kode} — {$j->nama}".($j->tahun_ajaran ? " (T.A {$j->tahun_ajaran})" : ''),
+            ])->all();
 
-        return [
-            'jenis_tunggakan_spp' => [
-                'label' => 'Jenis biaya untuk tunggakan SPP',
-                'tipe' => 'pilih',
-                'opsi' => $opsi,
-                'ket' => 'Wajib diisi bila ada kolom tunggakan_spp. Pakai jenis khusus saldo awal, bukan SPP berjalan.',
-            ],
-            'jenis_tunggakan_uang_pangkal' => [
-                'label' => 'Jenis biaya untuk sisa uang pangkal',
-                'tipe' => 'pilih',
-                'opsi' => $opsi,
-                'ket' => 'Wajib diisi bila ada kolom tunggakan_uang_pangkal.',
-            ],
+        $catatan = [
+            'spp' => 'Bila ditunjuk ke jenis SPP yang berjalan, tagihan ini tetap TIDAK mengganggu penerbitan SPP bulanan (penjaganya per periode, dan tagihan tunggakan tak berperiode) — hanya saja di laporan keduanya menyatu.',
+            'uang_pangkal' => 'Bila ditunjuk ke jenis uang pangkal yang berjalan, tagihan ini ikut muncul di modul Angsuran Uang Pangkal (bisa dibuatkan termin) dan di kartu penerimaan uang pangkal Dashboard PPSB.',
+            'daftar_ulang' => '',
+            'lain' => '',
         ];
+
+        $hasil = [];
+        foreach (self::TUNGGAKAN as $k => $t) {
+            $hasil["jenis_tunggakan_{$k}"] = [
+                'label' => "Jenis biaya untuk tunggakan {$t['label']}",
+                'tipe' => 'pilih',
+                'opsi' => $opsi,
+                'ket' => trim("Wajib dipilih bila kolom tunggakan_{$k} ada isinya. ".($catatan[$k] ?? '')),
+            ];
+        }
+
+        return $hasil;
     }
 
     public function periksaParameter(array $param): ?string
@@ -102,18 +158,27 @@ class PemetaSantriLama implements Pemeta
         // Jenis biaya tunggakan boleh kosong (berkas tanpa tunggakan), tetapi
         // kalau diisi harus benar — memeriksanya di sini menghindari pesan yang
         // sama berulang di ratusan baris.
-        foreach (['jenis_tunggakan_spp', 'jenis_tunggakan_uang_pangkal'] as $k) {
-            $kode = trim($param[$k] ?? '');
-            if ($kode === '') {
-                continue;
+        foreach (array_keys(self::TUNGGAKAN) as $k) {
+            if ($salah = $this->periksaJenis(trim($param["jenis_tunggakan_{$k}"] ?? ''))) {
+                return $salah;
             }
-            $jenis = JenisBiaya::whereKey($kode)->first();
-            if (! $jenis) {
-                return "Jenis biaya \"{$kode}\" tidak ditemukan.";
-            }
-            if (! $jenis->kode_coa_piutang) {
-                return "Jenis biaya \"{$kode}\" belum punya akun piutang — lengkapi dulu di master Jenis Biaya.";
-            }
+        }
+
+        return null;
+    }
+
+    /** Jenis biaya tunggakan sah? Kosong dianggap sah (berkas boleh tanpa tunggakan). */
+    private function periksaJenis(string $kode): ?string
+    {
+        if ($kode === '') {
+            return null;
+        }
+        $jenis = JenisBiaya::whereKey($kode)->first();
+        if (! $jenis) {
+            return "Jenis biaya \"{$kode}\" tidak ditemukan.";
+        }
+        if (! $jenis->kode_coa_piutang) {
+            return "Jenis biaya \"{$kode}\" belum punya akun piutang — lengkapi dulu di master Jenis Biaya.";
         }
 
         return null;
@@ -165,25 +230,19 @@ class PemetaSantriLama implements Pemeta
             return $this->masalah("Tanggal lahir \"{$t}\" tidak terbaca. Pakai format YYYY-MM-DD.");
         }
 
-        foreach ([
-            'tunggakan_spp' => 'jenis_tunggakan_spp',
-            'tunggakan_uang_pangkal' => 'jenis_tunggakan_uang_pangkal',
-        ] as $kolom => $kunciParam) {
+        foreach (array_keys(self::TUNGGAKAN) as $k) {
+            $kolom = "tunggakan_{$k}";
             $nilai = $this->angka($baris[$kolom] ?? '');
             if ($nilai === null) {
                 return $this->masalah("Kolom {$kolom} bukan angka yang sah.");
             }
             if (Money::gtZero($nilai)) {
-                $kodeJenis = trim($param[$kunciParam] ?? '');
+                $kodeJenis = trim($param["jenis_tunggakan_{$k}"] ?? '');
                 if ($kodeJenis === '') {
                     return $this->masalah("Ada nilai di {$kolom}, tetapi jenis biayanya belum dipilih di form impor.");
                 }
-                $jenis = JenisBiaya::whereKey($kodeJenis)->first();
-                if (! $jenis) {
-                    return $this->masalah("Jenis biaya \"{$kodeJenis}\" tidak ditemukan.");
-                }
-                if (! $jenis->kode_coa_piutang) {
-                    return $this->masalah("Jenis biaya \"{$kodeJenis}\" belum punya akun piutang — lengkapi dulu di master Jenis Biaya.");
+                if ($salah = $this->periksaJenis($kodeJenis)) {
+                    return $this->masalah($salah);
                 }
             }
         }
@@ -229,24 +288,21 @@ class PemetaSantriLama implements Pemeta
             ]);
             $dibuat['santri']++;
 
-            foreach ([
-                ['tunggakan_spp', 'ket_tunggakan_spp', 'jenis_tunggakan_spp', 'Tunggakan SPP'],
-                ['tunggakan_uang_pangkal', 'ket_tunggakan_uang_pangkal', 'jenis_tunggakan_uang_pangkal', 'Sisa uang pangkal'],
-            ] as [$kolom, $kolomKet, $kunciParam, $bawaanKet]) {
-                $nilai = $this->angka($b[$kolom] ?? '');
+            foreach (self::TUNGGAKAN as $k => $t) {
+                $nilai = $this->angka($b["tunggakan_{$k}"] ?? '');
                 if ($nilai === null || ! Money::gtZero($nilai)) {
                     continue;
                 }
                 TagihanSantri::create([
                     'id_santri' => $santri->id,
-                    'kode_jenis' => trim($param[$kunciParam]),
+                    'kode_jenis' => trim($param["jenis_tunggakan_{$k}"]),
                     'nominal' => $nilai,
                     'sisa' => $nilai,
                     'status' => 'belum_bayar',
                     // Nilainya sudah diakui sebagai pendapatan di catatan lama →
                     // pembayaran nanti mengkredit PIUTANG, bukan Pendapatan.
                     'sudah_akrual' => true,
-                    'keterangan' => $this->kosongJadiNull($b[$kolomKet] ?? '') ?? $bawaanKet,
+                    'keterangan' => $this->kosongJadiNull($b["ket_tunggakan_{$k}"] ?? '') ?? $t['bawaan_ket'],
                 ]);
                 $dibuat['tagihan']++;
             }
