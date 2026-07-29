@@ -44,7 +44,7 @@ class TanpaGelombangTest extends TestCase
         Level::create(['kode_level' => 'L1', 'nama_level' => 'Admin', 'max_transaksi' => null]);
         TahunAjaran::create(['kode' => self::TA, 'status' => 'aktif', 'default_pendaftaran' => true]);
         JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler', 'tahun_ajaran' => self::TA]);
-        Jenjang::create(['kode' => 'SD', 'nama' => 'Sekolah Dasar', 'urutan' => 1]);
+        Jenjang::create(['kode' => 'SD', 'nama' => 'Sekolah Dasar', 'jumlah_tingkat' => 6, 'urutan' => 1]);
         $this->admin = User::create(['username' => 'adm', 'nama' => 'Admin', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => true])->id_pengguna;
 
         (new JenisBiayaService)->create(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
@@ -108,6 +108,8 @@ class TanpaGelombangTest extends TestCase
         $dasar = [
             'id_wali' => $wali->id, 'nama' => 'Zaid', 'jenis_kelamin' => 'L',
             'tahun_ajaran' => self::TA, 'jalur' => 'reguler',
+            // Jenjang & tingkat kini wajib di form pendaftaran.
+            'kode_jenjang' => 'SD', 'tingkat' => 1,
         ];
 
         // Tanpa memilih mode → ditolak.

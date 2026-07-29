@@ -54,11 +54,12 @@
     <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <tr><th class="px-4 py-3">No. Daftar / NIS</th><th class="px-4 py-3">Nama</th><th class="px-4 py-3">L/P</th><th class="px-4 py-3">Jenjang</th><th class="px-4 py-3">Jalur</th><th class="px-4 py-3">Wali</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Pembayaran</th><th class="px-4 py-3 text-right">Aksi</th></tr>
+                <tr><th class="px-4 py-3">No. Daftar / NIS</th><th class="px-4 py-3">Nama</th><th class="px-4 py-3">L/P</th><th class="px-4 py-3">Jenjang</th><th class="px-4 py-3">Tingkat</th><th class="px-4 py-3">Jalur</th><th class="px-4 py-3">Wali</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Pembayaran</th><th class="px-4 py-3 text-right">Aksi</th></tr>
                 {{-- Baris filter per kolom (server-side). --}}
                 <tr class="bg-white">
                     <x-scol type="blank" /><x-scol type="blank" /><x-scol type="blank" />
                     <x-scol name="jenjang" :options="collect($opsiJenjang)->keys()->mapWithKeys(fn ($k) => [$k => $k])->all()" :value="$filter['jenjang']" />
+                    <x-scol name="tingkat" :options="$opsiTingkat" :value="$filter['tingkat']" />
                     <x-scol name="jalur" :options="$opsiJalur" :value="$filter['jalur']" />
                     <x-scol type="blank" />
                     <x-scol name="status" :options="$opsiStatus" :value="$filter['status']" />
@@ -73,6 +74,7 @@
                         <td class="px-4 py-3">{{ $r->nama }}</td>
                         <td class="px-4 py-3 text-gray-500">{{ $r->jenis_kelamin }}</td>
                         <td class="px-4 py-3 text-gray-500">{{ $r->kode_jenjang ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500">{{ $r->tingkat ? 'Tingkat '.$r->tingkat : '—' }}</td>
                         {{-- Jalur pendaftaran: nama dari master (Pindahan, Anak Karyawan, …);
                              turun ke kode mentah bila baris masternya sudah dihapus. --}}
                         <td class="px-4 py-3">
@@ -88,7 +90,7 @@
                         <td class="px-4 py-3 text-right"><a href="{{ route('santri.show', $r->id) }}" class="text-brand hover:underline">Detail</a></td>
                     </tr>
                 @empty
-                    <tr><td colspan="9" class="px-4 py-10 text-center text-gray-400">
+                    <tr><td colspan="10" class="px-4 py-10 text-center text-gray-400">
                         {{ $adaFilter ? 'Tidak ada data yang cocok dengan filter.' : 'Belum ada ' . strtolower($judul) . '.' }}
                     </td></tr>
                 @endforelse

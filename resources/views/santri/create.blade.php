@@ -34,9 +34,43 @@
                 <x-field name="nisn" label="NISN" :value="old('nisn')" />
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-field name="kode_jenjang" label="Jenjang" :value="old('kode_jenjang')"
-                         :options="['' => '— pilih jenjang —'] + \App\Support\Referensi::jenjang()" />
+            {{-- Jenjang & tingkat menyatu: pilihan tingkat diturunkan dari jumlah
+                 tingkat jenjang yang dipilih (SDTQ 6, SMP 3, SMA 3 — diatur di
+                 master Jenjang, bukan dipaku di sini). --}}
+            <div class="grid gap-4 sm:grid-cols-3"
+                 x-data="{
+                     jenjang: @js(old('kode_jenjang', '')),
+                     tingkat: @js((string) old('tingkat', '')),
+                     peta: @js(\App\Models\Jenjang::petaTingkat()),
+                     get jumlah() { return this.peta[this.jenjang] ?? 0 },
+                 }"
+                 x-init="$watch('jenjang', () => { if (Number(tingkat) > jumlah) tingkat = '' })">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Jenjang <span class="text-red-500">*</span></label>
+                    <select name="kode_jenjang" x-model="jenjang" required
+                            class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm focus:border-brand focus:ring-1 focus:ring-brand">
+                        <option value="">— pilih jenjang —</option>
+                        @foreach (\App\Support\Referensi::jenjang() as $kodeJenjang => $namaJenjang)
+                            <option value="{{ $kodeJenjang }}">{{ $namaJenjang }}</option>
+                        @endforeach
+                    </select>
+                    @error('kode_jenjang')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Tingkat <span class="text-red-500">*</span></label>
+                    <select name="tingkat" x-model="tingkat" required :disabled="!jenjang"
+                            class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-gray-100">
+                        <option value="">— pilih tingkat —</option>
+                        <template x-for="i in jumlah" :key="i">
+                            <option :value="i" x-text="'Tingkat ' + i" :selected="String(i) === tingkat"></option>
+                        </template>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-400" x-show="!jenjang" x-cloak>Pilih jenjang dulu.</p>
+                    <p class="mt-1 text-xs text-amber-600" x-show="jenjang && jumlah === 0" x-cloak>
+                        Jumlah tingkat jenjang ini belum diisi di Setting Awal → Jenjang Pendidikan.
+                    </p>
+                    @error('tingkat')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                </div>
                 <x-field name="asal_sekolah" label="Asal Sekolah" :value="old('asal_sekolah')" />
             </div>
 

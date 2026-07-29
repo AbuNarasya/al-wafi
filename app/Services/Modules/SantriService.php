@@ -5,6 +5,7 @@ namespace App\Services\Modules;
 use App\Exceptions\AppException;
 use App\Models\ActivityLog;
 use App\Models\JenisBiaya;
+use App\Models\Jenjang;
 use App\Models\PembayaranSantri;
 use App\Models\Pendaftaran;
 use App\Models\PotonganUangPangkal;
@@ -56,6 +57,12 @@ class SantriService
         }
         $ta = (new TahunAjaranService)->pastikanAktif($data['tahun_ajaran']);
         $this->pastikanJalurSah((string) ($data['jalur'] ?? ''));
+        // Kewajiban mengisi tingkat ditegakkan di FORM pendaftaran (PPSB);
+        // di sini yang dijaga kesahihannya — supaya jalur lain (impor santri
+        // lama yang memang belum bertingkat) tidak ikut tertolak.
+        if (($data['tingkat'] ?? '') !== '' && $data['tingkat'] !== null) {
+            $this->pastikanTingkatSah((string) ($data['kode_jenjang'] ?? ''), $data['tingkat']);
+        }
         $this->periksaCalonKembar($data);
 
         return DB::transaction(function () use ($data) {
@@ -720,6 +727,41 @@ class SantriService
         $jalur = \App\Models\JalurPendaftaran::find($kodeJalur);
         if (! $jalur || $jalur->status !== 'aktif') {
             throw new AppException(422, "Jalur pendaftaran \"{$kodeJalur}\" tidak terdaftar / nonaktif.");
+        }
+    }
+
+    /** Ubah tingkat seorang santri (mis. mengisi data lama, atau naik tingkat). */
+    public function setTingkat(int $id, int $tingkat): Santri
+    {
+        $santri = Santri::find($id);
+        if (! $santri) {
+            throw new AppException(404, 'Santri tidak ditemukan.');
+        }
+        $this->pastikanTingkatSah((string) $santri->kode_jenjang, $tingkat);
+        $santri->update(['tingkat' => $tingkat]);
+
+        return $santri;
+    }
+
+    /**
+     * Tingkat harus berada dalam rentang jenjangnya (1..jumlah_tingkat).
+     *
+     * Diperiksa di SERVICE, bukan cuma di form: batas atasnya data master yang
+     * bisa berubah, dan aturan ini harus tetap tegak bagi pemanggil lain
+     * (impor data awal, pemindahan jenjang) — bukan hanya bagi form PPSB.
+     */
+    public function pastikanTingkatSah(string $kodeJenjang, int|string|null $tingkat): void
+    {
+        $jenjang = Jenjang::find($kodeJenjang);
+        if (! $jenjang) {
+            throw new AppException(422, "Jenjang \"{$kodeJenjang}\" tidak terdaftar.");
+        }
+        if (! $jenjang->jumlah_tingkat) {
+            throw new AppException(422, "Jumlah tingkat jenjang \"{$jenjang->nama}\" belum diisi. Lengkapi dulu di Setting Awal → Jenjang Pendidikan.");
+        }
+        $tingkat = (int) $tingkat;
+        if ($tingkat < 1 || $tingkat > $jenjang->jumlah_tingkat) {
+            throw new AppException(422, "Tingkat {$tingkat} tidak ada di jenjang \"{$jenjang->nama}\" (hanya tingkat 1–{$jenjang->jumlah_tingkat}).");
         }
     }
 

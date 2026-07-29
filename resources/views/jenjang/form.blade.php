@@ -18,7 +18,12 @@
                 <div class="rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600">{{ $row->kode }}</div></div>
             @endif
 
-            <x-field name="nama" label="Nama Jenjang" :value="old('nama', $row->nama)" required placeholder="mis. Sekolah Dasar" />
+            <div class="grid gap-4 sm:grid-cols-2">
+                <x-field name="nama" label="Nama Jenjang" :value="old('nama', $row->nama)" required placeholder="mis. Sekolah Dasar" />
+                <x-field name="jumlah_tingkat" label="Jumlah Tingkat" type="number" :value="old('jumlah_tingkat', $row->jumlah_tingkat)"
+                         placeholder="mis. 6"
+                         hint="Berapa tingkat (kelas) yang ada di jenjang ini — SDTQ 6, SMP 3, SMA 3. Menentukan pilihan Tingkat saat calon santri didaftarkan." />
+            </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-field name="urutan" label="Urutan Tampil" type="number" :value="old('urutan', $row->urutan ?? 0)"

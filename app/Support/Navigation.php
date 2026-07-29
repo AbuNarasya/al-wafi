@@ -141,13 +141,71 @@ final class Navigation
     ];
 
     /** URL item yang paling cocok dengan path sekarang (prefix terpanjang). */
+    /**
+     * ITEMS + item yang lahir dari DATA, bukan dari daftar tetap.
+     *
+     * Master data siswa dipecah PER JENJANG mengikuti master Jenjang: menambah
+     * jenjang baru langsung menambah menunya, tanpa menyunting berkas ini.
+     * Ketiganya memakai modul hak akses `santri` yang sama — yang berbeda hanya
+     * penyaringnya, jadi tak ada hak akses baru yang perlu diberikan.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public static function items(): array
+    {
+        $perJenjang = self::itemPerJenjang();
+        if ($perJenjang === []) {
+            return self::ITEMS; // master jenjang kosong → tetap satu menu Santri
+        }
+
+        // Menu "Santri" umum digantikan oleh yang per jenjang.
+        $items = array_values(array_filter(self::ITEMS, fn ($n) => $n['url'] !== '/kesantrian/santri'));
+
+        return array_merge($items, $perJenjang);
+    }
+
+    /** @var list<array<string,mixed>>|null memo per request */
+    private static ?array $memoJenjang = null;
+
+    /** Buang memo menu per jenjang (dipakai test yang menambah jenjang di tengah jalan). */
+    public static function lupakan(): void
+    {
+        self::$memoJenjang = null;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private static function itemPerJenjang(): array
+    {
+        if (self::$memoJenjang !== null) {
+            return self::$memoJenjang;
+        }
+
+        try {
+            $jenjang = \App\Models\Jenjang::where('status', 'aktif')
+                ->orderBy('urutan')->orderBy('kode')->get(['kode', 'nama']);
+        } catch (\Throwable) {
+            return self::$memoJenjang = []; // tabelnya belum ada (migrasi awal) — jangan menggagalkan halaman
+        }
+
+        return self::$memoJenjang = $jenjang->map(fn ($j) => [
+            'url' => '/kesantrian/santri?jenjang='.$j->kode,
+            'label' => 'Santri '.$j->nama,
+            'group' => 'KEPENDIDIKAN',
+            'sub' => 'Master',
+            'modul' => 'santri',
+        ])->all();
+    }
+
     public static function activeUrl(): string
     {
         $path = '/'.trim(request()->path(), '/');
         $best = '';
-        foreach (self::ITEMS as $n) {
-            if ($n['url'] !== '/dashboard' && str_starts_with($path, $n['url']) && strlen($n['url']) > strlen($best)) {
-                $best = $n['url'];
+        foreach (self::items() as $n) {
+            // Penyaring jenjang dibawa di query string; yang dibandingkan hanya
+            // bagian path-nya, kalau tidak menu per jenjang tak pernah menyala.
+            $url = strtok($n['url'], '?');
+            if ($url !== '/dashboard' && str_starts_with($path, $url) && strlen($url) > strlen($best)) {
+                $best = $url;
             }
         }
         if ($best === '' && str_starts_with($path, '/dashboard')) {
@@ -160,7 +218,7 @@ final class Navigation
     /** Label menu sebuah URL (dipakai lonceng menyebut asal pekerjaan). */
     public static function labelUrl(string $url): ?string
     {
-        foreach (self::ITEMS as $n) {
+        foreach (self::items() as $n) {
             if ($n['url'] === $url) {
                 return $n['label'];
             }
@@ -185,8 +243,10 @@ final class Navigation
     private static function activeItem(): ?array
     {
         $active = self::activeUrl();
-        foreach (self::ITEMS as $n) {
-            if ($n['url'] === $active) {
+        foreach (self::items() as $n) {
+            // Yang per jenjang berbagi path yang sama; grup & sub-nya identik,
+            // jadi yang pertama cocok sudah cukup untuk membuka accordion.
+            if (strtok($n['url'], '?') === $active) {
                 return $n;
             }
         }
@@ -259,7 +319,7 @@ final class Navigation
      */
     public static function tree(): array
     {
-        $tampil = array_values(array_filter(self::ITEMS, fn ($n) => self::canSee($n)));
+        $tampil = array_values(array_filter(self::items(), fn ($n) => self::canSee($n)));
 
         $hasil = [];
         foreach (self::GROUP_ORDER as $group) {

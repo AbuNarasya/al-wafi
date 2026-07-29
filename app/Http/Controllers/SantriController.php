@@ -9,6 +9,7 @@ use App\Services\Modules\SantriService;
 use App\Services\Ppsb\Tahap;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
@@ -31,6 +32,7 @@ class SantriController extends Controller
         // yang menyaring di browser) karena daftar ini berpaginasi — filter sisi
         // browser hanya akan menyaring 25 baris yang sedang tampil.
         $fJenjang = trim((string) $request->query('jenjang', ''));
+        $fTingkat = trim((string) $request->query('tingkat', ''));
         $fJalur = trim((string) $request->query('jalur', ''));
         $fStatus = trim((string) $request->query('status', ''));
         $fBayar = trim((string) $request->query('bayar', ''));
@@ -44,6 +46,7 @@ class SantriController extends Controller
                     ->orWhere('nisn', 'ilike', "%{$q}%")->orWhere('nis', 'ilike', "%{$q}%"),
             ))
             ->when($fJenjang !== '', fn ($query) => $query->where('kode_jenjang', $fJenjang))
+            ->when($fTingkat !== '', fn ($query) => $query->where('tingkat', (int) $fTingkat))
             ->when($fJalur !== '', fn ($query) => $query->where('jalur', $fJalur))
             ->when($fStatus !== '' && in_array($fStatus, $statusLingkup, true), fn ($query) => $query->where('status', $fStatus))
             ->when($fBayar !== '', fn ($query) => $this->saringStatusBayar($query, $fBayar))
@@ -72,8 +75,11 @@ class SantriController extends Controller
             // Status pembayaran mutakhir per baris (termasuk setoran yang belum
             // diverifikasi keuangan) — 2 query agregat untuk seluruh halaman.
             'bayar' => (new \App\Services\Modules\RekapPembayaranService)->ringkasMassal($rows->pluck('id')),
-            'filter' => ['jenjang' => $fJenjang, 'jalur' => $fJalur, 'status' => $fStatus, 'bayar' => $fBayar],
+            'filter' => ['jenjang' => $fJenjang, 'tingkat' => $fTingkat, 'jalur' => $fJalur, 'status' => $fStatus, 'bayar' => $fBayar],
             'opsiJenjang' => \App\Support\Referensi::jenjang(),
+            // Pilihan tingkat mengikuti jenjang yang sedang disaring; tanpa
+            // penyaring jenjang, ditawarkan sebanyak jenjang terpanjang.
+            'opsiTingkat' => $this->opsiTingkat($fJenjang),
             'opsiStatus' => collect($statusLingkup)
                 ->mapWithKeys(fn ($s) => [$s => Tahap::labelStatus($s)])->all(),
         ]);
@@ -108,6 +114,24 @@ class SantriController extends Controller
         };
     }
 
+    /**
+     * Opsi penyaring Tingkat: [1 => 'Tingkat 1', …].
+     *
+     * @return array<int,string>
+     */
+    private function opsiTingkat(string $kodeJenjang): array
+    {
+        $peta = \App\Models\Jenjang::petaTingkat();
+        $maks = $kodeJenjang !== '' ? ($peta[$kodeJenjang] ?? 0) : (max($peta ?: [0]));
+
+        $hasil = [];
+        for ($i = 1; $i <= $maks; $i++) {
+            $hasil[$i] = "Tingkat {$i}";
+        }
+
+        return $hasil;
+    }
+
     public function create(): View
     {
         $taService = new \App\Services\Modules\TahunAjaranService;
@@ -137,7 +161,10 @@ class SantriController extends Controller
             'alamat_sekolah_asal' => ['nullable', 'string'],
             'kepala_sekolah_asal' => ['nullable', 'string', 'max:255'],
             'cp_kepala_sekolah_asal' => ['nullable', 'string', 'max:255'],
-            'kode_jenjang' => ['nullable', 'string', 'max:255'],
+            // Jenjang kini WAJIB: tingkat wajib diisi, dan tingkat tak punya arti
+            // tanpa jenjangnya (SDTQ tingkat 6 sah, SMP tingkat 6 tidak).
+            'kode_jenjang' => ['required', 'string', Rule::exists('jenjang', 'kode')->where('status', 'aktif')],
+            'tingkat' => ['required', 'integer', 'min:1'],
             'tahun_ajaran' => ['required', 'string', 'exists:tahun_ajaran,kode'],
             'jalur' => ['required', 'string', 'exists:jalur_pendaftaran,kode'],
             // Gelombang dipilih SADAR: "nomor" (isi angkanya) atau "tanpa"
@@ -253,6 +280,7 @@ class SantriController extends Controller
             'potonganUangPangkal' => $potonganUangPangkal,
             'nominalDefaultUangPangkal' => $nominalDefaultUangPangkal,
             'nominalDefaultPerlengkapan' => $nominalDefaultPerlengkapan,
+            'opsiTingkat' => \App\Models\Jenjang::find($santri->kode_jenjang)?->opsiTingkat() ?? [],
             'koreksiUangPangkal' => $koreksiUangPangkal,
             'koreksiPerlengkapan' => $koreksiPerlengkapan,
             'keluarAktif' => $keluarAktif,
@@ -287,6 +315,11 @@ class SantriController extends Controller
                     'jatuh_tempo' => ['nullable', 'date'],
                     'alasan' => ['required', 'string', 'max:255'],
                 ]), $request->user()->id_pengguna),
+                // Santri lama (termasuk hasil impor) belum bertingkat — inilah
+                // jalan mengisinya tanpa membuka seluruh data untuk disunting.
+                'set-tingkat' => $this->service->setTingkat($id, (int) $request->validate([
+                    'tingkat' => ['required', 'integer', 'min:1'],
+                ])['tingkat']),
                 'daftar-ulang' => $this->service->daftarUlang($id, $request->user()->id_pengguna),
                 'undur-diri' => $this->service->mengundurkanDiri(
                     $id,

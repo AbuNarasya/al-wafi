@@ -23,6 +23,9 @@ class JenjangRequest extends FormRequest
                 ? ['required', 'string', 'max:255', 'regex:/^[a-z0-9_]+$/i', Rule::unique('jenjang', 'kode')]
                 : ['prohibited'],
             'nama' => ['required', 'string', 'max:255'],
+            // Batas atas 20 sekadar penjaga salah ketik; tak ada jenjang
+            // pendidikan yang bertingkat sebanyak itu.
+            'jumlah_tingkat' => ['nullable', 'integer', 'between:1,20'],
             'urutan' => ['nullable', 'integer', 'between:0,999'],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
             'keterangan' => ['nullable', 'string'],
@@ -41,6 +44,9 @@ class JenjangRequest extends FormRequest
             $data['kode'] = $this->input('kode');
         }
         $data['urutan'] = (int) ($data['urutan'] ?? 0);
+        // Kosong = belum ditentukan; jangan dijadikan 0 karena "0 tingkat"
+        // membuat dropdown Tingkat kosong tanpa penjelasan.
+        $data['jumlah_tingkat'] = ($data['jumlah_tingkat'] ?? '') !== '' ? (int) $data['jumlah_tingkat'] : null;
 
         return $data;
     }

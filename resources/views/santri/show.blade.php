@@ -27,6 +27,29 @@
             <div><div class="text-xs text-gray-400">Nama</div><div>{{ $santri->nama }} ({{ $santri->jenis_kelamin }})</div></div>
             <div><div class="text-xs text-gray-400">Status</div><span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">{{ $labelStatus }}</span></div>
             <div><div class="text-xs text-gray-400">Jenjang / Jalur</div><div>{{ $santri->kode_jenjang ?? '—' }} · {{ ucfirst($santri->jalur) }}</div></div>
+            {{-- Tingkat bisa diubah di tempat: santri lama & hasil impor belum
+                 punya nilainya, dan tak ada form sunting santri yang lengkap. --}}
+            <div x-data="{ ubah: false }">
+                <div class="text-xs text-gray-400">Tingkat</div>
+                <div class="flex items-center gap-2" x-show="!ubah">
+                    <span>{{ $santri->tingkat ? 'Tingkat '.$santri->tingkat : '—' }}</span>
+                    @if (\App\Support\Akses::boleh('santri', 'ubah') && $opsiTingkat !== [])
+                        <button type="button" @click="ubah = true" class="text-xs text-brand hover:underline">ubah</button>
+                    @endif
+                </div>
+                @if (\App\Support\Akses::boleh('santri', 'ubah') && $opsiTingkat !== [])
+                    <form x-show="ubah" x-cloak method="POST" action="{{ $act('set-tingkat') }}" class="flex items-center gap-1">
+                        @csrf
+                        <select name="tingkat" required class="rounded border-gray-300 py-1 text-sm">
+                            @foreach ($opsiTingkat as $nomor => $labelTingkat)
+                                <option value="{{ $nomor }}" @selected($santri->tingkat === $nomor)>{{ $labelTingkat }}</option>
+                            @endforeach
+                        </select>
+                        <button class="text-xs font-semibold text-brand hover:underline">simpan</button>
+                        <button type="button" @click="ubah = false" class="text-xs text-gray-400 hover:underline">batal</button>
+                    </form>
+                @endif
+            </div>
             <div><div class="text-xs text-gray-400">Tahun Ajaran</div><div>{{ $santri->tahun_ajaran ?? '—' }}</div></div>
             <div><div class="text-xs text-gray-400">Gelombang</div><div>{{ $santri->gelombang ?? 'Tanpa Gelombang' }}</div></div>
             <div class="sm:col-span-2"><div class="text-xs text-gray-400">Wali</div><div>{{ $santri->wali?->nama ?? '—' }} · {{ $santri->wali?->telepon }}</div></div>
