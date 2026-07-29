@@ -30,9 +30,15 @@ final class ModulRegistry
         ['kode' => 'company-settings', 'nama' => 'Pengaturan Perusahaan', 'grup' => 'SETTING AWAL'],
         ['kode' => 'reminder-tagihan', 'nama' => 'Reminder Tagihan Jatuh Tempo', 'grup' => 'SETTING AWAL'],
         ['kode' => 'users', 'nama' => 'Pengguna', 'grup' => 'SETTING AWAL'],
+        ['kode' => 'karyawan', 'nama' => 'Karyawan', 'grup' => 'SETTING AWAL'],
+        // Alat pindahan, bukan pemasukan harian. 'buat' = boleh menulis hasil
+        // impor; sebaiknya dicabut lagi setelah migrasi selesai.
+        ['kode' => 'impor-data-awal', 'nama' => 'Impor Data Awal (pindahan sistem)', 'grup' => 'SETTING AWAL'],
 
         // ---- Anggaran ----
-        ['kode' => 'budget', 'nama' => 'Anggaran (Input & Realisasi)', 'grup' => 'ANGGARAN'],
+        // 'buat' pada modul ini = boleh MENGAJUKAN anggaran lewat rantai approval
+        // (menulis langsung ke tabel anggaran tetap khusus admin).
+        ['kode' => 'budget', 'nama' => 'Anggaran (Input, Pengajuan & Realisasi)', 'grup' => 'ANGGARAN'],
 
         // ---- Pengajuan Pembayaran ----
         ['kode' => 'pengajuan-pembayaran', 'nama' => 'Pengajuan Pembayaran', 'grup' => 'PENGAJUAN PEMBAYARAN', 'sub' => 'Pengajuan'],
@@ -56,6 +62,7 @@ final class ModulRegistry
         ['kode' => 'accrue', 'nama' => 'Accrue & Prepaid', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         ['kode' => 'book-transfer', 'nama' => 'Pindah Buku', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         ['kode' => 'bank-loans', 'nama' => 'Pembiayaan Bank', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
+        ['kode' => 'pinjaman-karyawan', 'nama' => 'Pinjaman Karyawan', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         ['kode' => 'bank-reconciliation', 'nama' => 'Rekonsiliasi Bank', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         ['kode' => 'journal', 'nama' => 'Jurnal Umum', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
 

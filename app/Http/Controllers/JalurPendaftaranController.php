@@ -24,7 +24,7 @@ class JalurPendaftaranController extends Controller
 
     public function create(): View
     {
-        return view('jalur-pendaftaran.form', ['row' => new JalurPendaftaran(['status' => 'aktif']), 'baru' => true, 'taOptions' => $this->taOptions()]);
+        return view('jalur-pendaftaran.form', ['row' => new JalurPendaftaran(['status' => 'aktif']), 'baru' => true]);
     }
 
     public function store(JalurPendaftaranRequest $request): RedirectResponse
@@ -42,13 +42,7 @@ class JalurPendaftaranController extends Controller
     {
         $row = JalurPendaftaran::findOrFail($kode);
 
-        return view('jalur-pendaftaran.form', ['row' => $row, 'baru' => false, 'taOptions' => $this->taOptions()]);
-    }
-
-    /** @return array<string,string> */
-    private function taOptions(): array
-    {
-        return ['' => '— pilih tahun ajaran —'] + (new \App\Services\Modules\TahunAjaranService)->opsiAktif();
+        return view('jalur-pendaftaran.form', ['row' => $row, 'baru' => false]);
     }
 
     public function update(JalurPendaftaranRequest $request, string $kode): RedirectResponse

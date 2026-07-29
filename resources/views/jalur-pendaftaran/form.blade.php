@@ -17,10 +17,8 @@
                 <div class="rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600">{{ $row->kode }}</div></div>
             @endif
 
-            <x-field name="nama" label="Nama Jalur" :value="$row->nama" required placeholder="mis. Reguler" />
-            <x-field name="tahun_ajaran" label="Tahun Ajaran" :value="old('tahun_ajaran', $row->tahun_ajaran)"
-                     :options="$taOptions + ($row->tahun_ajaran ? [$row->tahun_ajaran => $row->tahun_ajaran] : [])" required
-                     hint="Jalur hanya bisa dipilih saat mendaftarkan calon pada tahun ajaran ini." />
+            <x-field name="nama" label="Nama Jalur" :value="$row->nama" required placeholder="mis. Reguler"
+                     hint="Jalur berlaku untuk SEMUA tahun ajaran. Tarif yang berbeda tiap tahun diatur di Jenis Biaya, bukan di sini." />
             <x-field name="keterangan" label="Keterangan" :value="$row->keterangan" textarea />
             <x-field name="status" label="Status" :value="$row->status ?? 'aktif'" :options="['aktif' => 'Aktif', 'nonaktif' => 'Nonaktif']" />
 

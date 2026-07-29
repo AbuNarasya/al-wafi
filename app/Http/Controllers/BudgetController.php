@@ -17,7 +17,7 @@ use Illuminate\View\View;
 /**
  * Modul ANGGARAN: Input Anggaran (grid per TA×bagian×unit, simpan/kunci admin)
  * & Realisasi Anggaran (review anggaran vs realisasi, gerbang bertingkat).
- * Pengajuan anggaran non-admin lewat approval BELUM diport (jalur admin dulu).
+ * Jalur non-admin (ajukan → rantai persetujuan) ada di BudgetPengajuanController.
  */
 class BudgetController extends Controller
 {

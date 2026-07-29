@@ -64,10 +64,11 @@ class MasterTipeBiayaSumberTest extends TestCase
         ]);
     }
 
-    public function test_empat_tipe_bawaan_terisi_dari_migrasi(): void
+    public function test_lima_tipe_bawaan_terisi_dari_migrasi(): void
     {
-        $this->assertSame(4, TipeBiaya::count());
-        foreach (['registrasi', 'uang_pangkal', 'spp', 'lain'] as $kode) {
+        // Perilaku ke-5 "perlengkapan" menyusul lewat migrasi tersendiri.
+        $this->assertSame(5, TipeBiaya::count());
+        foreach (['registrasi', 'uang_pangkal', 'perlengkapan', 'spp', 'lain'] as $kode) {
             $t = TipeBiaya::findOrFail($kode);
             $this->assertTrue($t->bawaan);
             $this->assertSame($kode, $t->perilaku, 'Tipe bawaan berperilaku sama dengan namanya.');
@@ -84,8 +85,8 @@ class MasterTipeBiayaSumberTest extends TestCase
         ]);
         TipeBiaya::lupakan();
 
-        $this->assertContains('seragam', TipeBiaya::kode('lain'));
-        $this->assertNotContains('seragam', TipeBiaya::kode('registrasi'));
+        $this->assertContains('seragam', TipeBiaya::kodeBerperilaku('lain'));
+        $this->assertNotContains('seragam', TipeBiaya::kodeBerperilaku('registrasi'));
         $this->assertSame('lain', TipeBiaya::perilakuDari('seragam'));
 
         // Jenis biaya bertipe baru itu bisa dibuat & muncul di modul tagihan lain.
@@ -212,6 +213,67 @@ class MasterTipeBiayaSumberTest extends TestCase
         }
     }
 
+    /**
+     * Form Tambah memakai objek TipeBiaya yang BELUM tersimpan. Dulu halamannya
+     * gagal dibuka (500) karena model punya method statis bernama `kode` —
+     * sama dengan nama kolomnya — sehingga pada objek baru Eloquent menyangka
+     * `$row->kode` sebuah relasi. Methodnya kini `kodeBerperilaku()`.
+     */
+    public function test_form_tambah_tipe_biaya_bisa_dibuka(): void
+    {
+        $this->actingAs($this->admin)->get(route('tipe_biaya.create'))->assertOk()
+            ->assertSee('Tambah Tipe Biaya')
+            ->assertSee('Perilaku');
+
+        // Membaca atribut pada objek baru tidak boleh melempar apa pun.
+        $this->assertNull((new \App\Models\TipeBiaya)->kode);
+
+        // Ubah (objek tersimpan) tetap jalan.
+        $this->actingAs($this->admin)->get(route('tipe_biaya.edit', 'registrasi'))->assertOk();
+    }
+
+    /**
+     * Jenjang berlaku untuk SEMUA perilaku, termasuk lain-lain. Dulu isian
+     * jenjang ikut tersembunyi bersama Nominal & Jalur begitu perilakunya
+     * "lain", padahal jenjang dipakai memilah laporan — sama seperti unit.
+     */
+    public function test_jenis_biaya_berperilaku_lain_bisa_berjenjang(): void
+    {
+        TipeBiaya::create(['kode' => 'seragam', 'nama' => 'Seragam', 'perilaku' => 'lain', 'urutan' => 9, 'status' => 'aktif']);
+        TipeBiaya::lupakan();
+
+        $this->actingAs($this->admin)->post(route('jenis_biaya.store'), [
+            'kode' => 'SRG-SMP', 'nama' => 'Seragam', 'tipe' => 'seragam',
+            'tahun_ajaran' => self::TA, 'kode_jenjang' => 'SMP',
+            'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'status' => 'aktif',
+        ])->assertRedirect();
+
+        $jb = \App\Models\JenisBiaya::findOrFail('SRG-SMP');
+        $this->assertSame('SMP', $jb->kode_jenjang);
+        $this->assertSame(self::UNIT, $jb->kode_unit);
+
+        // Terbaca di daftar sebagai cakupan baris…
+        $this->actingAs($this->admin)->get(route('jenis_biaya.index'))->assertOk()
+            ->assertSee('SMP · Semua jalur', false);
+
+        // …dan jenjangnya ikut tampil saat memilih jenis di Tagihan Lain-lain,
+        // supaya dua baris bernama mirip tak tertukar. Halaman itu hanya
+        // memunculkan formulirnya bila ada santri aktif.
+        $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '08127']);
+        (new \App\Services\Modules\SantriService)->create([
+            'id_wali' => $wali->id, 'nama' => 'Santri Aktif', 'jenis_kelamin' => 'L', 'kode_jenjang' => 'SMP',
+            'tahun_ajaran' => self::TA, 'jalur' => 'reguler',
+        ])->update(['status' => 'aktif']);
+
+        $halaman = $this->actingAs($this->admin)->get(route('tagihan_lain.create'))->assertOk()->getContent();
+        $this->assertStringContainsString('SRG-SMP', $halaman, 'jenis berperilaku lain harus muncul sebagai pilihan');
+        $this->assertStringContainsString('(SMP)', $halaman, 'jenjangnya harus ikut tampil di label pilihan');
+
+        // Form suntingnya menampilkan isian jenjang.
+        $this->actingAs($this->admin)->get(route('jenis_biaya.edit', 'SRG-SMP'))->assertOk()
+            ->assertSee('name="kode_jenjang"', false);
+    }
+
     public function test_halaman_master_dan_letak_menunya(): void
     {
         $this->actingAs($this->admin)->get('/tipe-biaya')->assertOk()->assertSee('Registrasi')->assertSee('Perilaku');
@@ -233,7 +295,7 @@ class MasterTipeBiayaSumberTest extends TestCase
         TipeBiaya::query()->delete();
         TipeBiaya::lupakan();
 
-        $this->assertSame(['registrasi'], TipeBiaya::kode('registrasi'));
+        $this->assertSame(['registrasi'], TipeBiaya::kodeBerperilaku('registrasi'));
         $this->assertSame('spp', TipeBiaya::perilakuDari('spp'));
     }
 }

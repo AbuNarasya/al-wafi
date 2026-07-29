@@ -167,6 +167,40 @@ Route::middleware('auth')->group(function () {
         Route::get('/export/{type}', [$k, 'download'])->name('download');
     });
 
+    // ---- Karyawan & Pinjaman Karyawan ----
+    // Master karyawan ringkas; kelak diambil alih HRD.
+    Route::prefix('karyawan')->name('karyawan.')->group(function () {
+        $k = \App\Http\Controllers\KaryawanController::class;
+        Route::get('/', [$k, 'index'])->name('index')->middleware('hakakses:karyawan,lihat');
+        Route::get('/create', [$k, 'create'])->name('create')->middleware('hakakses:karyawan,buat');
+        Route::post('/', [$k, 'store'])->name('store')->middleware('hakakses:karyawan,buat');
+        Route::get('/{kode}/edit', [$k, 'edit'])->name('edit')->middleware('hakakses:karyawan,ubah');
+        Route::put('/{kode}', [$k, 'update'])->name('update')->middleware('hakakses:karyawan,ubah');
+        Route::delete('/{kode}', [$k, 'destroy'])->name('destroy')->middleware('hakakses:karyawan,hapus');
+    });
+
+    Route::prefix('pinjaman-karyawan')->name('pinjaman_karyawan.')->group(function () {
+        $p = \App\Http\Controllers\PinjamanKaryawanController::class;
+        Route::get('/', [$p, 'index'])->name('index')->middleware('hakakses:pinjaman-karyawan,lihat');
+        Route::get('/buat', [$p, 'create'])->name('create')->middleware('hakakses:pinjaman-karyawan,buat');
+        Route::post('/', [$p, 'store'])->name('store')->middleware('hakakses:pinjaman-karyawan,buat');
+        Route::get('/{id}', [$p, 'show'])->name('show')->middleware('hakakses:pinjaman-karyawan,lihat')->whereNumber('id');
+        // Mencatat cicilan = mengubah pinjaman, bukan membuat dokumen baru.
+        Route::post('/{id}/bayar', [$p, 'bayar'])->name('bayar')->middleware('hakakses:pinjaman-karyawan,ubah')->whereNumber('id');
+        Route::post('/{id}/termin', [$p, 'aturTermin'])->name('termin')->middleware('hakakses:pinjaman-karyawan,ubah')->whereNumber('id');
+    });
+
+    // ---- Impor Data Awal (alat pindahan sistem) ----
+    // Menulis dokumen TANPA jurnal; saldonya masuk lewat menu Saldo Awal.
+    // 'lihat' cukup untuk melihat & memeriksa berkas; menulis butuh 'buat'.
+    Route::prefix('impor-data-awal')->name('impor_data_awal.')->group(function () {
+        $i = \App\Http\Controllers\ImporDataAwalController::class;
+        Route::get('/', [$i, 'index'])->name('index')->middleware('hakakses:impor-data-awal,lihat');
+        Route::get('/template/{jenis}', [$i, 'template'])->name('template')->middleware('hakakses:impor-data-awal,lihat');
+        Route::post('/pratinjau', [$i, 'pratinjau'])->name('pratinjau')->middleware('hakakses:impor-data-awal,buat');
+        Route::post('/jalankan', [$i, 'jalankan'])->name('jalankan')->middleware('hakakses:impor-data-awal,buat');
+    });
+
     // ---- Anggaran (Input & Realisasi) ----
     Route::prefix('budget')->name('budget.')->group(function () {
         $b = \App\Http\Controllers\BudgetController::class;
@@ -175,6 +209,20 @@ Route::middleware('auth')->group(function () {
         Route::get('/realisasi', [$b, 'realisasi'])->name('realisasi');
         // Input Anggaran — lihat lewat matriks modul 'budget'.
         Route::get('/', [$b, 'index'])->name('index')->middleware('hakakses:budget,lihat');
+
+        // Pengajuan Anggaran (§3.c) — jalur non-admin lewat rantai BUDGET-STD.
+        // Digerbangi hak modul 'budget' (sama seperti app lama): 'lihat' untuk
+        // melihat status, 'buat' untuk mengajukan & membatalkan miliknya.
+        // Diletakkan SEBELUM PUT '/' yang admin-only agar tak ikut tergerbang.
+        $bp = \App\Http\Controllers\BudgetPengajuanController::class;
+        Route::get('/pengajuan', [$bp, 'index'])->name('pengajuan.index')->middleware('hakakses:budget,lihat');
+        Route::get('/pengajuan/buat', [$bp, 'create'])->name('pengajuan.create')->middleware('hakakses:budget,buat');
+        Route::post('/pengajuan', [$bp, 'store'])->name('pengajuan.store')->middleware('hakakses:budget,buat');
+        Route::get('/pengajuan/{id}', [$bp, 'show'])->name('pengajuan.show')->middleware('hakakses:budget,lihat')->whereNumber('id');
+        // "batal" (bukan "void") agar tergerbang aksi BUAT, bukan hapus — pemohon
+        // yang boleh membuat boleh membatalkan miliknya. Kepemilikan tetap
+        // ditegakkan di service.
+        Route::post('/pengajuan/{id}/batal', [$bp, 'batal'])->name('pengajuan.batal')->middleware('hakakses:budget,buat')->whereNumber('id');
         // Tulis anggaran langsung + kunci/buka = KHUSUS ADMIN (jalur darurat).
         Route::put('/', [$b, 'save'])->name('save')->middleware(\App\Http\Middleware\RequireAdmin::class);
         Route::post('/lock', [$b, 'lock'])->name('lock')->middleware(\App\Http\Middleware\RequireAdmin::class);

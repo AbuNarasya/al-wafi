@@ -84,7 +84,7 @@
                             <tr class="hover:bg-gray-50">
                                 <td class="px-3 py-2">{{ $r['nama'] }}<div class="text-xs text-gray-400">{{ $r['no_pendaftaran'] }}</div></td>
                                 <td class="px-3 py-2 text-xs">{{ $r['nama_wali'] ?? '—' }}<div class="text-gray-400">{{ $r['telepon_wali'] }}</div></td>
-                                <td class="px-3 py-2">#{{ $r['urutan'] }}</td>
+                                <td class="px-3 py-2">#{{ $r['urutan'] }}<div class="text-xs text-gray-400">{{ $r['label_komponen'] ?? 'Uang Pangkal' }}</div></td>
                                 <td class="px-3 py-2 text-right tabular-nums">@rp($r['sisa_termin'])</td>
                                 <td class="px-3 py-2">{{ $tgl($r['jatuh_tempo']) }}</td>
                                 <td class="px-3 py-2">
@@ -118,23 +118,33 @@
     <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <tr><th class="px-4 py-3">No. Pendaftaran</th><th class="px-4 py-3">Nama</th><th class="px-4 py-3">Wali</th><th class="px-4 py-3 text-right">Total</th><th class="px-4 py-3 text-right">Terbayar</th><th class="px-4 py-3 text-right">Sisa</th><th class="px-4 py-3">Termin berikut</th><th class="px-4 py-3">Status</th><th></th></tr>
+                <tr><th class="px-4 py-3">No. Pendaftaran</th><th class="px-4 py-3">Nama</th><th class="px-4 py-3">Komponen</th><th class="px-4 py-3">Wali</th><th class="px-4 py-3 text-right">Total</th><th class="px-4 py-3 text-right">Terbayar</th><th class="px-4 py-3 text-right">Sisa</th><th class="px-4 py-3">Termin berikut</th><th class="px-4 py-3">Status</th><th></th></tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
                 @forelse ($rows as $r)
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-2 font-mono">{{ $r['no_pendaftaran'] }}</td>
                         <td class="px-4 py-2">{{ $r['nama'] }}</td>
+                        {{-- Satu baris = satu santri. Cukup sebutkan biayanya; rincian
+                             nominal per komponen ada di halaman Detail. --}}
+                        <td class="px-4 py-2 text-xs">{{ $r['label_komponen'] ?: 'Uang Pangkal' }}</td>
                         <td class="px-4 py-2">{{ $r['nama_wali'] ?? '—' }}</td>
-                        <td class="px-4 py-2 text-right tabular-nums">@rp($r['total'])</td>
+                        <td class="px-4 py-2 text-right font-medium tabular-nums">@rp($r['total'])</td>
                         <td class="px-4 py-2 text-right tabular-nums">@rp($r['terbayar'])</td>
                         <td class="px-4 py-2 text-right tabular-nums">@rp($r['sisa'])</td>
-                        <td class="px-4 py-2 text-xs">{{ $r['termin_berikut'] ? '#' . $r['termin_berikut']['urutan'] . ' · ' . $tgl($r['termin_berikut']['jatuh_tempo']) : '—' }}</td>
+                        <td class="px-4 py-2 text-xs">
+                            @if ($r['termin_berikut'])
+                                #{{ $r['termin_berikut']['urutan'] }} · {{ $tgl($r['termin_berikut']['jatuh_tempo']) }}
+                                <div class="text-gray-400">{{ $r['termin_berikut']['label_komponen'] }}</div>
+                            @else
+                                —
+                            @endif
+                        </td>
                         <td class="px-4 py-2"><span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs">{{ $labelTagihan[$r['status_tagihan']] ?? $r['status_tagihan'] }}</span></td>
                         <td class="px-4 py-2 text-right"><a href="{{ route('angsuran_uang_pangkal.show', $r['id_santri']) }}" class="text-xs text-brand hover:underline">Detail</a></td>
                     </tr>
                 @empty
-                    <tr><td colspan="9" class="px-4 py-10 text-center text-gray-400">Belum ada rencana angsuran.</td></tr>
+                    <tr><td colspan="10" class="px-4 py-10 text-center text-gray-400">Belum ada rencana angsuran.</td></tr>
                 @endforelse
             </tbody>
         </table>

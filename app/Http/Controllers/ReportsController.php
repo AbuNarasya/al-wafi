@@ -36,8 +36,22 @@ class ReportsController extends Controller
     public function labaRugi(Request $request): View
     {
         [$from, $to] = $this->rentang($request);
+        $unit = $this->unitDipilih($request);
 
-        return view('reports.laba-rugi', ['data' => $this->reports->labaRugi($from, $to), 'from' => $from, 'to' => $to]);
+        return view('reports.laba-rugi', [
+            'data' => $this->reports->labaRugi($from, $to, $unit),
+            'from' => $from, 'to' => $to, 'unit' => $unit,
+            'unitOptions' => \App\Models\BusinessUnit::where('status', 'aktif')
+                ->orderBy('kode_unit')->pluck('nama_unit', 'kode_unit')->all(),
+        ]);
+    }
+
+    /** Unit bisnis terpilih; unit yang tak dikenal diabaikan (dianggap semua unit). */
+    private function unitDipilih(Request $request): ?string
+    {
+        $unit = trim((string) $request->query('kode_unit', ''));
+
+        return $unit !== '' && \App\Models\BusinessUnit::whereKey($unit)->exists() ? $unit : null;
     }
 
     public function perubahanModal(Request $request): View
@@ -58,12 +72,15 @@ class ReportsController extends Controller
     {
         [$from, $to] = $this->rentang($request);
         $kodeCoa = $request->query('kode_coa');
-        $data = $kodeCoa ? $this->reports->bukuBesar($kodeCoa, $from, $to) : null;
+        $unit = $this->unitDipilih($request);
+        $data = $kodeCoa ? $this->reports->bukuBesar($kodeCoa, $from, $to, $unit) : null;
 
         $akunList = CoaDetail::orderBy('kode_coa')->get()
             ->mapWithKeys(fn ($a) => [$a->kode_coa => "{$a->kode_coa} — {$a->nama_coa}"])->all();
+        $unitOptions = \App\Models\BusinessUnit::where('status', 'aktif')
+            ->orderBy('kode_unit')->pluck('nama_unit', 'kode_unit')->all();
 
-        return view('reports.buku-besar', compact('data', 'akunList', 'kodeCoa', 'from', 'to'));
+        return view('reports.buku-besar', compact('data', 'akunList', 'kodeCoa', 'from', 'to', 'unit', 'unitOptions'));
     }
 
     public function aset(): View
@@ -114,8 +131,9 @@ class ReportsController extends Controller
 
                 return [$rows, "neraca_{$asOf}", "Neraca per {$asOf}"];
             })(),
-            'laba-rugi' => (function () use ($from, $to) {
-                $d = $this->reports->labaRugi($from, $to);
+            'laba-rugi' => (function () use ($request, $from, $to) {
+                $unit = $this->unitDipilih($request);
+                $d = $this->reports->labaRugi($from, $to, $unit);
                 $rows = [
                     ...$this->flattenSection('PENDAPATAN', $d['pendapatan']),
                     ...$this->flattenSection('BEBAN', $d['beban']),
@@ -124,7 +142,13 @@ class ReportsController extends Controller
                     ['Bagian' => 'RINGKASAN', 'Grup' => '', 'Kode COA' => '', 'Akun' => 'Laba/Rugi Bersih', 'Nilai' => $d['laba_rugi_bersih']],
                 ];
 
-                return [$rows, "laba_rugi_{$from}_{$to}", "Laba Rugi {$from} s.d. {$to}"];
+                // Unit ikut ke nama berkas & judul: unduhan per unit yang tak
+                // bertanda mudah tertukar dengan laporan seluruh unit.
+                $namaUnit = $unit ? (\App\Models\BusinessUnit::find($unit)?->nama_unit ?? $unit) : null;
+                $berkas = 'laba_rugi_'.($unit ? \Illuminate\Support\Str::slug($unit).'_' : '')."{$from}_{$to}";
+                $judul = "Laba Rugi {$from} s.d. {$to}".($namaUnit ? " — Unit {$namaUnit}" : '');
+
+                return [$rows, $berkas, $judul];
             })(),
             'perubahan-modal' => (function () use ($from, $to) {
                 $d = $this->reports->perubahanModal($from, $to);
@@ -155,7 +179,7 @@ class ReportsController extends Controller
             'buku-besar' => (function () use ($request, $from, $to, $tgl) {
                 $kode = $request->query('kode_coa');
                 abort_if(! $kode, 400, 'Pilih akun dulu.');
-                $d = $this->reports->bukuBesar($kode, $from, $to);
+                $d = $this->reports->bukuBesar($kode, $from, $to, $this->unitDipilih($request));
                 $rows = [['Tanggal' => '', 'Referensi' => '', 'Keterangan' => 'Saldo Awal Periode', 'Debet' => '', 'Kredit' => '', 'Saldo' => $d['saldo_awal']]];
                 foreach ($d['mutasi'] as $m) {
                     $rows[] = ['Tanggal' => $tgl($m['tanggal']), 'Referensi' => $m['referensi'], 'Keterangan' => $m['keterangan'], 'Debet' => $m['debet'], 'Kredit' => $m['kredit'], 'Saldo' => $m['saldo']];

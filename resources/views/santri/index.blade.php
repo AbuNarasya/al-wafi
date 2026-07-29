@@ -11,9 +11,10 @@
         'mengundurkan_diri' => 'bg-gray-100 text-gray-500', 'keluar' => 'bg-gray-100 text-gray-500',
     ];
 
-    // Warna label JALUR: satu warna tetap per jalur, dibagi urut kode master
-    // supaya tak ada yang kembar dan warnanya sama di setiap halaman. Jalur
-    // "reguler" sengaja netral agar jalur khusus (pindahan, beasiswa, …) menonjol.
+    // Warna label JALUR: satu warna tetap per jalur, dibagi mengikuti urutan
+    // $jalurWarna (waktu dibuat — lihat SantriController) supaya jatah warna
+    // jalur lama tak bergeser saat jalur baru ditambahkan. Jalur "reguler"
+    // sengaja netral agar jalur khusus (pindahan, beasiswa, …) menonjol.
     // Kelas ditulis di Blade (bukan controller) agar tak terbuang saat build Tailwind.
     $palet = [
         'bg-amber-100 text-amber-800', 'bg-emerald-100 text-emerald-700', 'bg-violet-100 text-violet-700',
@@ -22,7 +23,7 @@
     ];
     $warnaJalur = [];
     $iJalur = 0;
-    foreach ($jalurUrut as $kodeJalur => $namaJalur) {
+    foreach ($jalurWarna as $kodeJalur => $namaJalur) {
         $warnaJalur[$kodeJalur] = str_contains(mb_strtolower($kodeJalur.' '.$namaJalur), 'reguler')
             ? 'bg-slate-100 text-slate-600'
             : $palet[$iJalur++ % count($palet)];
@@ -58,7 +59,7 @@
                 <tr class="bg-white">
                     <x-scol type="blank" /><x-scol type="blank" /><x-scol type="blank" />
                     <x-scol name="jenjang" :options="collect($opsiJenjang)->keys()->mapWithKeys(fn ($k) => [$k => $k])->all()" :value="$filter['jenjang']" />
-                    <x-scol name="jalur" :options="$jalurUrut" :value="$filter['jalur']" />
+                    <x-scol name="jalur" :options="$opsiJalur" :value="$filter['jalur']" />
                     <x-scol type="blank" />
                     <x-scol name="status" :options="$opsiStatus" :value="$filter['status']" />
                     <x-scol name="bayar" :options="['lunas' => 'Lunas', 'menunggu' => 'Menunggu verifikasi', 'sebagian' => 'Sebagian', 'belum' => 'Belum bayar', 'tanpa_tagihan' => 'Belum ditagih']" :value="$filter['bayar']" />

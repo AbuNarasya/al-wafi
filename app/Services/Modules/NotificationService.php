@@ -193,7 +193,7 @@ class NotificationService
         }
 
         return PembayaranSantri::whereIn('id', $ids)
-            ->whereHas('tagihan.jenis', fn ($q) => $q->whereIn('tipe', \App\Models\TipeBiaya::kode('registrasi', 'uang_pangkal')))
+            ->whereHas('tagihan.jenis', fn ($q) => $q->whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku('registrasi', 'uang_pangkal', 'perlengkapan')))
             ->pluck('id')->map(fn ($v) => (int) $v)->all();
     }
 

@@ -15,6 +15,13 @@ use Illuminate\Support\Facades\DB;
  */
 class JenisBiayaService
 {
+    /**
+     * Perilaku yang tarifnya DICARI PROGRAM lewat JenisBiaya::berlaku(), jadi
+     * kombinasi (perilaku, T.A, jenjang, jalur) wajib tunggal. Perilaku "lain"
+     * tidak masuk: tagihannya dipilih manual, jadi boleh berganda.
+     */
+    private const PERILAKU_TUNGGAL = ['registrasi', 'uang_pangkal', 'perlengkapan', 'spp'];
+
     public function list()
     {
         return JenisBiaya::orderBy('tipe')->orderBy('kode')->get();
@@ -190,14 +197,14 @@ class JenisBiayaService
     /** Cakupan (tipe, jenjang, jalur) sudah terisi di T.A tujuan? */
     private function adaCakupanSama(JenisBiaya $j, string $taTujuan): bool
     {
-        if (! in_array(\App\Models\TipeBiaya::perilakuDari($j->tipe), ['registrasi', 'uang_pangkal', 'spp'], true) || $j->status !== 'aktif') {
+        if (! in_array(\App\Models\TipeBiaya::perilakuDari($j->tipe), self::PERILAKU_TUNGGAL, true) || $j->status !== 'aktif') {
             return false; // tipe "lain" & baris nonaktif memang boleh berganda
         }
 
         // Dibandingkan per PERILAKU: dua tipe berperilaku sama yang mencakup
         // jenjang & jalur yang sama tetap membuat JenisBiaya::berlaku() bimbang.
         return JenisBiaya::where('tahun_ajaran', $taTujuan)
-            ->whereIn('tipe', \App\Models\TipeBiaya::kode((string) \App\Models\TipeBiaya::perilakuDari($j->tipe)))
+            ->whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku((string) \App\Models\TipeBiaya::perilakuDari($j->tipe)))
             ->where('status', 'aktif')
             ->when($j->kode_jenjang, fn ($q) => $q->where('kode_jenjang', $j->kode_jenjang), fn ($q) => $q->whereNull('kode_jenjang'))
             ->when($j->kode_jalur, fn ($q) => $q->where('kode_jalur', $j->kode_jalur), fn ($q) => $q->whereNull('kode_jalur'))
@@ -205,7 +212,7 @@ class JenisBiayaService
     }
 
     /**
-     * Registrasi, uang pangkal, & SPP dicari program lewat JenisBiaya::berlaku()
+     * Registrasi, uang pangkal, perlengkapan, & SPP dicari program lewat JenisBiaya::berlaku()
      * — jadi kombinasi (tipe, tahun ajaran, jenjang, jalur) HARUS tunggal di
      * antara baris aktif. Tanpa penjaga ini dua baris bersaing dan yang terpilih
      * cuma "urutan kode terkecil": itulah yang dulu membuat calon SMP reguler
@@ -215,13 +222,13 @@ class JenisBiayaService
     private function assertBarisTunggal(array $data, ?string $kecualiKode = null): void
     {
         $tipe = $data['tipe'] ?? null;
-        if (! in_array(\App\Models\TipeBiaya::perilakuDari($tipe), ['registrasi', 'uang_pangkal', 'spp'], true) || ($data['status'] ?? 'aktif') !== 'aktif') {
+        if (! in_array(\App\Models\TipeBiaya::perilakuDari($tipe), self::PERILAKU_TUNGGAL, true) || ($data['status'] ?? 'aktif') !== 'aktif') {
             return;
         }
 
         $kodeJenjang = ($data['kode_jenjang'] ?? null) ?: null;
         $kodeJalur = ($data['kode_jalur'] ?? null) ?: null;
-        $bentrok = JenisBiaya::whereIn('tipe', \App\Models\TipeBiaya::kode((string) \App\Models\TipeBiaya::perilakuDari($tipe)))
+        $bentrok = JenisBiaya::whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku((string) \App\Models\TipeBiaya::perilakuDari($tipe)))
             ->where('status', 'aktif')
             ->where('tahun_ajaran', $data['tahun_ajaran'])
             ->when($kodeJenjang, fn ($q) => $q->where('kode_jenjang', $kodeJenjang), fn ($q) => $q->whereNull('kode_jenjang'))

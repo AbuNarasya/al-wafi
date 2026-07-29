@@ -54,7 +54,7 @@
             <div class="grid gap-4 sm:grid-cols-2" x-show="tipe !== 'lain'" x-cloak>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700"
-                           x-text="{ registrasi: 'Nominal Registrasi', uang_pangkal: 'Nominal Uang Pangkal (default)', spp: 'Tarif SPP per Bulan' }[tipe] ?? 'Nominal'"></label>
+                           x-text="{ registrasi: 'Nominal Registrasi', uang_pangkal: 'Nominal Uang Pangkal (default)', perlengkapan: 'Nominal Perlengkapan (default)', spp: 'Tarif SPP per Bulan' }[tipe] ?? 'Nominal'"></label>
                     <input type="number" step="0.01" min="0" name="nominal" value="{{ old('nominal', $jb->nominal) }}"
                            class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm focus:border-brand focus:ring-1 focus:ring-brand">
                     <p class="mt-1 text-xs text-gray-400" x-show="tipe === 'registrasi'" x-cloak>
@@ -64,15 +64,16 @@
                         Mengisi otomatis form &ldquo;Tagihkan Uang Pangkal&rdquo; dan <b>tetap bisa diubah</b> per calon.
                         Kosongkan bila nominalnya selalu diketik manual.
                     </p>
+                    <p class="mt-1 text-xs text-gray-400" x-show="tipe === 'perlengkapan'" x-cloak>
+                        Mengisi otomatis isian &ldquo;Biaya Perlengkapan&rdquo; pada form Tagihkan Uang Pangkal dan <b>tetap bisa diubah</b> per calon.
+                        Perlengkapan <b>tidak dipotong potongan gelombang</b>.
+                    </p>
                     <p class="mt-1 text-xs text-gray-400" x-show="tipe === 'spp'" x-cloak>
                         Tarif SPP jenjang ini, dipakai saat menerbitkan tagihan SPP tiap periode.
                         Nominal khusus per santri (beasiswa/keringanan) tetap mengalahkan tarif ini.
                     </p>
                     @error('nominal')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
-                <x-field name="kode_jenjang" label="Jenjang" :value="$jb->kode_jenjang"
-                         :options="\App\Support\Referensi::withEmpty(\App\Support\Referensi::jenjang(), '— UMUM (semua jenjang) —')"
-                         hint="Berlaku khusus jenjang ini; KOSONGKAN untuk berlaku UMUM (dipakai bila jenjangnya tak punya baris sendiri)." />
                 <x-field name="kode_jalur" label="Jalur Pendaftaran" :value="$jb->kode_jalur"
                          :options="\App\Support\Referensi::withEmpty(\App\Support\Referensi::jalur(), '— Semua jalur (tarif dasar) —')"
                          hint="Isi HANYA untuk tarif pengecualian satu jalur (mis. uang pangkal SMP jalur OSS). Kosong = tarif dasar yang dipakai semua jalur yang tak punya baris sendiri." />
@@ -82,8 +83,21 @@
                 Dua baris aktif dengan cakupan sama akan ditolak, karena program tak bisa tahu mana yang benar.
             </p>
 
-            <x-field name="kode_unit" label="Unit Bisnis" :value="$jb->kode_unit" :options="$unitOptions" required
-                     hint="Unit penanggung jurnal pembayaran biaya ini." />
+            {{-- Jenjang & unit berlaku untuk SEMUA perilaku, termasuk lain-lain:
+                 keduanya dimensi yang dipakai memilah laporan, bukan sekadar
+                 bahan pencarian tarif. Karena itu keduanya di LUAR blok yang
+                 disembunyikan saat perilaku "lain". --}}
+            <div class="grid gap-4 sm:grid-cols-2">
+                <x-field name="kode_jenjang" label="Jenjang" :value="$jb->kode_jenjang"
+                         :options="\App\Support\Referensi::withEmpty(\App\Support\Referensi::jenjang(), '— UMUM (semua jenjang) —')"
+                         hint="Kosongkan bila berlaku untuk semua jenjang." />
+                <x-field name="kode_unit" label="Unit Bisnis" :value="$jb->kode_unit" :options="$unitOptions" required
+                         hint="Unit penanggung jurnal pembayaran biaya ini; menentukan laba rugi unit mana yang menerimanya." />
+            </div>
+            <p class="-mt-2 text-xs text-gray-400" x-show="tipe === 'lain'" x-cloak>
+                Untuk tagihan lain-lain, jenjang tidak ikut menentukan tarif (nominalnya diketik saat menagih),
+                tetapi tetap berguna untuk memilah laporan dan membedakan jenis yang namanya mirip antar jenjang.
+            </p>
 
             <fieldset class="rounded-lg border border-gray-200 p-4">
                 <legend class="px-2 text-sm font-semibold text-gray-700">Akun Akuntansi</legend>

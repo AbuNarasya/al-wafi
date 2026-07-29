@@ -47,7 +47,12 @@ class TahunAjaranTest extends TestCase
     {
         $svc = new TahunAjaranService;
         $ta = $svc->create(['kode' => '2026/2027', 'status' => 'aktif']);
-        JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler', 'tahun_ajaran' => '2026/2027']);
+
+        // Jenis biaya merujuk T.A; jalur pendaftaran TIDAK lagi (berlaku lintas T.A).
+        (new JenisBiayaService)->create([
+            'kode' => 'REGX', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '100000',
+            'kode_coa_pendapatan' => '4.ZZTA.REG', 'kode_unit' => 'ZZTAU', 'tahun_ajaran' => '2026/2027',
+        ]);
 
         try {
             $svc->remove($ta->id);
@@ -56,7 +61,9 @@ class TahunAjaranTest extends TestCase
             $this->assertSame(409, $e->status);
         }
 
-        JalurPendaftaran::destroy('reguler');
+        // Jalur yang masih ada tidak lagi menghalangi penghapusan T.A.
+        JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler']);
+        \App\Models\JenisBiaya::destroy('REGX');
         $svc->remove($ta->id);
         $this->assertDatabaseMissing('tahun_ajaran', ['kode' => '2026/2027']);
     }
@@ -83,13 +90,21 @@ class TahunAjaranTest extends TestCase
             $this->assertStringContainsString('Tahun ajaran wajib', $e->getMessage());
         }
 
-        // Jalur TA lain → ditolak.
+        // Jalur BERLAKU LINTAS T.A — jalur mana pun boleh dipakai di T.A mana pun.
+        // (Dulu ada aturan "jalur harus milik T.A yang sama"; dicabut 2026-07-28
+        // karena "Reguler" memang jalur yang sama tiap tahun.)
+        $lintas = $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'Lintas TA', 'jenis_kelamin' => 'L', 'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler28']);
+        $this->assertSame('reguler28', $lintas->jalur);
+
+        // Jalur nonaktif tetap ditolak.
+        JalurPendaftaran::whereKey('reguler28')->update(['status' => 'nonaktif']);
         try {
-            $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'A', 'jenis_kelamin' => 'L', 'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler28']);
+            $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'B', 'jenis_kelamin' => 'L', 'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler28']);
             $this->fail('harus 422');
         } catch (AppException $e) {
-            $this->assertStringContainsString('bukan 2026/2027', $e->getMessage());
+            $this->assertStringContainsString('nonaktif', $e->getMessage());
         }
+        JalurPendaftaran::whereKey('reguler28')->update(['status' => 'aktif']);
 
         // TA 27/28 → tagihan registrasi memakai jenis biaya TA itu (750rb).
         $santri = $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'A', 'jenis_kelamin' => 'L', 'tahun_ajaran' => '2027/2028', 'jalur' => 'reguler28']);

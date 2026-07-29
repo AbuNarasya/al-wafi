@@ -13,6 +13,13 @@
                 <input type="date" name="from" value="{{ $from }}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"></div>
             <div><label class="mb-1 block text-xs font-medium text-gray-500">Sampai</label>
                 <input type="date" name="to" value="{{ $to }}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"></div>
+            <div><label class="mb-1 block text-xs font-medium text-gray-500">Unit Bisnis</label>
+                <select name="kode_unit" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+                    <option value="">Semua unit</option>
+                    @foreach ($unitOptions as $kode => $nama)
+                        <option value="{{ $kode }}" @selected($unit === $kode)>{{ $nama }}</option>
+                    @endforeach
+                </select></div>
             <button class="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">Tampilkan</button>
         </form>
         @if ($kodeCoa && $data)
@@ -23,6 +30,13 @@
     @if (! $data)
         <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-12 text-center text-gray-400">Pilih akun untuk menampilkan buku besar.</div>
     @else
+        @if ($unit)
+            <div class="mb-3 rounded-lg border border-brand/30 bg-brand-soft/50 px-3 py-2 text-sm">
+                Disaring untuk <b>unit {{ $unitOptions[$unit] ?? $unit }}</b>.
+                Saldo awal dari menu Saldo Awal tidak ikut dihitung, karena baris saldo awal tidak berdimensi unit.
+            </div>
+        @endif
+
         <div class="mb-3 flex items-center justify-between rounded-lg bg-white px-4 py-2 shadow-sm border border-gray-200">
             <div class="font-semibold text-gray-900">{{ $data['akun']['kode_coa'] }} — {{ $data['akun']['nama_coa'] }}</div>
             <div class="text-sm text-gray-500">Saldo Awal: <strong class="tabular-nums">@rp($data['saldo_awal'])</strong></div>

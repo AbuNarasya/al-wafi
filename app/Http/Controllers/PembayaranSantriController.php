@@ -31,8 +31,8 @@ class PembayaranSantriController extends Controller
     private function tipe(string $lingkup): array
     {
         return $lingkup === 'ppsb'
-            ? \App\Models\TipeBiaya::kode('registrasi', 'uang_pangkal')
-            : \App\Models\TipeBiaya::kode('spp', 'lain');
+            ? \App\Models\TipeBiaya::kodeBerperilaku('registrasi', 'uang_pangkal', 'perlengkapan')
+            : \App\Models\TipeBiaya::kodeBerperilaku('spp', 'lain');
     }
 
     public function __construct(private readonly PembayaranSantriService $service) {}

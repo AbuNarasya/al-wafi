@@ -37,13 +37,13 @@
         <div class="doc">
             <div class="t">REKAP ANGSURAN UANG PANGKAL</div>
             <div class="meta">Dicetak: {{ now()->translatedFormat('d F Y') }}</div>
-            <div class="meta">{{ count($rows) }} rencana aktif</div>
+            <div class="meta">{{ count($rows) }} santri berjadwal aktif</div>
         </div>
     </div>
 
     <table>
         <thead>
-            <tr><th>#</th><th>No. Pendaftaran</th><th>Nama</th><th>Wali</th><th class="r">Total</th><th class="r">Terbayar</th><th class="r">Sisa</th><th>Termin berikut</th><th>Status</th></tr>
+            <tr><th>#</th><th>No. Pendaftaran</th><th>Nama</th><th>Komponen</th><th>Wali</th><th class="r">Total</th><th class="r">Terbayar</th><th class="r">Sisa</th><th>Termin berikut</th><th>Status</th></tr>
         </thead>
         <tbody>
             @forelse ($rows as $i => $r)
@@ -51,20 +51,24 @@
                     <td>{{ $i + 1 }}</td>
                     <td style="font-family:monospace">{{ $r['no_pendaftaran'] }}</td>
                     <td>{{ $r['nama'] }}</td>
+                    <td>{{ $r['label_komponen'] ?: 'Uang Pangkal' }}</td>
                     <td>{{ $r['nama_wali'] ?? '—' }}</td>
                     <td class="r">{{ $rp($r['total']) }}</td>
                     <td class="r">{{ $rp($r['terbayar']) }}</td>
                     <td class="r">{{ $rp($r['sisa']) }}</td>
-                    <td>{{ $r['termin_berikut'] ? '#' . $r['termin_berikut']['urutan'] . ' · ' . $tgl($r['termin_berikut']['jatuh_tempo']) : '—' }}</td>
+                    <td>
+                        {{ $r['termin_berikut'] ? '#' . $r['termin_berikut']['urutan'] . ' · ' . $tgl($r['termin_berikut']['jatuh_tempo']) : '—' }}
+                        @if ($r['termin_berikut'])<div style="color:#777;font-size:10px">{{ $r['termin_berikut']['label_komponen'] }}</div>@endif
+                    </td>
                     <td>{{ $labelTagihan[$r['status_tagihan']] ?? $r['status_tagihan'] }}</td>
                 </tr>
             @empty
-                <tr><td colspan="9" style="text-align:center;color:#999;padding:16px">Tidak ada rencana angsuran aktif.</td></tr>
+                <tr><td colspan="10" style="text-align:center;color:#999;padding:16px">Tidak ada rencana angsuran aktif.</td></tr>
             @endforelse
         </tbody>
         @if (count($rows))
             <tfoot>
-                <tr><td colspan="4">Total ({{ count($rows) }} rencana)</td><td class="r">{{ $rp($sum('total')) }}</td><td class="r">{{ $rp($sum('terbayar')) }}</td><td class="r">{{ $rp($sum('sisa')) }}</td><td colspan="2"></td></tr>
+                <tr><td colspan="5">Total ({{ count($rows) }} santri, uang pangkal + perlengkapan)</td><td class="r">{{ $rp($sum('total')) }}</td><td class="r">{{ $rp($sum('terbayar')) }}</td><td class="r">{{ $rp($sum('sisa')) }}</td><td colspan="2"></td></tr>
             </tfoot>
         @endif
     </table>

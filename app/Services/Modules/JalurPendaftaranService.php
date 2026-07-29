@@ -24,10 +24,11 @@ class JalurPendaftaranService
             throw new AppException(409, "Jalur berkode \"{$data['kode']}\" sudah ada. Sunting baris itu.");
         }
 
+        // Tanpa tahun_ajaran: jalur berlaku lintas T.A (lihat migration
+        // jalur_pendaftaran_lintas_tahun_ajaran).
         return JalurPendaftaran::create([
             'kode' => $data['kode'],
             'nama' => $data['nama'],
-            'tahun_ajaran' => $data['tahun_ajaran'],
             'keterangan' => $data['keterangan'] ?? null,
             'status' => $data['status'] ?? 'aktif',
         ]);
@@ -41,7 +42,6 @@ class JalurPendaftaranService
         }
         $lama->update([
             'nama' => $data['nama'] ?? $lama->nama,
-            'tahun_ajaran' => $data['tahun_ajaran'] ?? $lama->tahun_ajaran,
             'keterangan' => array_key_exists('keterangan', $data) ? $data['keterangan'] : $lama->keterangan,
             'status' => $data['status'] ?? $lama->status,
         ]);

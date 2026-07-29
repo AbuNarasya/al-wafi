@@ -129,6 +129,35 @@ class PengajuanPembayaranTest extends TestCase
         $this->svc->applyPayment($p->id, '50000');
     }
 
+    /**
+     * Lembar cetak: A4 portrait. Dulu A5 landscape (148mm) — tinggi isinya
+     * tumbuh mengikuti jumlah baris rincian DAN jumlah tahap approval, jadi
+     * mudah terpotong jadi dua halaman seperti kuitansi dulu.
+     */
+    public function test_cetak_memakai_a4_portrait(): void
+    {
+        $p = $this->buatPengajuan();
+        $inst = ApprovalInstance::where('jenis_dokumen', PengajuanPembayaranService::SUMBER)->where('id_dokumen', (string) $p->id)->first();
+        $this->appr->approve($inst->id, $this->mudir);
+
+        // status WAJIB 'aktif' di objek yang sama: default kolom hanya berlaku
+        // di baris DB, sedangkan Akses membaca model yang ada di memori.
+        $admin = User::create([
+            'username' => 'adm', 'nama' => 'Admin', 'password_hash' => 'x',
+            'kode_level' => 'L1', 'is_admin' => true, 'status' => 'aktif',
+        ]);
+
+        $this->actingAs($admin)->get("/pengajuan-pembayaran/{$p->id}/cetak")
+            ->assertOk()
+            ->assertSee('size: A4 portrait', false)
+            ->assertDontSee('A5 landscape', false)
+            ->assertSee('PENGAJUAN PEMBAYARAN')
+            ->assertSee($p->nomor)
+            // Blok tanda tangan ikut terisi: pemohon + approver yang sudah setuju.
+            ->assertSee('Diajukan oleh')
+            ->assertSee('Mudir');
+    }
+
     public function test_tolak_menandai_pengajuan_ditolak(): void
     {
         $p = $this->buatPengajuan();

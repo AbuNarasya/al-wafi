@@ -33,7 +33,7 @@ class SppController extends Controller
         }
 
         return view('spp.index', [
-            'sppJenis' => JenisBiaya::whereIn('tipe', \App\Models\TipeBiaya::kode('spp'))->where('status', 'aktif')->orderBy('kode')->get()
+            'sppJenis' => JenisBiaya::whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku('spp'))->where('status', 'aktif')->orderBy('kode')->get()
                 ->mapWithKeys(fn ($j) => [$j->kode => "{$j->kode} — {$j->nama}"])->all(),
             'periode' => $periode,
             'pratinjau' => $pratinjau,

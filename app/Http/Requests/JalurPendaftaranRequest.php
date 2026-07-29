@@ -23,7 +23,7 @@ class JalurPendaftaranRequest extends FormRequest
                 ? ['required', 'string', 'max:255', 'regex:/^[a-z0-9_]+$/i', Rule::unique('jalur_pendaftaran', 'kode')]
                 : ['prohibited'],
             'nama' => ['required', 'string', 'max:255'],
-            'tahun_ajaran' => ['required', 'string', Rule::exists('tahun_ajaran', 'kode')],
+            // Jalur berlaku lintas tahun ajaran — tak ada kolom T.A lagi.
             'keterangan' => ['nullable', 'string'],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
         ];

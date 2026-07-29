@@ -64,7 +64,7 @@ class UangPangkalTest extends TestCase
         PotonganGelombang::create(['tahun_ajaran' => '2026/2027', 'gelombang' => 1, 'potongan' => '1000000', 'masa_berlaku_hari' => 7, 'aktif' => true]);
         $santri = $this->buatSantriDiterima();
 
-        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '5000000']);
+        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '5000000'])['uang_pangkal'];
         // Efektif = 5jt - 1jt potongan = 4jt.
         $this->assertSame(4000000.0, (float) $tagihan->nominal);
         $potongan = PotonganUangPangkal::where('id_tagihan', $tagihan->id)->first();
@@ -96,7 +96,7 @@ class UangPangkalTest extends TestCase
     {
         PotonganGelombang::create(['tahun_ajaran' => '2026/2027', 'gelombang' => 1, 'potongan' => '1000000', 'masa_berlaku_hari' => 7, 'aktif' => true]);
         $santri = $this->buatSantriDiterima();
-        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '5000000']); // efektif 4jt
+        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '5000000'])['uang_pangkal']; // efektif 4jt
 
         $angsuran = new AngsuranUangPangkalService;
         $rencana = $angsuran->buatRencana($santri->id, [

@@ -13,9 +13,11 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Master Tahun Ajaran. kode ("2026/2027") dirujuk sebagai string oleh
- * jenis_biaya, jalur_pendaftaran, potongan_gelombang, target_santri, dan
- * santri — karena itu kode tak bisa diubah dan TA yang terpakai tak bisa
- * dihapus. Maksimal satu TA aktif menjadi default_pendaftaran.
+ * jenis_biaya, potongan_gelombang, target_santri, dan santri — karena itu kode
+ * tak bisa diubah dan TA yang terpakai tak bisa dihapus. Maksimal satu TA aktif
+ * menjadi default_pendaftaran.
+ *
+ * Jalur pendaftaran TIDAK termasuk: ia berlaku lintas tahun ajaran.
  */
 class TahunAjaranService
 {
@@ -72,7 +74,8 @@ class TahunAjaranService
         $row = $this->get($id);
         $dipakai = [
             'jenis biaya' => JenisBiaya::where('tahun_ajaran', $row->kode)->count(),
-            'jalur pendaftaran' => JalurPendaftaran::where('tahun_ajaran', $row->kode)->count(),
+            // Jalur pendaftaran TIDAK lagi dihitung: sejak 2026-07-28 jalur
+            // berlaku lintas tahun ajaran, jadi tak pernah merujuk satu T.A.
             'potongan gelombang' => PotonganGelombang::where('tahun_ajaran', $row->kode)->count(),
             'target santri' => TargetSantri::where('tahun_ajaran', $row->kode)->count(),
             'santri' => Santri::where('tahun_ajaran', $row->kode)->count(),

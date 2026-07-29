@@ -2,11 +2,11 @@
 
 @section('title', 'Jenis Biaya')
 
-@php $labelTipe = ['registrasi' => 'bg-blue-100 text-blue-700', 'uang_pangkal' => 'bg-purple-100 text-purple-700', 'spp' => 'bg-emerald-100 text-emerald-700', 'lain' => 'bg-gray-100 text-gray-600']; @endphp
+@php $labelTipe = ['registrasi' => 'bg-blue-100 text-blue-700', 'uang_pangkal' => 'bg-purple-100 text-purple-700', 'perlengkapan' => 'bg-amber-100 text-amber-700', 'spp' => 'bg-emerald-100 text-emerald-700', 'lain' => 'bg-gray-100 text-gray-600']; @endphp
 
 @section('content')
     <div x-data="rowFilter" x-cloak>
-    <p class="mb-3 text-sm text-gray-500">Jenis biaya kesantrian: registrasi, uang pangkal, SPP (berulang), dan lain-lain.</p>
+    <p class="mb-3 text-sm text-gray-500">Jenis biaya kesantrian: registrasi, uang pangkal, perlengkapan, SPP (berulang), dan lain-lain.</p>
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <x-filter-bar placeholder="Cari kode / nama…" />
         @if (\App\Support\Akses::boleh('jenis-biaya', 'buat'))

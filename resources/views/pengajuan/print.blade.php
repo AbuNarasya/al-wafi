@@ -8,7 +8,15 @@
     <style>
         @media print {
             .no-print { display: none !important; }
-            @page { size: A5 landscape; margin: 8mm; }
+            /* A4 portrait: rincian pengajuan bisa berbaris banyak dan blok
+               tanda tangan tumbuh mengikuti jumlah tahap approval, jadi A5
+               landscape (148mm) terlalu pendek dan memotong isinya. */
+            @page { size: A4 portrait; margin: 12mm; }
+            /* Marginnya sudah diberi @page; batas lebar & padding layar
+               dilepas agar isi tak melebar melewati area cetak. */
+            .lembar { max-width: none !important; padding: 0 !important; }
+            /* Blok tanda tangan jangan terbelah dua halaman. */
+            .ttd { break-inside: avoid; page-break-inside: avoid; }
         }
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     </style>
@@ -35,7 +43,7 @@
         : ['label' => 'Diverifikasi — Keuangan', 'nama' => null];
 @endphp
 
-    <div class="mx-auto max-w-3xl p-8">
+    <div class="lembar mx-auto max-w-3xl p-8">
         {{-- Toolbar (tidak ikut cetak) --}}
         <div class="no-print mb-6 flex items-center justify-between">
             <a href="{{ route('pengajuan.show', $rec->id) }}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Kembali</a>
@@ -101,7 +109,9 @@
         </table>
 
         {{-- Tanda tangan: pemohon → approver (per tahap berlaku) → verifikator --}}
-        <div class="mt-8 grid gap-6 text-center text-xs" style="grid-template-columns: repeat({{ max(count($signatures), 1) }}, minmax(0, 1fr));">
+        {{-- Maksimal 4 kolom: di A4 portrait (lebar cetak ±186mm) lebih dari itu
+             membuat tiap kotak terlalu sempit; sisanya turun ke baris berikutnya. --}}
+        <div class="ttd mt-8 grid gap-6 text-center text-xs" style="grid-template-columns: repeat({{ min(max(count($signatures), 1), 4) }}, minmax(0, 1fr));">
             @foreach ($signatures as $s)
                 <div>
                     <div class="text-gray-500">{{ $s['label'] }}</div>

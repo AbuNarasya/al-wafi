@@ -75,7 +75,7 @@ class TanpaGelombangTest extends TestCase
         $santri = $this->buatSantri(null);
         $this->assertNull($santri->gelombang);
 
-        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '20000000']);
+        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '20000000'])['uang_pangkal'];
 
         // Terbit penuh — potongan gelombang 1 TIDAK menempel.
         $this->assertSame(20000000.0, (float) $tagihan->nominal);
@@ -86,7 +86,7 @@ class TanpaGelombangTest extends TestCase
     {
         $santri = $this->buatSantri(1);
 
-        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '20000000']);
+        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '20000000'])['uang_pangkal'];
 
         $this->assertSame(18000000.0, (float) $tagihan->nominal); // 20jt − 2jt
         $this->assertSame(2000000.0, (float) PotonganUangPangkal::where('id_tagihan', $tagihan->id)->first()->potongan);

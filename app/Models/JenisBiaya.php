@@ -58,7 +58,7 @@ class JenisBiaya extends Model
     {
         // $tipe di sini adalah PERILAKU (registrasi/uang_pangkal/spp/lain), bukan
         // kode tipe — master Tipe Biaya boleh punya banyak kode berperilaku sama.
-        $kodeTipe = TipeBiaya::kode($tipe);
+        $kodeTipe = TipeBiaya::kodeBerperilaku($tipe);
 
         $cari = function (?string $jenjang, ?string $jalur) use ($kodeTipe, $tahunAjaran) {
             return static::whereIn('tipe', $kodeTipe)->where('status', 'aktif')

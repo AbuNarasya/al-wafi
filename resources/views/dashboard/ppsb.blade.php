@@ -41,11 +41,15 @@
         $kartu = [
             ['registrasi', 'Penerimaan Registrasi', $penerimaan['registrasi'], 'text-emerald-700', null],
             ['uang_pangkal', 'Penerimaan Uang Pangkal', $penerimaan['uang_pangkal'], 'text-emerald-700', 'termasuk cicilan termin'],
+            ['perlengkapan', 'Penerimaan Perlengkapan', $penerimaan['perlengkapan'] ?? '0', 'text-emerald-700', 'tanpa potongan gelombang'],
             ['total', 'Total Penerimaan', $penerimaan['total'], 'text-brand', null],
             ['outstanding', 'Outstanding Closing', $outstanding['total'], 'text-amber-600', $outstanding['jumlah_santri'].' santri yang sudah mulai membayar'],
         ];
+        // Kolom komponen pada rincian: tampil bila kartunya memang komponen itu,
+        // atau bila yang dibuka kartu Total (yang memuat ketiganya).
+        $kolomKomponen = ['registrasi' => 'Registrasi', 'uang_pangkal' => 'Uang Pangkal', 'perlengkapan' => 'Perlengkapan'];
     @endphp
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         @foreach ($kartu as [$jenis, $label, $nilai, $warna, $catatan])
             <div class="flex flex-col rounded-xl border bg-white p-4 shadow-sm {{ $detail === $jenis ? 'border-brand ring-1 ring-brand' : 'border-gray-200' }}">
                 <div class="text-xs uppercase tracking-wide text-gray-500">{{ $label }}</div>
@@ -64,6 +68,7 @@
     @if ($rincian !== null)
         @php
             $judulDetail = ['registrasi' => 'Penerimaan Registrasi', 'uang_pangkal' => 'Penerimaan Uang Pangkal',
+                'perlengkapan' => 'Penerimaan Biaya Perlengkapan',
                 'total' => 'Total Penerimaan', 'outstanding' => 'Outstanding Closing'][$detail];
         @endphp
         <div id="rincian" class="overflow-hidden rounded-xl border border-brand/40 bg-white shadow-sm">
@@ -115,8 +120,9 @@
                                 <th class="px-4 py-2 text-right">Sisa</th>
                                 <th class="px-4 py-2">Jatuh Tempo</th>
                             @else
-                                @if ($detail !== 'uang_pangkal')<th class="px-4 py-2 text-right">Registrasi</th>@endif
-                                @if ($detail !== 'registrasi')<th class="px-4 py-2 text-right">Uang Pangkal</th>@endif
+                                @foreach ($kolomKomponen as $k => $labelKolom)
+                                    @if ($detail === 'total' || $detail === $k)<th class="px-4 py-2 text-right">{{ $labelKolom }}</th>@endif
+                                @endforeach
                                 <th class="px-4 py-2 text-right">Total</th>
                                 <th class="px-4 py-2 text-right">Bayar</th>
                                 <th class="px-4 py-2">Terakhir</th>
@@ -140,8 +146,9 @@
                                     <td class="px-4 py-2 text-right font-semibold tabular-nums text-amber-700">@rp($r->sisa)</td>
                                     <td class="px-4 py-2 text-gray-500">{{ $r->jatuh_tempo ? \Illuminate\Support\Carbon::parse($r->jatuh_tempo)->format('d/m/Y') : '—' }}</td>
                                 @else
-                                    @if ($detail !== 'uang_pangkal')<td class="px-4 py-2 text-right tabular-nums">@rp($r->registrasi)</td>@endif
-                                    @if ($detail !== 'registrasi')<td class="px-4 py-2 text-right tabular-nums">@rp($r->uang_pangkal)</td>@endif
+                                    @foreach (array_keys($kolomKomponen) as $k)
+                                        @if ($detail === 'total' || $detail === $k)<td class="px-4 py-2 text-right tabular-nums">@rp($r->$k)</td>@endif
+                                    @endforeach
                                     <td class="px-4 py-2 text-right font-semibold tabular-nums">@rp($r->total)</td>
                                     <td class="px-4 py-2 text-right tabular-nums text-gray-500">{{ $r->jumlah_bayar }}×</td>
                                     <td class="px-4 py-2 text-gray-500">{{ $r->terakhir ? \Illuminate\Support\Carbon::parse($r->terakhir)->format('d/m/Y') : '—' }}</td>

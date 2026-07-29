@@ -164,7 +164,7 @@ class PpsbDashboardService
         $rows = PembayaranSantri::query()
             ->where('status', self::DIAKUI)
             ->whereHas('santri', fn ($q) => $q->where('tahun_ajaran', $ta))
-            ->whereHas('tagihan.jenis', fn ($q) => $q->whereIn('tipe', TipeBiaya::kode(...$tipe)))
+            ->whereHas('tagihan.jenis', fn ($q) => $q->whereIn('tipe', TipeBiaya::kodeBerperilaku(...$tipe)))
             ->orderBy('tanggal')->orderBy('id')
             ->get(['id_santri', 'tanggal']);
 
@@ -200,7 +200,7 @@ class PpsbDashboardService
         $rows = TagihanSantri::query()
             ->whereIn('id_santri', $ids)
             ->where('status', '!=', 'batal')
-            ->whereHas('jenis', fn ($q) => $q->whereIn('tipe', TipeBiaya::kode('uang_pangkal')))
+            ->whereHas('jenis', fn ($q) => $q->whereIn('tipe', TipeBiaya::kodeBerperilaku('uang_pangkal')))
             ->with('santri:id,kode_jenjang')
             ->get(['id', 'id_santri', 'sisa']);
 
@@ -224,10 +224,15 @@ class PpsbDashboardService
     }
 
     /**
-     * 4 — Penerimaan yang sudah masuk: registrasi + uang pangkal (termasuk
-     * cicilan termin, karena semuanya tercatat sebagai pembayaran tagihan yang sama).
+     * 4 — Penerimaan yang sudah masuk: registrasi + uang pangkal + perlengkapan
+     * (termasuk cicilan termin, karena semuanya tercatat sebagai pembayaran
+     * tagihan yang sama).
      *
-     * @return array{registrasi:string,uang_pangkal:string,total:string,per_bulan:array<string,string>}
+     * Perlengkapan dihitung di KOLOM SENDIRI, tidak dilebur ke uang pangkal:
+     * kalau digabung, angkanya tak lagi bisa dibandingkan dengan tarif uang
+     * pangkal mana pun di master.
+     *
+     * @return array{registrasi:string,uang_pangkal:string,perlengkapan:string,total:string,per_bulan:array<string,string>}
      */
     public function penerimaan(string $ta): array
     {
@@ -239,6 +244,7 @@ class PpsbDashboardService
 
         $registrasi = '0';
         $uangPangkal = '0';
+        $perlengkapan = '0';
         $perBulan = [];
         foreach ($rows as $p) {
             $tipe = TipeBiaya::perilakuDari($p->tagihan?->jenis?->tipe);
@@ -246,6 +252,8 @@ class PpsbDashboardService
                 $registrasi = Money::add($registrasi, $p->nominal);
             } elseif ($tipe === 'uang_pangkal') {
                 $uangPangkal = Money::add($uangPangkal, $p->nominal);
+            } elseif ($tipe === 'perlengkapan') {
+                $perlengkapan = Money::add($perlengkapan, $p->nominal);
             } else {
                 continue; // SPP & tagihan lain di luar lingkup PPSB
             }
@@ -256,7 +264,8 @@ class PpsbDashboardService
         return [
             'registrasi' => $registrasi,
             'uang_pangkal' => $uangPangkal,
-            'total' => Money::add($registrasi, $uangPangkal),
+            'perlengkapan' => $perlengkapan,
+            'total' => Money::add(Money::add($registrasi, $uangPangkal), $perlengkapan),
             'per_bulan' => $perBulan,
         ];
     }
@@ -270,21 +279,23 @@ class PpsbDashboardService
      * seluruh pembayaran ke memori lalu dijumlahkan PHP: begitu pendaftarnya
      * ratusan, cara lama memuat ribuan baris tiap kali panel dibuka.
      *
-     * @param  'registrasi'|'uang_pangkal'|'total'  $jenis
+     * @param  'registrasi'|'uang_pangkal'|'perlengkapan'|'total'  $jenis
      */
     public function kueriPenerimaan(string $ta, string $jenis, string $cari = '')
     {
         $tipe = match ($jenis) {
             'registrasi' => ['registrasi'],
             'uang_pangkal' => ['uang_pangkal'],
-            default => ['registrasi', 'uang_pangkal'],
+            'perlengkapan' => ['perlengkapan'],
+            default => ['registrasi', 'uang_pangkal', 'perlengkapan'],
         };
 
-        // Kolom "registrasi" & "uang pangkal" dijumlahkan per PERILAKU tipe, jadi
-        // tipe buatan sendiri ikut masuk kolom yang benar. Daftar kodenya
-        // di-bind sebagai parameter, bukan ditempel ke SQL.
-        $kodeReg = TipeBiaya::kode('registrasi');
-        $kodeUp = TipeBiaya::kode('uang_pangkal');
+        // Kolom "registrasi", "uang pangkal", & "perlengkapan" dijumlahkan per
+        // PERILAKU tipe, jadi tipe buatan sendiri ikut masuk kolom yang benar.
+        // Daftar kodenya di-bind sebagai parameter, bukan ditempel ke SQL.
+        $kodeReg = TipeBiaya::kodeBerperilaku('registrasi');
+        $kodeUp = TipeBiaya::kodeBerperilaku('uang_pangkal');
+        $kodePl = TipeBiaya::kodeBerperilaku('perlengkapan');
         $isi = fn (array $kode) => implode(',', array_fill(0, count($kode), '?'));
 
         return DB::table('pembayaran_santri as p')
@@ -293,12 +304,13 @@ class PpsbDashboardService
             ->join('santri as s', 's.id', '=', 'p.id_santri')
             ->where('p.status', self::DIAKUI)
             ->where('s.tahun_ajaran', $ta)
-            ->whereIn('j.tipe', TipeBiaya::kode(...$tipe))
+            ->whereIn('j.tipe', TipeBiaya::kodeBerperilaku(...$tipe))
             ->tap(fn ($q) => $this->saringCari($q, $cari))
             ->groupBy('s.id', 's.nama', 's.no_pendaftaran', 's.nis', 's.kode_jenjang', 's.jalur')
             ->select(['s.id', 's.nama', 's.no_pendaftaran', 's.nis', 's.kode_jenjang as jenjang', 's.jalur'])
             ->selectRaw("COALESCE(SUM(CASE WHEN j.tipe IN ({$isi($kodeReg)}) THEN p.nominal ELSE 0 END), 0) as registrasi", $kodeReg)
             ->selectRaw("COALESCE(SUM(CASE WHEN j.tipe IN ({$isi($kodeUp)}) THEN p.nominal ELSE 0 END), 0) as uang_pangkal", $kodeUp)
+            ->selectRaw("COALESCE(SUM(CASE WHEN j.tipe IN ({$isi($kodePl)}) THEN p.nominal ELSE 0 END), 0) as perlengkapan", $kodePl)
             ->selectRaw('COALESCE(SUM(p.nominal), 0) as total')
             ->selectRaw('COUNT(*) as jumlah_bayar')
             ->selectRaw('MAX(p.tanggal) as terakhir')
@@ -316,7 +328,7 @@ class PpsbDashboardService
         return DB::table('tagihan_santri as t')
             ->join('jenis_biaya as j', 'j.kode', '=', 't.kode_jenis')
             ->join('santri as s', 's.id', '=', 't.id_santri')
-            ->whereIn('j.tipe', TipeBiaya::kode('uang_pangkal'))
+            ->whereIn('j.tipe', TipeBiaya::kodeBerperilaku('uang_pangkal'))
             ->where('t.status', '!=', 'batal')
             ->where('t.sisa', '>', 0)
             ->where('s.tahun_ajaran', $ta)
@@ -325,7 +337,7 @@ class PpsbDashboardService
                 ->join('jenis_biaya as j2', 'j2.kode', '=', 't2.kode_jenis')
                 ->whereColumn('p2.id_santri', 's.id')
                 ->where('p2.status', self::DIAKUI)
-                ->whereIn('j2.tipe', TipeBiaya::kode('uang_pangkal'))
+                ->whereIn('j2.tipe', TipeBiaya::kodeBerperilaku('uang_pangkal'))
                 ->selectRaw('1'))
             ->tap(fn ($q) => $this->saringCari($q, $cari))
             ->select([
@@ -548,7 +560,7 @@ class PpsbDashboardService
     /** Apakah master jenis biaya PPSB sudah siap (untuk pesan menuntun di view). */
     public function masterSiap(string $ta): bool
     {
-        return JenisBiaya::where('tahun_ajaran', $ta)->whereIn('tipe', TipeBiaya::kode('registrasi', 'uang_pangkal'))
+        return JenisBiaya::where('tahun_ajaran', $ta)->whereIn('tipe', TipeBiaya::kodeBerperilaku('registrasi', 'uang_pangkal'))
             ->where('status', 'aktif')->exists();
     }
 }

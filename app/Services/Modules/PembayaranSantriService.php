@@ -25,12 +25,12 @@ use Illuminate\Support\Facades\DB;
 class PembayaranSantriService
 {
     private const TIPE_LINGKUP = [
-        'ppsb' => ['registrasi', 'uang_pangkal'],
+        'ppsb' => ['registrasi', 'uang_pangkal', 'perlengkapan'],
         'kesantrian' => ['spp', 'lain'],
     ];
 
     private const LABEL_LINGKUP = [
-        'ppsb' => 'PPSB (registrasi & uang pangkal)',
+        'ppsb' => 'PPSB (registrasi, uang pangkal & perlengkapan)',
         'kesantrian' => 'Kesantrian (SPP & tagihan lain)',
     ];
 

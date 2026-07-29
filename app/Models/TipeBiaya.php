@@ -6,8 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * Master Tipe Biaya. `perilaku` menentukan ALUR yang diikuti tipe ini
- * (registrasi | uang_pangkal | spp | lain) — kode boleh apa saja, tetapi
- * program selalu menyaring berdasarkan perilakunya.
+ * (registrasi | uang_pangkal | perlengkapan | spp | lain) — kode boleh apa saja,
+ * tetapi program selalu menyaring berdasarkan perilakunya.
  */
 class TipeBiaya extends Model
 {
@@ -25,6 +25,7 @@ class TipeBiaya extends Model
     public const PERILAKU = [
         'registrasi' => 'Registrasi — tagihan terbit otomatis saat calon mendaftar',
         'uang_pangkal' => 'Uang Pangkal — potongan gelombang & angsuran termin',
+        'perlengkapan' => 'Perlengkapan — terbit bersama uang pangkal, TANPA potongan gelombang, termin sendiri',
         'spp' => 'SPP — terbit berkala per periode',
         'lain' => 'Lain-lain — ditagihkan manual per santri',
     ];
@@ -44,9 +45,16 @@ class TipeBiaya extends Model
      * Selalu memuat nama perilaku itu sendiri walau masternya kosong/terhapus,
      * supaya data lama (yang tipenya persis bernama perilaku) tetap terbaca.
      *
+     * NAMANYA JANGAN dikembalikan jadi `kode()`: `kode` juga nama KOLOM tabel
+     * ini. Pada objek yang belum tersimpan (`new TipeBiaya`) atribut `kode`
+     * belum ada, sehingga Eloquent menyangka `$row->kode` adalah relasi dan
+     * melempar "must return a relationship instance" — itu yang dulu membuat
+     * halaman Tambah Tipe Biaya gagal dibuka. Nama method di model TIDAK BOLEH
+     * sama dengan nama kolom.
+     *
      * @return list<string>
      */
-    public static function kode(string ...$perilaku): array
+    public static function kodeBerperilaku(string ...$perilaku): array
     {
         self::$memoKode ??= static::query()->get(['kode', 'perilaku'])
             ->groupBy('perilaku')->map(fn ($g) => $g->pluck('kode')->all())->all();
@@ -65,8 +73,8 @@ class TipeBiaya extends Model
         if ($kode === null) {
             return null;
         }
-        foreach (['registrasi', 'uang_pangkal', 'spp', 'lain'] as $p) {
-            if (in_array($kode, self::kode($p), true)) {
+        foreach (array_keys(self::PERILAKU) as $p) {
+            if (in_array($kode, self::kodeBerperilaku($p), true)) {
                 return $p;
             }
         }

@@ -24,11 +24,12 @@ use Illuminate\View\View;
 class DashboardController extends Controller
 {
     /** Kartu PPSB yang punya rincian & unduhan. */
-    private const JENIS_RINCIAN = ['registrasi', 'uang_pangkal', 'total', 'outstanding'];
+    private const JENIS_RINCIAN = ['registrasi', 'uang_pangkal', 'perlengkapan', 'total', 'outstanding'];
 
     private const JUDUL_RINCIAN = [
         'registrasi' => 'Rincian Penerimaan Registrasi',
         'uang_pangkal' => 'Rincian Penerimaan Uang Pangkal',
+        'perlengkapan' => 'Rincian Penerimaan Biaya Perlengkapan',
         'total' => 'Rincian Total Penerimaan',
         'outstanding' => 'Rincian Outstanding Closing',
     ];
@@ -158,6 +159,7 @@ class DashboardController extends Controller
             'Jalur' => $r->jalur,
             'Registrasi' => $r->registrasi,
             'Uang Pangkal' => $r->uang_pangkal,
+            'Perlengkapan' => $r->perlengkapan,
             'Total' => $r->total,
             'Jumlah Pembayaran' => $r->jumlah_bayar,
             'Pembayaran Terakhir' => $r->terakhir,

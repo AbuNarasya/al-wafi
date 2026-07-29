@@ -87,7 +87,7 @@ final class TugasSaya
             ['/approvals', (new ApprovalService)->inbox($user->id_pengguna)->count(), 'menunggu persetujuan Anda'],
 
             ['/ppsb/pembayaran', Akses::boleh('pembayaran-ppsb', 'ubah')
-                ? self::pembayaranMenunggu(['registrasi', 'uang_pangkal']) : 0, 'menunggu verifikasi'],
+                ? self::pembayaranMenunggu(['registrasi', 'uang_pangkal', 'perlengkapan']) : 0, 'menunggu verifikasi'],
 
             ['/kesantrian/pembayaran', Akses::boleh('pembayaran-kesantrian', 'ubah')
                 ? self::pembayaranMenunggu(['spp', 'lain']) : 0, 'menunggu verifikasi'],
@@ -120,17 +120,22 @@ final class TugasSaya
     private static function jatuhTempo(): array
     {
         $modul = [
-            '/ppsb/angsuran-uang-pangkal' => ['modul' => 'angsuran-uang-pangkal', 'jumlah' => 0, 'label' => 'angsuran jatuh tempo'],
-            '/ppsb/pembayaran' => ['modul' => 'pembayaran-ppsb', 'jumlah' => 0, 'label' => 'tagihan jatuh tempo'],
-            '/kesantrian/pembayaran' => ['modul' => 'pembayaran-kesantrian', 'jumlah' => 0, 'label' => 'tagihan jatuh tempo'],
-            '/invoices' => ['modul' => 'invoices', 'jumlah' => 0, 'label' => 'invoice jatuh tempo'],
+            // Label menyebut "mendekati/lewat" karena hitungannya memang memuat
+            // yang BELUM jatuh tempo: jendelanya H-n dari pengaturan reminder
+            // (mis. 7,3,1 → semua yang jatuh tempo ≤ 7 hari lagi ikut terhitung).
+            // Menyebutnya "jatuh tempo" saja membuat orang menyangka ada yang
+            // sudah telat padahal belum.
+            '/ppsb/angsuran-uang-pangkal' => ['modul' => 'angsuran-uang-pangkal', 'jumlah' => 0, 'label' => 'angsuran mendekati/lewat jatuh tempo'],
+            '/ppsb/pembayaran' => ['modul' => 'pembayaran-ppsb', 'jumlah' => 0, 'label' => 'tagihan mendekati/lewat jatuh tempo'],
+            '/kesantrian/pembayaran' => ['modul' => 'pembayaran-kesantrian', 'jumlah' => 0, 'label' => 'tagihan mendekati/lewat jatuh tempo'],
+            '/invoices' => ['modul' => 'invoices', 'jumlah' => 0, 'label' => 'invoice mendekati/lewat jatuh tempo'],
         ];
 
         foreach ((new ReminderTagihanService)->daftarMendekati() as $item) {
             $url = match ($item['sumber']) {
                 'angsuran_uang_pangkal' => '/ppsb/angsuran-uang-pangkal',
                 'invoice_vendor' => '/invoices',
-                'tagihan_santri' => in_array($item['tipe'] ?? 'lain', ['registrasi', 'uang_pangkal'], true)
+                'tagihan_santri' => in_array($item['tipe'] ?? 'lain', ['registrasi', 'uang_pangkal', 'perlengkapan'], true)
                     ? '/ppsb/pembayaran' : '/kesantrian/pembayaran',
                 default => null,
             };
@@ -152,7 +157,7 @@ final class TugasSaya
     private static function pembayaranMenunggu(array $perilaku): int
     {
         return PembayaranSantri::where('status', 'menunggu_verifikasi')
-            ->whereHas('tagihan.jenis', fn ($q) => $q->whereIn('tipe', \App\Models\TipeBiaya::kode(...$perilaku)))
+            ->whereHas('tagihan.jenis', fn ($q) => $q->whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku(...$perilaku)))
             ->count();
     }
 

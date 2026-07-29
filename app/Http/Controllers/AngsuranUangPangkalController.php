@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
 use App\Models\CompanySettings;
-use App\Models\TagihanSantri;
 use App\Services\Modules\AngsuranUangPangkalService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,18 +34,17 @@ class AngsuranUangPangkalController extends Controller
         ]);
     }
 
+    /**
+     * Satu baris per SANTRI (bukan per tagihan): sekali pilih nama, kedua
+     * komponennya dijadwalkan di form yang sama — masing-masing dengan tabel
+     * termin sendiri.
+     */
     public function create(): View
     {
-        $tagihan = TagihanSantri::query()->with('santri')
-            ->whereHas('jenis', fn ($q) => $q->whereIn('tipe', \App\Models\TipeBiaya::kode('uang_pangkal')))
-            ->whereDoesntHave('rencanaAngsuran', fn ($q) => $q->where('status', 'aktif'))
-            ->get();
-
-        $santriData = $tagihan->map(fn ($t) => [
-            'id_santri' => $t->id_santri, 'nama' => $t->santri?->nama, 'total' => (float) $t->nominal,
-        ])->values();
-
-        return view('angsuran-uang-pangkal.create', ['santriData' => $santriData]);
+        return view('angsuran-uang-pangkal.create', [
+            'santriData' => collect($this->service->daftarPenjadwalan()),
+            'komponen' => AngsuranUangPangkalService::KOMPONEN,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -54,22 +52,27 @@ class AngsuranUangPangkalController extends Controller
         $data = $this->validasiTermin($request);
 
         try {
-            $this->service->buatRencana((int) $data['id_santri'], [
-                'disepakati_pada' => $data['disepakati_pada'], 'catatan' => $data['catatan'] ?? null,
-                'termin' => array_values($data['termin']),
+            $rencana = $this->service->buatRencanaGabungan((int) $data['id_santri'], [
+                'disepakati_pada' => $data['disepakati_pada'],
+                'catatan' => $data['catatan'] ?? null,
+                'uang_pangkal' => $data['termin_uang_pangkal'] ?? null,
+                'perlengkapan' => $data['termin_perlengkapan'] ?? null,
             ], $request->user()->id_pengguna);
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('angsuran_uang_pangkal.index')->with('status', 'Rencana angsuran berhasil dibuat.');
+        $label = collect($rencana)->map(fn ($r, $k) => strtolower(AngsuranUangPangkalService::KOMPONEN[$k]))->join(' & ');
+
+        return redirect()->route('angsuran_uang_pangkal.index')
+            ->with('status', "Rencana angsuran {$label} berhasil dibuat.");
     }
 
-    /** Detail rencana satu santri (termin, potongan, riwayat bayar & versi) + form re-negosiasi. */
+    /** Detail kedua komponen satu santri (termin, potongan, riwayat bayar & versi) + form re-negosiasi. */
     public function show(int $idSantri): View
     {
         try {
-            $detail = $this->service->detail($idSantri);
+            $detail = $this->service->detailSantri($idSantri);
         } catch (AppException $e) {
             return abort(404, $e->getMessage());
         }
@@ -80,6 +83,7 @@ class AngsuranUangPangkalController extends Controller
     public function renegosiasi(Request $request, int $idSantri): RedirectResponse
     {
         $data = $request->validate([
+            'komponen' => ['nullable', 'string', 'in:'.implode(',', array_keys(AngsuranUangPangkalService::KOMPONEN))],
             'disepakati_pada' => ['required', 'date'],
             'alasan' => ['required', 'string', 'max:255'],
             'catatan' => ['nullable', 'string'],
@@ -91,6 +95,7 @@ class AngsuranUangPangkalController extends Controller
 
         try {
             $this->service->renegosiasi($idSantri, [
+                'komponen' => $data['komponen'] ?? 'uang_pangkal',
                 'disepakati_pada' => $data['disepakati_pada'], 'alasan' => $data['alasan'],
                 'catatan' => $data['catatan'] ?? null, 'termin' => array_values($data['termin']),
             ], $request->user()->id_pengguna);
@@ -143,7 +148,7 @@ class AngsuranUangPangkalController extends Controller
     public function cetakDetail(int $idSantri): View
     {
         try {
-            $detail = $this->service->detail($idSantri);
+            $detail = $this->service->detailSantri($idSantri);
         } catch (AppException $e) {
             return abort(404, $e->getMessage());
         }
@@ -151,17 +156,27 @@ class AngsuranUangPangkalController extends Controller
         return view('angsuran-uang-pangkal.print-detail', ['d' => $detail, 'company' => CompanySettings::find(1)]);
     }
 
-    /** @return array<string,mixed> */
+    /**
+     * Dua tabel termin dalam satu form; salah satunya boleh kosong (komponen
+     * yang tak ada tagihannya atau sudah punya rencana aktif), tetapi tidak
+     * keduanya — itu diperiksa servicenya dengan pesan yang lebih menuntun.
+     *
+     * @return array<string,mixed>
+     */
     private function validasiTermin(Request $request): array
     {
+        $aturanTermin = [];
+        foreach (array_keys(AngsuranUangPangkalService::KOMPONEN) as $k) {
+            $aturanTermin["termin_{$k}"] = ['nullable', 'array'];
+            $aturanTermin["termin_{$k}.*.nominal"] = ['required', 'numeric', 'gt:0'];
+            $aturanTermin["termin_{$k}.*.jatuh_tempo"] = ['required', 'date'];
+            $aturanTermin["termin_{$k}.*.keterangan"] = ['nullable', 'string'];
+        }
+
         return $request->validate([
             'id_santri' => ['required', 'integer', 'exists:santri,id'],
             'disepakati_pada' => ['required', 'date'],
             'catatan' => ['nullable', 'string'],
-            'termin' => ['required', 'array', 'min:1'],
-            'termin.*.nominal' => ['required', 'numeric', 'gt:0'],
-            'termin.*.jatuh_tempo' => ['required', 'date'],
-            'termin.*.keterangan' => ['nullable', 'string'],
-        ]);
+        ] + $aturanTermin);
     }
 }

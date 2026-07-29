@@ -23,7 +23,10 @@
                         <td class="px-4 py-1.5 text-right text-gray-600 tabular-nums">@rp($a['nilai'])</td>
                         @if ($detail)
                             <td class="px-4 py-1.5 text-right">
-                                <a href="{{ route('reports.buku_besar', ['kode_coa' => $a['kode_coa'], 'from' => $detail['from'], 'to' => $detail['to']]) }}"
+                                {{-- Unit ikut dibawa: kalau laporannya sedang disaring per
+                                     unit, buku besarnya harus menyaring hal yang sama —
+                                     kalau tidak, angkanya tak akan cocok. --}}
+                                <a href="{{ route('reports.buku_besar', array_filter(['kode_coa' => $a['kode_coa'], 'from' => $detail['from'], 'to' => $detail['to'], 'kode_unit' => $detail['kode_unit'] ?? null])) }}"
                                    target="_blank" class="text-xs text-brand hover:underline">Lihat detail</a>
                             </td>
                         @endif

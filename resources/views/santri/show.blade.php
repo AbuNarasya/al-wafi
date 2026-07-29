@@ -151,7 +151,7 @@
                     @if (in_array($santri->status, ['diterima', 'lolos_kesehatan'], true) && ! $sudahAdaUangPangkal)
                         {{-- Tagihkan uang pangkal: nominal diinput per calon (agar keringanan/potongan bisa) --}}
                         <form method="POST" action="{{ $act('tagih-uang-pangkal') }}" class="w-full space-y-2 rounded-lg border border-amber-200 bg-amber-50/40 p-3">@csrf
-                            <div class="text-sm font-semibold text-gray-700">Tagihkan Uang Pangkal</div>
+                            <div class="text-sm font-semibold text-gray-700">Tagihkan Uang Pangkal &amp; Perlengkapan</div>
                             <p class="text-xs text-gray-500">Masukkan nominal <b>NORMAL</b>. Bila gelombang berpotongan, tagihan terbit sebesar setelah potongan. <b>Belum menerbitkan jurnal</b> — yang dibayar sebelum daftar ulang diakui saat uang diterima, sisanya diakrualkan saat Daftar Ulang.</p>
                             @if ($potonganUangPangkal)
                                 <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -166,6 +166,16 @@
                                         <span class="mt-0.5 block text-[11px] text-gray-400">Terisi dari master Jenis Biaya — boleh diubah bila calon ini berbeda.</span>
                                     @endif
                                 </label>
+                                {{-- Perlengkapan TIDAK dipotong potongan gelombang: terbit utuh
+                                     sebagai tagihan tersendiri, dengan jadwal termin sendiri. --}}
+                                <label class="block text-xs text-gray-600">Biaya Perlengkapan
+                                    <input type="number" step="0.01" min="0" name="nominal_perlengkapan" placeholder="kosongkan bila tidak dipungut"
+                                           value="{{ old('nominal_perlengkapan', $nominalDefaultPerlengkapan) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                    <span class="mt-0.5 block text-[11px] text-gray-400">
+                                        Terbit sebagai tagihan terpisah dan <b>tidak dipotong</b> potongan gelombang.
+                                        @if ($nominalDefaultPerlengkapan !== null) Terisi dari master Jenis Biaya. @endif
+                                    </span>
+                                </label>
                                 <label class="block text-xs text-gray-600">Jatuh Tempo
                                     <input type="date" name="jatuh_tempo" class="mt-0.5 w-full rounded border-gray-300 text-sm">
                                 </label>
@@ -173,7 +183,7 @@
                                     <input type="text" name="keterangan" placeholder="opsional" class="mt-0.5 w-full rounded border-gray-300 text-sm">
                                 </label>
                             </div>
-                            <button class="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-700">Terbitkan Tagihan Uang Pangkal</button>
+                            <button class="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-700">Terbitkan Tagihan</button>
                         </form>
                     @endif
 
@@ -217,6 +227,53 @@
                                     </label>
                                     <label class="block text-xs text-gray-600">Jatuh Tempo
                                         <input type="date" name="jatuh_tempo" value="{{ old('jatuh_tempo', optional($k['tagihan']->jatuh_tempo)->format('Y-m-d')) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                    </label>
+                                    <label class="block text-xs text-gray-600">Alasan Koreksi <span class="text-red-500">*</span>
+                                        <input type="text" name="alasan" required placeholder="mis. salah ketik nol" value="{{ old('alasan') }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                    </label>
+                                </div>
+                                <button class="rounded-lg bg-gray-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-gray-800">Simpan Koreksi</button>
+                            </form>
+                        </div>
+                    @endif
+
+                    {{-- Koreksi nominal biaya perlengkapan — pagar sama, tanpa urusan potongan --}}
+                    @if ($koreksiPerlengkapan)
+                        @php $kp = $koreksiPerlengkapan; @endphp
+                        <div class="w-full rounded-lg border border-gray-200 bg-gray-50 p-3" x-data="{ buka: false }">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div class="text-sm text-gray-700">
+                                    <span class="font-semibold">Biaya perlengkapan tertagih:</span> @rp($kp['tagihan']->nominal)
+                                    <span class="text-xs text-gray-500">(terbayar @rp($kp['terbayar']) · sisa @rp($kp['tagihan']->sisa))</span>
+                                </div>
+                                <button type="button" @click="buka = !buka"
+                                        class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100">
+                                    <span x-text="buka ? 'Tutup' : '✏️ Koreksi Perlengkapan'"></span>
+                                </button>
+                            </div>
+
+                            <form x-show="buka" x-cloak method="POST" action="{{ $act('koreksi-perlengkapan') }}" class="mt-3 space-y-2 border-t border-gray-200 pt-3"
+                                  data-confirm="Koreksi nominal biaya perlengkapan? Sisa tagihan dihitung ulang.">
+                                @csrf
+                                <p class="text-xs text-gray-500">
+                                    Untuk memperbaiki <b>salah input nominal</b>. Biaya perlengkapan tidak dipotong potongan gelombang, jadi nominal yang diketik langsung menjadi nominal tagihannya.
+                                </p>
+                                @if ($kp['menunggu'] > 0)
+                                    <p class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                        Ada {{ $kp['menunggu'] }} pembayaran menunggu verifikasi keuangan — koreksi akan ditolak sampai itu diselesaikan.
+                                    </p>
+                                @endif
+                                @if ($kp['rencana_aktif'])
+                                    <p class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                        Ada rencana angsuran perlengkapan yang aktif. Setelah nominal dikoreksi, jadwal itu <b>dinonaktifkan</b> dan terminnya harus disusun ulang.
+                                    </p>
+                                @endif
+                                <div class="grid gap-2 sm:grid-cols-3">
+                                    <label class="block text-xs text-gray-600">Nominal yang Benar <span class="text-red-500">*</span>
+                                        <input type="number" step="0.01" min="0" name="nominal" required value="{{ old('nominal', $kp['tagihan']->nominal) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                    </label>
+                                    <label class="block text-xs text-gray-600">Jatuh Tempo
+                                        <input type="date" name="jatuh_tempo" value="{{ old('jatuh_tempo', optional($kp['tagihan']->jatuh_tempo)->format('Y-m-d')) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
                                     </label>
                                     <label class="block text-xs text-gray-600">Alasan Koreksi <span class="text-red-500">*</span>
                                         <input type="text" name="alasan" required placeholder="mis. salah ketik nol" value="{{ old('alasan') }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">

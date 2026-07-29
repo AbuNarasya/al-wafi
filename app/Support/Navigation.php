@@ -13,12 +13,13 @@ use Illuminate\Support\Facades\Auth;
  *
  * `url` = tautan tujuan (memakai path aplikasi ini; sebagian modul belum dibangun
  * sehingga 404 sampai dibuat). `modul` = kode hak akses (sumbu `menu`).
- * Flag khusus: adminOnly, staffOnly, direktoratOrAdmin — sama seperti asli.
+ * Flag khusus: adminOnly, staffOnly, direktoratOrAdmin — sama seperti asli;
+ * staffOrMudirBagian ditambahkan di konversi ini untuk Pengajuan Anggaran.
  */
 final class Navigation
 {
     /**
-     * @var list<array{url:string,label:string,group:string,sub?:string,modul?:string,adminOnly?:bool,staffOnly?:bool,direktoratOrAdmin?:bool}>
+     * @var list<array{url:string,label:string,group:string,sub?:string,modul?:string,adminOnly?:bool,staffOnly?:bool,staffOrMudirBagian?:bool,direktoratOrAdmin?:bool}>
      */
     public const ITEMS = [
         // Cukup berhak atas SALAH SATU tab untuk melihat menunya.
@@ -35,10 +36,17 @@ final class Navigation
         ['url' => '/company-settings', 'label' => 'Pengaturan Perusahaan', 'group' => 'SETTING AWAL', 'modul' => 'company-settings'],
         ['url' => '/reminder-tagihan', 'label' => 'Reminder Tagihan Jatuh Tempo', 'group' => 'SETTING AWAL', 'modul' => 'reminder-tagihan'],
         ['url' => '/users', 'label' => 'Pengguna', 'group' => 'SETTING AWAL', 'modul' => 'users'],
+        ['url' => '/karyawan', 'label' => 'Karyawan', 'group' => 'SETTING AWAL', 'modul' => 'karyawan'],
+        ['url' => '/impor-data-awal', 'label' => 'Impor Data Awal', 'group' => 'SETTING AWAL', 'modul' => 'impor-data-awal'],
         ['url' => '/hak-akses', 'label' => 'Hak Akses Modul', 'group' => 'SETTING AWAL', 'adminOnly' => true],
 
         // ---- 2. Anggaran ----
         ['url' => '/budget', 'label' => 'Input Anggaran', 'group' => 'ANGGARAN', 'modul' => 'budget'],
+        // Pengajuan anggaran = jalur penyusun bagian. Yang boleh MENGAJUKAN cuma
+        // Staff & Mudir Bagian (ditegakkan BudgetPengajuanService), jadi menunya
+        // pun hanya muncul bagi mereka — daripada mengantar orang ke pesan 403.
+        ['url' => '/budget/pengajuan/buat', 'label' => 'Ajukan Anggaran', 'group' => 'ANGGARAN', 'modul' => 'budget', 'staffOrMudirBagian' => true],
+        ['url' => '/budget/pengajuan', 'label' => 'Status Pengajuan Anggaran', 'group' => 'ANGGARAN', 'modul' => 'budget'],
         ['url' => '/budget/realisasi', 'label' => 'Realisasi Anggaran', 'group' => 'ANGGARAN', 'direktoratOrAdmin' => true],
 
         // ---- 3. Pengajuan Pembayaran ----
@@ -67,6 +75,7 @@ final class Navigation
         ['url' => '/accrue', 'label' => 'Accrue & Prepaid', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'accrue'],
         ['url' => '/book-transfer', 'label' => 'Pindah Buku', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'book-transfer'],
         ['url' => '/bank-loans', 'label' => 'Pembiayaan', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'bank-loans'],
+        ['url' => '/pinjaman-karyawan', 'label' => 'Pinjaman Karyawan', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'pinjaman-karyawan'],
         ['url' => '/bank-reconciliation', 'label' => 'Rekonsiliasi Bank', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'bank-reconciliation'],
         ['url' => '/journal', 'label' => 'Jurnal Umum', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'journal'],
 
@@ -205,6 +214,20 @@ final class Navigation
                 && in_array($user->peringkat_pengajuan, [PeringkatPengajuan::MUDIR_BAGIAN, PeringkatPengajuan::STAFF], true);
         }
         if (($n['staffOnly'] ?? false) && ! ($user->is_admin || $user->peringkat_pengajuan === PeringkatPengajuan::STAFF)) {
+            return false;
+        }
+        // Pengajuan anggaran boleh dari Staff MAUPUN Mudir Bagian (mudir yang
+        // mengajukan otomatis melewati tahap bagiannya sendiri). SENGAJA tidak
+        // meloloskan is_admin seperti staffOnly: admin lazimnya tanpa peringkat
+        // & tanpa bagian, jadi menunya akan mengantar ke form yang tak bisa
+        // dipakai. Admin punya jalurnya sendiri (Input Anggaran, simpan
+        // langsung). Admin yang MEMANG ber-peringkat Staff/Mudir Bagian tetap
+        // melihatnya lewat pemeriksaan di bawah.
+        if (($n['staffOrMudirBagian'] ?? false) && ! in_array(
+            $user->peringkat_pengajuan,
+            [PeringkatPengajuan::STAFF, PeringkatPengajuan::MUDIR_BAGIAN],
+            true,
+        )) {
             return false;
         }
         // Menu yang isinya beberapa bagian berhak-akses sendiri (mis. Dashboard

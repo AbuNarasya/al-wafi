@@ -49,16 +49,26 @@ class SantriController extends Controller
             ->when($fBayar !== '', fn ($query) => $this->saringStatusBayar($query, $fBayar))
             ->orderByDesc('id')->paginate(25)->withQueryString();
 
-        // Urutan kode jalur dipakai view untuk memberi warna label yang TETAP
-        // per jalur (diambil dari seluruh master, bukan hanya baris di halaman
-        // ini, agar warnanya konsisten antar-halaman).
-        $jalurUrut = \App\Models\JalurPendaftaran::orderBy('kode')->pluck('nama', 'kode')->all();
+        // Seluruh master jalur (bukan hanya baris di halaman ini) agar warna
+        // labelnya konsisten antar-halaman. Diambil sekali, dipakai dua rupa:
+        //
+        //   $jalurWarna — urut WAKTU DIBUAT: jatah warna melekat pada jalur lama
+        //     dan jalur baru selalu kebagian warna berikutnya. Kalau diurutkan
+        //     abjad kode, menambah satu jalur akan MENGGESER warna semua jalur
+        //     setelahnya — orang yang sudah hafal "biru = pindahan" jadi salah baca.
+        //     created_at NULL (baris hasil impor SQL langsung) dianggap paling tua.
+        //   $opsiJalur — urut kode, untuk dropdown filter (yang dicari orang abjad).
+        $jalur = \App\Models\JalurPendaftaran::orderByRaw('created_at ASC NULLS FIRST')
+            ->orderBy('kode')->pluck('nama', 'kode')->all();
+        $opsiJalur = $jalur;
+        ksort($opsiJalur);
 
         return view('santri.index', [
             'rows' => $rows,
             'q' => $q,
             'lingkup' => $lingkup,
-            'jalurUrut' => $jalurUrut,
+            'jalurWarna' => $jalur,
+            'opsiJalur' => $opsiJalur,
             // Status pembayaran mutakhir per baris (termasuk setoran yang belum
             // diverifikasi keuangan) — 2 query agregat untuk seluruh halaman.
             'bayar' => (new \App\Services\Modules\RekapPembayaranService)->ringkasMassal($rows->pluck('id')),
@@ -102,19 +112,15 @@ class SantriController extends Controller
     {
         $taService = new \App\Services\Modules\TahunAjaranService;
 
-        // Jalur aktif dikelompokkan per TA — form memfilter sesuai TA terpilih.
-        $jalurPerTa = \App\Models\JalurPendaftaran::where('status', 'aktif')->orderBy('nama')->get()
-            ->groupBy('tahun_ajaran')
-            ->map(fn ($grup) => $grup->map(fn ($j) => ['v' => $j->kode, 'l' => $j->nama])->values())
-            ->all();
-
         return view('santri.create', [
             'santri' => new Santri(['jenis_kelamin' => 'L']),
             'waliOptions' => Wali::where('status', 'aktif')->orderBy('nama')->get()
                 ->mapWithKeys(fn ($w) => [$w->id => "{$w->nama} ({$w->telepon})"])->all(),
             'taOptions' => $taService->opsiAktif(),
             'taDefault' => $taService->defaultPendaftaran()?->kode,
-            'jalurPerTa' => $jalurPerTa,
+            // Jalur berlaku LINTAS tahun ajaran (kolom tahun_ajaran-nya sudah
+            // dibuang), jadi daftarnya tidak lagi disaring per T.A.
+            'jalurOptions' => \App\Support\Referensi::jalur(),
         ]);
     }
 
@@ -166,6 +172,7 @@ class SantriController extends Controller
         $sudahAdaUangPangkal = $santri->tagihan->contains(fn ($t) => \App\Models\TipeBiaya::perilakuDari($t->jenis?->tipe) === 'uang_pangkal');
         $potonganUangPangkal = null;
         $nominalDefaultUangPangkal = null;
+        $nominalDefaultPerlengkapan = null;
         if (in_array($santri->status, ['diterima', 'lolos_kesehatan'], true) && ! $sudahAdaUangPangkal) {
             $potonganUangPangkal = (new \App\Services\Modules\PotonganGelombangService)
                 ->potonganAktif($santri->gelombang, $santri->kode_jenjang, $santri->tahun_ajaran);
@@ -177,6 +184,12 @@ class SantriController extends Controller
                     ->jenisUangPangkal($santri->tahun_ajaran, $santri->kode_jenjang, $santri->jalur)->nominal;
             } catch (AppException) {
                 $nominalDefaultUangPangkal = null; // master uang pangkal belum ada → biarkan kosong
+            }
+            try {
+                $nominalDefaultPerlengkapan = $this->service
+                    ->jenisPerlengkapan($santri->tahun_ajaran, $santri->kode_jenjang, $santri->jalur)->nominal;
+            } catch (AppException) {
+                $nominalDefaultPerlengkapan = null; // memang boleh tak dipungut
             }
         }
 
@@ -203,15 +216,32 @@ class SantriController extends Controller
             ];
         }
 
-        // Pengunduran diri santri AKTIF: pratinjau sisa uang pangkal yang akan dihapuskan.
+        // Koreksi nominal perlengkapan — pagar sama, tanpa urusan potongan.
+        $tagihanPerlengkapan = $santri->tagihan->first(fn ($t) => \App\Models\TipeBiaya::perilakuDari($t->jenis?->tipe) === 'perlengkapan');
+        $koreksiPerlengkapan = null;
+        if ($tagihanPerlengkapan && ! $tagihanPerlengkapan->sudah_akrual && $tagihanPerlengkapan->status !== 'batal') {
+            $koreksiPerlengkapan = [
+                'tagihan' => $tagihanPerlengkapan,
+                'terbayar' => \App\Models\PembayaranSantri::where('id_tagihan', $tagihanPerlengkapan->id)
+                    ->where('status', 'terverifikasi')->sum('nominal'),
+                'menunggu' => \App\Models\PembayaranSantri::where('id_tagihan', $tagihanPerlengkapan->id)
+                    ->where('status', 'menunggu_verifikasi')->count(),
+                'rencana_aktif' => \App\Models\RencanaAngsuranUangPangkal::where('id_tagihan', $tagihanPerlengkapan->id)
+                    ->where('status', 'aktif')->exists(),
+            ];
+        }
+
+        // Pengunduran diri santri AKTIF: pratinjau sisa yang akan dihapuskan —
+        // uang pangkal DAN perlengkapan, karena keduanya ikut dibatalkan.
         $keluarAktif = null;
         if ($santri->status === 'aktif') {
-            $up = $tagihanUangPangkal && $tagihanUangPangkal->status !== 'batal' ? $tagihanUangPangkal : null;
+            $hidup = collect([$tagihanUangPangkal, $tagihanPerlengkapan])
+                ->filter(fn ($t) => $t && $t->status !== 'batal');
             $keluarAktif = [
-                'sisa' => $up?->sisa ?? '0',
-                'akrual' => (bool) $up?->sudah_akrual,
-                'menunggu' => $up ? \App\Models\PembayaranSantri::where('id_tagihan', $up->id)
-                    ->where('status', 'menunggu_verifikasi')->count() : 0,
+                'sisa' => (string) $hidup->reduce(fn ($s, $t) => \App\Support\Money::add($s, $t->sisa), '0'),
+                'akrual' => $hidup->contains(fn ($t) => (bool) $t->sudah_akrual),
+                'menunggu' => $hidup->sum(fn ($t) => \App\Models\PembayaranSantri::where('id_tagihan', $t->id)
+                    ->where('status', 'menunggu_verifikasi')->count()),
             ];
         }
 
@@ -222,7 +252,9 @@ class SantriController extends Controller
             'sudahAdaUangPangkal' => $sudahAdaUangPangkal,
             'potonganUangPangkal' => $potonganUangPangkal,
             'nominalDefaultUangPangkal' => $nominalDefaultUangPangkal,
+            'nominalDefaultPerlengkapan' => $nominalDefaultPerlengkapan,
             'koreksiUangPangkal' => $koreksiUangPangkal,
+            'koreksiPerlengkapan' => $koreksiPerlengkapan,
             'keluarAktif' => $keluarAktif,
             'menungguPerTagihan' => $menungguPerTagihan,
         ]);
@@ -237,12 +269,20 @@ class SantriController extends Controller
                 'seleksi' => $this->service->seleksi($id, $request->only(['nilai_baca', 'nilai_akademik', 'wawancara_wali', 'wawancara_santri', 'catatan'])),
                 'pengumuman' => $this->service->pengumuman($id, ['lulus' => $request->boolean('lulus'), 'catatan' => $request->input('catatan')]),
                 'medcheck' => $this->service->medcheck($id, ['lolos' => $request->boolean('lolos'), 'dokumen_lengkap' => $request->boolean('dokumen_lengkap'), 'catatan' => $request->input('catatan')]),
+                // Satu form menerbitkan dua tagihan: uang pangkal (dipotong
+                // potongan gelombang) & biaya perlengkapan (utuh, boleh kosong).
                 'tagih-uang-pangkal' => $this->service->tagihkanUangPangkal($id, $request->validate([
                     'nominal' => ['required', 'numeric', 'gt:0'],
+                    'nominal_perlengkapan' => ['nullable', 'numeric', 'min:0'],
                     'jatuh_tempo' => ['nullable', 'date'],
                     'keterangan' => ['nullable', 'string', 'max:255'],
                 ])),
                 'koreksi-uang-pangkal' => $this->service->koreksiNominalUangPangkal($id, $request->validate([
+                    'nominal' => ['required', 'numeric', 'gt:0'],
+                    'jatuh_tempo' => ['nullable', 'date'],
+                    'alasan' => ['required', 'string', 'max:255'],
+                ]), $request->user()->id_pengguna),
+                'koreksi-perlengkapan' => $this->service->koreksiNominalPerlengkapan($id, $request->validate([
                     'nominal' => ['required', 'numeric', 'gt:0'],
                     'jatuh_tempo' => ['nullable', 'date'],
                     'alasan' => ['required', 'string', 'max:255'],

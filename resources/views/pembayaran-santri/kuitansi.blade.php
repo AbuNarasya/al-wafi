@@ -25,9 +25,12 @@
     $labelTipe = [
         'registrasi' => 'Biaya Registrasi',
         'uang_pangkal' => 'Uang Pangkal',
+        'perlengkapan' => 'Biaya Perlengkapan',
         'spp' => 'SPP',
         'lain' => 'Tagihan Lain-lain',
-    ][$jenis?->tipe ?? ''] ?? 'Pembayaran';
+        // Dicocokkan lewat PERILAKU, bukan kode tipe: tipe buatan sendiri ikut
+        // berlabel benar, dan kuitansi tak jatuh ke "Pembayaran" yang kabur.
+    ][\App\Models\TipeBiaya::perilakuDari($jenis?->tipe) ?? ''] ?? 'Pembayaran';
 
     $labelSumber = ['manual' => 'Setoran langsung', 'dompet_wali' => 'Potong Dompet Wali', 'xendit' => 'Pembayaran daring'][$p->sumber] ?? $p->sumber;
     $sisaSesudah = $p->tagihan ? (float) $p->tagihan->sisa : null;

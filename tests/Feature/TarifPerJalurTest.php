@@ -194,7 +194,7 @@ class TarifPerJalurTest extends TestCase
         $this->buatJenis('UP-SMP-REG', 'uang_pangkal', '50000000', 'SMP', null);
 
         $santri = $this->calonLulus('SMP', 'REG');
-        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '50000000']);
+        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '50000000'])['uang_pangkal'];
         $this->assertSame('UP-SMP-REG', $tagihan->kode_jenis);
 
         // detail() dulu menebak baris master lebih dulu (urut kode → UP-SMP-OSS)

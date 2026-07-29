@@ -108,7 +108,7 @@ class NominalDefaultUangPangkalTest extends TestCase
         $santri = $this->calonLulus('SD');
 
         // Petugas mengetik angka lain → yang dipakai angka petugas, bukan master.
-        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '12000000']);
+        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '12000000'])['uang_pangkal'];
 
         $this->assertSame(12000000.0, (float) $tagihan->nominal);
     }
@@ -123,7 +123,7 @@ class NominalDefaultUangPangkalTest extends TestCase
             ->assertOk()
             ->assertDontSee('Terisi dari master Jenis Biaya');
 
-        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '9000000']);
+        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '9000000'])['uang_pangkal'];
         $this->assertSame(9000000.0, (float) $tagihan->nominal);
     }
 
@@ -133,7 +133,7 @@ class NominalDefaultUangPangkalTest extends TestCase
         $this->buatUangPangkal('UP-UMUM', '10000000', null);
         $santri = $this->calonLulus('SD');
         $svc = new SantriService;
-        $tagihan = $svc->tagihkanUangPangkal($santri->id, ['nominal' => '10000000']);
+        $tagihan = $svc->tagihkanUangPangkal($santri->id, ['nominal' => '10000000'])['uang_pangkal'];
 
         // …lalu admin menambah baris khusus jenjang SD (master berubah setelah tagihan terbit).
         $this->buatUangPangkal('UP-SD', '30000000', 'SD');

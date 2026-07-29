@@ -64,7 +64,7 @@ class SppService
     {
         $santri = Santri::where('status', 'aktif')->orderBy('nama')
             ->get(['id', 'nama', 'nis', 'kode_jenjang', 'nominal_spp', 'keterangan_spp']);
-        $kodeSpp = JenisBiaya::whereIn('tipe', \App\Models\TipeBiaya::kode('spp'))->pluck('kode')->all();
+        $kodeSpp = JenisBiaya::whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku('spp'))->pluck('kode')->all();
         $sudahAda = TagihanSantri::whereIn('kode_jenis', $kodeSpp)->where('periode', $periode)->pluck('id_santri')->all();
 
         $hasil = [];

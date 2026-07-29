@@ -75,9 +75,33 @@
         @if (session('status'))<div class="mb-3 rounded bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ session('status') }}</div>@endif
         @if (session('error'))<div class="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{{ session('error') }}</div>@endif
 
+        {{-- Kunci anggaran sengaja DI LUAR blok "sudah pilih bagian": kuncinya
+             berlaku per TAHUN ANGGARAN untuk seluruh bagian & unit, jadi
+             menyembunyikannya di balik pemilihan satu bagian menyesatkan
+             (seakan yang terkunci cuma bagian itu). --}}
         @if ($terkunci)
-            <div class="mb-3 rounded bg-gray-100 px-3 py-2 text-sm text-gray-600">
-                🔒 <b>Anggaran TA {{ $labelTa }} terkunci.</b> Tidak dapat diubah oleh siapa pun{{ $isAdmin ? ' — buka kunci dulu untuk menyunting.' : '. Hubungi administrator bila perlu perubahan.' }}
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded bg-gray-100 px-3 py-2 text-sm text-gray-600">
+                <span>🔒 <b>Anggaran TA {{ $labelTa }} terkunci.</b> Tidak dapat diubah oleh siapa pun{{ $isAdmin ? ' — buka kunci dulu untuk menyunting.' : '. Hubungi administrator bila perlu perubahan.' }}</span>
+                @if ($isAdmin)
+                    <form method="POST" action="{{ route('budget.unlock', $tahun) }}">
+                        @csrf @method('DELETE')
+                        <input type="hidden" name="kode_bagian" value="{{ $kodeBagian }}">
+                        <input type="hidden" name="kode_unit" value="{{ $kodeUnit }}">
+                        <button class="whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">🔓 Buka Kunci</button>
+                    </form>
+                @endif
+            </div>
+        @elseif ($isAdmin)
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600">
+                <span>Anggaran TA <b>{{ $labelTa }}</b> masih terbuka. Menguncinya membekukan anggaran <b>seluruh bagian &amp; unit</b> tahun itu — pengajuan baru ditolak, dan simpan-langsung ikut terkunci bagi admin sendiri.</span>
+                <form method="POST" action="{{ route('budget.lock') }}"
+                      onsubmit="return confirm('Kunci anggaran TA {{ $labelTa }}? Setelah terkunci tak seorang pun (termasuk admin) bisa mengubahnya sampai dibuka.')">
+                    @csrf
+                    <input type="hidden" name="tahun" value="{{ $tahun }}">
+                    <input type="hidden" name="kode_bagian" value="{{ $kodeBagian }}">
+                    <input type="hidden" name="kode_unit" value="{{ $kodeUnit }}">
+                    <button class="whitespace-nowrap rounded-lg border border-amber-300 px-3 py-1.5 text-sm text-amber-700 hover:bg-amber-50">🔒 Kunci Anggaran</button>
+                </form>
             </div>
         @endif
 
@@ -99,27 +123,11 @@
                             @endforeach
                         </select>
                     </div>
+                    {{-- Kunci/buka kunci ada di bilah atas (berlaku per TA, bukan per bagian). --}}
                     <button type="button" @click="simpan()" @disabled($terkunci)
                             class="rounded-lg bg-brand px-4 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50">
                         Simpan Langsung
                     </button>
-                    @if ($terkunci)
-                        <form method="POST" action="{{ route('budget.unlock', $tahun) }}">
-                            @csrf @method('DELETE')
-                            <input type="hidden" name="kode_bagian" value="{{ $kodeBagian }}">
-                            <input type="hidden" name="kode_unit" value="{{ $kodeUnit }}">
-                            <button class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">🔓 Buka Kunci</button>
-                        </form>
-                    @else
-                        <form method="POST" action="{{ route('budget.lock') }}"
-                              onsubmit="return confirm('Kunci anggaran TA {{ $labelTa }}? Setelah terkunci tak seorang pun (termasuk admin) bisa mengubahnya sampai dibuka.')">
-                            @csrf
-                            <input type="hidden" name="tahun" value="{{ $tahun }}">
-                            <input type="hidden" name="kode_bagian" value="{{ $kodeBagian }}">
-                            <input type="hidden" name="kode_unit" value="{{ $kodeUnit }}">
-                            <button class="rounded-lg border border-amber-300 px-3 py-1.5 text-sm text-amber-700 hover:bg-amber-50">🔒 Kunci Anggaran</button>
-                        </form>
-                    @endif
                 </div>
             @endif
 

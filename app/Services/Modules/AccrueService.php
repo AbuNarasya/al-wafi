@@ -52,6 +52,14 @@ class AccrueService
                 'id_pengguna' => $idPengguna ?? 0,
             ]);
 
+            // Saldo awal pindahan sistem: dokumennya perlu ada supaya bisa
+            // dibalik/dikonsumsi nanti, tetapi jurnalnya TIDAK boleh terbit —
+            // nilainya sudah masuk lewat jurnal pembuka. Pola yang sama dipakai
+            // BankLoanService lewat `posting_pencairan`.
+            if (! empty($input['tanpa_jurnal'])) {
+                return $rec;
+            }
+
             PostingService::postJournal([
                 'referensi' => $ref,
                 'tanggal' => $input['tanggal'],

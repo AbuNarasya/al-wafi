@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Manual Book Modul PPSB</title>
+<style>
+    @page { margin: 24mm 18mm 22mm 18mm; }
+
+    body {
+        font-family: "DejaVu Sans", sans-serif;
+        font-size: 9.5pt; line-height: 1.55; color: #1f2937; margin: 0;
+    }
+
+    /* Footer melayang. CATATAN: jangan pakai float di dalamnya — dompdf salah
+       menghitung tinggi halaman dan jumlah halaman membengkak lebih dari dua
+       kali lipat. Pakai tabel dua sel. */
+    #footer {
+        position: fixed; bottom: 8mm; left: 18mm; right: 18mm;
+        font-size: 7.5pt; color: #6b7280;
+        border-top: 0.5pt solid #d1d5db; padding-top: 1.5mm;
+    }
+    #footer table { margin: 0; font-size: 7.5pt; }
+    #footer td { border: none; padding: 0; color: #6b7280; }
+    .nohal:after { content: counter(page); }
+
+    h1 {
+        font-size: 17pt; color: #0f766e; margin: 0 0 2mm 0;
+        padding-bottom: 2mm; border-bottom: 1.5pt solid #0f766e;
+    }
+    h2 { font-size: 12pt; color: #115e59; margin: 7mm 0 2mm 0; }
+    h3 { font-size: 10.5pt; color: #1f2937; margin: 5mm 0 1.5mm 0; }
+    p { margin: 0 0 2.5mm 0; text-align: justify; }
+    ul, ol { margin: 0 0 3mm 0; padding-left: 6mm; }
+    li { margin-bottom: 1.2mm; }
+
+    .pagebreak { page-break-before: always; }
+    .nomorbab { font-size: 8.5pt; letter-spacing: 1.5pt; color: #6b7280; text-transform: uppercase; margin-bottom: 1mm; }
+
+    table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm 0; font-size: 8.5pt; }
+    th, td { border: 0.5pt solid #cbd5e1; padding: 1.6mm 2mm; text-align: left; vertical-align: top; }
+    th { background: #f1f5f9; color: #0f172a; font-weight: bold; }
+    td.num, th.num { text-align: right; }
+    tr { page-break-inside: avoid; }
+
+    .kotak { padding: 2.5mm 3mm; margin: 2.5mm 0 3.5mm 0; page-break-inside: avoid; }
+    .kotak p:last-child { margin-bottom: 0; }
+    .kotak .judul { font-weight: bold; display: block; margin-bottom: 1mm; }
+    .penting { background: #fffbeb; border-left: 2.5pt solid #d97706; }
+    .penting .judul { color: #92400e; }
+    .awas { background: #fef2f2; border-left: 2.5pt solid #dc2626; }
+    .awas .judul { color: #991b1b; }
+    .catatan { background: #f8fafc; border-left: 2.5pt solid #94a3b8; }
+    .catatan .judul { color: #475569; }
+
+    code, .jalur { font-family: "DejaVu Sans Mono", monospace; font-size: 8pt; background: #f1f5f9; padding: 0.3mm 1mm; }
+
+    /* ---- Sampul ---- */
+    .sampul { text-align: center; padding-top: 55mm; }
+    .sampul .lembaga { font-size: 11pt; letter-spacing: 2pt; color: #6b7280; text-transform: uppercase; }
+    .sampul .judul { font-size: 30pt; color: #0f766e; font-weight: bold; margin: 6mm 0 2mm 0; }
+    .sampul .anak { font-size: 15pt; color: #334155; }
+    .sampul .garis { border-top: 2pt solid #0f766e; width: 45mm; margin: 9mm auto; }
+    .sampul .ket { font-size: 9.5pt; color: #64748b; }
+    .sampul .kaki { margin-top: 40mm; font-size: 8.5pt; color: #94a3b8; }
+
+    /* ---- Daftar isi ---- */
+    .toc { font-size: 9.5pt; }
+    .toc a { color: #1f2937; text-decoration: none; }
+    .toc .bab { margin-top: 3mm; font-weight: bold; color: #0f766e; }
+    .toc .sub { margin-left: 7mm; color: #374151; }
+
+    /* ---- Alur tahap ---- */
+    .tahap td { border: none; padding: 1mm 0; }
+    .tahap .no {
+        width: 8mm; background: #0f766e; color: #ffffff; text-align: center;
+        font-weight: bold; border-radius: 2mm; padding: 1mm 0;
+    }
+    .tahap .isi { padding-left: 3mm; }
+    .panah { color: #94a3b8; text-align: center; font-size: 8pt; }
+</style>
+</head>
+<body>
+
+<div id="footer">
+    <table>
+        <tr>
+            <td>Manual Book Modul PPSB &mdash; Sistem Akuntansi &amp; Kesantrian Al Wafi</td>
+            <td style="text-align:right; width:22mm">Hal. <span class="nohal"></span></td>
+        </tr>
+    </table>
+</div>
+
+<!-- ==================== SAMPUL ==================== -->
+<div class="sampul">
+    <div class="lembaga">Al Wafi Islamic Boarding School</div>
+    <div class="judul">MANUAL BOOK</div>
+    <div class="anak">Modul PPSB<br>Penerimaan Peserta Santri Baru</div>
+    <div class="garis"></div>
+    <div class="ket">
+        Panduan kerja bagi petugas PPSB<br>
+        Sistem Akuntansi &amp; Kesantrian Al Wafi
+    </div>
+    <div class="kaki">
+        Disusun dari perilaku aplikasi yang berjalan.<br>
+        Edisi Juli 2026
+    </div>
+</div>
+
+<!-- ==================== DAFTAR ISI ==================== -->
+<div class="pagebreak"></div>
+<h1>Daftar Isi</h1>
+
+<div class="toc">
+    <div class="bab"><a href="#bab1">1 &nbsp; Sebelum Mulai</a></div>
+    <div class="sub"><a href="#b1-1">1.1 Untuk siapa buku ini</a></div>
+    <div class="sub"><a href="#b1-2">1.2 Masuk ke aplikasi</a></div>
+    <div class="sub"><a href="#b1-3">1.3 Peta menu PPSB</a></div>
+    <div class="sub"><a href="#b1-4">1.4 Hak akses: siapa boleh apa</a></div>
+    <div class="sub"><a href="#b1-5">1.5 Lonceng dan penanda tugas</a></div>
+
+    <div class="bab"><a href="#bab2">2 &nbsp; Setting Awal</a></div>
+    <div class="sub"><a href="#b2-0">2.1 Urutan pengisian yang wajib diikuti</a></div>
+    <div class="sub"><a href="#b2-1">2.2 Tahun Ajaran</a></div>
+    <div class="sub"><a href="#b2-2">2.3 Jenjang Pendidikan</a></div>
+    <div class="sub"><a href="#b2-3">2.4 Jalur Pendaftaran</a></div>
+    <div class="sub"><a href="#b2-4">2.5 Sumber Informasi</a></div>
+    <div class="sub"><a href="#b2-5">2.6 Tipe Biaya</a></div>
+    <div class="sub"><a href="#b2-6">2.7 Jenis Biaya dan aturan tarif</a></div>
+    <div class="sub"><a href="#b2-7">2.8 Potongan Gelombang</a></div>
+    <div class="sub"><a href="#b2-8">2.9 Target Santri</a></div>
+    <div class="sub"><a href="#b2-9">2.10 Setting Filter Termin Jatuh Tempo</a></div>
+    <div class="sub"><a href="#b2-10">2.11 Reminder Tagihan Jatuh Tempo</a></div>
+
+    <div class="bab"><a href="#bab3">3 &nbsp; Data Master</a></div>
+    <div class="sub"><a href="#b3-1">3.1 Wali / Keluarga</a></div>
+    <div class="sub"><a href="#b3-2">3.2 Mendaftarkan calon santri</a></div>
+    <div class="sub"><a href="#b3-3">3.3 Mencari dan menyaring daftar calon santri</a></div>
+    <div class="sub"><a href="#b3-4">3.4 Berkas santri</a></div>
+
+    <div class="bab"><a href="#bab4">4 &nbsp; Alur Penerimaan</a></div>
+    <div class="sub"><a href="#b4-0">4.1 Tujuh tahap dan aturan mainnya</a></div>
+    <div class="sub"><a href="#b4-1">4.2 Tahap 1 &ndash; Registrasi</a></div>
+    <div class="sub"><a href="#b4-2">4.3 Tahap 2 &ndash; Pembayaran registrasi</a></div>
+    <div class="sub"><a href="#b4-3">4.4 Tahap 3 &ndash; Verifikasi berkas</a></div>
+    <div class="sub"><a href="#b4-4">4.5 Tahap 4 &ndash; Seleksi</a></div>
+    <div class="sub"><a href="#b4-5">4.6 Tahap 5 &ndash; Pengumuman</a></div>
+    <div class="sub"><a href="#b4-6">4.7 Tahap 6 &ndash; Med check</a></div>
+    <div class="sub"><a href="#b4-7">4.8 Tahap 7 &ndash; Daftar ulang</a></div>
+    <div class="sub"><a href="#b4-8">4.9 Mengundurkan diri</a></div>
+
+    <div class="bab"><a href="#bab5">5 &nbsp; Uang Pangkal</a></div>
+    <div class="sub"><a href="#b5-1">5.1 Menagihkan uang pangkal</a></div>
+    <div class="sub"><a href="#b5-2">5.2 Potongan gelombang: didapat atau hangus</a></div>
+    <div class="sub"><a href="#b5-3">5.3 Mengoreksi nominal yang salah</a></div>
+    <div class="sub"><a href="#b5-4">5.4 Rencana angsuran dan termin</a></div>
+    <div class="sub"><a href="#b5-5">5.5 Re-negosiasi jadwal</a></div>
+    <div class="sub"><a href="#b5-6">5.6 Menagih termin dan mencatat tanggapan</a></div>
+    <div class="sub"><a href="#b5-7">5.7 Cetak rekap dan detail</a></div>
+
+    <div class="bab"><a href="#bab6">6 &nbsp; Pembayaran</a></div>
+    <div class="sub"><a href="#b6-1">6.1 Prinsip dua tangan</a></div>
+    <div class="sub"><a href="#b6-2">6.2 Mencatat setoran</a></div>
+    <div class="sub"><a href="#b6-3">6.3 Verifikasi dan penolakan</a></div>
+    <div class="sub"><a href="#b6-4">6.4 Membayar dari Dompet Wali</a></div>
+    <div class="sub"><a href="#b6-5">6.5 Kuitansi</a></div>
+    <div class="sub"><a href="#b6-6">6.6 Rekap Pembayaran Santri</a></div>
+    <div class="sub"><a href="#b6-7">6.7 Membaca status pembayaran di daftar</a></div>
+
+    <div class="bab"><a href="#bab7">7 &nbsp; Dashboard PPSB</a></div>
+    <div class="bab"><a href="#bab8">8 &nbsp; Masalah yang Sering Muncul</a></div>
+
+    <div class="bab"><a href="#lampiran">Lampiran</a></div>
+    <div class="sub"><a href="#lamp-a">A. Daftar status calon santri</a></div>
+    <div class="sub"><a href="#lamp-b">B. Daftar jenis berkas</a></div>
+    <div class="sub"><a href="#lamp-c">C. Modul dan hak akses PPSB</a></div>
+    <div class="sub"><a href="#lamp-d">D. Arti nomor dokumen</a></div>
+</div>
+
+<!-- ==================== BAB 1 ==================== -->
+<div class="pagebreak"></div>
+<div class="nomorbab">Bab 1</div>
+<h1 id="bab1">Sebelum Mulai</h1>
+
+<h2 id="b1-1">1.1 Untuk siapa buku ini</h2>
+<p>Buku ini ditujukan bagi <b>petugas PPSB</b> &mdash; panitia penerimaan yang setiap hari mendaftarkan calon santri, menerima setoran, dan mengurus berkas. Isinya langkah kerja, bukan penjelasan teknis program.</p>
+<p>Beberapa langkah dalam alur PPSB dikerjakan oleh <b>tim keuangan</b>, bukan panitia. Bagian seperti itu tetap dijelaskan di sini &mdash; supaya panitia tahu apa yang sedang ditunggu dan kepada siapa harus bertanya &mdash; dan ditandai dengan jelas.</p>
+
+<h2 id="b1-2">1.2 Masuk ke aplikasi</h2>
+<p>Buka alamat aplikasi di peramban, lalu masuk dengan nama pengguna dan kata sandi masing-masing. Jangan memakai akun orang lain: setiap pencatatan menyimpan nama pencatatnya, dan itulah yang jadi rujukan bila ada selisih.</p>
+<div class="kotak catatan">
+    <span class="judul">Kalau aplikasi dijalankan di komputer sendiri</span>
+    <p>Gunakan alamat <code>http://localhost:8123</code>, <b>bukan</b> <code>http://127.0.0.1:8123</code>. Kedua alamat itu dianggap dua tempat berbeda oleh peramban, sehingga sesi login di satu alamat tidak dikenali di alamat yang lain.</p>
+</div>
+
+<h2 id="b1-3">1.3 Peta menu PPSB</h2>
+<p>Menu PPSB tersusun dalam tiga kelompok. Sebagian master yang dipakai PPSB berada di kelompok <b>Setting Awal</b> karena juga dipakai modul lain.</p>
+
+<table>
+    <tr><th style="width:26%">Kelompok</th><th style="width:34%">Menu</th><th>Kegunaan</th></tr>
+    <tr><td rowspan="6">PPSB &rarr; Setting Awal</td><td>Tahun Ajaran</td><td>Induk seluruh master PPSB</td></tr>
+    <tr><td>Jalur Pendaftaran</td><td>Reguler, pindahan, anak karyawan, dan sebagainya</td></tr>
+    <tr><td>Sumber Informasi</td><td>Dari mana wali tahu tentang pesantren</td></tr>
+    <tr><td>Potongan Gelombang</td><td>Potongan uang pangkal per gelombang</td></tr>
+    <tr><td>Target Santri</td><td>Target penerimaan per jenjang</td></tr>
+    <tr><td>Setting Filter Termin Jatuh Tempo</td><td>Pilihan rentang hari di halaman angsuran</td></tr>
+    <tr><td rowspan="3">PPSB &rarr; Data Master</td><td>Wali / Keluarga</td><td>Data orang tua dan wali</td></tr>
+    <tr><td>Calon Santri</td><td>Pendaftaran dan seluruh tahap penerimaan</td></tr>
+    <tr><td>Angsuran Uang Pangkal</td><td>Jadwal cicilan dan penagihannya</td></tr>
+    <tr><td rowspan="2">PPSB &rarr; Transaksi</td><td>Pembayaran Registrasi &amp; Uang Pangkal</td><td>Mencatat dan memverifikasi setoran</td></tr>
+    <tr><td>Rekap Pembayaran Santri</td><td>Riwayat tagihan dan pembayaran per santri</td></tr>
+    <tr><td rowspan="4">Setting Awal (bersama)</td><td>Jenjang Pendidikan</td><td>SDTQ, SMP, SMA</td></tr>
+    <tr><td>Tipe Biaya</td><td>Perilaku alur biaya</td></tr>
+    <tr><td>Jenis Biaya</td><td>Tarif registrasi, uang pangkal, SPP</td></tr>
+    <tr><td>Reminder Tagihan Jatuh Tempo</td><td>Pengaturan pengingat otomatis</td></tr>
+    <tr><td>Umum</td><td>Dashboard &rarr; tab PPSB</td><td>Angka penerimaan dan grafik</td></tr>
+</table>
+
+<h2 id="b1-4">1.4 Hak akses: siapa boleh apa</h2>
+<p>Tiap menu dijaga hak akses per modul dengan empat aksi: <b>lihat</b>, <b>buat</b>, <b>ubah</b>, dan <b>hapus</b>. Yang tidak diberi hak tidak akan melihat menunya sama sekali, dan tombol aksinya pun tidak muncul. Pengaturannya ada di <b>Setting Awal &rarr; Hak Akses Modul</b>, khusus administrator.</p>
+<p>Dua pekerjaan sengaja dipisahkan dari panitia:</p>
+<ul>
+    <li><b>Verifikasi dan penolakan pembayaran</b> hanya bisa dilakukan anggota <b>tim keuangan</b>. Panitia mencatat, keuangan mengesahkan.</li>
+    <li><b>Penguncian anggaran</b> dan pengaturan sistem lain hanya administrator.</li>
+</ul>
+
+<h2 id="b1-5">1.5 Lonceng dan penanda tugas</h2>
+<p>Angka merah di samping menu bukan sekadar kabar &mdash; itu <b>pekerjaan yang menunggu Anda</b>. Angkanya dihitung ulang setiap halaman dibuka, dan hanya hilang setelah pekerjaannya benar-benar dikerjakan; ia tidak bisa dipadamkan dengan "tandai dibaca".</p>
+<p>Penanda muncul di menu tempat pekerjaannya dikerjakan. Misalnya tagihan uang pangkal yang jatuh tempo ditandai di <b>Angsuran Uang Pangkal</b>, bukan di menu pengaturan pengingat.</p>
+<p>Lonceng di pojok kanan atas memuat keduanya: tugas (tak bisa dipadamkan) dan kabar (boleh ditandai dibaca), misalnya pemberitahuan bahwa setoran yang Anda catat ditolak keuangan.</p>
+
+<!-- ==================== BAB 2 ==================== -->
+<div class="pagebreak"></div>
+<div class="nomorbab">Bab 2</div>
+<h1 id="bab2">Setting Awal</h1>
+
+<h2 id="b2-0">2.1 Urutan pengisian yang wajib diikuti</h2>
+<p>Master PPSB saling bergantung. Mengisi dengan urutan terbalik akan berhenti di tengah jalan karena rujukannya belum ada. Ikuti urutan ini setiap kali membuka tahun ajaran baru.</p>
+
+<table>
+    <tr><th class="num" style="width:8%">No</th><th style="width:34%">Master</th><th>Mengapa harus lebih dulu</th></tr>
+    <tr><td class="num">1</td><td>Tahun Ajaran</td><td>Hampir semua master PPSB terikat pada satu tahun ajaran</td></tr>
+    <tr><td class="num">2</td><td>Jenjang Pendidikan</td><td>Dipakai jalur, tarif, dan target</td></tr>
+    <tr><td class="num">3</td><td>Jalur Pendaftaran</td><td>Tarif dibedakan per jalur, jadi jalurnya harus sudah ada</td></tr>
+    <tr><td class="num">4</td><td>Sumber Informasi</td><td>Dipilih saat mendaftarkan calon</td></tr>
+    <tr><td class="num">5</td><td>Tipe Biaya</td><td>Menentukan perilaku setiap jenis biaya</td></tr>
+    <tr><td class="num">6</td><td>Jenis Biaya</td><td>Tarif registrasi dan uang pangkal; butuh nomor 1&ndash;5</td></tr>
+    <tr><td class="num">7</td><td>Potongan Gelombang</td><td>Dipakai saat uang pangkal ditagihkan</td></tr>
+    <tr><td class="num">8</td><td>Target Santri</td><td>Pembanding di Dashboard PPSB</td></tr>
+    <tr><td class="num">9</td><td>Setting Filter Termin</td><td>Kenyamanan halaman angsuran; boleh terakhir</td></tr>
+</table>
+
+<div class="kotak penting">
+    <span class="judul">Yang paling sering terlewat</span>
+    <p>Tarif <b>registrasi</b> harus sudah ada sebelum calon pertama didaftarkan. Tagihan registrasi terbit otomatis saat pendaftaran disimpan; kalau tarifnya belum ada, pendaftaran gagal dan datanya tidak tersimpan sama sekali.</p>
+</div>
+
+<h2 id="b2-1">2.2 Tahun Ajaran</h2>
+<p>Menu <b>PPSB &rarr; Setting Awal &rarr; Tahun Ajaran</b>. Kodenya berbentuk <code>2027/2028</code> dan dipakai sebagai rujukan oleh master lain, jadi jangan diubah setelah dipakai.</p>
+<p>Tandai satu tahun ajaran sebagai <b>default pendaftaran</b>. Tahun itulah yang terpilih otomatis di form pendaftaran calon santri, sehingga panitia tidak perlu memilih berulang-ulang dan tidak salah tahun. Hanya boleh ada satu default pada satu waktu.</p>
+<p>Tahun ajaran yang <b>tidak aktif</b> tidak bisa dipakai mendaftarkan calon baru.</p>
+
+<h2 id="b2-2">2.3 Jenjang Pendidikan</h2>
+<p>Menu <b>Setting Awal &rarr; Jenjang Pendidikan</b>. Isi kode singkat dan namanya, misalnya SDTQ, SMP, SMA. Jenjang dipakai sebagai dimensi tarif, target, dan seluruh laporan penerimaan.</p>
+
+<h2 id="b2-3">2.4 Jalur Pendaftaran</h2>
+<p>Menu <b>PPSB &rarr; Setting Awal &rarr; Jalur Pendaftaran</b>. Jalur adalah cara calon masuk: reguler, pindahan, anak karyawan, beasiswa, dan sebagainya. Setiap jalur terikat pada satu tahun ajaran.</p>
+<div class="kotak penting">
+    <span class="judul">Jalur harus milik tahun ajaran yang dipilih</span>
+    <p>Saat mendaftarkan calon, jalur yang dipilih harus jalur milik tahun ajaran yang sama. Kalau membuka tahun ajaran baru, jalur-jalurnya perlu dibuat ulang untuk tahun itu.</p>
+</div>
+<p>Di daftar calon santri, tiap jalur tampil sebagai label berwarna. Warnanya dibagi mengikuti urutan pembuatan jalur, sehingga menambah jalur baru tidak menggeser warna jalur yang sudah ada &mdash; petugas yang sudah hafal warnanya tidak perlu belajar ulang.</p>
+
+<h2 id="b2-4">2.5 Sumber Informasi</h2>
+<p>Menu <b>PPSB &rarr; Setting Awal &rarr; Sumber Informasi</b>. Berisi pilihan "dari mana wali mengetahui pesantren": iklan, teman, alumni, dan seterusnya. Hasilnya diperingkat di Dashboard PPSB, jadi daftar ini menentukan mutu evaluasi promosi.</p>
+<p>Setiap sumber punya penanda <b>butuh keterangan</b>. Bila dinyalakan, form pendaftaran akan memunculkan isian teks bebas ketika sumber itu dipilih &mdash; berguna untuk pilihan semacam "lainnya".</p>
+<p>Sumber yang sudah pernah dipilih santri <b>tidak bisa dihapus</b>. Kalau tidak dipakai lagi, nonaktifkan saja: baris lama tetap terbaca, tapi tidak muncul lagi sebagai pilihan.</p>
+
+<h2 id="b2-5">2.6 Tipe Biaya</h2>
+<p>Menu <b>Setting Awal &rarr; Tipe Biaya</b>. Tipe biaya bukan sekadar label &mdash; ia menentukan <b>perilaku</b> sebuah biaya di seluruh aplikasi. Ada empat perilaku:</p>
+
+<table>
+    <tr><th style="width:24%">Perilaku</th><th>Akibatnya di aplikasi</th></tr>
+    <tr><td>registrasi</td><td>Tagihan terbit <b>otomatis</b> saat calon didaftarkan. Kelunasannya menjadi gerbang tahap berikutnya.</td></tr>
+    <tr><td>uang_pangkal</td><td>Ditagihkan manual setelah calon lulus. Bisa mendapat potongan gelombang dan dicicil lewat rencana angsuran.</td></tr>
+    <tr><td>spp</td><td>Iuran berkala, diterbitkan modul SPP di Kesantrian.</td></tr>
+    <tr><td>lain</td><td>Tagihan bebas yang dibuat manual.</td></tr>
+</table>
+
+<p>Empat baris bawaan sudah tersedia dan terlindungi: kode, perilaku, dan statusnya tidak bisa diubah, dan barisnya tidak bisa dihapus. Nama, urutan, serta keterangannya bebas disesuaikan.</p>
+<p>Anda boleh menambah tipe baru, misalnya "Seragam", tetapi <b>wajib memilih perilakunya</b>. Tanpa itu, tagihan yang terbit dari tipe baru tidak akan muncul di modul mana pun.</p>
+
+<h2 id="b2-6">2.7 Jenis Biaya dan aturan tarif</h2>
+<p>Menu <b>Setting Awal &rarr; Jenis Biaya</b>. Di sinilah nominal sebenarnya diisi. Satu baris jenis biaya memuat: kode, nama, tipe, tahun ajaran, jenjang, jalur, nominal, akun pendapatan, akun piutang, dan unit.</p>
+
+<h3>Bagaimana aplikasi memilih tarif</h3>
+<p>Kolom <b>jenjang</b> dan <b>jalur</b> boleh dikosongkan, dan kosong berarti "berlaku untuk semua". Saat mencari tarif seorang calon, aplikasi menelusuri empat langkah berurutan dan memakai yang pertama ketemu:</p>
+<ol>
+    <li>Baris yang cocok <b>jenjang dan jalurnya</b> sekaligus</li>
+    <li>Baris yang cocok <b>jalurnya</b> saja (berlaku semua jenjang)</li>
+    <li>Baris yang cocok <b>jenjangnya</b> saja (berlaku semua jalur)</li>
+    <li>Baris umum &mdash; jenjang dan jalur dikosongkan</li>
+</ol>
+<p>Jalur sengaja diperiksa lebih dulu daripada jenjang, karena baris berjalur adalah pengecualian yang dibuat dengan sadar.</p>
+
+<div class="kotak penting">
+    <span class="judul">Cara mengisi yang disarankan</span>
+    <p>Isi <b>tarif dasar</b> tanpa jalur (langkah 3 atau 4), lalu buat baris berjalur hanya untuk pengecualian. Dengan begitu jalur baru otomatis kebagian tarif dasar tanpa perlu menambah baris.</p>
+</div>
+
+<div class="kotak awas">
+    <span class="judul">Cakupan tidak boleh bertabrakan</span>
+    <p>Untuk perilaku registrasi, uang pangkal, dan SPP, gabungan <b>tipe + tahun ajaran + jenjang + jalur</b> harus unik di antara baris yang aktif. Kalau ada dua baris dengan cakupan sama, aplikasi menolak penyimpanan &mdash; sebab kalau dibiarkan, tarif yang terpakai jadi bergantung urutan kode, bukan keputusan Anda. Tipe berperilaku <b>lain</b> dikecualikan karena tagihannya dipilih manual.</p>
+</div>
+
+<h3>Menyalin tarif ke tahun ajaran baru</h3>
+<p>Tombol <b>Duplikat ke T.A Baru</b> di halaman Jenis Biaya menyalin seluruh baris dari satu tahun ajaran ke tahun ajaran lain. Karena kode adalah penanda unik, tiap baris salinan mendapat kode baru: dua digit tahun di dalam kode ditukar dengan milik tahun tujuan, misalnya <code>UP-SMP27-OSS</code> menjadi <code>UP-SMP28-OSS</code>. Kode yang tidak berpola tahun diberi akhiran, misalnya <code>SERAGAM</code> menjadi <code>SERAGAM-28</code>.</p>
+<p>Aplikasi <b>selalu menampilkan pratinjau lebih dulu</b>. Tiap baris ditandai <b>siap</b> atau <b>bentrok</b> beserta alasannya. Menekan Salin hanya menyalin yang siap; yang bentrok dilewati, bukan menggagalkan semuanya. Jadi Anda bisa membereskan yang bentrok lalu menjalankannya lagi.</p>
+
+<h2 id="b2-7">2.8 Potongan Gelombang</h2>
+<p>Menu <b>PPSB &rarr; Setting Awal &rarr; Potongan Gelombang</b>. Satu baris memuat: gelombang, jenjang, tahun ajaran, nominal potongan, dan masa berlaku dalam hari.</p>
+<p>Potongan ini <b>bersyarat</b>, bukan diskon langsung. Rincian cara kerjanya ada di bagian <a href="#b5-2">5.2</a>. Yang perlu diketahui saat mengisi master: nominal potongan tidak boleh sama dengan atau lebih besar daripada uang pangkal, dan bila masa berlaku dikosongkan, aplikasi memakai <b>7 hari</b>.</p>
+
+<h2 id="b2-8">2.9 Target Santri</h2>
+<p>Menu <b>PPSB &rarr; Setting Awal &rarr; Target Santri</b>. Isi target penerimaan per jenjang per tahun ajaran, dirinci <b>Ikhwan</b> dan <b>Akhwat</b>. Totalnya dihitung otomatis dari penjumlahan keduanya.</p>
+<p>Rincian ikhwan/akhwat boleh dikosongkan. Kalau dikosongkan, Dashboard PPSB menuliskan "belum dirinci" &mdash; berbeda artinya dengan target nol.</p>
+
+<h2 id="b2-9">2.10 Setting Filter Termin Jatuh Tempo</h2>
+<p>Menu <b>PPSB &rarr; Setting Awal &rarr; Setting Filter Termin Jatuh Tempo</b>. Halaman ini hanya mengatur dua hal untuk dropdown "termin yang perlu ditagih" di halaman Angsuran Uang Pangkal:</p>
+<ul>
+    <li><b>Pilihan hari</b> &mdash; daftar angka dipisah koma, misalnya <code>7,14,30</code>.</li>
+    <li><b>Hari default</b> &mdash; yang terpilih saat halaman dibuka. Nilainya 0 sampai 365 dan harus termasuk dalam daftar pilihan.</li>
+</ul>
+
+<h2 id="b2-10">2.11 Reminder Tagihan Jatuh Tempo</h2>
+<p>Menu <b>Setting Awal &rarr; Reminder Tagihan Jatuh Tempo</b>. Mengatur kapan pengingat dikirim (misalnya H-7, H-3, H-1), sumber tagihan mana yang dipantau, dan siapa penerimanya.</p>
+<div class="kotak catatan">
+    <span class="judul">Ini halaman pengaturan, bukan halaman kerja</span>
+    <p>Daftar tagihan yang benar-benar jatuh tempo tidak ada di sini, melainkan di menu tempat pekerjaannya dikerjakan &mdash; Angsuran Uang Pangkal atau Pembayaran. Mengirim pengingat juga tidak membuat tagihan lunas; penandanya baru hilang setelah setorannya masuk dan diverifikasi.</p>
+</div>
+
+<!-- ==================== BAB 3 ==================== -->
+<div class="pagebreak"></div>
+<div class="nomorbab">Bab 3</div>
+<h1 id="bab3">Data Master</h1>
+
+<h2 id="b3-1">3.1 Wali / Keluarga</h2>
+<p>Menu <b>PPSB &rarr; Data Master &rarr; Wali / Keluarga</b>. Data wali dibuat <b>sebelum</b> calon santri, karena setiap calon wajib menunjuk satu wali.</p>
+<p>Satu wali bisa memiliki banyak santri &mdash; untuk kakak beradik, cukup satu data wali. Ini juga yang membuat satu Dompet Wali bisa dipakai membayar tagihan beberapa anak sekaligus.</p>
+<ul>
+    <li><b>Nomor telepon harus unik.</b> Kalau muncul penolakan saat menyimpan, kemungkinan besar keluarga itu sudah terdaftar &mdash; cari dulu, jangan buat data kedua.</li>
+    <li>Kontak utama disalin otomatis dari data ayah, ibu, atau wali sesuai pilihan Anda.</li>
+    <li>Wali yang berstatus <b>nonaktif</b> tidak bisa dipilih saat mendaftarkan calon baru.</li>
+</ul>
+
+<h2 id="b3-2">3.2 Mendaftarkan calon santri</h2>
+<p>Menu <b>PPSB &rarr; Data Master &rarr; Calon Santri</b>, lalu tombol tambah. Isian yang <b>wajib</b>:</p>
+
+<table>
+    <tr><th style="width:30%">Isian</th><th>Catatan</th></tr>
+    <tr><td>Wali</td><td>Dipilih dari data wali yang sudah ada dan berstatus aktif</td></tr>
+    <tr><td>Nama</td><td>Nama lengkap calon santri</td></tr>
+    <tr><td>Jenis kelamin</td><td>Ikhwan atau akhwat</td></tr>
+    <tr><td>Tahun ajaran</td><td>Terisi otomatis bila sudah ditandai sebagai default pendaftaran</td></tr>
+    <tr><td>Jalur pendaftaran</td><td>Harus jalur milik tahun ajaran yang sama</td></tr>
+    <tr><td>Gelombang</td><td>Pilih <b>nomor</b> lalu isi angkanya, atau pilih <b>tanpa gelombang</b></td></tr>
+</table>
+
+<p>Isian lain bersifat pelengkap namun sangat dianjurkan: tempat dan tanggal lahir, NISN, jenjang, asal sekolah beserta alamat, kepala sekolah dan kontaknya, serta sumber informasi.</p>
+
+<div class="kotak penting">
+    <span class="judul">Gelombang dipilih dengan sadar</span>
+    <p>"Tanpa gelombang" bukan berarti gelombang nol. Calon tanpa gelombang <b>tidak akan pernah mendapat potongan gelombang</b>. Pilihan ini disediakan untuk calon pindahan dan kasus khusus. Kalau calon seharusnya ikut gelombang, isi nomornya &mdash; jangan dikosongkan.</p>
+</div>
+
+<h3>Apa yang terjadi otomatis saat disimpan</h3>
+<ol>
+    <li><b>Nomor pendaftaran</b> terbit berurutan, berbentuk <code>PSB-2607-0001</code> (dua digit tahun, dua digit bulan, nomor urut bulan itu).</li>
+    <li>Status calon diisi <b>Calon</b>.</li>
+    <li>Baris pendaftaran tercatat dengan tanggal hari itu.</li>
+    <li><b>Tagihan registrasi terbit otomatis</b> sebesar tarif yang berlaku bagi jenjang dan jalurnya. Tagihan ini belum masuk pembukuan &mdash; pendapatan baru diakui saat setorannya diverifikasi keuangan.</li>
+</ol>
+
+<div class="kotak awas">
+    <span class="judul">Pendaftaran ditolak? Periksa tiga hal ini</span>
+    <p>Aplikasi menolak menyimpan bila: tahun ajaran tidak aktif; jalur bukan milik tahun ajaran itu; atau tarif registrasi untuk jenjang dan jalur tersebut belum ada di master Jenis Biaya. Aplikasi juga memperingatkan bila ada calon lain dengan NISN sama yang prosesnya belum berakhir &mdash; artinya kemungkinan besar pendaftaran ganda.</p>
+</div>
+
+<h2 id="b3-3">3.3 Mencari dan menyaring daftar calon santri</h2>
+<p>Kotak cari di atas tabel menyaring <b>seketika sambil diketik</b>, tanpa tombol Cari. Yang dicocokkan: nama, nomor pendaftaran, NISN, dan NIS.</p>
+<p>Baris di bawah judul kolom berisi penyaring tambahan: <b>Jenjang</b>, <b>Jalur</b>, <b>Status</b>, dan <b>Status Pembayaran</b>. Semua penyaring bekerja di server, jadi hasilnya tetap benar walau data sudah ratusan dan terbagi beberapa halaman.</p>
+<p>Tautan <b>Reset</b> muncul begitu ada penyaring aktif, dan penghitung "N data" menunjukkan jumlah yang cocok. Penyaring ikut terbawa saat berpindah halaman.</p>
+
+<h2 id="b3-4">3.4 Berkas santri</h2>
+<p>Berkas diunggah dari <b>halaman detail santri</b>, bukan dari menu tersendiri. Jenisnya sudah ditentukan aplikasi dan terbagi tiga kelompok:</p>
+
+<table>
+    <tr><th style="width:32%">Kelompok</th><th>Isi</th></tr>
+    <tr><td>Berkas Registrasi</td><td>KTP ayah, KTP ibu, KTP wali, akta kelahiran, kartu keluarga, foto</td></tr>
+    <tr><td>Berkas Pindahan Dari Sekolah Asal</td><td>Surat keterangan aktif, surat keterangan kelakuan baik, rapot terakhir</td></tr>
+    <tr><td>Berkas Setelah Lulus</td><td>Surat keterangan siswa sekolah sebelumnya, hasil med check, dokumen lainnya</td></tr>
+</table>
+
+<p>Kelompok <b>Berkas Setelah Lulus</b> baru bisa diunggah setelah calon dinyatakan lulus. Kalau tombolnya belum bisa ditekan, berarti tahapnya memang belum sampai ke sana &mdash; bukan kerusakan.</p>
+<p>Kelompok <b>Berkas Pindahan</b> hanya relevan bagi calon pindahan; bagi calon reguler kelompok ini boleh dibiarkan kosong.</p>
+
+<div class="kotak awas">
+    <span class="judul">Bila aplikasi dijalankan di layanan gratis tanpa penyimpanan permanen</span>
+    <p>Berkas yang diunggah bisa hilang setiap kali server dinyalakan ulang, sementara catatan barisnya tetap ada &mdash; sehingga tautan unduhnya menjadi mati. Simpan salinan berkas asli di luar aplikasi sampai penyimpanan permanen tersedia.</p>
+</div>
+
+<!-- ==================== BAB 4 ==================== -->
+<div class="pagebreak"></div>
+<div class="nomorbab">Bab 4</div>
+<h1 id="bab4">Alur Penerimaan</h1>
+
+<h2 id="b4-0">4.1 Tujuh tahap dan aturan mainnya</h2>
+<p>Penerimaan berjalan melalui tujuh tahap berurutan. Status calon berpindah hanya lewat tombol aksi di halaman detail santri.</p>
+
+<table class="tahap">
+    <tr><td class="no">1</td><td class="isi"><b>Registrasi</b> &mdash; calon didaftarkan, status <i>Calon</i>, tagihan registrasi terbit</td></tr>
+    <tr><td class="panah" colspan="2">&#9660;</td></tr>
+    <tr><td class="no">2</td><td class="isi"><b>Registrasi terbayar</b> &mdash; setoran diverifikasi keuangan, status <i>Registrasi Terbayar</i></td></tr>
+    <tr><td class="panah" colspan="2">&#9660;</td></tr>
+    <tr><td class="no">3</td><td class="isi"><b>Verifikasi berkas</b> &mdash; status <i>Berkas Terverifikasi</i></td></tr>
+    <tr><td class="panah" colspan="2">&#9660;</td></tr>
+    <tr><td class="no">4</td><td class="isi"><b>Seleksi</b> &mdash; tes santri dan wawancara wali, status <i>Sudah Diseleksi</i></td></tr>
+    <tr><td class="panah" colspan="2">&#9660;</td></tr>
+    <tr><td class="no">5</td><td class="isi"><b>Pengumuman</b> &mdash; <i>Diterima</i> atau <i>Tidak Lulus</i></td></tr>
+    <tr><td class="panah" colspan="2">&#9660;</td></tr>
+    <tr><td class="no">6</td><td class="isi"><b>Med check</b> &mdash; <i>Lolos Kesehatan</i> atau <i>Gagal Med Check</i></td></tr>
+    <tr><td class="panah" colspan="2">&#9660;</td></tr>
+    <tr><td class="no">7</td><td class="isi"><b>Daftar ulang</b> &mdash; menjadi <i>Santri Aktif</i> dan mendapat NIS</td></tr>
+</table>
+
+<div class="kotak penting">
+    <span class="judul">Tahap tidak bisa dilompati</span>
+    <p>Aplikasi menolak perpindahan yang tidak sah dan menyebutkan tahap mana yang seharusnya berikutnya. Ini disengaja: melompati tahap berarti ada calon yang ikut tes tanpa membayar, atau diterima tanpa diseleksi, tanpa gejala apa pun di data.</p>
+</div>
+
+<p>Empat status bersifat <b>final</b> &mdash; prosesnya berakhir dan tidak bisa dilanjutkan: <i>Tidak Lulus</i>, <i>Gagal Med Check</i>, <i>Mengundurkan Diri</i>, dan <i>Keluar</i>.</p>
+
+<h2 id="b4-1">4.2 Tahap 1 &ndash; Registrasi</h2>
+<p>Lihat bagian <a href="#b3-2">3.2</a>. Setelah tersimpan, calon berstatus <i>Calon</i> dan sudah punya satu tagihan registrasi yang belum terbayar.</p>
+
+<h2 id="b4-2">4.3 Tahap 2 &ndash; Pembayaran registrasi</h2>
+<p>Panitia mencatat setoran registrasi lewat menu <b>PPSB &rarr; Transaksi &rarr; Pembayaran Registrasi &amp; Uang Pangkal</b> (lihat bab <a href="#bab6">6</a>).</p>
+<div class="kotak penting">
+    <span class="judul">Status berpindah sendiri, tidak ada tombolnya</span>
+    <p>Begitu tim keuangan memverifikasi setoran dan tagihan registrasi menjadi <b>lunas</b>, status calon berpindah otomatis dari <i>Calon</i> ke <i>Registrasi Terbayar</i>. Jangan mencari tombol untuk tahap ini &mdash; memang tidak ada. Kalau statusnya belum berpindah, periksa apakah setorannya sudah diverifikasi dan apakah tagihannya benar-benar sudah lunas, bukan terbayar sebagian.</p>
+</div>
+
+<h2 id="b4-3">4.4 Tahap 3 &ndash; Verifikasi berkas</h2>
+<p>Setelah berkas registrasi lengkap dan sah, tekan tombol <b>Verifikasi Berkas</b> di halaman detail santri. Status menjadi <i>Berkas Terverifikasi</i>.</p>
+
+<h2 id="b4-4">4.5 Tahap 4 &ndash; Seleksi</h2>
+<p>Tombol <b>Seleksi</b> membuka isian hasil tes dan wawancara:</p>
+<ul>
+    <li>Nilai baca &mdash; kemampuan membaca Al-Qur'an</li>
+    <li>Nilai akademik</li>
+    <li>Hasil wawancara wali</li>
+    <li>Hasil wawancara santri</li>
+    <li>Catatan panitia</li>
+</ul>
+<p>Semua isian boleh dikosongkan bila memang tidak dinilai. Status menjadi <i>Sudah Diseleksi</i>.</p>
+
+<h2 id="b4-5">4.6 Tahap 5 &ndash; Pengumuman</h2>
+<p>Tombol <b>Pengumuman</b> memuat satu pilihan menentukan: <b>lulus</b> atau <b>tidak lulus</b>, disertai catatan.</p>
+<ul>
+    <li>Lulus &rarr; status <i>Diterima</i>. Tahap berikutnya med check, dan uang pangkal sudah boleh ditagihkan.</li>
+    <li>Tidak lulus &rarr; status <i>Tidak Lulus</i>, dan prosesnya <b>berakhir</b>.</li>
+</ul>
+<div class="kotak awas">
+    <span class="judul">Pengumuman tidak bisa dibatalkan</span>
+    <p><i>Tidak Lulus</i> adalah status final. Pastikan keputusannya sudah bulat sebelum menekan tombol.</p>
+</div>
+
+<h2 id="b4-6">4.7 Tahap 6 &ndash; Med check</h2>
+<p>Tombol <b>Med Check</b> memuat pilihan <b>lolos</b> atau <b>tidak lolos</b>, penanda kelengkapan dokumen, dan catatan.</p>
+<ul>
+    <li>Lolos &rarr; status <i>Lolos Kesehatan</i>, siap daftar ulang.</li>
+    <li>Tidak lolos &rarr; status <i>Gagal Med Check</i>. Ini <b>membatalkan penerimaan</b> dan prosesnya berakhir.</li>
+</ul>
+
+<h2 id="b4-7">4.8 Tahap 7 &ndash; Daftar ulang</h2>
+<p>Tombol <b>Daftar Ulang</b> adalah langkah terakhir. Ia mengubah calon menjadi <b>santri aktif</b>, <b>menerbitkan NIS</b>, dan mengakui sisa uang pangkal sebagai piutang di pembukuan.</p>
+<p>Aplikasi menolak daftar ulang bila salah satu syarat berikut belum terpenuhi:</p>
+
+<table>
+    <tr><th style="width:44%">Syarat</th><th>Kalau belum terpenuhi</th></tr>
+    <tr><td>Status harus <i>Lolos Kesehatan</i></td><td>Selesaikan med check lebih dulu</td></tr>
+    <tr><td>Uang pangkal sudah ditagihkan</td><td>Terbitkan tagihannya lebih dulu (bagian <a href="#b5-1">5.1</a>)</td></tr>
+    <tr><td>Belum pernah diakrualkan</td><td>Berarti daftar ulang sudah pernah dijalankan</td></tr>
+    <tr><td>Tidak ada setoran yang menggantung</td><td>Minta keuangan memverifikasi dulu, agar nilai yang dibukukan tidak keliru</td></tr>
+    <tr><td>Jenis biaya uang pangkal punya akun piutang</td><td>Lengkapi di master Jenis Biaya</td></tr>
+</table>
+
+<h2 id="b4-8">4.9 Mengundurkan diri</h2>
+<p>Tombol <b>Undur Diri</b> tersedia kapan saja selama proses belum berakhir, dan <b>wajib disertai alasan</b>. Status menjadi <i>Mengundurkan Diri</i>, yang bersifat final.</p>
+<p>Pengunduran diri <b>tidak membatalkan jurnal</b> pembayaran yang sudah terlanjur diverifikasi. Bila ada uang yang harus dikembalikan, urusannya ditangani tim keuangan sebagai transaksi tersendiri, bukan dengan menghapus data calon.</p>
+
+<!-- ==================== BAB 5 ==================== -->
+<div class="pagebreak"></div>
+<div class="nomorbab">Bab 5</div>
+<h1 id="bab5">Uang Pangkal</h1>
+
+<h2 id="b5-1">5.1 Menagihkan uang pangkal</h2>
+<p>Dari halaman detail santri, tombol <b>Tagih Uang Pangkal</b>. Hanya bisa ditekan bila status calon sudah <i>Diterima</i> atau <i>Lolos Kesehatan</i>, dan hanya <b>sekali</b> untuk tiap santri.</p>
+<p>Isian: <b>nominal</b>, jatuh tempo (boleh dikosongkan), dan keterangan.</p>
+
+<div class="kotak penting">
+    <span class="judul">Isi nominal NORMAL, bukan nominal setelah potongan</span>
+    <p>Masukkan tarif penuh uang pangkal. Bila gelombang calon punya potongan aktif, aplikasi sendiri yang mengurangi dan menerbitkan tagihan sebesar nominal setelah potongan. Kalau Anda memasukkan nominal yang sudah dikurangi, potongannya terhitung dua kali.</p>
+</div>
+
+<p>Nominal awalnya diusulkan aplikasi dari master Jenis Biaya sesuai jenjang dan jalur calon. Bila angka yang muncul terasa aneh, kemungkinan besar cakupan baris di master Jenis Biaya belum tepat &mdash; periksa bagian <a href="#b2-6">2.7</a>.</p>
+
+<h2 id="b5-2">5.2 Potongan gelombang: didapat atau hangus</h2>
+<p>Potongan gelombang adalah <b>insentif bayar cepat</b>, bukan diskon yang langsung menjadi hak. Cara kerjanya:</p>
+<ol>
+    <li>Saat uang pangkal ditagihkan, tagihan langsung terbit sebesar <b>nominal setelah potongan</b>.</li>
+    <li>Bersamaan itu tercatat satu <b>tenggat</b>, yaitu tanggal penagihan ditambah masa berlaku gelombang (bawaan 7 hari).</li>
+    <li>Bila sampai tenggat wali sudah membayar <b>minimal 50%</b> dari tagihan, potongan menjadi <b>hak</b> (didapat). Tidak ada perubahan nominal.</li>
+    <li>Bila sampai tenggat belum mencapai 50%, potongan <b>hangus</b>: nominal potongan <b>ditambahkan kembali</b> ke tagihan dan ke sisanya.</li>
+</ol>
+<p>Yang dihitung adalah pembayaran yang sudah <b>diverifikasi</b> keuangan, dan yang dilihat adalah <b>tanggal pembayarannya</b>, bukan tanggal verifikasinya. Jadi setoran tanggal 5 yang baru diverifikasi tanggal 9 tetap dihitung sebagai setoran tanggal 5.</p>
+<p>Bila potongan hangus dan santri sudah punya rencana angsuran, aplikasi otomatis menyusun <b>versi baru</b> rencana itu: seluruh termin lama disalin apa adanya, lalu ditambah satu termin baru sebesar potongan yang hangus, jatuh tempo 30 hari setelah termin terakhir.</p>
+<p>Penilaian dijalankan dari halaman <b>Angsuran Uang Pangkal</b> lewat tombol evaluasi potongan.</p>
+
+<h2 id="b5-3">5.3 Mengoreksi nominal yang salah</h2>
+<p>Bila nominal uang pangkal telanjur salah, gunakan tombol <b>Koreksi Uang Pangkal</b> &mdash; jangan menerbitkan tagihan kedua. Yang dikoreksi adalah <b>nominal normal</b>, sama seperti saat menagihkan, dan aplikasi menghitung ulang nominal setelah potongan. Alasan koreksi <b>wajib diisi</b> dan tersimpan sebagai jejak.</p>
+<p>Koreksi ditolak bila: santri sudah daftar ulang (jurnalnya sudah terbit, sehingga koreksi harus lewat jurnal penyesuaian keuangan); masih ada setoran yang menunggu verifikasi; atau nominal baru lebih kecil daripada yang sudah dibayar.</p>
+<p>Bila santri punya rencana angsuran aktif, rencana itu dinonaktifkan supaya terminnya disusun ulang mengikuti nominal baru.</p>
+
+<h2 id="b5-4">5.4 Rencana angsuran dan termin</h2>
+<p>Menu <b>PPSB &rarr; Data Master &rarr; Angsuran Uang Pangkal</b>. Rencana angsuran adalah <b>kesepakatan jadwal</b> antara pesantren dan wali. Ia tidak membuat jurnal apa pun &mdash; yang masuk pembukuan hanyalah pembayaran yang benar-benar diterima.</p>
+<p>Saat membuat rencana, isi tanggal kesepakatan lalu daftar termin: urutan, nominal, jatuh tempo, dan keterangan.</p>
+<div class="kotak awas">
+    <span class="judul">Jumlah termin harus persis sama dengan tagihan</span>
+    <p>Penjumlahan seluruh termin wajib sama dengan nominal tagihan uang pangkal. Kalau kurang atau lebih walau seribu rupiah, aplikasi menolak menyimpan. Ini yang menjaga jadwal cicilan tidak pernah menyimpang dari tagihannya.</p>
+</div>
+<p>Satu santri hanya boleh punya <b>satu rencana aktif</b>. Untuk mengubah jadwal yang sudah ada, gunakan re-negosiasi.</p>
+
+<h2 id="b5-5">5.5 Re-negosiasi jadwal</h2>
+<p>Tombol <b>Re-negosiasi</b> membuat <b>versi baru</b> rencana; versi lama ditandai digantikan dan tetap tersimpan sebagai riwayat. Isi tanggal kesepakatan baru, alasan, dan susunan termin yang baru.</p>
+<p>Total termin tetap harus sama dengan nominal tagihan. Re-negosiasi ditolak bila masih ada setoran yang menunggu verifikasi &mdash; selesaikan dulu, agar jadwal baru disusun di atas angka yang sudah pasti.</p>
+
+<h2 id="b5-6">5.6 Menagih termin dan mencatat tanggapan</h2>
+<p>Halaman Angsuran Uang Pangkal punya penyaring <b>termin jatuh tempo dalam N hari</b>. Pilihan angkanya diatur di Setting Filter Termin (bagian <a href="#b2-9">2.10</a>).</p>
+<p>Untuk tiap termin tersedia dua pencatatan:</p>
+<ul>
+    <li><b>Tandai sudah diingatkan</b> &mdash; menyimpan tanggal, nama petugas, dan catatan. Berguna agar wali tidak ditagih dua kali oleh dua petugas berbeda.</li>
+    <li><b>Catat tanggapan</b> &mdash; isian bebas berisi jawaban wali, misalnya janji tanggal pembayaran.</li>
+</ul>
+<div class="kotak catatan">
+    <span class="judul">Menagih bukan berarti lunas</span>
+    <p>Menandai termin sudah diingatkan tidak mengubah status tagihan dan tidak menghilangkan penanda jatuh tempo di menu. Penandanya baru hilang setelah setorannya masuk dan diverifikasi.</p>
+</div>
+
+<h2 id="b5-7">5.7 Cetak rekap dan detail</h2>
+<p>Tersedia dua cetakan: <b>rekap</b> seluruh santri yang punya rencana angsuran, dan <b>detail</b> per santri berisi susunan termin beserta riwayat pembayarannya. Keduanya bisa dicetak dari halaman Angsuran Uang Pangkal.</p>
+
+<!-- ==================== BAB 6 ==================== -->
+<div class="pagebreak"></div>
+<div class="nomorbab">Bab 6</div>
+<h1 id="bab6">Pembayaran</h1>
+
+<h2 id="b6-1">6.1 Prinsip dua tangan</h2>
+<p>Pencatatan uang selalu melibatkan dua orang berbeda. Ini pengaman pokok modul pembayaran:</p>
+
+<table>
+    <tr><th style="width:18%">Langkah</th><th style="width:20%">Pelaku</th><th>Akibatnya</th></tr>
+    <tr><td>Mencatat</td><td>Panitia PPSB</td><td>Setoran tercatat berstatus <b>menunggu verifikasi</b>. Belum masuk pembukuan, sisa tagihan <b>belum</b> berkurang.</td></tr>
+    <tr><td>Verifikasi</td><td>Tim keuangan</td><td>Jurnal terbit, sisa tagihan berkurang, status tagihan diperbarui, dan status calon ikut maju bila registrasinya lunas.</td></tr>
+</table>
+
+<p>Karena itu, santri yang sudah menyetor tetap tampak "belum lunas" sampai keuangan sempat memproses. Untuk membedakannya, daftar calon santri dan rekap pembayaran menampilkan keterangan <b>menunggu verifikasi</b> beserta nominalnya.</p>
+<p>Menu pembayaran terbagi dua lingkup dan tidak bisa saling menyeberang:</p>
+<ul>
+    <li><b>PPSB &rarr; Pembayaran Registrasi &amp; Uang Pangkal</b> &mdash; hanya tagihan registrasi dan uang pangkal.</li>
+    <li><b>Kesantrian &rarr; Pembayaran SPP &amp; Tagihan Lain</b> &mdash; hanya SPP dan tagihan lain.</li>
+</ul>
+
+<h2 id="b6-2">6.2 Mencatat setoran</h2>
+<p>Tombol tambah di halaman Pembayaran. Isiannya:</p>
+<table>
+    <tr><th style="width:28%">Isian</th><th>Catatan</th></tr>
+    <tr><td>Santri</td><td>Ketik untuk mencari &mdash; cocok dengan nomor pendaftaran, NIS, nama, atau jenjang, dalam urutan bebas</td></tr>
+    <tr><td>Tagihan</td><td>Daftar tagihan santri itu yang masih bersisa</td></tr>
+    <tr><td>Tanggal</td><td>Tanggal uang benar-benar diterima, bukan tanggal pencatatan</td></tr>
+    <tr><td>Nominal</td><td>Tidak boleh melebihi sisa tagihan yang belum tercatat</td></tr>
+    <tr><td>Rekening penerima</td><td>Kas atau rekening bank tujuan</td></tr>
+    <tr><td>Metode</td><td>Tunai, transfer, dan seterusnya</td></tr>
+    <tr><td>Bukti</td><td>Unggahan foto atau berkas bukti setor</td></tr>
+    <tr><td>Catatan</td><td>Keterangan tambahan bila perlu</td></tr>
+</table>
+
+<div class="kotak penting">
+    <span class="judul">Tanggal menentukan potongan gelombang</span>
+    <p>Isi tanggal sesuai kapan uang diterima. Penilaian potongan gelombang memakai tanggal pembayaran, bukan tanggal verifikasi &mdash; salah tanggal bisa membuat potongan yang seharusnya didapat menjadi hangus.</p>
+</div>
+
+<p>Nomor pembayaran terbit otomatis berbentuk <code>BYR-2607-0001</code>. Setelah tersimpan, tim keuangan langsung mendapat pemberitahuan.</p>
+<p>Bila nominal ditolak karena "melebihi sisa yang belum tercatat", periksa apakah sudah ada setoran lain untuk tagihan yang sama yang masih menunggu verifikasi. Setoran yang menggantung tetap memesan ruang tagihan supaya tidak terjadi pencatatan dobel.</p>
+
+<h2 id="b6-3">6.3 Verifikasi dan penolakan</h2>
+<p>Langkah ini <b>hanya untuk tim keuangan</b>. Panitia PPSB tidak akan melihat tombolnya.</p>
+<p>Sebelum menyetujui, pastikan dananya benar-benar sudah masuk ke rekening. Setelah <b>Verifikasi</b> ditekan:</p>
+<ul>
+    <li>Jurnal terbit &mdash; rekening penerima di sisi debet, akun pendapatan di sisi kredit. Bila uang pangkalnya sudah diakrualkan saat daftar ulang, sisi kreditnya adalah akun <b>piutang</b>, supaya pendapatan tidak diakui dua kali.</li>
+    <li>Sisa tagihan berkurang dan statusnya menjadi <i>sebagian</i> atau <i>lunas</i>.</li>
+    <li>Bila tagihan registrasi menjadi lunas dan calon masih berstatus <i>Calon</i>, statusnya berpindah otomatis menjadi <i>Registrasi Terbayar</i>.</li>
+</ul>
+<p>Tombol <b>Tolak</b> memerlukan <b>alasan</b>. Setoran ditandai ditolak, tidak ada jurnal yang terbit, dan petugas yang mencatatnya mendapat pemberitahuan berisi alasan tersebut. Setoran yang sudah diverifikasi atau sudah ditolak tidak bisa diproses ulang.</p>
+
+<h2 id="b6-4">6.4 Membayar dari Dompet Wali</h2>
+<p>Bila keluarga sudah menitipkan dana lewat <b>Dompet Wali</b>, tagihan bisa dibayar langsung dari saldo itu. Pembayaran dari dompet <b>tidak melewati verifikasi</b>, karena dananya sudah diverifikasi saat top-up.</p>
+<p>Syaratnya: keluarga sudah punya Dompet Wali, dan saldonya mencukupi. Bila belum ada dompet, lakukan top-up lebih dulu di menu <b>Kesantrian &rarr; Dompet &amp; Tabungan</b>.</p>
+
+<h2 id="b6-5">6.5 Kuitansi</h2>
+<p>Setiap pembayaran bisa dicetak kuitansinya dari daftar pembayaran. Kuitansi dicetak pada kertas <b>A4 tegak</b>.</p>
+
+<h2 id="b6-6">6.6 Rekap Pembayaran Santri</h2>
+<p>Menu <b>PPSB &rarr; Transaksi &rarr; Rekap Pembayaran Santri</b> menampilkan seluruh tagihan dan pembayaran per santri dalam satu halaman: nominal tagihan, yang sudah terbayar, yang masih menunggu verifikasi, dan sisanya.</p>
+<p>Halaman ini bisa dicetak. Perlu diketahui, <b>cetakannya sengaja hanya memuat uang yang sudah diakui</b> &mdash; setoran yang masih menunggu verifikasi tidak ikut tercetak, karena dokumen itu bersifat resmi.</p>
+
+<h2 id="b6-7">6.7 Membaca status pembayaran di daftar</h2>
+<p>Kolom Pembayaran di daftar calon santri dan rekap memakai lima label:</p>
+
+<table>
+    <tr><th style="width:26%">Label</th><th>Artinya</th></tr>
+    <tr><td>Belum ditagih</td><td>Santri belum punya tagihan sama sekali</td></tr>
+    <tr><td>Belum bayar</td><td>Ada tagihan, belum ada pembayaran yang diakui</td></tr>
+    <tr><td>Sebagian</td><td>Sudah terbayar sebagian, masih bersisa</td></tr>
+    <tr><td>Menunggu verifikasi</td><td>Ada setoran yang sudah disetor tapi belum disahkan keuangan</td></tr>
+    <tr><td>Lunas</td><td>Seluruh tagihan tidak bersisa</td></tr>
+</table>
+
+<p>Label <b>Menunggu verifikasi</b> diutamakan daripada "belum bayar" dan "sebagian", supaya petugas tidak menagih wali yang sebenarnya sudah menyetor. Meski begitu, nominal yang menunggu <b>tidak pernah</b> dihitung sebagai terbayar dan <b>tidak mengurangi</b> sisa tagihan &mdash; uangnya belum diakui.</p>
+
+<!-- ==================== BAB 7 ==================== -->
+<div class="pagebreak"></div>
+<div class="nomorbab">Bab 7</div>
+<h1 id="bab7">Dashboard PPSB</h1>
+
+<p>Menu <b>Dashboard</b>, lalu pilih tab <b>PPSB</b>. Seluruh angka dihitung untuk <b>satu tahun ajaran</b> yang dipilih di bagian atas halaman.</p>
+
+<div class="kotak penting">
+    <span class="judul">Hanya pembayaran terverifikasi yang dihitung</span>
+    <p>Seluruh angka di dashboard memakai pembayaran yang sudah disahkan keuangan. Setoran yang masih menunggu verifikasi belum ikut terhitung &mdash; jadi selisih dengan catatan panitia biasanya berarti masih ada yang menggantung, bukan salah hitung.</p>
+</div>
+
+<h2>Enam bagian isinya</h2>
+<table>
+    <tr><th style="width:30%">Bagian</th><th>Isi</th></tr>
+    <tr><td>Pendaftar per bulan</td><td>Jumlah pendaftar per jenjang per bulan, disertai grafik tren</td></tr>
+    <tr><td>Closing per bulan</td><td>Calon yang sudah membayar uang pangkal, per jenjang per bulan</td></tr>
+    <tr><td>Outstanding closing</td><td>Yang sudah mulai membayar uang pangkal tapi belum lunas</td></tr>
+    <tr><td>Penerimaan</td><td>Uang masuk registrasi, uang pangkal, dan totalnya</td></tr>
+    <tr><td>Plan vs aktual</td><td>Target dibanding capaian per jenjang, dirinci Ikhwan dan Akhwat</td></tr>
+    <tr><td>Sumber informasi</td><td>Peringkat asal informasi calon</td></tr>
+</table>
+
+<h2>Kolom bulan memakai musim penerimaan</h2>
+<p>Dua belas kolom bulan berjalan dari <b>Juli tahun sebelumnya sampai Juni</b> tahun berjalannya tahun ajaran. Untuk tahun ajaran 2027/2028, kolomnya Juli 2026 sampai Juni 2027.</p>
+<p>Alasannya sederhana: pendaftaran dan pembayaran terjadi <b>sebelum</b> tahun ajaran berjalan. Kalau memakai bulan tahun ajaran itu sendiri, seluruh kolom akan bernilai nol padahal totalnya tidak.</p>
+<p>Pembayaran yang jatuh di luar dua belas bulan itu dikumpulkan pada kolom <b>Di luar rentang</b>, yang hanya muncul bila memang ada isinya. Dengan begitu jumlah seluruh kolom bulan selalu sama dengan totalnya.</p>
+
+<h2>Melihat rincian dan mengunduhnya</h2>
+<p>Empat kartu penerimaan punya tautan <b>Lihat detail</b> yang membuka daftar santri penyumbang angkanya. Panel rincian ini dilengkapi:</p>
+<ul>
+    <li>Kotak <b>cari</b> berdasarkan nomor pendaftaran, NIS, atau nama &mdash; penyaringannya dikerjakan di server, jadi tetap benar walau datanya ratusan</li>
+    <li>Penghitung "N santri cocok" dan pembagian halaman</li>
+    <li>Tautan <b>Rekap</b> dan <b>Detail</b> pada tiap baris</li>
+    <li>Unduhan <b>CSV, Excel, dan PDF</b> yang mengikuti kata kunci pencarian yang sedang aktif, tanpa dipotong per halaman</li>
+</ul>
+
+<h2>Tabel jalur pendaftaran</h2>
+<p>Tabel sebaran jalur menampilkan <b>seluruh jalur aktif</b>, termasuk yang belum punya pendaftar &mdash; angka nol pada sebuah jalur adalah informasi, bukan kekosongan yang perlu disembunyikan. Basis perhitungannya bisa ditukar antara <b>closing</b> dan <b>pendaftar</b>.</p>
+
+<h2>Bila target belum diisi</h2>
+<p>Kolom pencapaian pada tabel Plan vs Aktual dibiarkan kosong bila targetnya belum diisi, bukan ditulis 0%. Keduanya berbeda arti: kosong berarti belum ada patokan, sedangkan 0% berarti ada target tapi belum tercapai sama sekali.</p>
+
+<!-- ==================== BAB 8 ==================== -->
+<div class="pagebreak"></div>
+<div class="nomorbab">Bab 8</div>
+<h1 id="bab8">Masalah yang Sering Muncul</h1>
+
+<table>
+    <tr><th style="width:38%">Gejala</th><th>Sebab dan penanganannya</th></tr>
+
+    <tr>
+        <td>Pendaftaran calon ditolak, data tidak tersimpan</td>
+        <td>Periksa berurutan: (1) tahun ajarannya aktif? (2) jalur yang dipilih milik tahun ajaran itu? (3) tarif registrasi untuk jenjang dan jalur itu sudah ada di master Jenis Biaya? Tagihan registrasi terbit otomatis, jadi tarifnya wajib ada lebih dulu.</td>
+    </tr>
+    <tr>
+        <td>"Tarif tidak ditemukan" saat menagihkan uang pangkal</td>
+        <td>Belum ada baris Jenis Biaya yang cakupannya menjangkau jenjang dan jalur santri itu. Tambahkan baris tarif dasar tanpa jalur, atau baris khusus untuk jalur tersebut. Lihat bagian 2.7.</td>
+    </tr>
+    <tr>
+        <td>Nominal uang pangkal yang muncul bukan yang seharusnya</td>
+        <td>Hampir selalu karena cakupan baris di master Jenis Biaya. Ingat urutan pencariannya: jenjang+jalur, lalu jalur saja, lalu jenjang saja, lalu umum. Baris berjalur mengalahkan baris berjenjang.</td>
+    </tr>
+    <tr>
+        <td>Penyimpanan Jenis Biaya ditolak karena cakupan ganda</td>
+        <td>Sudah ada baris aktif lain dengan tipe, tahun ajaran, jenjang, dan jalur yang sama. Nonaktifkan atau perbaiki baris lama itu lebih dulu.</td>
+    </tr>
+    <tr>
+        <td>Status calon tidak berpindah ke Registrasi Terbayar</td>
+        <td>Tidak ada tombol untuk tahap ini. Pastikan setorannya sudah <b>diverifikasi</b> keuangan dan tagihan registrasinya benar-benar <b>lunas</b>, bukan terbayar sebagian.</td>
+    </tr>
+    <tr>
+        <td>"Dari status A tidak bisa langsung ke B"</td>
+        <td>Tahap dilompati. Pesan aplikasi menyebutkan tahap mana yang seharusnya berikutnya &mdash; kerjakan itu dulu.</td>
+    </tr>
+    <tr>
+        <td>Nominal setoran ditolak: melebihi sisa yang belum tercatat</td>
+        <td>Ada setoran lain untuk tagihan yang sama yang masih menunggu verifikasi. Setoran menggantung tetap memesan ruang tagihan agar tidak terjadi pencatatan dobel. Selesaikan yang menggantung lebih dulu.</td>
+    </tr>
+    <tr>
+        <td>Tombol verifikasi tidak muncul</td>
+        <td>Verifikasi dan penolakan hanya untuk anggota tim keuangan. Panitia PPSB memang tidak melihat tombolnya.</td>
+    </tr>
+    <tr>
+        <td>Daftar ulang ditolak</td>
+        <td>Lihat tabel syarat di bagian 4.8. Yang paling sering: uang pangkal belum ditagihkan, atau masih ada setoran menunggu verifikasi.</td>
+    </tr>
+    <tr>
+        <td>Rencana angsuran ditolak</td>
+        <td>Jumlah seluruh termin harus persis sama dengan nominal tagihan uang pangkal. Periksa juga apakah sudah ada rencana aktif &mdash; kalau ada, gunakan Re-negosiasi.</td>
+    </tr>
+    <tr>
+        <td>Potongan gelombang hangus padahal wali sudah membayar</td>
+        <td>Yang dihitung hanya pembayaran <b>terverifikasi</b>, dan yang dipakai adalah <b>tanggal pembayaran</b>. Periksa apakah setorannya sudah diverifikasi, dan apakah tanggalnya diisi sesuai tanggal uang diterima.</td>
+    </tr>
+    <tr>
+        <td>Calon tidak pernah mendapat potongan gelombang</td>
+        <td>Kemungkinan saat mendaftar dipilih "tanpa gelombang". Pilihan itu memang meniadakan potongan.</td>
+    </tr>
+    <tr>
+        <td>Kolom bulan di dashboard nol padahal totalnya tidak</td>
+        <td>Periksa apakah tanggal pembayarannya jatuh di luar musim penerimaan (Juli sampai Juni). Bila ya, angkanya ada di kolom "Di luar rentang".</td>
+    </tr>
+    <tr>
+        <td>Sumber informasi tidak bisa dihapus</td>
+        <td>Sudah pernah dipilih santri. Nonaktifkan saja &mdash; data lama tetap terbaca, tapi tidak muncul lagi sebagai pilihan.</td>
+    </tr>
+    <tr>
+        <td>Berkas terunggah tapi tautan unduhnya mati</td>
+        <td>Terjadi bila aplikasi dijalankan di layanan tanpa penyimpanan permanen. Simpan salinan berkas asli di luar aplikasi.</td>
+    </tr>
+    <tr>
+        <td>Menu yang dicari tidak ada di sidebar</td>
+        <td>Hak akses modulnya belum diberikan. Hubungi administrator lewat Setting Awal &rarr; Hak Akses Modul.</td>
+    </tr>
+</table>
+
+<!-- ==================== LAMPIRAN ==================== -->
+<div class="pagebreak"></div>
+<div class="nomorbab">Lampiran</div>
+<h1 id="lampiran">Lampiran</h1>
+
+<h2 id="lamp-a">A. Daftar status calon santri</h2>
+<table>
+    <tr><th style="width:30%">Status</th><th style="width:14%">Sifat</th><th>Artinya</th></tr>
+    <tr><td>Calon</td><td>berjalan</td><td>Baru terdaftar, registrasi belum lunas</td></tr>
+    <tr><td>Registrasi Terbayar</td><td>berjalan</td><td>Registrasi lunas dan sudah diverifikasi</td></tr>
+    <tr><td>Berkas Terverifikasi</td><td>berjalan</td><td>Berkas dinyatakan lengkap dan sah</td></tr>
+    <tr><td>Sudah Diseleksi</td><td>berjalan</td><td>Tes dan wawancara selesai</td></tr>
+    <tr><td>Diterima</td><td>berjalan</td><td>Dinyatakan lulus, menunggu med check</td></tr>
+    <tr><td>Lolos Kesehatan</td><td>berjalan</td><td>Med check lolos, siap daftar ulang</td></tr>
+    <tr><td>Santri Aktif</td><td>berjalan</td><td>Sudah daftar ulang dan mendapat NIS</td></tr>
+    <tr><td>Alumni</td><td><b>final</b></td><td>Menyelesaikan masa belajar</td></tr>
+    <tr><td>Tidak Lulus</td><td><b>final</b></td><td>Tidak lulus seleksi</td></tr>
+    <tr><td>Gagal Med Check</td><td><b>final</b></td><td>Med check tidak lolos, penerimaan batal</td></tr>
+    <tr><td>Mengundurkan Diri</td><td><b>final</b></td><td>Mundur atas permintaan sendiri</td></tr>
+    <tr><td>Keluar</td><td><b>final</b></td><td>Berhenti setelah menjadi santri aktif</td></tr>
+</table>
+
+<h2 id="lamp-b">B. Daftar jenis berkas</h2>
+<table>
+    <tr><th style="width:44%">Jenis berkas</th><th style="width:30%">Kelompok</th><th>Boleh diunggah</th></tr>
+    <tr><td>KTP Ayah</td><td>Berkas Registrasi</td><td>Sejak awal</td></tr>
+    <tr><td>KTP Ibu</td><td>Berkas Registrasi</td><td>Sejak awal</td></tr>
+    <tr><td>KTP Wali</td><td>Berkas Registrasi</td><td>Sejak awal</td></tr>
+    <tr><td>Akta Kelahiran</td><td>Berkas Registrasi</td><td>Sejak awal</td></tr>
+    <tr><td>Kartu Keluarga</td><td>Berkas Registrasi</td><td>Sejak awal</td></tr>
+    <tr><td>Foto</td><td>Berkas Registrasi</td><td>Sejak awal</td></tr>
+    <tr><td>Surat Keterangan Aktif</td><td>Berkas Pindahan</td><td>Sejak awal</td></tr>
+    <tr><td>Surat Keterangan Kelakuan Baik</td><td>Berkas Pindahan</td><td>Sejak awal</td></tr>
+    <tr><td>Rapot Terakhir</td><td>Berkas Pindahan</td><td>Sejak awal</td></tr>
+    <tr><td>Surat Keterangan Siswa Sekolah Sebelumnya</td><td>Berkas Setelah Lulus</td><td>Setelah dinyatakan lulus</td></tr>
+    <tr><td>Hasil Med Check</td><td>Berkas Setelah Lulus</td><td>Setelah dinyatakan lulus</td></tr>
+    <tr><td>Dokumen Lainnya</td><td>Berkas Setelah Lulus</td><td>Setelah dinyatakan lulus</td></tr>
+</table>
+
+<h2 id="lamp-c">C. Modul dan hak akses PPSB</h2>
+<p>Berikan hak seperlunya. Aksi <b>hapus</b> sebaiknya dibatasi pada sedikit orang.</p>
+<table>
+    <tr><th style="width:34%">Modul</th><th>Aksi yang biasanya diperlukan panitia</th></tr>
+    <tr><td>tahun-ajaran</td><td>lihat</td></tr>
+    <tr><td>jenjang</td><td>lihat</td></tr>
+    <tr><td>jalur-pendaftaran</td><td>lihat, buat, ubah</td></tr>
+    <tr><td>sumber-informasi</td><td>lihat, buat, ubah</td></tr>
+    <tr><td>tipe-biaya</td><td>lihat</td></tr>
+    <tr><td>jenis-biaya</td><td>lihat, buat, ubah</td></tr>
+    <tr><td>potongan-gelombang</td><td>lihat, buat</td></tr>
+    <tr><td>target-santri</td><td>lihat, buat, ubah</td></tr>
+    <tr><td>termin-filter</td><td>lihat, ubah</td></tr>
+    <tr><td>wali</td><td>lihat, buat, ubah</td></tr>
+    <tr><td>santri</td><td>lihat, buat, ubah</td></tr>
+    <tr><td>dokumen-santri</td><td>lihat, buat</td></tr>
+    <tr><td>angsuran-uang-pangkal</td><td>lihat, buat, ubah</td></tr>
+    <tr><td>pembayaran-ppsb</td><td>lihat, buat &mdash; <i>ubah</i> dan <i>hapus</i> untuk tim keuangan</td></tr>
+    <tr><td>rekap-pembayaran</td><td>lihat</td></tr>
+    <tr><td>dashboard-ppsb</td><td>lihat</td></tr>
+</table>
+
+<h2 id="lamp-d">D. Arti nomor dokumen</h2>
+<p>Nomor dokumen berpola <code>AWALAN-TTBB-NNNN</code>: dua digit tahun, dua digit bulan, lalu nomor urut yang dimulai lagi dari 0001 setiap bulan.</p>
+<table>
+    <tr><th style="width:22%">Awalan</th><th style="width:26%">Contoh</th><th>Dokumen</th></tr>
+    <tr><td>PSB</td><td>PSB-2607-0003</td><td>Nomor pendaftaran calon santri</td></tr>
+    <tr><td>BYR</td><td>BYR-2607-0012</td><td>Pembayaran santri</td></tr>
+</table>
+<p>Contoh <code>PSB-2607-0003</code> berarti: pendaftar ketiga pada bulan Juli 2026.</p>
+
+<div class="kotak catatan" style="margin-top:10mm">
+    <span class="judul">Tentang buku ini</span>
+    <p>Isi buku ini disusun mengikuti perilaku aplikasi yang berjalan. Bila suatu saat ada langkah di aplikasi yang tidak lagi cocok dengan keterangan di sini, yang benar adalah aplikasinya &mdash; mohon sampaikan agar buku ini diperbarui.</p>
+</div>
+
+</body>
+</html>

@@ -18,14 +18,7 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('santri.store') }}" class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
-              x-data="{
-                  ta: @js(old('tahun_ajaran', $taDefault ?? '')),
-                  jalur: @js(old('jalur', '')),
-                  jalurMap: @js($jalurPerTa),
-                  opsiJalur() { return this.jalurMap[this.ta] ?? [] },
-              }"
-              x-init="$watch('ta', () => { if (!opsiJalur().some(o => o.v === jalur)) jalur = opsiJalur()[0]?.v ?? '' })">
+        <form method="POST" action="{{ route('santri.store') }}" class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             @csrf
 
             <x-field name="id_wali" label="Wali / Keluarga" :value="old('id_wali')" :options="['' => '— pilih wali —'] + $waliOptions" required />
@@ -56,25 +49,34 @@
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Tahun Ajaran <span class="text-red-500">*</span></label>
-                    <select name="tahun_ajaran" x-model="ta" required
+                    <select name="tahun_ajaran" required
                             class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm focus:border-brand focus:ring-1 focus:ring-brand">
                         <option value="">— pilih tahun ajaran —</option>
                         @foreach ($taOptions as $kodeTa)
-                            <option value="{{ $kodeTa }}">{{ $kodeTa }}{{ $kodeTa === ($taDefault ?? null) ? ' (default)' : '' }}</option>
+                            <option value="{{ $kodeTa }}" @selected(old('tahun_ajaran', $taDefault ?? '') === $kodeTa)>{{ $kodeTa }}{{ $kodeTa === ($taDefault ?? null) ? ' (default)' : '' }}</option>
                         @endforeach
                     </select>
-                    <p class="mt-1 text-xs text-gray-400">Menentukan jenis biaya, jalur, potongan gelombang, dan target yang berlaku.</p>
+                    <p class="mt-1 text-xs text-gray-400">Menentukan jenis biaya, potongan gelombang, dan target yang berlaku.</p>
                 </div>
                 <div>
+                    {{-- Jalur BERLAKU LINTAS TAHUN AJARAN sejak kolom tahun_ajaran-nya
+                         dibuang, jadi daftarnya tidak lagi bergantung pada T.A terpilih.
+                         Yang tetap berbeda per tahun adalah TARIF-nya, dan itu dimensi
+                         milik jenis_biaya (tahun_ajaran + kode_jalur). --}}
                     <label class="mb-1 block text-sm font-medium text-gray-700">Jalur <span class="text-red-500">*</span></label>
-                    <select name="jalur" x-model="jalur" required
+                    <select name="jalur" required
                             class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm focus:border-brand focus:ring-1 focus:ring-brand">
-                        <template x-if="opsiJalur().length === 0"><option value="">— belum ada jalur untuk T.A ini —</option></template>
-                        <template x-for="o in opsiJalur()" :key="o.v"><option :value="o.v" x-text="o.l" :selected="o.v === jalur"></option></template>
+                        @forelse ($jalurOptions as $kodeJalur => $namaJalur)
+                            <option value="{{ $kodeJalur }}" @selected(old('jalur') === (string) $kodeJalur)>{{ $namaJalur }}</option>
+                        @empty
+                            <option value="">— belum ada jalur aktif —</option>
+                        @endforelse
                     </select>
-                    <p class="mt-1 text-xs text-gray-400" x-show="ta && opsiJalur().length === 0" x-cloak>
-                        Tambahkan jalur untuk tahun ajaran ini di menu PPSB → Jalur Pendaftaran.
-                    </p>
+                    @if (empty($jalurOptions))
+                        <p class="mt-1 text-xs text-gray-400">
+                            Tambahkan jalurnya di menu PPSB → Setting Awal → Jalur Pendaftaran (berlaku untuk semua tahun ajaran).
+                        </p>
+                    @endif
                 </div>
             </div>
 

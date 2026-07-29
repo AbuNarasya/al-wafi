@@ -88,12 +88,19 @@ class ReportsService
     }
 
     /** Mutasi (debet − kredit) per akun untuk entry pada rentang. @return array<string,string> */
-    private function movementDebitMap(?string $gte, ?string $lte): array
+    /**
+     * @param  ?string  $kodeUnit  saring per unit bisnis. Dimensi unit melekat di
+     *                             BARIS jurnal (PostingService menyalinnya dari
+     *                             kepala transaksi), jadi penyaringannya di jl,
+     *                             bukan je.
+     */
+    private function movementDebitMap(?string $gte, ?string $lte, ?string $kodeUnit = null): array
     {
         $rows = DB::table('journal_lines as jl')
             ->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
             ->when($gte, fn ($q) => $q->where('je.tanggal', '>=', $gte))
             ->when($lte, fn ($q) => $q->where('je.tanggal', '<=', $lte))
+            ->when($kodeUnit, fn ($q) => $q->where('jl.kode_unit', $kodeUnit))
             ->groupBy('jl.kode_coa')
             ->selectRaw('jl.kode_coa as kode_coa, SUM(jl.debet) as d, SUM(jl.kredit) as k')
             ->get();
@@ -191,10 +198,18 @@ class ReportsService
 
     // ---- Laba Rugi ----
 
-    public function labaRugi(string $from, string $to): array
+    /**
+     * Laba rugi periode. `$kodeUnit` menyaring per unit bisnis.
+     *
+     * CATATAN yang harus ikut ditampilkan halaman: baris jurnal yang unitnya
+     * KOSONG tidak masuk laporan unit mana pun. Jadi menjumlahkan laba semua
+     * unit belum tentu sama dengan laba keseluruhan — karena itu `tanpa_unit`
+     * dihitung dan dipakai memperingatkan pembaca, bukan disembunyikan.
+     */
+    public function labaRugi(string $from, string $to, ?string $kodeUnit = null): array
     {
         $ctx = $this->coaContext();
-        $move = $this->movementDebitMap($from, $to);
+        $move = $this->movementDebitMap($from, $to, $kodeUnit);
         $periodNormal = fn ($a) => $this->applySign($move[$a->kode_coa] ?? '0', $a->jenis_saldo);
         $acctsOf = fn ($root) => array_values(array_filter($ctx['accounts'], fn ($a) => $this->rootOfAccount($ctx, $a) === $root));
         $skip = fn ($a, $nilai) => $this->roundedZero($nilai);
@@ -204,11 +219,40 @@ class ReportsService
         $laba = Money::sub($pendapatan['total'], $beban['total']);
 
         return [
-            'from' => $from, 'to' => $to,
+            'from' => $from, 'to' => $to, 'kode_unit' => $kodeUnit,
             'pendapatan' => ['title' => 'Pendapatan', 'groups' => $pendapatan['groups'], 'total' => Money::of($pendapatan['total'])],
             'beban' => ['title' => 'Beban', 'groups' => $beban['groups'], 'total' => Money::of($beban['total'])],
             'total_pendapatan' => Money::of($pendapatan['total']), 'total_beban' => Money::of($beban['total']), 'laba_rugi_bersih' => Money::of($laba),
+            'tanpa_unit' => $this->labaRugiTanpaUnit($ctx, $from, $to),
         ];
+    }
+
+    /**
+     * Nilai mutasi akun Pendapatan & Beban pada periode yang barisnya TIDAK
+     * berunit. Angka ini tidak muncul di laporan unit mana pun, jadi halaman
+     * memakainya untuk memperingatkan bila ada yang tercecer.
+     */
+    private function labaRugiTanpaUnit(array $ctx, string $from, string $to): string
+    {
+        $kode = [];
+        foreach ($ctx['accounts'] as $a) {
+            if (in_array($this->rootOfAccount($ctx, $a), ['4', '5'], true)) {
+                $kode[] = $a->kode_coa;
+            }
+        }
+        if ($kode === []) {
+            return '0';
+        }
+
+        $row = DB::table('journal_lines as jl')
+            ->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
+            ->whereBetween('je.tanggal', [$from, $to])
+            ->whereNull('jl.kode_unit')
+            ->whereIn('jl.kode_coa', $kode)
+            ->selectRaw('COALESCE(SUM(jl.debet + jl.kredit), 0) as n')
+            ->first();
+
+        return Money::of($row->n ?? '0');
     }
 
     // ---- Perubahan Modal ----
@@ -298,7 +342,14 @@ class ReportsService
 
     // ---- Buku Besar (satu akun) ----
 
-    public function bukuBesar(string $kodeCoa, ?string $from = null, ?string $to = null): array
+    /**
+     * @param  ?string  $kodeUnit  saring per unit bisnis (drill-down dari Laba
+     *                             Rugi per unit). Saldo awal dari menu Saldo Awal
+     *                             SENGAJA tidak ikut saat menyaring unit: baris
+     *                             saldo awal tidak berdimensi unit, jadi
+     *                             membebankannya ke satu unit akan menyesatkan.
+     */
+    public function bukuBesar(string $kodeCoa, ?string $from = null, ?string $to = null, ?string $kodeUnit = null): array
     {
         $from ??= '1900-01-01';
         $to ??= '9999-12-31';
@@ -309,14 +360,19 @@ class ReportsService
         $normal = $akun->jenis_saldo === 'debet';
 
         $saldoAwalDebit = '0';
-        foreach (OpeningBalance::where('kode_coa', $kodeCoa)->get() as $o) {
-            $saldoAwalDebit = Money::add($saldoAwalDebit, $o->jenis_saldo === 'debet' ? Money::of($o->saldo) : Money::sub('0', $o->saldo));
+        if (! $kodeUnit) {
+            foreach (OpeningBalance::where('kode_coa', $kodeCoa)->get() as $o) {
+                $saldoAwalDebit = Money::add($saldoAwalDebit, $o->jenis_saldo === 'debet' ? Money::of($o->saldo) : Money::sub('0', $o->saldo));
+            }
         }
         $before = DB::table('journal_lines as jl')->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
-            ->where('jl.kode_coa', $kodeCoa)->where('je.tanggal', '<', $from)->selectRaw('COALESCE(SUM(jl.debet),0) as d, COALESCE(SUM(jl.kredit),0) as k')->first();
+            ->where('jl.kode_coa', $kodeCoa)->where('je.tanggal', '<', $from)
+            ->when($kodeUnit, fn ($q) => $q->where('jl.kode_unit', $kodeUnit))
+            ->selectRaw('COALESCE(SUM(jl.debet),0) as d, COALESCE(SUM(jl.kredit),0) as k')->first();
         $saldoAwalDebit = Money::sub(Money::add($saldoAwalDebit, $before->d), $before->k);
 
         $inRange = \App\Models\JournalLine::where('kode_coa', $kodeCoa)
+            ->when($kodeUnit, fn ($q) => $q->where('journal_lines.kode_unit', $kodeUnit))
             ->whereHas('entry', fn ($q) => $q->whereBetween('tanggal', [$from, $to]))
             ->with(['entry:id,tanggal,referensi,keterangan,status,id_pengguna'])
             ->join('journal_entries', 'journal_lines.entry_id', '=', 'journal_entries.id')
@@ -337,7 +393,7 @@ class ReportsService
 
         return [
             'akun' => ['kode_coa' => $akun->kode_coa, 'nama_coa' => $akun->nama_coa, 'jenis_saldo' => $akun->jenis_saldo],
-            'periode' => ['from' => $from, 'to' => $to],
+            'periode' => ['from' => $from, 'to' => $to], 'kode_unit' => $kodeUnit,
             'saldo_awal' => $normal ? Money::of($saldoAwalDebit) : Money::sub('0', $saldoAwalDebit),
             'mutasi' => $mutasi,
             'saldo_akhir' => $normal ? Money::of($running) : Money::sub('0', $running),
