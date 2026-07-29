@@ -187,13 +187,22 @@
                                 </div>
                             @endif
                             <div class="grid gap-2 sm:grid-cols-3">
-                                <label class="block text-xs text-gray-600">Nominal Normal <span class="text-red-500">*</span>
-                                    <input type="number" step="0.01" min="0" name="nominal" required placeholder="mis. 20000000"
-                                           value="{{ old('nominal', $nominalDefaultUangPangkal) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
-                                    @if ($nominalDefaultUangPangkal !== null)
-                                        <span class="mt-0.5 block text-[11px] text-gray-400">Terisi dari master Jenis Biaya — boleh diubah bila calon ini berbeda.</span>
-                                    @endif
-                                </label>
+                                @if ($bebasUangPangkal)
+                                    {{-- Jalur bebas uang pangkal (mis. Anak Karyawan): isiannya
+                                         ditiadakan, bukan dibiarkan lalu ditolak saat disimpan. --}}
+                                    <div class="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                                        <b>Bebas uang pangkal.</b> Jalur {{ $santri->jalurPendaftaran?->nama ?? $santri->jalur }}
+                                        tidak ditagih uang pangkal — yang terbit hanya biaya perlengkapan.
+                                    </div>
+                                @else
+                                    <label class="block text-xs text-gray-600">Nominal Normal <span class="text-red-500">*</span>
+                                        <input type="number" step="0.01" min="0" name="nominal" required placeholder="mis. 20000000"
+                                               value="{{ old('nominal', $nominalDefaultUangPangkal) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                        @if ($nominalDefaultUangPangkal !== null)
+                                            <span class="mt-0.5 block text-[11px] text-gray-400">Terisi dari master Jenis Biaya — boleh diubah bila calon ini berbeda.</span>
+                                        @endif
+                                    </label>
+                                @endif
                                 {{-- Perlengkapan TIDAK dipotong potongan gelombang: terbit utuh
                                      sebagai tagihan tersendiri, dengan jadwal termin sendiri. --}}
                                 <label class="block text-xs text-gray-600">Biaya Perlengkapan

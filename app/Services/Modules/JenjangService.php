@@ -37,9 +37,14 @@ class JenjangService
             throw new AppException(409, "Jenjang berkode \"{$data['kode']}\" sudah ada. Sunting baris itu.");
         }
 
+        // CATATAN: daftar kolom di sini ditulis eksplisit, jadi setiap kolom BARU
+        // wajib ditambahkan di create() DAN update() — kalau terlewat, formnya
+        // tampak menyimpan padahal nilainya dibuang diam-diam.
         return Jenjang::create([
             'kode' => $data['kode'],
             'nama' => $data['nama'],
+            'jumlah_tingkat' => $data['jumlah_tingkat'] ?? null,
+            'kode_jenjang_lanjutan' => $data['kode_jenjang_lanjutan'] ?? null,
             'urutan' => $data['urutan'] ?? 0,
             'status' => $data['status'] ?? 'aktif',
             'keterangan' => $data['keterangan'] ?? null,
@@ -51,6 +56,9 @@ class JenjangService
         $row = $this->get($kode);
         $row->update([
             'nama' => $data['nama'] ?? $row->nama,
+            'jumlah_tingkat' => array_key_exists('jumlah_tingkat', $data) ? $data['jumlah_tingkat'] : $row->jumlah_tingkat,
+            'kode_jenjang_lanjutan' => array_key_exists('kode_jenjang_lanjutan', $data)
+                ? ($data['kode_jenjang_lanjutan'] ?: null) : $row->kode_jenjang_lanjutan,
             'urutan' => $data['urutan'] ?? $row->urutan,
             'status' => $data['status'] ?? $row->status,
             'keterangan' => array_key_exists('keterangan', $data) ? $data['keterangan'] : $row->keterangan,

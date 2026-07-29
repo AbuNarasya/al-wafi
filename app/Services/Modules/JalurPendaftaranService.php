@@ -29,6 +29,8 @@ class JalurPendaftaranService
         return JalurPendaftaran::create([
             'kode' => $data['kode'],
             'nama' => $data['nama'],
+            'kode_jalur_lanjutan' => $data['kode_jalur_lanjutan'] ?? null,
+            'bebas_uang_pangkal' => (bool) ($data['bebas_uang_pangkal'] ?? false),
             'keterangan' => $data['keterangan'] ?? null,
             'status' => $data['status'] ?? 'aktif',
         ]);
@@ -42,6 +44,12 @@ class JalurPendaftaranService
         }
         $lama->update([
             'nama' => $data['nama'] ?? $lama->nama,
+            'kode_jalur_lanjutan' => array_key_exists('kode_jalur_lanjutan', $data)
+                ? ($data['kode_jalur_lanjutan'] ?: null) : $lama->kode_jalur_lanjutan,
+            // Kotak centang tak terkirim saat tidak dicentang, jadi dibaca dari
+            // hidden 0/1 yang menyertainya — bukan dari ada/tidaknya kunci.
+            'bebas_uang_pangkal' => array_key_exists('bebas_uang_pangkal', $data)
+                ? (bool) $data['bebas_uang_pangkal'] : $lama->bebas_uang_pangkal,
             'keterangan' => array_key_exists('keterangan', $data) ? $data['keterangan'] : $lama->keterangan,
             'status' => $data['status'] ?? $lama->status,
         ]);

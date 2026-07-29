@@ -21,5 +21,25 @@ class JalurPendaftaran extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['kode', 'nama', 'keterangan', 'status'];
+    protected $fillable = ['kode', 'nama', 'kode_jalur_lanjutan', 'bebas_uang_pangkal', 'keterangan', 'status'];
+
+    protected function casts(): array
+    {
+        return ['bebas_uang_pangkal' => 'boolean'];
+    }
+
+    /** Jalur yang berlaku setelah santri naik jenjang; null = jalurnya tak berubah. */
+    public function lanjutan(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(self::class, 'kode_jalur_lanjutan', 'kode');
+    }
+
+    /**
+     * Santri berjalur ini bebas uang pangkal? Dipakai dua tempat: penerbitan
+     * tagihan saat mendaftar, dan proses kenaikan jenjang.
+     */
+    public static function bebasUangPangkal(?string $kode): bool
+    {
+        return $kode !== null && (bool) static::whereKey($kode)->value('bebas_uang_pangkal');
+    }
 }

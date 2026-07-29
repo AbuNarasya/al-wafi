@@ -19,6 +19,24 @@
 
             <x-field name="nama" label="Nama Jalur" :value="$row->nama" required placeholder="mis. Reguler"
                      hint="Jalur berlaku untuk SEMUA tahun ajaran. Tarif yang berbeda tiap tahun diatur di Jenis Biaya, bukan di sini." />
+            {{-- Dua isian di bawah dipakai proses KENAIKAN JENJANG. --}}
+            <x-field name="kode_jalur_lanjutan" label="Jalur Setelah Naik Jenjang" :value="$row->kode_jalur_lanjutan"
+                     :options="\App\Support\Referensi::withEmpty(\App\Support\Referensi::jalur(), '— jalurnya tidak berubah —')"
+                     hint="Jalur yang berlaku setelah santri naik ke jenjang berikutnya — inilah yang menentukan tarif uang pangkal lanjutannya. Boleh menunjuk jalur ini sendiri." />
+
+            <label class="flex items-start gap-2 text-sm text-gray-700">
+                <input type="hidden" name="bebas_uang_pangkal" value="0">
+                <input type="checkbox" name="bebas_uang_pangkal" value="1" @checked(old('bebas_uang_pangkal', $row->bebas_uang_pangkal))
+                       class="mt-0.5 rounded border-gray-300 text-brand focus:ring-brand">
+                <span>
+                    Bebas uang pangkal
+                    <span class="block text-xs text-gray-400">
+                        Santri berjalur ini tidak ditagih uang pangkal — baik saat mendaftar maupun saat naik jenjang.
+                        Tagihan perlengkapan tetap terbit seperti biasa.
+                    </span>
+                </span>
+            </label>
+
             <x-field name="keterangan" label="Keterangan" :value="$row->keterangan" textarea />
             <x-field name="status" label="Status" :value="$row->status ?? 'aktif'" :options="['aktif' => 'Aktif', 'nonaktif' => 'Nonaktif']" />
 

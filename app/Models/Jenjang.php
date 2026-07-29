@@ -15,11 +15,17 @@ class Jenjang extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['kode', 'nama', 'jumlah_tingkat', 'urutan', 'status', 'keterangan'];
+    protected $fillable = ['kode', 'nama', 'jumlah_tingkat', 'kode_jenjang_lanjutan', 'urutan', 'status', 'keterangan'];
 
     protected function casts(): array
     {
         return ['urutan' => 'integer', 'jumlah_tingkat' => 'integer'];
+    }
+
+    /** Jenjang berikutnya; null = jenjang terakhir (santrinya menjadi alumni). */
+    public function lanjutan(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(self::class, 'kode_jenjang_lanjutan', 'kode');
     }
 
     /**

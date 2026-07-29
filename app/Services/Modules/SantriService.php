@@ -4,6 +4,7 @@ namespace App\Services\Modules;
 
 use App\Exceptions\AppException;
 use App\Models\ActivityLog;
+use App\Models\JalurPendaftaran;
 use App\Models\JenisBiaya;
 use App\Models\Jenjang;
 use App\Models\PembayaranSantri;
@@ -165,7 +166,12 @@ class SantriService
      * Perlengkapan boleh dikosongkan: nominal kosong/nol → tagihannya tidak
      * terbit sama sekali.
      *
-     * @return array{uang_pangkal:TagihanSantri,perlengkapan:?TagihanSantri}
+     * JALUR BEBAS UANG PANGKAL (mis. Anak Karyawan): tagihan uang pangkalnya
+     * TIDAK diterbitkan sama sekali — bukan diterbitkan bernominal nol, yang
+     * hanya akan jadi baris kosong di rekap dan tetap ditolak penjaga nominal.
+     * Perlengkapannya tetap ditagih seperti biasa.
+     *
+     * @return array{uang_pangkal:?TagihanSantri,perlengkapan:?TagihanSantri}
      */
     public function tagihkanUangPangkal(int $id, array $data): array
     {
@@ -176,12 +182,14 @@ class SantriService
         if (! in_array($santri->status, ['diterima', 'lolos_kesehatan'], true)) {
             throw new AppException(422, 'Uang pangkal hanya bisa ditagihkan setelah calon dinyatakan lulus. Status sekarang "'.Tahap::labelStatus($santri->status).'".');
         }
-        $jenis = $this->jenisUangPangkal($santri->tahun_ajaran, $santri->kode_jenjang, $santri->jalur);
-        if ($this->tagihanBerperilaku($id, 'uang_pangkal')) {
+
+        $bebas = JalurPendaftaran::bebasUangPangkal($santri->jalur);
+        $jenis = $bebas ? null : $this->jenisUangPangkal($santri->tahun_ajaran, $santri->kode_jenjang, $santri->jalur);
+        if (! $bebas && $this->tagihanBerperilaku($id, 'uang_pangkal')) {
             throw new AppException(409, 'Uang pangkal untuk santri ini sudah pernah ditagihkan. Sunting tagihannya, jangan terbitkan yang kedua.');
         }
-        $nominalNormal = Money::of($data['nominal']);
-        if (Money::lte($nominalNormal, '0')) {
+        $nominalNormal = $bebas ? '0' : Money::of($data['nominal']);
+        if (! $bebas && Money::lte($nominalNormal, '0')) {
             throw new AppException(422, 'Nominal uang pangkal harus lebih dari nol.');
         }
 
@@ -197,19 +205,21 @@ class SantriService
             $jenisPerlengkapan = $this->jenisPerlengkapan($santri->tahun_ajaran, $santri->kode_jenjang, $santri->jalur);
         }
 
-        $potonganRow = (new PotonganGelombangService)->potonganAktif($santri->gelombang, $santri->kode_jenjang, $santri->tahun_ajaran);
+        // Jalur bebas: tak ada nominal, jadi tak ada pula potongan yang dihitung.
+        $potonganRow = $bebas ? null
+            : (new PotonganGelombangService)->potonganAktif($santri->gelombang, $santri->kode_jenjang, $santri->tahun_ajaran);
         $potongan = $potonganRow ? Money::of($potonganRow->potongan) : '0';
-        if (Money::gte($potongan, $nominalNormal)) {
+        if (Money::gte($potongan, $nominalNormal) && ! $bebas) {
             throw new AppException(422, "Potongan Gelombang {$santri->gelombang} ({$potongan}) tidak boleh ≥ nominal uang pangkal ({$nominalNormal}).");
         }
         $efektif = Money::sub($nominalNormal, $potongan);
 
         return DB::transaction(function () use ($id, $data, $jenis, $santri, $nominalNormal, $potongan, $potonganRow, $efektif, $jenisPerlengkapan, $nominalPerlengkapan) {
-            $tagihan = TagihanSantri::create([
+            $tagihan = $jenis === null ? null : TagihanSantri::create([
                 'id_santri' => $id, 'kode_jenis' => $jenis->kode, 'nominal' => $efektif, 'sisa' => $efektif,
                 'jatuh_tempo' => $data['jatuh_tempo'] ?? null, 'keterangan' => $data['keterangan'] ?? $jenis->nama,
             ]);
-            if (Money::gtZero($potongan)) {
+            if ($tagihan && Money::gtZero($potongan)) {
                 $masaBerlaku = $potonganRow?->masa_berlaku_hari ?? 7;
                 PotonganUangPangkal::create([
                     'id_tagihan' => $tagihan->id, 'gelombang' => $santri->gelombang,
@@ -431,9 +441,12 @@ class SantriService
         // Cari lewat TIPE tagihannya (lihat catatan di koreksiNominalUangPangkal).
         $tagihan = $this->tagihanPerilaku($id, 'uang_pangkal');
         if (! $tagihan) {
-            throw new AppException(422, 'Uang pangkal belum ditagihkan. Terbitkan tagihannya lebih dulu sebelum daftar ulang.');
-        }
-        if ($tagihan->sudah_akrual) {
+            // Santri berjalur bebas uang pangkal memang tak punya tagihan itu —
+            // menuntutnya akan mengunci mereka selamanya di "lolos kesehatan".
+            if (! JalurPendaftaran::bebasUangPangkal($santri->jalur)) {
+                throw new AppException(422, 'Uang pangkal belum ditagihkan. Terbitkan tagihannya lebih dulu sebelum daftar ulang.');
+            }
+        } elseif ($tagihan->sudah_akrual) {
             throw new AppException(422, 'Uang pangkal santri ini sudah pernah diakrualkan.');
         }
 

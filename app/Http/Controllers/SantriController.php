@@ -364,6 +364,7 @@ class SantriController extends Controller
             'nominalDefaultUangPangkal' => $nominalDefaultUangPangkal,
             'nominalDefaultPerlengkapan' => $nominalDefaultPerlengkapan,
             'opsiTingkat' => \App\Models\Jenjang::find($santri->kode_jenjang)?->opsiTingkat() ?? [],
+            'bebasUangPangkal' => \App\Models\JalurPendaftaran::bebasUangPangkal($santri->jalur),
             'kembali' => $this->tautanKembali($santri),
             'koreksiUangPangkal' => $koreksiUangPangkal,
             'koreksiPerlengkapan' => $koreksiPerlengkapan,
@@ -384,7 +385,11 @@ class SantriController extends Controller
                 // Satu form menerbitkan dua tagihan: uang pangkal (dipotong
                 // potongan gelombang) & biaya perlengkapan (utuh, boleh kosong).
                 'tagih-uang-pangkal' => $this->service->tagihkanUangPangkal($id, $request->validate([
-                    'nominal' => ['required', 'numeric', 'gt:0'],
+                    // Jalur bebas uang pangkal tak punya isian nominal sama sekali.
+                    'nominal' => [
+                        \App\Models\JalurPendaftaran::bebasUangPangkal(Santri::find($id)?->jalur) ? 'nullable' : 'required',
+                        'numeric', 'gt:0',
+                    ],
                     'nominal_perlengkapan' => ['nullable', 'numeric', 'min:0'],
                     'jatuh_tempo' => ['nullable', 'date'],
                     'keterangan' => ['nullable', 'string', 'max:255'],

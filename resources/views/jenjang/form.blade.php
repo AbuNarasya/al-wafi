@@ -26,6 +26,12 @@
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
+                <x-field name="kode_jenjang_lanjutan" label="Jenjang Lanjutan" :value="old('kode_jenjang_lanjutan', $row->kode_jenjang_lanjutan)"
+                         :options="\App\Support\Referensi::withEmpty(collect(\App\Support\Referensi::jenjang())->except($row->kode ?? '')->all(), '— jenjang terakhir —')"
+                         hint="Jenjang berikutnya saat santri tamat di sini (SDTQ→SMP, SMP→SMA). Dikosongkan berarti jenjang terakhir: santrinya menjadi alumni, bukan naik." />
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
                 <x-field name="urutan" label="Urutan Tampil" type="number" :value="old('urutan', $row->urutan ?? 0)"
                          hint="Angka kecil tampil lebih dulu (mis. SD 1, SMP 2, SMA 3)." />
                 <x-field name="status" label="Status" :value="old('status', $row->status ?? 'aktif')" :options="['aktif' => 'Aktif', 'nonaktif' => 'Nonaktif']"

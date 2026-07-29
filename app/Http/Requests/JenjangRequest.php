@@ -26,6 +26,12 @@ class JenjangRequest extends FormRequest
             // Batas atas 20 sekadar penjaga salah ketik; tak ada jenjang
             // pendidikan yang bertingkat sebanyak itu.
             'jumlah_tingkat' => ['nullable', 'integer', 'between:1,20'],
+            // Tak boleh menunjuk dirinya sendiri: itu akan membuat proses
+            // kenaikan berputar di jenjang yang sama tanpa pernah lulus.
+            'kode_jenjang_lanjutan' => [
+                'nullable', 'string', Rule::exists('jenjang', 'kode'),
+                Rule::notIn([$this->route('kode') ?? $this->input('kode')]),
+            ],
             'urutan' => ['nullable', 'integer', 'between:0,999'],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
             'keterangan' => ['nullable', 'string'],
@@ -47,6 +53,7 @@ class JenjangRequest extends FormRequest
         // Kosong = belum ditentukan; jangan dijadikan 0 karena "0 tingkat"
         // membuat dropdown Tingkat kosong tanpa penjelasan.
         $data['jumlah_tingkat'] = ($data['jumlah_tingkat'] ?? '') !== '' ? (int) $data['jumlah_tingkat'] : null;
+        $data['kode_jenjang_lanjutan'] = ($data['kode_jenjang_lanjutan'] ?? '') !== '' ? $data['kode_jenjang_lanjutan'] : null;
 
         return $data;
     }
