@@ -33,6 +33,7 @@ use Tests\TestCase;
 class DashboardPpsbTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const GRP = 'ZZDB';
     private const KAS = '1.ZZDB.KAS';
@@ -61,11 +62,11 @@ class DashboardPpsbTest extends TestCase
             'kode_level' => 'L1', 'is_admin' => true, 'tim_keuangan' => true, 'status' => 'aktif',
         ]);
 
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '1000000',
             'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
         ]);
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => 'UP', 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'nominal' => '10000000',
             'kode_coa_pendapatan' => self::PEND, 'kode_coa_piutang' => self::PIUT,
             'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,

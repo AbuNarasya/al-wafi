@@ -69,7 +69,7 @@ class ImporDataAwalTest extends TestCase
         );
         JenisBiaya::create([
             'kode' => $this->jenisTunggakan, 'nama' => 'Tunggakan SPP (saldo awal)', 'tipe' => 'lain',
-            'tahun_ajaran' => self::TA, 'nominal' => 0, 'kode_coa_pendapatan' => '4.ZZIM.1',
+            'kode_coa_pendapatan' => '4.ZZIM.1',
             'kode_coa_piutang' => '1.ZZIM.1', 'kode_unit' => 'ZZUNIT', 'status' => 'aktif',
         ]);
     }
@@ -108,6 +108,27 @@ class ImporDataAwalTest extends TestCase
     }
 
     /**
+     * Kolom `kode_jenjang` menerima KODE maupun NAMA jenjangnya.
+     *
+     * Sejak kode jenjang berformat `J001`, angka itu tak bisa ditebak penyusun
+     * berkas — sedangkan berkas pindahan biasanya sudah menuliskan "SDTQ"/"SMP".
+     */
+    public function test_kolom_jenjang_menerima_kode_maupun_nama(): void
+    {
+        Jenjang::whereKey('SMP')->update(['kode' => 'J002']);
+        Jenjang::create(['kode' => 'J003', 'nama' => 'SMA', 'jumlah_tingkat' => 3]);
+
+        $hasil = app(ImporSaldoAwal::class)->jalankan('santri-lama', $this->berkas([
+            $this->barisSah(['nis' => '230101', 'kode_jenjang' => 'J002']),   // lewat kode
+            $this->barisSah(['nis' => '230102', 'kode_jenjang' => 'SMA']),    // lewat nama
+        ]), $this->param());
+
+        $this->assertSame(2, $hasil['tersimpan']['santri']);
+        $this->assertSame('J002', Santri::where('nis', '230101')->value('kode_jenjang'));
+        $this->assertSame('J003', Santri::where('nis', '230102')->value('kode_jenjang'), 'nama dipetakan ke kodenya');
+    }
+
+    /**
      * Empat jenis tunggakan (SPP, uang pangkal, daftar ulang, tagihan lain)
      * masing-masing jadi TAGIHAN SENDIRI, supaya pelunasannya bisa dipisah dan
      * ketahuan mana yang lunas duluan.
@@ -118,8 +139,8 @@ class ImporDataAwalTest extends TestCase
         $kode = [];
         foreach (['SPP' => 'Tunggakan SPP', 'UP' => 'Tunggakan Uang Pangkal', 'DU' => 'Tunggakan Daftar Ulang', 'LN' => 'Tunggakan Lain'] as $k => $nama) {
             JenisBiaya::create([
-                'kode' => "ZZ{$k}", 'nama' => $nama, 'tipe' => 'lain', 'tahun_ajaran' => self::TA,
-                'nominal' => 0, 'kode_coa_pendapatan' => '4.ZZIM.1', 'kode_coa_piutang' => '1.ZZIM.1',
+                'kode' => "ZZ{$k}", 'nama' => $nama, 'tipe' => 'lain',
+                'kode_coa_pendapatan' => '4.ZZIM.1', 'kode_coa_piutang' => '1.ZZIM.1',
                 'kode_unit' => 'ZZUNIT', 'status' => 'aktif',
             ]);
             $kode[$k] = "ZZ{$k}";

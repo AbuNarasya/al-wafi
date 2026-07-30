@@ -24,6 +24,7 @@ use Tests\TestCase;
 class TanpaGelombangTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const GRP = 'ZZTG';
     private const PEND = '4.ZZTG.REG';
@@ -47,8 +48,8 @@ class TanpaGelombangTest extends TestCase
         Jenjang::create(['kode' => 'SD', 'nama' => 'Sekolah Dasar', 'jumlah_tingkat' => 6, 'urutan' => 1]);
         $this->admin = User::create(['username' => 'adm', 'nama' => 'Admin', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => true])->id_pengguna;
 
-        (new JenisBiayaService)->create(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
-        (new JenisBiayaService)->create(['kode' => 'UP', 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'kode_coa_pendapatan' => self::PEND, 'kode_coa_piutang' => self::PIUT, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
+        $this->buatBiaya(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
+        $this->buatBiaya(['kode' => 'UP', 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'kode_coa_pendapatan' => self::PEND, 'kode_coa_piutang' => self::PIUT, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
 
         // Potongan gelombang 1 yang menggiurkan — tak boleh menempel ke santri tanpa gelombang.
         PotonganGelombang::create(['tahun_ajaran' => self::TA, 'gelombang' => 1, 'potongan' => '2000000', 'masa_berlaku_hari' => 7, 'aktif' => true]);

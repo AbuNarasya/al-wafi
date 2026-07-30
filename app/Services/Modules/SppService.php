@@ -34,38 +34,42 @@ class SppService
         if (! $santri->kode_jenjang) {
             throw new AppException(422, "Santri \"{$santri->nama}\" belum punya jenjang, jadi jenis & tarif SPP-nya tak bisa ditentukan.");
         }
-        $tarif = $this->jenisSppSantri($santri->kode_jenjang, $santri->tahun_ajaran, $santri->jalur);
-        if (! $tarif) {
-            $labelJalur = $santri->jalur ? " jalur \"{$santri->jalur}\"" : '';
-            throw new AppException(422, "Belum ada jenis biaya SPP aktif untuk jenjang \"{$santri->kode_jenjang}\"{$labelJalur}. Isi nominalnya di menu PPSB → Jenis Biaya.");
-        }
-        if ($tarif->nominal === null) {
-            throw new AppException(422, "Jenis biaya SPP \"{$tarif->kode}\" belum diisi nominalnya. Lengkapi di menu PPSB → Jenis Biaya.");
-        }
+        // Tarif dicari pada tahun yang SEDANG DIJALANI, bukan angkatan: santri
+        // angkatan 2026 yang kini kelas 3 pada T.A 2028 harus memakai tarif 2028.
+        ['jenis' => $jenis, 'tarif' => $tarif] = (new SantriService)
+            ->komponen('spp', $santri->taBerjalan(), $santri->kode_jenjang, $santri->jalur);
+
+        // Nominal khusus per santri menang atas grid — dan sengaja diperiksa
+        // SEBELUM status tarif: santri bertarif khusus tetap bisa ditagih walau
+        // sel grid jenjangnya belum diisi.
         if ($santri->nominal_spp !== null) {
-            return ['nominal' => Money::of($santri->nominal_spp), 'asal' => 'khusus', 'kode_jenis' => $tarif->kode, 'keterangan' => $santri->keterangan_spp];
+            return ['nominal' => Money::of($santri->nominal_spp), 'asal' => 'khusus',
+                'kode_jenis' => $jenis->kode, 'asal_label' => 'Nominal khusus santri', 'keterangan' => $santri->keterangan_spp];
+        }
+        if ($tarif['status'] === 'bebas') {
+            throw new AppException(422, "Tarif SPP untuk jenjang \"{$santri->kode_jenjang}\" jalur \"{$santri->jalur}\" bertanda BEBAS, "
+                .'jadi tak ada SPP yang bisa diterbitkan. Isi nominal khusus santri bila ia tetap harus membayar.');
+        }
+        if ($tarif['status'] !== 'ada') {
+            throw new AppException(422, $tarif['label'].' Isi selnya di menu Setting Awal → Tarif.');
         }
 
-        return ['nominal' => Money::of($tarif->nominal), 'asal' => 'jenjang', 'kode_jenis' => $tarif->kode, 'keterangan' => null];
+        return ['nominal' => $tarif['nominal'], 'asal' => 'jenjang',
+            'kode_jenis' => $jenis->kode, 'asal_label' => $tarif['asal'], 'keterangan' => null];
     }
 
-    /**
-     * Jenis biaya SPP yang berlaku untuk (jenjang, jalur, TA) — urutan khusus→umum
-     * ditentukan JenisBiaya::berlaku(), sama seperti registrasi & uang pangkal.
-     * Tarif SPP terpusat di master ini (tabel tarif_spp dibuang).
-     */
-    public function jenisSppSantri(string $kodeJenjang, ?string $tahunAjaran = null, ?string $kodeJalur = null): ?JenisBiaya
+    /** Identitas akuntansi SPP untuk sebuah jenjang (tarifnya ada di grid Tarif). */
+    public function jenisSppSantri(string $kodeJenjang): ?JenisBiaya
     {
-        return JenisBiaya::berlaku('spp', $tahunAjaran, $kodeJenjang, $kodeJalur);
+        return JenisBiaya::untuk('spp', $kodeJenjang);
     }
 
     /** Pratinjau: siapa ditagih berapa untuk periode. */
     public function pratinjau(string $periode): array
     {
         $santri = Santri::where('status', 'aktif')->orderBy('nama')
-            ->get(['id', 'nama', 'nis', 'kode_jenjang', 'nominal_spp', 'keterangan_spp']);
-        $kodeSpp = JenisBiaya::whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku('spp'))->pluck('kode')->all();
-        $sudahAda = TagihanSantri::whereIn('kode_jenis', $kodeSpp)->where('periode', $periode)->pluck('id_santri')->all();
+            ->get(['id', 'nama', 'nis', 'kode_jenjang', 'tahun_ajaran', 'tahun_ajaran_berjalan', 'nominal_spp', 'keterangan_spp']);
+        $sudahAda = TagihanSantri::where('perilaku', 'spp')->where('periode', $periode)->pluck('id_santri')->all();
 
         $hasil = [];
         foreach ($santri as $s) {
@@ -76,7 +80,11 @@ class SppService
             }
             try {
                 $n = $this->nominalSppSantri($s->id);
-                $hasil[] = ['id' => $s->id, 'nama' => $s->nama, 'nominal' => $n['nominal'], 'asal' => $n['asal'], 'kode_jenis' => $n['kode_jenis'], 'status' => 'siap'];
+                $hasil[] = ['id' => $s->id, 'nama' => $s->nama, 'nominal' => $n['nominal'], 'asal' => $n['asal'],
+                    'asal_label' => $n['asal_label'], 'kode_jenis' => $n['kode_jenis'], 'status' => 'siap',
+                    // Tagihan dicap tahun yang SEDANG DIJALANI, bukan angkatan —
+                    // itulah yang membuat SPP tahun kedua tak menabrak tahun pertama.
+                    'kode_jenjang' => $s->kode_jenjang, 'tahun_ajaran' => $s->taBerjalan()];
             } catch (AppException $e) {
                 $hasil[] = ['id' => $s->id, 'nama' => $s->nama, 'status' => 'tanpa_tarif', 'nominal' => null, 'kode_jenis' => null, 'pesan' => $e->getMessage()];
             }
@@ -129,6 +137,7 @@ class SppService
 
                 TagihanSantri::insert(array_map(fn ($r) => [
                     'id_santri' => $r['id'], 'kode_jenis' => $kode, 'periode' => $data['periode'],
+                    'perilaku' => 'spp', 'kode_jenjang' => $r['kode_jenjang'], 'tahun_ajaran' => $r['tahun_ajaran'],
                     'nominal' => $r['nominal'], 'sisa' => $r['nominal'], 'sudah_akrual' => true, 'status' => 'belum_bayar',
                     'jatuh_tempo' => $data['jatuh_tempo'] ?? null, 'keterangan' => "{$jenis->nama} {$data['periode']} · akrual {$nomor}",
                     'created_at' => $now, 'updated_at' => $now,

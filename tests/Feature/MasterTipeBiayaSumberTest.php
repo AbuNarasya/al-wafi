@@ -33,6 +33,7 @@ use Tests\TestCase;
 class MasterTipeBiayaSumberTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const GRP = 'ZZMT';
     private const PEND = '4.ZZMT.PEND';
@@ -58,17 +59,19 @@ class MasterTipeBiayaSumberTest extends TestCase
         TipeBiaya::lupakan();
 
         // Registrasi bawaan: pendaftaran calon santri butuh ini untuk menagih.
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => 'REG27', 'nama' => 'Registrasi 2027', 'tipe' => 'registrasi', 'nominal' => '750000',
             'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
         ]);
     }
 
-    public function test_lima_tipe_bawaan_terisi_dari_migrasi(): void
+    public function test_tipe_bawaan_terisi_dari_migrasi(): void
     {
-        // Perilaku ke-5 "perlengkapan" menyusul lewat migrasi tersendiri.
-        $this->assertSame(5, TipeBiaya::count());
-        foreach (['registrasi', 'uang_pangkal', 'perlengkapan', 'spp', 'lain'] as $kode) {
+        // Perilaku ke-5 "perlengkapan" & ke-6 "daftar_ulang" menyusul lewat
+        // migrasi tersendiri; keduanya hanya disisipkan bila belum ada tipe
+        // berperilaku itu, sehingga master yang sudah diisi manual tak ditambahi.
+        $this->assertSame(6, TipeBiaya::count());
+        foreach (['registrasi', 'uang_pangkal', 'perlengkapan', 'daftar_ulang', 'spp', 'lain'] as $kode) {
             $t = TipeBiaya::findOrFail($kode);
             $this->assertTrue($t->bawaan);
             $this->assertSame($kode, $t->perilaku, 'Tipe bawaan berperilaku sama dengan namanya.');
@@ -90,7 +93,7 @@ class MasterTipeBiayaSumberTest extends TestCase
         $this->assertSame('lain', TipeBiaya::perilakuDari('seragam'));
 
         // Jenis biaya bertipe baru itu bisa dibuat & muncul di modul tagihan lain.
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => 'SRG27', 'nama' => 'Seragam 2027', 'tipe' => 'seragam', 'nominal' => '500000',
             'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
         ]);
@@ -116,7 +119,7 @@ class MasterTipeBiayaSumberTest extends TestCase
         // Bercakupan jenjang SMP → lebih khusus daripada REG27 yang umum, jadi
         // inilah yang dipakai. Sekaligus membuktikan penjaga cakupan tunggal
         // membandingkan PERILAKU: dua tipe berbeda tetap tak boleh bercakupan sama.
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => 'REGK27', 'nama' => 'Registrasi Khusus 2027', 'tipe' => 'reg_khusus', 'nominal' => '900000',
             'kode_jenjang' => 'SMP', 'kode_coa_pendapatan' => self::PEND,
             'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
@@ -169,7 +172,7 @@ class MasterTipeBiayaSumberTest extends TestCase
     {
         (new TipeBiayaService)->create(['kode' => 'seragam', 'nama' => 'Seragam', 'perilaku' => 'lain', 'status' => 'aktif']);
         TipeBiaya::lupakan();
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => 'SRG27', 'nama' => 'Seragam 2027', 'tipe' => 'seragam', 'nominal' => '500000',
             'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
         ]);
@@ -252,9 +255,10 @@ class MasterTipeBiayaSumberTest extends TestCase
         $this->assertSame('SMP', $jb->kode_jenjang);
         $this->assertSame(self::UNIT, $jb->kode_unit);
 
-        // Terbaca di daftar sebagai cakupan baris…
+        // Terbaca di daftar. Kolom cakupan kini cuma jenjang: jalur & tahun ajaran
+        // sudah pindah ke grid Tarif.
         $this->actingAs($this->admin)->get(route('jenis_biaya.index'))->assertOk()
-            ->assertSee('SMP · Semua jalur', false);
+            ->assertSee('SMP', false);
 
         // …dan jenjangnya ikut tampil saat memilih jenis di Tagihan Lain-lain,
         // supaya dua baris bernama mirip tak tertukar. Halaman itu hanya

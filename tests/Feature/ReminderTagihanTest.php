@@ -21,6 +21,7 @@ use Tests\TestCase;
 class ReminderTagihanTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private int $admin;
 
@@ -43,7 +44,7 @@ class ReminderTagihanTest extends TestCase
     private function buatTagihan(string $jatuhTempo): TagihanSantri
     {
         $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '08999']);
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000',
             'kode_coa_pendapatan' => '4.ZZRM.REG', 'kode_unit' => 'ZZRMU', 'tahun_ajaran' => '2026/2027',
         ]);

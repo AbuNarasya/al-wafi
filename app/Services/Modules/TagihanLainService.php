@@ -35,7 +35,8 @@ class TagihanLainService
             throw new AppException(422, 'Nominal tagihan harus lebih dari nol.');
         }
 
-        $santri = Santri::whereIn('id', $data['id_santri'])->where('status', 'aktif')->get(['id', 'nama']);
+        $santri = Santri::whereIn('id', $data['id_santri'])->where('status', 'aktif')
+            ->get(['id', 'nama', 'kode_jenjang', 'tahun_ajaran']);
         if ($santri->isEmpty()) {
             throw new AppException(422, 'Tidak ada santri aktif yang dipilih.');
         }
@@ -70,6 +71,9 @@ class TagihanLainService
             $now = now();
             TagihanSantri::insert($target->map(fn ($s) => [
                 'id_santri' => $s->id, 'kode_jenis' => $data['kode_jenis'], 'periode' => $data['periode'] ?? null,
+                // Perilaku "lain" sengaja TIDAK kena indeks unik anti tagih-ganda:
+                // satu santri boleh kena beberapa tagihan insidental di tahun sama.
+                'perilaku' => 'lain', 'kode_jenjang' => $s->kode_jenjang, 'tahun_ajaran' => $s->tahun_ajaran,
                 'nominal' => $nominal, 'sisa' => $nominal, 'sudah_akrual' => $akrual, 'status' => 'belum_bayar',
                 'jatuh_tempo' => $data['jatuh_tempo'] ?? null, 'keterangan' => $data['keterangan'] ?? $jenis->nama,
                 'created_at' => $now, 'updated_at' => $now,

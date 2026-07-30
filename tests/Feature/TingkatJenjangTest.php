@@ -29,6 +29,7 @@ use Tests\TestCase;
 class TingkatJenjangTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const TA = '2026/2027';
 
@@ -56,7 +57,7 @@ class TingkatJenjangTest extends TestCase
         CoaGroup::create(['kode_grup' => self::GRP, 'nama_grup' => 'Uji']);
         CoaDetail::create(['kode_coa' => '4.ZZTK.1', 'nama_coa' => 'Pendapatan', 'kode_grup' => self::GRP, 'jenis_saldo' => 'kredit']);
         BusinessUnit::create(['kode_unit' => 'ZZUNIT', 'nama_unit' => 'Unit']);
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000',
             'kode_coa_pendapatan' => '4.ZZTK.1', 'kode_unit' => 'ZZUNIT', 'tahun_ajaran' => self::TA,
         ]);

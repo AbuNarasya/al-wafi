@@ -43,7 +43,9 @@ class Santri extends Model
     {
         return [
             'tanggal_lahir' => 'date',
+            'tanggal_lulus' => 'date',
             'gelombang' => 'integer',
+            'tingkat' => 'integer',
             'nominal_spp' => 'decimal:2',
         ];
     }
@@ -53,9 +55,38 @@ class Santri extends Model
         return $this->belongsTo(Wali::class, 'id_wali', 'id');
     }
 
+    /**
+     * Siklus pendaftaran TERBARU. Sejak kenaikan jenjang internal juga melewati
+     * PPSB, satu santri bisa punya beberapa baris pendaftaran — jadi relasi ini
+     * harus menyebut yang mana. Pemakai lama (form berkas, seleksi, med check
+     * pendaftar baru) tetap mendapat baris yang benar karena siklus terbaru
+     * memang yang sedang dikerjakan.
+     */
     public function pendaftaran(): HasOne
     {
-        return $this->hasOne(Pendaftaran::class, 'id_santri', 'id');
+        return $this->hasOne(Pendaftaran::class, 'id_santri', 'id')->latestOfMany();
+    }
+
+    /** Seluruh siklus pendaftaran, terbaru lebih dulu (riwayat kenaikan jenjang). */
+    public function pendaftaranSemua(): HasMany
+    {
+        return $this->hasMany(Pendaftaran::class, 'id_santri', 'id')->orderByDesc('id');
+    }
+
+    /** Di mana santri ini berada tiap tahun ajaran. */
+    public function riwayatTingkat(): HasMany
+    {
+        return $this->hasMany(RiwayatTingkat::class, 'id_santri', 'id')->orderBy('tahun_ajaran');
+    }
+
+    /**
+     * Tahun ajaran yang SEDANG DIJALANI — bukan angkatan. Kolomnya baru, jadi
+     * data lama yang belum terisi jatuh ke tahun masuknya, dan itu memang benar
+     * bagi santri yang belum pernah naik.
+     */
+    public function taBerjalan(): ?string
+    {
+        return $this->tahun_ajaran_berjalan ?: $this->tahun_ajaran;
     }
 
     /** Jalur pendaftaran (reguler/pindahan/anak karyawan/…) — kolom `jalur` menyimpan kodenya. */

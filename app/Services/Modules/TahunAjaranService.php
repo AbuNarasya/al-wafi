@@ -4,11 +4,11 @@ namespace App\Services\Modules;
 
 use App\Exceptions\AppException;
 use App\Models\JalurPendaftaran;
-use App\Models\JenisBiaya;
 use App\Models\PotonganGelombang;
 use App\Models\Santri;
 use App\Models\TahunAjaran;
 use App\Models\TargetSantri;
+use App\Models\TarifBiaya;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -73,9 +73,12 @@ class TahunAjaranService
     {
         $row = $this->get($id);
         $dipakai = [
-            'jenis biaya' => JenisBiaya::where('tahun_ajaran', $row->kode)->count(),
-            // Jalur pendaftaran TIDAK lagi dihitung: sejak 2026-07-28 jalur
-            // berlaku lintas tahun ajaran, jadi tak pernah merujuk satu T.A.
+            // Jenis biaya TIDAK lagi dihitung: sejak tarif pindah ke tabelnya
+            // sendiri, jenis biaya hanya memegang akun dan berlaku lintas T.A.
+            // Yang merujuk tahun ajaran sekarang adalah sel tarifnya.
+            'sel tarif' => TarifBiaya::where('tahun_ajaran', $row->kode)->count(),
+            // Jalur pendaftaran TIDAK dihitung: sejak 2026-07-28 jalur berlaku
+            // lintas tahun ajaran, jadi tak pernah merujuk satu T.A.
             'potongan gelombang' => PotonganGelombang::where('tahun_ajaran', $row->kode)->count(),
             'target santri' => TargetSantri::where('tahun_ajaran', $row->kode)->count(),
             'santri' => Santri::where('tahun_ajaran', $row->kode)->count(),

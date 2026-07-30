@@ -33,6 +33,8 @@ final class Navigation
         // Tipe Biaya mendahului Jenis Biaya: jenis biaya memilih tipenya dari sini.
         ['url' => '/tipe-biaya', 'label' => 'Tipe Biaya', 'group' => 'SETTING AWAL', 'modul' => 'tipe-biaya'],
         ['url' => '/ppsb/jenis-biaya', 'label' => 'Jenis Biaya', 'group' => 'SETTING AWAL', 'modul' => 'jenis-biaya'],
+        // Tarif menyusul Jenis Biaya: selnya baru bisa dipakai kalau baris akunnya ada.
+        ['url' => '/tarif', 'label' => 'Tarif', 'group' => 'SETTING AWAL', 'modul' => 'tarif'],
         ['url' => '/company-settings', 'label' => 'Pengaturan Perusahaan', 'group' => 'SETTING AWAL', 'modul' => 'company-settings'],
         ['url' => '/reminder-tagihan', 'label' => 'Reminder Tagihan Jatuh Tempo', 'group' => 'SETTING AWAL', 'modul' => 'reminder-tagihan'],
         ['url' => '/users', 'label' => 'Pengguna', 'group' => 'SETTING AWAL', 'modul' => 'users'],
@@ -122,6 +124,10 @@ final class Navigation
         ['url' => '/kesantrian/santri', 'label' => 'Santri', 'group' => 'KEPENDIDIKAN', 'sub' => 'Master', 'modul' => 'santri'],
         ['url' => '/kesantrian/pembayaran', 'label' => 'Pembayaran SPP & Tagihan Lain', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'pembayaran-kesantrian'],
         ['url' => '/kesantrian/spp', 'label' => 'SPP', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'spp'],
+        // Urutannya sengaja: kenaikan tingkat dulu, baru penagihan daftar ulangnya
+        // — tarif daftar ulang mengikuti tingkat yang BARU.
+        ['url' => '/kesantrian/kenaikan-tingkat', 'label' => 'Kenaikan Tingkat & Kelulusan', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'kenaikan-tingkat'],
+        ['url' => '/kesantrian/tagihan-massal', 'label' => 'Terbitkan Daftar Ulang Massal', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'tagihan-massal'],
         ['url' => '/kesantrian/dompet', 'label' => 'Dompet & Tabungan', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'dompet'],
         ['url' => '/rekap-pembayaran', 'label' => 'Rekap Pembayaran Santri', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'rekap-pembayaran'],
 

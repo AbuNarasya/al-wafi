@@ -25,6 +25,7 @@ use Tests\TestCase;
 class KuitansiRekapTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const GRP = 'ZZKR';
     private const KAS = '1.ZZKR.KAS';
@@ -48,7 +49,7 @@ class KuitansiRekapTest extends TestCase
         JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler', 'tahun_ajaran' => self::TA]);
         $this->admin = User::create(['username' => 'adm', 'nama' => 'Admin', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => true, 'tim_keuangan' => true])->id_pengguna;
 
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000',
             'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
         ]);

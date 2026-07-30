@@ -36,6 +36,7 @@ use Tests\TestCase;
 class BiayaPerlengkapanTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const GRP = 'ZZPL';
 
@@ -81,14 +82,14 @@ class BiayaPerlengkapanTest extends TestCase
             'kode_level' => 'L1', 'is_admin' => true, 'tim_keuangan' => true,
         ])->id_pengguna;
 
-        (new JenisBiayaService)->create(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND_REG, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
-        (new JenisBiayaService)->create(['kode' => 'UP', 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'kode_coa_pendapatan' => self::PEND_UP, 'kode_coa_piutang' => self::PIUT_UP, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
+        $this->buatBiaya(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND_REG, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
+        $this->buatBiaya(['kode' => 'UP', 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'kode_coa_pendapatan' => self::PEND_UP, 'kode_coa_piutang' => self::PIUT_UP, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
     }
 
     /** Master perlengkapan dibuat terpisah: sebagian test menguji ketiadaannya. */
     private function masterPerlengkapan(string $nominal = '2000000'): void
     {
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => 'PLK', 'nama' => 'Biaya Perlengkapan', 'tipe' => 'perlengkapan', 'nominal' => $nominal,
             'kode_coa_pendapatan' => self::PEND_PL, 'kode_coa_piutang' => self::PIUT_PL,
             'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,

@@ -25,10 +25,28 @@ final class Tahap
         'aktif' => ['alumni', 'keluar'],
     ];
 
+    /**
+     * Rantai untuk PENDAFTARAN LANJUTAN (kenaikan jenjang internal). Dua bedanya:
+     *  • tahap BERKAS dilewati — santrinya sudah dikenal & dokumennya sudah ada,
+     *    jadi `terbayar` langsung ke `diseleksi`;
+     *  • berakhir di `naik`, bukan `aktif`. Santrinya memang sudah aktif sejak
+     *    sebelum mendaftar; yang berakhir di sini adalah SIKLUS PENDAFTARANNYA.
+     */
+    public const TRANSISI_LANJUTAN = [
+        'calon' => ['terbayar'],
+        'terbayar' => ['diseleksi'],
+        'diseleksi' => ['diterima', 'tidak_lulus'],
+        'diterima' => ['lolos_kesehatan', 'gagal_medcheck'],
+        'lolos_kesehatan' => ['naik'],
+    ];
+
+    /** Status yang mengakhiri siklus pendaftaran lanjutan. */
+    public const FINAL_LANJUTAN = ['naik', 'tidak_lulus', 'gagal_medcheck', 'mengundurkan_diri'];
+
     private const LABEL = [
         'calon' => 'Calon', 'terbayar' => 'Registrasi Terbayar', 'terverifikasi' => 'Berkas Terverifikasi',
         'diseleksi' => 'Sudah Diseleksi', 'diterima' => 'Diterima', 'lolos_kesehatan' => 'Lolos Kesehatan',
-        'aktif' => 'Santri Aktif', 'alumni' => 'Alumni', 'tidak_lulus' => 'Tidak Lulus',
+        'aktif' => 'Santri Aktif', 'naik' => 'Naik Jenjang', 'alumni' => 'Alumni', 'tidak_lulus' => 'Tidak Lulus',
         'gagal_medcheck' => 'Gagal Med Check', 'mengundurkan_diri' => 'Mengundurkan Diri', 'keluar' => 'Keluar',
     ];
 
@@ -37,20 +55,25 @@ final class Tahap
         return self::LABEL[$s] ?? $s;
     }
 
-    public static function isFinal(string $status): bool
+    public static function isFinal(string $status, string $jenis = 'baru'): bool
     {
-        return in_array($status, self::STATUS_FINAL, true);
+        return in_array($status, $jenis === 'lanjutan' ? self::FINAL_LANJUTAN : self::STATUS_FINAL, true);
     }
 
-    public static function assertTransisi(string $dari, string $ke): void
+    /**
+     * $jenis = 'baru' (santri/pendaftar dari luar) atau 'lanjutan' (kenaikan jenjang
+     * internal, yang memakai rantai berbeda — lihat TRANSISI_LANJUTAN).
+     */
+    public static function assertTransisi(string $dari, string $ke, string $jenis = 'baru'): void
     {
+        $subjek = $jenis === 'lanjutan' ? 'Pendaftaran' : 'Santri';
         if ($dari === $ke) {
-            throw new AppException(422, 'Santri sudah berstatus "'.self::labelStatus($dari).'".');
+            throw new AppException(422, $subjek.' sudah berstatus "'.self::labelStatus($dari).'".');
         }
-        if (self::isFinal($dari)) {
-            throw new AppException(422, 'Proses santri ini sudah berakhir dengan status "'.self::labelStatus($dari).'" dan tidak bisa dilanjutkan.');
+        if (self::isFinal($dari, $jenis)) {
+            throw new AppException(422, 'Proses '.strtolower($subjek).' ini sudah berakhir dengan status "'.self::labelStatus($dari).'" dan tidak bisa dilanjutkan.');
         }
-        $boleh = self::TRANSISI[$dari] ?? [];
+        $boleh = ($jenis === 'lanjutan' ? self::TRANSISI_LANJUTAN : self::TRANSISI)[$dari] ?? [];
         if (! in_array($ke, $boleh, true)) {
             $daftar = implode(' atau ', array_map([self::class, 'labelStatus'], $boleh));
             throw new AppException(422, 'Dari "'.self::labelStatus($dari).'" tidak bisa langsung ke "'.self::labelStatus($ke).'"'
@@ -59,9 +82,9 @@ final class Tahap
     }
 
     /** Pengunduran diri boleh kapan saja sebelum proses berakhir (tidak membalik jurnal). */
-    public static function assertBolehMundur(string $dari): void
+    public static function assertBolehMundur(string $dari, string $jenis = 'baru'): void
     {
-        if (self::isFinal($dari)) {
+        if (self::isFinal($dari, $jenis)) {
             throw new AppException(422, 'Proses santri ini sudah berakhir dengan status "'.self::labelStatus($dari).'".');
         }
     }

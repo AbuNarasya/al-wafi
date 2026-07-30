@@ -32,7 +32,9 @@ class PembayaranSantriController extends Controller
     {
         return $lingkup === 'ppsb'
             ? \App\Models\TipeBiaya::kodeBerperilaku('registrasi', 'uang_pangkal', 'perlengkapan')
-            : \App\Models\TipeBiaya::kodeBerperilaku('spp', 'lain');
+            // Daftar ulang masuk KEPENDIDIKAN: penerimanya santri yang sudah
+            // aktif, bukan calon yang sedang diproses PPSB.
+            : \App\Models\TipeBiaya::kodeBerperilaku('spp', 'daftar_ulang', 'lain');
     }
 
     public function __construct(private readonly PembayaranSantriService $service) {}

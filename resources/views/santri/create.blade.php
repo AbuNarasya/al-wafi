@@ -18,7 +18,21 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('santri.store') }}" class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        {{-- Keadaan dipegang di tingkat FORM karena tiga isian yang saling terkait
+             (tahun ajaran, jenjang, jalur) tersebar di beberapa grid. Dulu
+             `jenjang` dideklarasikan di x-data dalam, sehingga tak terjangkau
+             oleh isian jalur di bawahnya. --}}
+        <form method="POST" action="{{ route('santri.store') }}" class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
+              x-data="{
+                  jenjang: @js(old('kode_jenjang', '')),
+                  tingkat: @js((string) old('tingkat', '')),
+                  ta: @js(old('tahun_ajaran', $taDefault ?? '')),
+                  peta: @js(\App\Models\Jenjang::petaTingkat()),
+                  jalurTutup: @js($jalurNonaktif),
+                  get jumlah() { return this.peta[this.jenjang] ?? 0 },
+                  get tutup() { return this.jalurTutup[this.ta + '|' + this.jenjang] ?? [] },
+              }"
+              x-init="$watch('jenjang', () => { if (Number(tingkat) > jumlah) tingkat = '' })">
             @csrf
 
             <x-field name="id_wali" label="Wali / Keluarga" :value="old('id_wali')" :options="['' => '— pilih wali —'] + $waliOptions" required />
@@ -37,14 +51,7 @@
             {{-- Jenjang & tingkat menyatu: pilihan tingkat diturunkan dari jumlah
                  tingkat jenjang yang dipilih (SDTQ 6, SMP 3, SMA 3 — diatur di
                  master Jenjang, bukan dipaku di sini). --}}
-            <div class="grid gap-4 sm:grid-cols-3"
-                 x-data="{
-                     jenjang: @js(old('kode_jenjang', '')),
-                     tingkat: @js((string) old('tingkat', '')),
-                     peta: @js(\App\Models\Jenjang::petaTingkat()),
-                     get jumlah() { return this.peta[this.jenjang] ?? 0 },
-                 }"
-                 x-init="$watch('jenjang', () => { if (Number(tingkat) > jumlah) tingkat = '' })">
+            <div class="grid gap-4 sm:grid-cols-3">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Jenjang <span class="text-red-500">*</span></label>
                     <select name="kode_jenjang" x-model="jenjang" required
@@ -83,7 +90,7 @@
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Tahun Ajaran <span class="text-red-500">*</span></label>
-                    <select name="tahun_ajaran" required
+                    <select name="tahun_ajaran" x-model="ta" required
                             class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm focus:border-brand focus:ring-1 focus:ring-brand">
                         <option value="">— pilih tahun ajaran —</option>
                         @foreach ($taOptions as $kodeTa)
@@ -93,22 +100,30 @@
                     <p class="mt-1 text-xs text-gray-400">Menentukan jenis biaya, potongan gelombang, dan target yang berlaku.</p>
                 </div>
                 <div>
-                    {{-- Jalur BERLAKU LINTAS TAHUN AJARAN sejak kolom tahun_ajaran-nya
-                         dibuang, jadi daftarnya tidak lagi bergantung pada T.A terpilih.
-                         Yang tetap berbeda per tahun adalah TARIF-nya, dan itu dimensi
-                         milik jenis_biaya (tahun_ajaran + kode_jalur). --}}
+                    {{-- Jalur berlaku lintas tahun ajaran, TAPI bisa dinonaktifkan
+                         untuk (T.A, jenjang) tertentu — mis. SDTQ tak punya jalur
+                         OSS. Seluruh pilihan tetap DIRENDER di server lalu yang tak
+                         berlaku di-disable & disembunyikan Alpine; kalau dirender
+                         Alpine sepenuhnya, isi dropdown tak bisa diperiksa test
+                         maupun tampil saat JavaScript mati. --}}
                     <label class="mb-1 block text-sm font-medium text-gray-700">Jalur <span class="text-red-500">*</span></label>
                     <select name="jalur" required
                             class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm focus:border-brand focus:ring-1 focus:ring-brand">
+                        <option value="">— pilih jalur —</option>
                         @forelse ($jalurOptions as $kodeJalur => $namaJalur)
-                            <option value="{{ $kodeJalur }}" @selected(old('jalur') === (string) $kodeJalur)>{{ $namaJalur }}</option>
+                            <option value="{{ $kodeJalur }}" @selected(old('jalur') === (string) $kodeJalur) x-bind:disabled="tutup.includes('{{ $kodeJalur }}')" x-bind:hidden="tutup.includes('{{ $kodeJalur }}')">{{ $namaJalur }}</option>
                         @empty
-                            <option value="">— belum ada jalur aktif —</option>
+                            <option value="" disabled>— belum ada jalur aktif —</option>
                         @endforelse
                     </select>
                     @if (empty($jalurOptions))
                         <p class="mt-1 text-xs text-gray-400">
                             Tambahkan jalurnya di menu PPSB → Setting Awal → Jalur Pendaftaran (berlaku untuk semua tahun ajaran).
+                        </p>
+                    @else
+                        <p class="mt-1 text-xs text-gray-400" x-show="tutup.length > 0" x-cloak>
+                            <span x-text="tutup.length"></span> jalur disembunyikan karena tidak berlaku di jenjang &amp; tahun ajaran ini
+                            (diatur di Setting Awal &rarr; Tarif).
                         </p>
                     @endif
                 </div>

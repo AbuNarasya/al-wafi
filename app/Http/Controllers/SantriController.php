@@ -225,9 +225,13 @@ class SantriController extends Controller
                 ->mapWithKeys(fn ($w) => [$w->id => "{$w->nama} ({$w->telepon})"])->all(),
             'taOptions' => $taService->opsiAktif(),
             'taDefault' => $taService->defaultPendaftaran()?->kode,
-            // Jalur berlaku LINTAS tahun ajaran (kolom tahun_ajaran-nya sudah
-            // dibuang), jadi daftarnya tidak lagi disaring per T.A.
+            // Jalur berlaku LINTAS tahun ajaran, jadi seluruhnya dikirim; yang
+            // tidak berlaku untuk (T.A, jenjang) tertentu disaring di layar dari
+            // peta di bawah, dan ditolak lagi oleh SantriService saat menyimpan.
             'jalurOptions' => \App\Support\Referensi::jalur(),
+            'jalurNonaktif' => \App\Models\JalurNonaktif::all(['tahun_ajaran', 'kode_jenjang', 'kode_jalur'])
+                ->groupBy(fn ($n) => $n->tahun_ajaran.'|'.$n->kode_jenjang)
+                ->map(fn ($g) => $g->pluck('kode_jalur')->values()->all())->all(),
         ]);
     }
 
@@ -283,24 +287,22 @@ class SantriController extends Controller
         $potonganUangPangkal = null;
         $nominalDefaultUangPangkal = null;
         $nominalDefaultPerlengkapan = null;
+        $asalTarifUangPangkal = null;
+        $asalTarifPerlengkapan = null;
         if (in_array($santri->status, ['diterima', 'lolos_kesehatan'], true) && ! $sudahAdaUangPangkal) {
             $potonganUangPangkal = (new \App\Services\Modules\PotonganGelombangService)
                 ->potonganAktif($santri->gelombang, $santri->kode_jenjang, $santri->tahun_ajaran);
 
-            // Nominal default dari master (per jenjang + jalur, fallback umum) —
-            // mengisi form penagihan tapi tetap boleh diubah petugas.
-            try {
-                $nominalDefaultUangPangkal = $this->service
-                    ->jenisUangPangkal($santri->tahun_ajaran, $santri->kode_jenjang, $santri->jalur)->nominal;
-            } catch (AppException) {
-                $nominalDefaultUangPangkal = null; // master uang pangkal belum ada → biarkan kosong
-            }
-            try {
-                $nominalDefaultPerlengkapan = $this->service
-                    ->jenisPerlengkapan($santri->tahun_ajaran, $santri->kode_jenjang, $santri->jalur)->nominal;
-            } catch (AppException) {
-                $nominalDefaultPerlengkapan = null; // memang boleh tak dipungut
-            }
+            // Angka default diambil dari grid Tarif, dan ASAL-nya ikut ditampilkan
+            // supaya petugas tahu sel mana yang terpakai — bukan sekadar melihat
+            // angka yang entah dari mana. Tetap boleh diubah saat menagihkan.
+            $tarifUp = $this->tarifKomponen($santri, 'uang_pangkal');
+            $nominalDefaultUangPangkal = $tarifUp['nominal'];
+            $asalTarifUangPangkal = $tarifUp['label'];
+
+            $tarifPlk = $this->tarifKomponen($santri, 'perlengkapan');
+            $nominalDefaultPerlengkapan = $tarifPlk['nominal'];
+            $asalTarifPerlengkapan = $tarifPlk['label'];
         }
 
         // Nominal per tagihan yang sudah disetor tapi belum diverifikasi keuangan:
@@ -363,14 +365,94 @@ class SantriController extends Controller
             'potonganUangPangkal' => $potonganUangPangkal,
             'nominalDefaultUangPangkal' => $nominalDefaultUangPangkal,
             'nominalDefaultPerlengkapan' => $nominalDefaultPerlengkapan,
+            'asalTarifUangPangkal' => $asalTarifUangPangkal,
+            'asalTarifPerlengkapan' => $asalTarifPerlengkapan,
             'opsiTingkat' => \App\Models\Jenjang::find($santri->kode_jenjang)?->opsiTingkat() ?? [],
-            'bebasUangPangkal' => \App\Models\JalurPendaftaran::bebasUangPangkal($santri->jalur),
+            'bebasUangPangkal' => $this->tarifKomponen($santri, 'uang_pangkal')['bebas'],
             'kembali' => $this->tautanKembali($santri),
             'koreksiUangPangkal' => $koreksiUangPangkal,
             'koreksiPerlengkapan' => $koreksiPerlengkapan,
             'keluarAktif' => $keluarAktif,
             'menungguPerTagihan' => $menungguPerTagihan,
+            // Kenaikan jenjang internal lewat proses PPSB. Sasarannya null bila
+            // santri ini memang tak bisa naik (jenjang terakhir → alumni).
+            'lanjutan' => $this->bahanLanjutan($santri),
         ]);
+    }
+
+    /**
+     * Tarif satu komponen bagi seorang santri, dalam bentuk siap-pakai untuk
+     * layar: nominal default, penanda bebas, dan kalimat asal angkanya.
+     *
+     * Kegagalan mencari master TIDAK dilempar ke atas — halaman detail santri
+     * harus tetap terbuka walau setelan tarifnya belum lengkap; pesannyalah yang
+     * ditampilkan di tempat isian, bukan halaman error.
+     *
+     * @return array{nominal:?string,bebas:bool,label:?string}
+     */
+    private function tarifKomponen(Santri $santri, string $perilaku): array
+    {
+        try {
+            $tarif = $this->service->komponen($perilaku, $santri->tahun_ajaran, $santri->kode_jenjang, $santri->jalur)['tarif'];
+        } catch (AppException $e) {
+            return ['nominal' => null, 'bebas' => false, 'label' => $e->getMessage()];
+        }
+
+        return [
+            'nominal' => $tarif['status'] === 'ada' ? $tarif['nominal'] : null,
+            'bebas' => $tarif['status'] === 'bebas',
+            'label' => $tarif['label'],
+        ];
+    }
+
+    /**
+     * Bahan panel "Jenjang Lanjutan" di halaman santri: sasaran kenaikan, siklus
+     * yang sedang berjalan (bila ada), riwayatnya, dan usulan tarif tujuan.
+     *
+     * Sengaja mengembalikan `null` untuk santri yang bukan calon naik — supaya
+     * panelnya tak muncul sama sekali, bukan muncul lalu menolak.
+     */
+    private function bahanLanjutan(Santri $santri): ?array
+    {
+        if ($santri->status !== 'aktif') {
+            return null;
+        }
+        $svc = new \App\Services\Modules\PendaftaranLanjutanService;
+        $sasaran = $svc->sasaran($santri);
+        $berjalan = \App\Models\Pendaftaran::where('id_santri', $santri->id)->lanjutan()->terbuka()
+            ->orderByDesc('id')->first();
+        if (! $sasaran && ! $berjalan) {
+            return null;
+        }
+
+        $tarif = new \App\Services\Modules\TarifService;
+        $ta = $berjalan->tahun_ajaran ?? null;
+        $jenjangTujuan = $berjalan->kode_jenjang ?? $sasaran['kode_jenjang'] ?? null;
+        $jalurTujuan = $berjalan->kode_jalur ?? $sasaran['kode_jalur'] ?? null;
+
+        return [
+            'sasaran' => $sasaran,
+            'berjalan' => $berjalan,
+            'riwayat' => \App\Models\Pendaftaran::where('id_santri', $santri->id)->lanjutan()
+                ->orderByDesc('id')->get(),
+            'opsiTa' => \App\Models\TahunAjaran::where('status', 'aktif')
+                ->where('kode', '!=', (string) $santri->taBerjalan())
+                ->orderBy('kode')->pluck('kode', 'kode')->all(),
+            'opsiTingkat' => $jenjangTujuan ? (\App\Models\Jenjang::find($jenjangTujuan)?->opsiTingkat() ?? []) : [],
+            // Usulan angka untuk form eksekusi — tetap boleh ditimpa petugas.
+            'tarif' => $ta && $jenjangTujuan ? [
+                'uang_pangkal' => $tarif->cari('uang_pangkal', $ta, $jenjangTujuan, $jalurTujuan),
+                'perlengkapan' => $tarif->cari('perlengkapan', $ta, $jenjangTujuan, $jalurTujuan),
+            ] : null,
+        ];
+    }
+
+    /** Sel tarif uang pangkal santri ini bertanda BEBAS? (menentukan wajib/tidaknya isian nominal) */
+    private function bebasUangPangkal(int $id): bool
+    {
+        $santri = Santri::find($id);
+
+        return $santri ? $this->tarifKomponen($santri, 'uang_pangkal')['bebas'] : false;
     }
 
     /** Aksi lifecycle terpusat. */
@@ -385,9 +467,9 @@ class SantriController extends Controller
                 // Satu form menerbitkan dua tagihan: uang pangkal (dipotong
                 // potongan gelombang) & biaya perlengkapan (utuh, boleh kosong).
                 'tagih-uang-pangkal' => $this->service->tagihkanUangPangkal($id, $request->validate([
-                    // Jalur bebas uang pangkal tak punya isian nominal sama sekali.
+                    // Sel tarif bertanda BEBAS tak punya isian nominal sama sekali.
                     'nominal' => [
-                        \App\Models\JalurPendaftaran::bebasUangPangkal(Santri::find($id)?->jalur) ? 'nullable' : 'required',
+                        $this->bebasUangPangkal($id) ? 'nullable' : 'required',
                         'numeric', 'gt:0',
                     ],
                     'nominal_perlengkapan' => ['nullable', 'numeric', 'min:0'],

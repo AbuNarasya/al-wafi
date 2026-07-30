@@ -25,6 +25,7 @@ use Tests\TestCase;
 class PpsbAkuntansiTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const GRP = 'ZZAK';
     private const KAS = 'ZZAK.KAS';
@@ -55,7 +56,7 @@ class PpsbAkuntansiTest extends TestCase
         \App\Models\JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler', 'tahun_ajaran' => '2026/2027']);
         \App\Models\Jenjang::create(['kode' => 'SD', 'nama' => 'Sekolah Dasar', 'urutan' => 1]);
 
-        (new JenisBiayaService)->create(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND_REG, 'kode_unit' => self::UNIT, 'tahun_ajaran' => '2026/2027']);
+        $this->buatBiaya(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND_REG, 'kode_unit' => self::UNIT, 'tahun_ajaran' => '2026/2027']);
     }
 
     private function buatSantri(bool $aktif = false, ?string $jenjang = null): Santri
@@ -92,7 +93,7 @@ class PpsbAkuntansiTest extends TestCase
     public function test_spp_generate_akrual(): void
     {
         $santri = $this->buatSantri(aktif: true, jenjang: 'SD');
-        (new JenisBiayaService)->create(['kode' => 'SPP-SD', 'nama' => 'SPP SD', 'tipe' => 'spp', 'nominal' => '300000', 'kode_coa_pendapatan' => self::PEND_SPP, 'kode_coa_piutang' => self::PIUT_SPP, 'kode_unit' => self::UNIT, 'berulang' => true, 'tahun_ajaran' => '2026/2027', 'kode_jenjang' => 'SD']);
+        $this->buatBiaya(['kode' => 'SPP-SD', 'nama' => 'SPP SD', 'tipe' => 'spp', 'nominal' => '300000', 'kode_coa_pendapatan' => self::PEND_SPP, 'kode_coa_piutang' => self::PIUT_SPP, 'kode_unit' => self::UNIT, 'berulang' => true, 'tahun_ajaran' => '2026/2027', 'kode_jenjang' => 'SD']);
 
         $hasil = (new SppService)->generate(['periode' => '2026-07', 'tanggal' => '2026-07-01'], $this->admin);
         $this->assertSame(1, $hasil['terbit']);
@@ -130,7 +131,7 @@ class PpsbAkuntansiTest extends TestCase
     public function test_bayar_tagihan_dari_dompet_wali(): void
     {
         $santri = $this->buatSantri(aktif: true, jenjang: 'SD');
-        (new JenisBiayaService)->create(['kode' => 'SPP-SD', 'nama' => 'SPP SD', 'tipe' => 'spp', 'nominal' => '300000', 'kode_coa_pendapatan' => self::PEND_SPP, 'kode_coa_piutang' => self::PIUT_SPP, 'kode_unit' => self::UNIT, 'berulang' => true, 'tahun_ajaran' => '2026/2027', 'kode_jenjang' => 'SD']);
+        $this->buatBiaya(['kode' => 'SPP-SD', 'nama' => 'SPP SD', 'tipe' => 'spp', 'nominal' => '300000', 'kode_coa_pendapatan' => self::PEND_SPP, 'kode_coa_piutang' => self::PIUT_SPP, 'kode_unit' => self::UNIT, 'berulang' => true, 'tahun_ajaran' => '2026/2027', 'kode_jenjang' => 'SD']);
         (new SppService)->generate(['periode' => '2026-07', 'tanggal' => '2026-07-01'], $this->admin);
         $tagihan = TagihanSantri::where('id_santri', $santri->id)->where('kode_jenis', 'SPP-SD')->first();
 

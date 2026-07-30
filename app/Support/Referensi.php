@@ -88,6 +88,25 @@ class Referensi
             ->all();
     }
 
+    /**
+     * Label "kode — nama" yang MENGKERUT jadi satu bila keduanya sama.
+     *
+     * Banyak master di sini diisi dengan kode = nama (jenjang SDTQ/SMP/SMA
+     * misalnya), sehingga penggabungan mentah menghasilkan "SDTQ — SDTQ".
+     * Dipakai di tempat yang perlu menampilkan kodenya, bukan namanya saja.
+     */
+    public static function label(?string $kode, ?string $nama): string
+    {
+        $kode = trim((string) $kode);
+        $nama = trim((string) $nama);
+
+        if ($kode === '' || strcasecmp($kode, $nama) === 0) {
+            return $nama !== '' ? $nama : $kode;
+        }
+
+        return $nama === '' ? $kode : "{$kode} — {$nama}";
+    }
+
     /** Sisipkan opsi kosong di depan (mis. "— Semua —"). */
     public static function withEmpty(array $options, string $label = '— Pilih —'): array
     {

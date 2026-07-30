@@ -32,6 +32,7 @@ use Tests\TestCase;
 class NotifikasiTugasTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const GRP = 'ZZNT';
     private const KAS = '1.ZZNT.KAS';
@@ -61,7 +62,7 @@ class NotifikasiTugasTest extends TestCase
             'kode_level' => 'L1', 'is_admin' => true, 'tim_keuangan' => true, 'status' => 'aktif',
         ]);
 
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000',
             'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
         ]);

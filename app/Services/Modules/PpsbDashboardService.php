@@ -557,10 +557,17 @@ class PpsbDashboardService
         return $master;
     }
 
-    /** Apakah master jenis biaya PPSB sudah siap (untuk pesan menuntun di view). */
+    /**
+     * Apakah setelan PPSB sudah siap untuk T.A ini (untuk pesan menuntun di view).
+     * Dua-duanya diperlukan: baris akun di jenis biaya DAN sel tarifnya —
+     * salah satu saja tak cukup untuk menerbitkan tagihan.
+     */
     public function masterSiap(string $ta): bool
     {
-        return JenisBiaya::where('tahun_ajaran', $ta)->whereIn('tipe', TipeBiaya::kodeBerperilaku('registrasi', 'uang_pangkal'))
+        $adaAkun = JenisBiaya::whereIn('tipe', TipeBiaya::kodeBerperilaku('registrasi', 'uang_pangkal'))
             ->where('status', 'aktif')->exists();
+
+        return $adaAkun && \App\Models\TarifBiaya::where('tahun_ajaran', $ta)
+            ->whereIn('perilaku', ['registrasi', 'uang_pangkal'])->exists();
     }
 }

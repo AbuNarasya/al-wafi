@@ -20,6 +20,7 @@ use Tests\TestCase;
 class PpsbTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const GRP = 'ZZPB';
     private const PEND = '4.ZZPB.REG';
@@ -46,7 +47,7 @@ class PpsbTest extends TestCase
 
     private function buatJenisRegistrasi(): JenisBiaya
     {
-        return (new JenisBiayaService)->create([
+        return $this->buatBiaya([
             'kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000',
             'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
         ]);
@@ -69,7 +70,7 @@ class PpsbTest extends TestCase
         $this->assertDatabaseHas('jenis_biaya', ['kode' => 'REG']);
 
         $this->expectException(AppException::class);
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => 'X', 'nama' => 'X', 'tipe' => 'lain', 'kode_coa_pendapatan' => 'TIDAK_ADA', 'kode_unit' => self::UNIT,
         ]);
     }

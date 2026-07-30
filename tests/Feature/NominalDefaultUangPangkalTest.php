@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\AppException;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
 use App\Models\CoaGroup;
@@ -22,6 +23,7 @@ use Tests\TestCase;
 class NominalDefaultUangPangkalTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const GRP = 'ZZND';
     private const PEND = '4.ZZND.PEND';
@@ -46,12 +48,12 @@ class NominalDefaultUangPangkalTest extends TestCase
         Jenjang::create(['kode' => 'SMP', 'nama' => 'Sekolah Menengah Pertama', 'urutan' => 2]);
         $this->admin = User::create(['username' => 'adm', 'nama' => 'Admin', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => true])->id_pengguna;
 
-        (new JenisBiayaService)->create(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
+        $this->buatBiaya(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
     }
 
     private function buatUangPangkal(string $kode, ?string $nominal, ?string $jenjang): void
     {
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => $kode, 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'nominal' => $nominal,
             'kode_jenjang' => $jenjang, 'kode_coa_pendapatan' => self::PEND, 'kode_coa_piutang' => self::PIUT,
             'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
@@ -74,20 +76,23 @@ class NominalDefaultUangPangkalTest extends TestCase
         return $santri->refresh();
     }
 
-    public function test_master_per_jenjang_dipakai_lalu_fallback_umum(): void
+    /**
+     * Tarif per jenjang berdiri sendiri — TIDAK saling meminjam. Dulu jenjang
+     * tanpa baris sendiri jatuh ke baris UMUM; kini jenjang harus cocok persis,
+     * dan sel yang belum diisi menghentikan penagihan alih-alih menebak.
+     */
+    public function test_tarif_per_jenjang_berdiri_sendiri(): void
     {
-        $this->buatUangPangkal('UP-UMUM', '15000000', null);
-        $this->buatUangPangkal('UP-SMP', '25000000', 'SMP');
-        $svc = new SantriService;
+        $this->buatUangPangkal('UP', '15000000', null); // dicerminkan ke tiap jenjang oleh fixture
+        $this->pasangTarif(self::TA, 'SMP', null, 'uang_pangkal', '25000000');
+        $tarif = new \App\Services\Modules\TarifService;
 
-        // Jenjang punya baris sendiri → dipakai.
-        $this->assertSame('UP-SMP', $svc->jenisUangPangkal(self::TA, 'SMP')->kode);
-        $this->assertSame(25000000.0, (float) $svc->jenisUangPangkal(self::TA, 'SMP')->nominal);
+        $this->assertSame('25000000.00', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'reguler')['nominal']);
+        $this->assertSame('15000000.00', $tarif->cari('uang_pangkal', self::TA, 'SD', 'reguler')['nominal']);
 
-        // Jenjang tanpa baris sendiri → jatuh ke UMUM.
-        $this->assertSame('UP-UMUM', $svc->jenisUangPangkal(self::TA, 'SD')->kode);
-        // Tanpa jenjang sama sekali → UMUM.
-        $this->assertSame('UP-UMUM', $svc->jenisUangPangkal(self::TA, null)->kode);
+        // Jenjang yang selnya belum diisi sama sekali → berhenti, bukan menebak.
+        \App\Models\Jenjang::create(['kode' => 'SMA', 'nama' => 'SMA', 'urutan' => 3]);
+        $this->assertSame('kosong', $tarif->cari('uang_pangkal', self::TA, 'SMA', 'reguler')['status']);
     }
 
     public function test_form_penagihan_terisi_nominal_default(): void
@@ -99,7 +104,8 @@ class NominalDefaultUangPangkalTest extends TestCase
             ->get(route('santri.show', $santri->id))
             ->assertOk()
             ->assertSee('value="18000000.00"', false)
-            ->assertSee('Terisi dari master Jenis Biaya');
+            // Asal angkanya disebut, bukan sekadar "terisi dari master".
+            ->assertSee('Tarif SD');
     }
 
     public function test_nominal_default_tetap_bisa_diubah_saat_menagih(): void
@@ -113,18 +119,29 @@ class NominalDefaultUangPangkalTest extends TestCase
         $this->assertSame(12000000.0, (float) $tagihan->nominal);
     }
 
-    public function test_master_tanpa_nominal_form_tetap_kosong_dan_alur_lama_jalan(): void
+    /**
+     * Sel yang BELUM DIISI menghentikan penagihan — sengaja lebih ketat daripada
+     * dulu (yang membiarkan petugas mengetik angka tanpa acuan apa pun). Tanpa
+     * sel, sistem tak tahu apakah jalur ini memang dipungut atau terlewat diisi.
+     */
+    public function test_sel_kosong_menghalangi_penagihan_dengan_pesan_menuntun(): void
     {
-        $this->buatUangPangkal('UP-UMUM', null, null); // nominal sengaja dikosongkan
+        $this->buatUangPangkal('UP-UMUM', null, null); // tak ada sel tarif sama sekali
+        \App\Models\TarifBiaya::where('perilaku', 'uang_pangkal')->delete();
         $santri = $this->calonLulus('SD');
 
         $this->actingAs(User::find($this->admin))
             ->get(route('santri.show', $santri->id))
             ->assertOk()
-            ->assertDontSee('Terisi dari master Jenis Biaya');
+            ->assertSee('belum diisi');
 
-        $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '9000000'])['uang_pangkal'];
-        $this->assertSame(9000000.0, (float) $tagihan->nominal);
+        try {
+            (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '9000000']);
+            $this->fail('sel tarif yang kosong seharusnya menghentikan penagihan');
+        } catch (AppException $e) {
+            $this->assertSame(422, $e->status);
+            $this->assertStringContainsString('belum diisi', $e->getMessage());
+        }
     }
 
     public function test_daftar_ulang_menemukan_tagihan_meski_master_berubah(): void

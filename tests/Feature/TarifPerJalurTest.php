@@ -11,26 +11,29 @@ use App\Models\JenisBiaya;
 use App\Models\Jenjang;
 use App\Models\Level;
 use App\Models\Santri;
+use App\Models\TagihanSantri;
 use App\Models\TahunAjaran;
 use App\Models\User;
-use App\Services\Modules\JenisBiayaService;
 use App\Services\Modules\SantriService;
 use App\Services\Modules\SppService;
+use App\Services\Modules\TarifService;
 use App\Services\Modules\WaliService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Tarif dibedakan per JALUR, bukan cuma per jenjang.
+ * Tarif dibedakan per JALUR — kini lewat grid `tarif_biaya`, bukan lagi lewat
+ * baris master jenis biaya.
  *
- * Latar: dua baris uang pangkal SMP (jalur OSS 70jt & reguler 50jt) dulu tak
- * terbedakan — yang terpilih baris pertama urut kode, sehingga calon SMP
- * reguler ditawari tarif OSS. Kolom kode_jalur + JenisBiaya::berlaku() menutup
- * celah itu; penjaga cakupan tunggal mencegah celahnya terbuka lagi.
+ * Latar aslinya: dua baris uang pangkal SMP (jalur OSS 70jt & reguler 50jt) tak
+ * terbedakan, yang terpilih baris pertama urut kode, sehingga calon SMP reguler
+ * ditawari tarif OSS. Sejak tarif pindah ke grid, yang membedakan adalah SEL —
+ * dan sel yang tidak ada berarti "belum diisi", bukan "pakai yang mana saja".
  */
 class TarifPerJalurTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const GRP = 'ZZJL';
     private const PEND = '4.ZZJL.PEND';
@@ -51,23 +54,27 @@ class TarifPerJalurTest extends TestCase
         Level::create(['kode_level' => 'L1', 'nama_level' => 'Admin', 'max_transaksi' => null]);
         TahunAjaran::create(['kode' => self::TA, 'status' => 'aktif', 'default_pendaftaran' => true]);
         foreach ([['REG', 'Reguler'], ['OSS', 'SMP (OSS)'], ['YTM', 'Beasiswa Yatim']] as [$kode, $nama]) {
-            JalurPendaftaran::create(['kode' => $kode, 'nama' => $nama, 'tahun_ajaran' => self::TA]);
+            JalurPendaftaran::create(['kode' => $kode, 'nama' => $nama]);
         }
         Jenjang::create(['kode' => 'SDTQ', 'nama' => 'SD Tahfizh', 'urutan' => 1]);
         Jenjang::create(['kode' => 'SMP', 'nama' => 'SMP', 'urutan' => 2]);
         $this->admin = User::create(['username' => 'adm', 'nama' => 'Admin', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => true])->id_pengguna;
 
-        // Registrasi dasar agar pendaftaran calon bisa jalan.
-        $this->buatJenis('REG-UMUM', 'registrasi', '500000', null, null);
+        // Registrasi dasar agar pendaftaran calon bisa jalan (semua jenjang, 500rb).
+        $this->buatBiaya([
+            'kode' => 'REG-UMUM', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000',
+            'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
+        ]);
     }
 
-    private function buatJenis(string $kode, string $tipe, ?string $nominal, ?string $jenjang, ?string $jalur): JenisBiaya
+    /** Satu baris identitas akuntansi per (perilaku, jenjang) — tanpa nominal. */
+    private function buatJenis(string $kode, string $tipe, ?string $jenjang): JenisBiaya
     {
-        return (new JenisBiayaService)->create([
-            'kode' => $kode, 'nama' => $kode, 'tipe' => $tipe, 'nominal' => $nominal,
-            'kode_jenjang' => $jenjang, 'kode_jalur' => $jalur,
-            'kode_coa_pendapatan' => self::PEND, 'kode_coa_piutang' => $tipe === 'registrasi' ? null : self::PIUT,
-            'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
+        return (new \App\Services\Modules\JenisBiayaService)->create([
+            'kode' => $kode, 'nama' => $kode, 'tipe' => $tipe, 'kode_jenjang' => $jenjang,
+            'kode_coa_pendapatan' => self::PEND,
+            'kode_coa_piutang' => $tipe === 'registrasi' ? null : self::PIUT,
+            'kode_unit' => self::UNIT,
         ]);
     }
 
@@ -87,99 +94,123 @@ class TarifPerJalurTest extends TestCase
         return $santri->refresh();
     }
 
-    /** KASUS ASLI: SMP punya tarif dasar 50jt + tarif khusus jalur OSS 70jt. */
-    public function test_tarif_jalur_khusus_tidak_bocor_ke_jalur_lain(): void
+    /** KASUS ASLI: SMP punya baris Umum 50jt + sel khusus jalur OSS 70jt. */
+    public function test_sel_jalur_khusus_tidak_bocor_ke_jalur_lain(): void
     {
-        // Kode OSS sengaja lebih kecil dari kode REG secara abjad — dulu ini yang
-        // membuat OSS "menang" untuk semua calon SMP.
-        $this->buatJenis('UP-SMP-OSS', 'uang_pangkal', '70000000', 'SMP', 'OSS');
-        $this->buatJenis('UP-SMP-REG', 'uang_pangkal', '50000000', 'SMP', null);
-        $svc = new SantriService;
+        $this->buatJenis('UP-SMP', 'uang_pangkal', 'SMP');
+        $this->pasangTarif(self::TA, 'SMP', 'OSS', 'uang_pangkal', '70000000');
+        $this->pasangTarif(self::TA, 'SMP', null, 'uang_pangkal', '50000000');
+        $tarif = new TarifService;
 
-        $this->assertSame(70000000.0, (float) $svc->jenisUangPangkal(self::TA, 'SMP', 'OSS')->nominal);
-        $this->assertSame(50000000.0, (float) $svc->jenisUangPangkal(self::TA, 'SMP', 'REG')->nominal);
-        // Jalur lain yang tak punya baris sendiri ikut tarif dasar, bukan tarif OSS.
-        $this->assertSame(50000000.0, (float) $svc->jenisUangPangkal(self::TA, 'SMP', 'YTM')->nominal);
+        $this->assertSame('70000000.00', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'OSS')['nominal']);
+        $this->assertSame('50000000.00', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'REG')['nominal']);
+        // Jalur yang tak punya selnya sendiri ikut baris Umum, bukan sel OSS.
+        $this->assertSame('50000000.00', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'YTM')['nominal']);
+        // Asal angkanya selalu bisa disebut — inilah yang dulu tak terlihat.
+        $this->assertStringContainsString('jalur OSS', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'OSS')['asal']);
+        $this->assertStringContainsString('baris Umum', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'YTM')['asal']);
     }
 
-    /** Baris berjalur tanpa jenjang = pengecualian lintas jenjang, menang atas tarif dasar jenjang. */
-    public function test_jalur_lintas_jenjang_menang_atas_tarif_dasar_jenjang(): void
+    /** Jenjang harus COCOK PERSIS — sel SMP tak boleh melayani calon SDTQ. */
+    public function test_jenjang_tidak_saling_meminjam_tarif(): void
     {
-        $this->buatJenis('UP-SMP', 'uang_pangkal', '50000000', 'SMP', null);
-        $this->buatJenis('UP-YATIM', 'uang_pangkal', '1000000', null, 'YTM');
-        $svc = new SantriService;
+        $this->buatJenis('UP-SMP', 'uang_pangkal', 'SMP');
+        $this->pasangTarif(self::TA, 'SMP', null, 'uang_pangkal', '50000000');
+        $tarif = new TarifService;
 
-        $this->assertSame('UP-YATIM', $svc->jenisUangPangkal(self::TA, 'SMP', 'YTM')->kode);
-        $this->assertSame('UP-SMP', $svc->jenisUangPangkal(self::TA, 'SMP', 'REG')->kode);
+        $this->assertSame('ada', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'REG')['status']);
+        $this->assertSame('kosong', $tarif->cari('uang_pangkal', self::TA, 'SDTQ', 'REG')['status']);
     }
 
-    public function test_fallback_ke_baris_umum_saat_tak_ada_baris_khusus(): void
+    /** Tahun ajaran juga harus cocok persis. */
+    public function test_tahun_ajaran_tidak_saling_meminjam_tarif(): void
     {
-        $this->buatJenis('UP-UMUM', 'uang_pangkal', '15000000', null, null);
-        $this->buatJenis('UP-SMP-OSS', 'uang_pangkal', '70000000', 'SMP', 'OSS');
-        $svc = new SantriService;
+        TahunAjaran::create(['kode' => '2027/2028', 'status' => 'aktif']);
+        $this->buatJenis('UP-SMP', 'uang_pangkal', 'SMP');
+        $this->pasangTarif(self::TA, 'SMP', null, 'uang_pangkal', '50000000');
 
-        $this->assertSame('UP-UMUM', $svc->jenisUangPangkal(self::TA, 'SDTQ', 'REG')->kode);
-        $this->assertSame('UP-UMUM', $svc->jenisUangPangkal(self::TA, 'SMP', 'REG')->kode);
-        $this->assertSame('UP-SMP-OSS', $svc->jenisUangPangkal(self::TA, 'SMP', 'OSS')->kode);
+        $this->assertSame('kosong', (new TarifService)->cari('uang_pangkal', '2027/2028', 'SMP', 'REG')['status']);
     }
 
-    /** Tak ada baris yang cocok → GAGAL dengan pesan menuntun, bukan diam-diam memakai tarif jenjang lain. */
-    public function test_tanpa_baris_cocok_gagal_bukan_asal_pilih(): void
+    /** Sel kosong → GAGAL dengan pesan menuntun, bukan diam-diam memakai tarif lain. */
+    public function test_tanpa_sel_gagal_bukan_asal_pilih(): void
     {
-        $this->buatJenis('UP-SMP-OSS', 'uang_pangkal', '70000000', 'SMP', 'OSS');
+        $this->buatJenis('UP-SMP', 'uang_pangkal', 'SMP');
+        $this->pasangTarif(self::TA, 'SMP', 'OSS', 'uang_pangkal', '70000000');
+        $santri = $this->calonLulus('SMP', 'REG');
 
         $this->expectException(AppException::class);
-        $this->expectExceptionMessage('jenjang "SDTQ" jalur "REG"');
-        (new SantriService)->jenisUangPangkal(self::TA, 'SDTQ', 'REG');
+        $this->expectExceptionMessage('belum diisi');
+        (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '50000000']);
     }
 
-    public function test_dua_baris_bercakupan_sama_ditolak_beda_jalur_diterima(): void
+    /**
+     * SEL BERTANDA BEBAS: tagihannya TIDAK terbit sama sekali — inilah yang
+     * menjaga santri OSS lanjutan & anak karyawan tak ditagih uang pangkal lagi.
+     * Bedanya dengan sel kosong: bebas berjalan mulus, kosong menghentikan.
+     */
+    public function test_sel_bebas_tidak_menerbitkan_tagihan_uang_pangkal(): void
     {
-        $this->buatJenis('UP-SMP-A', 'uang_pangkal', '50000000', 'SMP', null);
+        $this->buatJenis('UP-SMP', 'uang_pangkal', 'SMP');
+        $this->pasangTarif(self::TA, 'SMP', null, 'uang_pangkal', '50000000');
+        $this->pasangTarif(self::TA, 'SMP', 'OSS', 'uang_pangkal', null, bebas: true);
 
-        // Cakupan persis sama (SMP, semua jalur) → ditolak.
+        $hasil = (new SantriService)->tagihkanUangPangkal($this->calonLulus('SMP', 'OSS')->id, []);
+
+        $this->assertNull($hasil['uang_pangkal'], 'jalur bebas tak boleh menerbitkan tagihan uang pangkal');
+        $this->assertSame(0, TagihanSantri::where('perilaku', 'uang_pangkal')->count());
+    }
+
+    /** Dua baris identitas untuk (perilaku, jenjang) yang sama tetap ditolak. */
+    public function test_dua_baris_jenis_biaya_sejenjang_ditolak(): void
+    {
+        $this->buatJenis('UP-SMP-A', 'uang_pangkal', 'SMP');
+
         try {
-            $this->buatJenis('UP-SMP-B', 'uang_pangkal', '60000000', 'SMP', null);
-            $this->fail('Baris kedua dengan cakupan sama seharusnya ditolak.');
+            $this->buatJenis('UP-SMP-B', 'uang_pangkal', 'SMP');
+            $this->fail('Baris kedua untuk jenjang yang sama seharusnya ditolak.');
         } catch (AppException $e) {
             $this->assertSame(409, $e->status);
             $this->assertStringContainsString('UP-SMP-A', $e->getMessage());
         }
 
-        // Dibedakan jalurnya → boleh.
-        $this->buatJenis('UP-SMP-OSS', 'uang_pangkal', '70000000', 'SMP', 'OSS');
+        // Jenjang lain tetap boleh punya barisnya sendiri.
+        $this->buatJenis('UP-SDTQ', 'uang_pangkal', 'SDTQ');
         $this->assertSame(2, JenisBiaya::where('tipe', 'uang_pangkal')->count());
     }
 
     public function test_registrasi_dan_spp_ikut_aturan_jalur_yang_sama(): void
     {
-        $this->buatJenis('REG-SMP-OSS', 'registrasi', '1500000', 'SMP', 'OSS');
-        $this->buatJenis('SPP-SMP', 'spp', '4200000', 'SMP', null);
-        $this->buatJenis('SPP-SMP-OSS', 'spp', '6000000', 'SMP', 'OSS');
+        $this->buatJenis('REG-SMP', 'registrasi', 'SMP');
+        $this->buatJenis('SPP-SMP', 'spp', 'SMP');
+        $this->pasangTarif(self::TA, 'SMP', 'OSS', 'registrasi', '1500000');
+        $this->pasangTarif(self::TA, 'SMP', null, 'registrasi', '500000');
+        $this->pasangTarif(self::TA, 'SMP', null, 'spp', '4200000');
+        $this->pasangTarif(self::TA, 'SMP', 'OSS', 'spp', '6000000');
 
         // Registrasi terbit otomatis saat mendaftar → nominalnya ikut jalur.
-        $calonOss = $this->calonLulus('SMP', 'OSS');
-        $this->assertSame(1500000.0, (float) $calonOss->tagihan()->first()->nominal);
-        $calonReg = $this->calonLulus('SMP', 'REG');
-        $this->assertSame(500000.0, (float) $calonReg->tagihan()->first()->nominal); // REG-UMUM
+        $this->assertSame(1500000.0, (float) $this->calonLulus('SMP', 'OSS')->tagihan()->first()->nominal);
+        $this->assertSame(500000.0, (float) $this->calonLulus('SMP', 'REG')->tagihan()->first()->nominal);
 
         $spp = new SppService;
-        $this->assertSame('SPP-SMP-OSS', $spp->jenisSppSantri('SMP', self::TA, 'OSS')->kode);
-        $this->assertSame('SPP-SMP', $spp->jenisSppSantri('SMP', self::TA, 'REG')->kode);
+        $this->assertSame(6000000.0, (float) $spp->nominalSppSantri($this->santriAktif('SMP', 'OSS')->id)['nominal']);
+        $this->assertSame(4200000.0, (float) $spp->nominalSppSantri($this->santriAktif('SMP', 'REG')->id)['nominal']);
     }
 
     /** Form "Tagihkan Uang Pangkal" terisi tarif jalur calon yang bersangkutan. */
     public function test_form_penagihan_terisi_tarif_sesuai_jalur(): void
     {
-        $this->buatJenis('UP-SMP-OSS', 'uang_pangkal', '70000000', 'SMP', 'OSS');
-        $this->buatJenis('UP-SMP-REG', 'uang_pangkal', '50000000', 'SMP', null);
+        $this->buatJenis('UP-SMP', 'uang_pangkal', 'SMP');
+        $this->pasangTarif(self::TA, 'SMP', 'OSS', 'uang_pangkal', '70000000');
+        $this->pasangTarif(self::TA, 'SMP', null, 'uang_pangkal', '50000000');
 
         $this->actingAs(User::find($this->admin))
             ->get(route('santri.show', $this->calonLulus('SMP', 'REG')->id))
             ->assertOk()
             ->assertSee('value="50000000.00"', false)
-            ->assertDontSee('value="70000000.00"', false);
+            ->assertDontSee('value="70000000.00"', false)
+            // Asal tarifnya ikut tampil di layar.
+            ->assertSee('baris Umum');
 
         $this->actingAs(User::find($this->admin))
             ->get(route('santri.show', $this->calonLulus('SMP', 'OSS')->id))
@@ -187,21 +218,29 @@ class TarifPerJalurTest extends TestCase
             ->assertSee('value="70000000.00"', false);
     }
 
-    /** Tagihan dicari lewat TIPE, jadi baris master lain tak membuatnya "hilang". */
+    /** Tagihan dicari lewat PERILAKU, jadi baris master lain tak membuatnya "hilang". */
     public function test_tagihan_uang_pangkal_tetap_ditemukan_meski_master_banyak_baris(): void
     {
-        $this->buatJenis('UP-SMP-OSS', 'uang_pangkal', '70000000', 'SMP', 'OSS');
-        $this->buatJenis('UP-SMP-REG', 'uang_pangkal', '50000000', 'SMP', null);
+        $this->buatJenis('UP-SMP', 'uang_pangkal', 'SMP');
+        $this->buatJenis('UP-SDTQ', 'uang_pangkal', 'SDTQ');
+        $this->pasangTarif(self::TA, 'SMP', null, 'uang_pangkal', '50000000');
 
         $santri = $this->calonLulus('SMP', 'REG');
         $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '50000000'])['uang_pangkal'];
-        $this->assertSame('UP-SMP-REG', $tagihan->kode_jenis);
+        $this->assertSame('UP-SMP', $tagihan->kode_jenis);
+        $this->assertSame('SMP', $tagihan->kode_jenjang);
+        $this->assertSame(self::TA, $tagihan->tahun_ajaran);
 
-        // detail() dulu menebak baris master lebih dulu (urut kode → UP-SMP-OSS)
-        // lalu mencari tagihan ber-kode_jenis itu → tagihan yang ADA dianggap
-        // "tidak ditemukan". Sekarang dicari lewat tipe tagihannya.
         $detail = (new \App\Services\Modules\AngsuranUangPangkalService)->detail($santri->id);
         $this->assertSame($santri->id, $detail['id_santri']);
         $this->assertSame('50000000.00', $detail['total']);
+    }
+
+    private function santriAktif(string $jenjang, string $jalur): Santri
+    {
+        $santri = $this->calonLulus($jenjang, $jalur);
+        $santri->update(['status' => 'aktif']);
+
+        return $santri->refresh();
     }
 }

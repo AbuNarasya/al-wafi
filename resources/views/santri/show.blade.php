@@ -188,19 +188,24 @@
                             @endif
                             <div class="grid gap-2 sm:grid-cols-3">
                                 @if ($bebasUangPangkal)
-                                    {{-- Jalur bebas uang pangkal (mis. Anak Karyawan): isiannya
-                                         ditiadakan, bukan dibiarkan lalu ditolak saat disimpan. --}}
+                                    {{-- Sel tarifnya bertanda BEBAS (mis. jalur Anak Karyawan atau
+                                         OSS lanjutan): isiannya ditiadakan, bukan dibiarkan lalu
+                                         ditolak saat disimpan. --}}
                                     <div class="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
                                         <b>Bebas uang pangkal.</b> Jalur {{ $santri->jalurPendaftaran?->nama ?? $santri->jalur }}
                                         tidak ditagih uang pangkal — yang terbit hanya biaya perlengkapan.
+                                        <span class="mt-0.5 block text-[11px] text-emerald-700/80">{{ $asalTarifUangPangkal }}</span>
                                     </div>
                                 @else
                                     <label class="block text-xs text-gray-600">Nominal Normal <span class="text-red-500">*</span>
                                         <input type="number" step="0.01" min="0" name="nominal" required placeholder="mis. 20000000"
                                                value="{{ old('nominal', $nominalDefaultUangPangkal) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
-                                        @if ($nominalDefaultUangPangkal !== null)
-                                            <span class="mt-0.5 block text-[11px] text-gray-400">Terisi dari master Jenis Biaya — boleh diubah bila calon ini berbeda.</span>
-                                        @endif
+                                        {{-- Asal angkanya selalu disebut: petugas harus bisa tahu sel
+                                             tarif mana yang terpakai tanpa menebak. --}}
+                                        <span class="mt-0.5 block text-[11px] {{ $nominalDefaultUangPangkal !== null ? 'text-gray-400' : 'text-red-600' }}">
+                                            {{ $asalTarifUangPangkal }}
+                                            @if ($nominalDefaultUangPangkal !== null) — boleh diubah bila calon ini berbeda. @endif
+                                        </span>
                                     </label>
                                 @endif
                                 {{-- Perlengkapan TIDAK dipotong potongan gelombang: terbit utuh
@@ -210,7 +215,7 @@
                                            value="{{ old('nominal_perlengkapan', $nominalDefaultPerlengkapan) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
                                     <span class="mt-0.5 block text-[11px] text-gray-400">
                                         Terbit sebagai tagihan terpisah dan <b>tidak dipotong</b> potongan gelombang.
-                                        @if ($nominalDefaultPerlengkapan !== null) Terisi dari master Jenis Biaya. @endif
+                                        {{ $asalTarifPerlengkapan }}
                                     </span>
                                 </label>
                                 <label class="block text-xs text-gray-600">Jatuh Tempo
@@ -334,6 +339,156 @@
                         </form>
                     </div>
                 </div>
+            </div>
+        @endif
+
+        {{-- Santri AKTIF: kenaikan jenjang LEWAT PROSES PPSB.
+             Yang bergerak adalah status PENDAFTARAN, bukan status santri —
+             ia tetap aktif & tetap ditagih SPP sampai kenaikannya dieksekusi. --}}
+        @if ($lanjutan && \App\Support\Akses::boleh('santri', 'ubah'))
+            @php $p = $lanjutan['berjalan']; @endphp
+            <div class="mt-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <h3 class="text-sm font-semibold text-gray-800">Jenjang Lanjutan</h3>
+
+                @if (! $p)
+                    {{-- Belum ada siklus: tawarkan membukanya. --}}
+                    @if ($lanjutan['sasaran'] && ! $lanjutan['sasaran']['alasan'])
+                        <p class="mt-1 text-xs text-gray-500">
+                            Naik ke <b>{{ \App\Support\Referensi::label($lanjutan['sasaran']['kode_jenjang'], $lanjutan['sasaran']['nama_jenjang']) }}</b>,
+                            jalur <b>{{ $lanjutan['sasaran']['kode_jalur'] }}</b>. Prosesnya melewati PPSB (seleksi &amp; med check);
+                            <b>tahap berkas dilewati</b> karena dokumennya sudah ada.
+                        </p>
+                        <form method="POST" action="{{ route('pendaftaran_lanjutan.store', $santri->id) }}"
+                              class="mt-3 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-3">
+                            @csrf
+                            <label class="block text-xs text-gray-600">Tahun Ajaran Tujuan <span class="text-red-500">*</span>
+                                <select name="tahun_ajaran" required class="mt-0.5 w-40 rounded border-gray-300 text-sm">
+                                    @foreach ($lanjutan['opsiTa'] as $kode => $label)
+                                        <option value="{{ $kode }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label class="block flex-1 text-xs text-gray-600">Catatan
+                                <input type="text" name="catatan" placeholder="opsional" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                            </label>
+                            <button class="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">
+                                Daftarkan ke Jenjang Lanjutan
+                            </button>
+                        </form>
+                    @else
+                        <p class="mt-1 text-xs text-amber-700">
+                            {{ $lanjutan['sasaran']['alasan'] ?? 'Jenjang ini tidak punya jenjang lanjutan — santrinya menjadi alumni, bukan naik.' }}
+                        </p>
+                    @endif
+                @else
+                    @php $act = fn ($a) => route('pendaftaran_lanjutan.aksi', ['id' => $santri->id, 'pendaftaran' => $p->id, 'aksi' => $a]); @endphp
+                    <p class="mt-1 text-xs text-gray-500">
+                        {{ $p->nomor }} &middot; ke <b>{{ $p->kode_jenjang }}</b> jalur <b>{{ $p->kode_jalur }}</b> &middot;
+                        T.A <b>{{ $p->tahun_ajaran }}</b> &middot; tahap
+                        <span class="rounded bg-brand/10 px-1.5 py-0.5 font-semibold text-brand">{{ $p->labelStatus() }}</span>
+                    </p>
+
+                    <div class="mt-3 flex flex-wrap items-start gap-2 border-t border-gray-100 pt-3">
+                        @if ($p->status === 'calon')
+                            <p class="text-xs text-amber-700">
+                                Menunggu biaya registrasi jenjang lanjutan dilunasi &amp; diverifikasi keuangan.
+                                Tahapnya maju sendiri begitu tagihan itu lunas.
+                            </p>
+                        @elseif ($p->status === 'terbayar')
+                            <form method="POST" action="{{ $act('seleksi') }}" class="w-full space-y-2">@csrf
+                                <div class="grid gap-2 sm:grid-cols-4">
+                                    <label class="block text-xs text-gray-600">Nilai Baca
+                                        <input type="number" step="0.01" name="nilai_baca" class="mt-0.5 w-full rounded border-gray-300 text-sm"></label>
+                                    <label class="block text-xs text-gray-600">Nilai Akademik
+                                        <input type="number" step="0.01" name="nilai_akademik" class="mt-0.5 w-full rounded border-gray-300 text-sm"></label>
+                                    <label class="block text-xs text-gray-600 sm:col-span-2">Catatan Wawancara
+                                        <input type="text" name="wawancara_santri" class="mt-0.5 w-full rounded border-gray-300 text-sm"></label>
+                                </div>
+                                <button class="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">Simpan Seleksi</button>
+                            </form>
+                        @elseif ($p->status === 'diseleksi')
+                            <form method="POST" action="{{ $act('pengumuman') }}">@csrf
+                                <input type="hidden" name="lulus" value="1">
+                                <button class="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">Diterima</button>
+                            </form>
+                            <form method="POST" action="{{ $act('pengumuman') }}">@csrf
+                                <input type="hidden" name="lulus" value="0">
+                                <button class="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100">Tidak Lulus</button>
+                            </form>
+                        @elseif ($p->status === 'diterima')
+                            <form method="POST" action="{{ $act('medcheck') }}">@csrf
+                                <input type="hidden" name="lolos" value="1">
+                                <button class="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">Med Check: Lolos</button>
+                            </form>
+                            <form method="POST" action="{{ $act('medcheck') }}">@csrf
+                                <input type="hidden" name="lolos" value="0">
+                                <button class="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100">Med Check: Gagal</button>
+                            </form>
+                        @elseif ($p->status === 'lolos_kesehatan')
+                            {{-- LANGKAH TERAKHIR: barulah data santri berubah. --}}
+                            <form method="POST" action="{{ $act('naik') }}" class="w-full space-y-2"
+                                  data-confirm="Eksekusi kenaikan? Jenjang, tingkat, & jalur santri berubah, dan uang pangkal + perlengkapan ditagihkan.">
+                                @csrf
+                                <p class="text-xs text-gray-500">
+                                    Sekali dieksekusi: jenjang, tingkat, jalur, &amp; tahun ajaran berjalan santri berubah,
+                                    riwayat tingkatnya ditulis, lalu uang pangkal &amp; perlengkapan ditagihkan dengan tarif
+                                    <b>{{ $p->kode_jenjang }} T.A {{ $p->tahun_ajaran }}</b>.
+                                </p>
+                                <div class="grid gap-2 sm:grid-cols-4">
+                                    <label class="block text-xs text-gray-600">Tingkat Baru <span class="text-red-500">*</span>
+                                        <select name="tingkat" required class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                            @foreach ($lanjutan['opsiTingkat'] as $t => $labelT)
+                                                <option value="{{ $t }}" @selected($t === 1)>{{ $labelT }}</option>
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                    @php $tu = $lanjutan['tarif']['uang_pangkal'] ?? null; $tp = $lanjutan['tarif']['perlengkapan'] ?? null; @endphp
+                                    @if (($tu['status'] ?? null) !== 'bebas')
+                                        <label class="block text-xs text-gray-600">Uang Pangkal
+                                            <input type="number" step="0.01" min="0" name="nominal_uang_pangkal"
+                                                   value="{{ $tu['nominal'] ?? '' }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                        </label>
+                                    @endif
+                                    <label class="block text-xs text-gray-600">Perlengkapan
+                                        <input type="number" step="0.01" min="0" name="nominal_perlengkapan"
+                                               value="{{ ($tp['status'] ?? null) === 'ada' ? $tp['nominal'] : '' }}"
+                                               placeholder="kosongkan bila tak dipungut" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                    </label>
+                                    <label class="block text-xs text-gray-600">Jatuh Tempo
+                                        <input type="date" name="jatuh_tempo" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                    </label>
+                                </div>
+                                @foreach (['uang_pangkal' => $tu, 'perlengkapan' => $tp] as $namaK => $t)
+                                    @if ($t)
+                                        <p class="text-[11px] {{ $t['status'] === 'kosong' ? 'text-red-600' : 'text-gray-400' }}">
+                                            {{ ucfirst(str_replace('_', ' ', $namaK)) }}: {{ $t['label'] }}
+                                        </p>
+                                    @endif
+                                @endforeach
+                                <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+                                    Eksekusi Kenaikan
+                                </button>
+                            </form>
+                        @endif
+
+                        <form method="POST" action="{{ $act('batal') }}" class="ml-auto flex items-end gap-2"
+                              data-confirm="Batalkan pendaftaran lanjutan ini?">
+                            @csrf
+                            <input type="text" name="alasan" required placeholder="alasan pembatalan"
+                                   class="w-56 rounded border-gray-300 text-xs">
+                            <button class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs hover:bg-gray-50">Batalkan</button>
+                        </form>
+                    </div>
+                @endif
+
+                @if ($lanjutan['riwayat']->isNotEmpty())
+                    <div class="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-500">
+                        <div class="mb-1 font-medium text-gray-600">Riwayat pendaftaran lanjutan</div>
+                        @foreach ($lanjutan['riwayat'] as $r)
+                            <div>{{ $r->nomor }} &middot; {{ $r->kode_jenjang }} T.A {{ $r->tahun_ajaran }} &middot; {{ $r->labelStatus() }}</div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         @endif
 

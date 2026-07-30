@@ -29,6 +29,7 @@ use Tests\TestCase;
 class JalurBebasUangPangkalTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const TA = '2026/2027';
 
@@ -60,13 +61,17 @@ class JalurBebasUangPangkalTest extends TestCase
         CoaDetail::create(['kode_coa' => '1.ZZBB.1', 'nama_coa' => 'Piutang', 'kode_grup' => self::GRP, 'jenis_saldo' => 'debet']);
         BusinessUnit::create(['kode_unit' => 'ZZUNIT', 'nama_unit' => 'Unit']);
 
-        $svc = new JenisBiayaService;
-        $svc->create(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000',
+        $this->buatBiaya(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000',
             'kode_coa_pendapatan' => '4.ZZBB.1', 'kode_unit' => 'ZZUNIT', 'tahun_ajaran' => self::TA]);
-        $svc->create(['kode' => 'UP', 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'nominal' => '20000000',
+        $this->buatBiaya(['kode' => 'UP', 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'nominal' => '20000000',
             'kode_coa_pendapatan' => '4.ZZBB.1', 'kode_coa_piutang' => '1.ZZBB.1', 'kode_unit' => 'ZZUNIT', 'tahun_ajaran' => self::TA]);
-        $svc->create(['kode' => 'PLK', 'nama' => 'Perlengkapan', 'tipe' => 'perlengkapan', 'nominal' => '5000000',
+        $this->buatBiaya(['kode' => 'PLK', 'nama' => 'Perlengkapan', 'tipe' => 'perlengkapan', 'nominal' => '5000000',
             'kode_coa_pendapatan' => '4.ZZBB.1', 'kode_coa_piutang' => '1.ZZBB.1', 'kode_unit' => 'ZZUNIT', 'tahun_ajaran' => self::TA]);
+
+        // PEMBEBASAN kini ditegakkan lewat SEL TARIF bertanda Bebas, bukan lagi
+        // lewat penanda `bebas_uang_pangkal` di master jalur — penanda itu tinggal
+        // menjadi pengisi awal grid. Satu sumber kebenaran saat menagih.
+        $this->pasangTarif(self::TA, 'SMP', 'karyawan', 'uang_pangkal', null, bebas: true);
     }
 
     private function calonLulus(string $jalur): Santri

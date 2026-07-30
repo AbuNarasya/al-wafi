@@ -19,6 +19,7 @@ use Tests\TestCase;
 class TahunAjaranTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     protected function setUp(): void
     {
@@ -48,8 +49,9 @@ class TahunAjaranTest extends TestCase
         $svc = new TahunAjaranService;
         $ta = $svc->create(['kode' => '2026/2027', 'status' => 'aktif']);
 
-        // Jenis biaya merujuk T.A; jalur pendaftaran TIDAK lagi (berlaku lintas T.A).
-        (new JenisBiayaService)->create([
+        // Yang merujuk T.A kini SEL TARIF-nya (jenis biaya sendiri berlaku lintas
+        // tahun); jalur pendaftaran TIDAK lagi merujuk T.A.
+        $this->buatBiaya([
             'kode' => 'REGX', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '100000',
             'kode_coa_pendapatan' => '4.ZZTA.REG', 'kode_unit' => 'ZZTAU', 'tahun_ajaran' => '2026/2027',
         ]);
@@ -64,6 +66,7 @@ class TahunAjaranTest extends TestCase
         // Jalur yang masih ada tidak lagi menghalangi penghapusan T.A.
         JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler']);
         \App\Models\JenisBiaya::destroy('REGX');
+        \App\Models\TarifBiaya::where('tahun_ajaran', '2026/2027')->delete();
         $svc->remove($ta->id);
         $this->assertDatabaseMissing('tahun_ajaran', ['kode' => '2026/2027']);
     }
@@ -75,9 +78,11 @@ class TahunAjaranTest extends TestCase
         $svc->create(['kode' => '2027/2028', 'status' => 'aktif']);
         JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler', 'tahun_ajaran' => '2026/2027']);
         JalurPendaftaran::create(['kode' => 'reguler28', 'nama' => 'Reguler', 'tahun_ajaran' => '2027/2028']);
-        // Registrasi 500rb utk TA 26/27, 750rb utk TA 27/28.
-        (new JenisBiayaService)->create(['kode' => 'REG27', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => '4.ZZTA.REG', 'kode_unit' => 'ZZTAU', 'tahun_ajaran' => '2026/2027']);
-        (new JenisBiayaService)->create(['kode' => 'REG28', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '750000', 'kode_coa_pendapatan' => '4.ZZTA.REG', 'kode_unit' => 'ZZTAU', 'tahun_ajaran' => '2027/2028']);
+        // SATU baris registrasi (akunnya sama tiap tahun), DUA sel tarif: 500rb
+        // untuk T.A 26/27 dan 750rb untuk 27/28. Dulu ini menuntut dua baris
+        // master; sejak tarif dipisah, tahun ajaran tak lagi memecah masternya.
+        $this->buatBiaya(['kode' => 'REG27', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => '4.ZZTA.REG', 'kode_unit' => 'ZZTAU', 'tahun_ajaran' => '2026/2027']);
+        $this->pasangTarif('2027/2028', null, null, 'registrasi', '750000');
         $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '08321']);
 
         $santriSvc = new SantriService;
@@ -106,11 +111,15 @@ class TahunAjaranTest extends TestCase
         }
         JalurPendaftaran::whereKey('reguler28')->update(['status' => 'aktif']);
 
-        // TA 27/28 → tagihan registrasi memakai jenis biaya TA itu (750rb).
+        // TA 27/28 → tagihan registrasi memakai SEL TARIF tahun itu (750rb),
+        // tetapi baris master (akun) yang dipakai tetap satu-satunya yang ada.
         $santri = $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'A', 'jenis_kelamin' => 'L', 'tahun_ajaran' => '2027/2028', 'jalur' => 'reguler28']);
         $this->assertSame('2027/2028', $santri->tahun_ajaran);
         $this->assertSame(750000.0, (float) $santri->tagihan()->first()->nominal);
-        $this->assertSame('REG28', $santri->tagihan()->first()->kode_jenis);
+        $this->assertSame('REG27', $santri->tagihan()->first()->kode_jenis);
+        // Kolom baru ikut terisi — inilah yang membedakan tagihan antar T.A.
+        $this->assertSame('2027/2028', $santri->tagihan()->first()->tahun_ajaran);
+        $this->assertSame('registrasi', $santri->tagihan()->first()->perilaku);
     }
 
     public function test_kode_ta_tidak_bisa_diubah(): void

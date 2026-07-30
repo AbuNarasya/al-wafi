@@ -90,7 +90,7 @@ final class TugasSaya
                 ? self::pembayaranMenunggu(['registrasi', 'uang_pangkal', 'perlengkapan']) : 0, 'menunggu verifikasi'],
 
             ['/kesantrian/pembayaran', Akses::boleh('pembayaran-kesantrian', 'ubah')
-                ? self::pembayaranMenunggu(['spp', 'lain']) : 0, 'menunggu verifikasi'],
+                ? self::pembayaranMenunggu(['spp', 'daftar_ulang', 'lain']) : 0, 'menunggu verifikasi'],
 
             ['/pengajuan-pembayaran', $keuangan ? self::pengajuanMenungguKeuangan() : 0, 'menunggu verifikasi keuangan'],
 

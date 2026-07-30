@@ -29,9 +29,11 @@
                 <x-field name="nama" label="Nama" :value="$jb->nama" required />
             </div>
 
-            <x-field name="tahun_ajaran" label="Tahun Ajaran" :value="old('tahun_ajaran', $jb->tahun_ajaran)"
-                     :options="$taOptions + ($jb->tahun_ajaran ? [$jb->tahun_ajaran => $jb->tahun_ajaran] : [])" required
-                     hint="Jenis biaya berlaku untuk tahun ajaran ini (rujukan saat pendaftaran calon santri)." />
+            <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Baris ini hanya menentukan <b>akun &amp; unit bisnis</b>-nya &mdash; diisi sekali, dipakai terus.
+                <b>Besarannya tidak di sini</b>: tarif per tahun ajaran, jenjang, dan jalur diatur di
+                <a href="{{ route('tarif.index') }}" class="font-semibold underline">Setting Awal &rarr; Tarif</a>.
+            </div>
 
             <div>
                 <label class="mb-1 block text-sm font-medium text-gray-700">Tipe <span class="text-red-500">*</span></label>
@@ -47,46 +49,8 @@
                 </p>
             </div>
 
-            {{-- Registrasi, Uang Pangkal, & SPP memakai nominal + jenjang. Bedanya:
-                 registrasi WAJIB (tagihan terbit otomatis saat mendaftar), SPP WAJIB
-                 (dipakai saat menerbitkan tagihan SPP per periode), sedangkan uang
-                 pangkal hanya nilai DEFAULT yang masih boleh diubah per calon. --}}
-            <div class="grid gap-4 sm:grid-cols-2" x-show="tipe !== 'lain'" x-cloak>
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700"
-                           x-text="{ registrasi: 'Nominal Registrasi', uang_pangkal: 'Nominal Uang Pangkal (default)', perlengkapan: 'Nominal Perlengkapan (default)', spp: 'Tarif SPP per Bulan' }[tipe] ?? 'Nominal'"></label>
-                    <input type="number" step="0.01" min="0" name="nominal" value="{{ old('nominal', $jb->nominal) }}"
-                           class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm focus:border-brand focus:ring-1 focus:ring-brand">
-                    <p class="mt-1 text-xs text-gray-400" x-show="tipe === 'registrasi'" x-cloak>
-                        Nominal biaya registrasi (tagihannya terbit otomatis saat calon mendaftar).
-                    </p>
-                    <p class="mt-1 text-xs text-gray-400" x-show="tipe === 'uang_pangkal'" x-cloak>
-                        Mengisi otomatis form &ldquo;Tagihkan Uang Pangkal&rdquo; dan <b>tetap bisa diubah</b> per calon.
-                        Kosongkan bila nominalnya selalu diketik manual.
-                    </p>
-                    <p class="mt-1 text-xs text-gray-400" x-show="tipe === 'perlengkapan'" x-cloak>
-                        Mengisi otomatis isian &ldquo;Biaya Perlengkapan&rdquo; pada form Tagihkan Uang Pangkal dan <b>tetap bisa diubah</b> per calon.
-                        Perlengkapan <b>tidak dipotong potongan gelombang</b>.
-                    </p>
-                    <p class="mt-1 text-xs text-gray-400" x-show="tipe === 'spp'" x-cloak>
-                        Tarif SPP jenjang ini, dipakai saat menerbitkan tagihan SPP tiap periode.
-                        Nominal khusus per santri (beasiswa/keringanan) tetap mengalahkan tarif ini.
-                    </p>
-                    @error('nominal')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
-                </div>
-                <x-field name="kode_jalur" label="Jalur Pendaftaran" :value="$jb->kode_jalur"
-                         :options="\App\Support\Referensi::withEmpty(\App\Support\Referensi::jalur(), '— Semua jalur (tarif dasar) —')"
-                         hint="Isi HANYA untuk tarif pengecualian satu jalur (mis. uang pangkal SMP jalur OSS). Kosong = tarif dasar yang dipakai semua jalur yang tak punya baris sendiri." />
-            </div>
-            <p class="-mt-2 text-xs text-gray-400" x-show="tipe !== 'lain'" x-cloak>
-                Tarif seorang santri dicari dari yang paling khusus: jenjang + jalur &rarr; jalur saja &rarr; jenjang saja &rarr; umum.
-                Dua baris aktif dengan cakupan sama akan ditolak, karena program tak bisa tahu mana yang benar.
-            </p>
-
             {{-- Jenjang & unit berlaku untuk SEMUA perilaku, termasuk lain-lain:
-                 keduanya dimensi yang dipakai memilah laporan, bukan sekadar
-                 bahan pencarian tarif. Karena itu keduanya di LUAR blok yang
-                 disembunyikan saat perilaku "lain". --}}
+                 keduanya dimensi yang dipakai memilah laporan. --}}
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-field name="kode_jenjang" label="Jenjang" :value="$jb->kode_jenjang"
                          :options="\App\Support\Referensi::withEmpty(\App\Support\Referensi::jenjang(), '— UMUM (semua jenjang) —')"

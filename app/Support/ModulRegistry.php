@@ -26,7 +26,10 @@ final class ModulRegistry
         ['kode' => 'bagian', 'nama' => 'Bagian / Struktur Organisasi', 'grup' => 'SETTING AWAL'],
         ['kode' => 'jenjang', 'nama' => 'Jenjang Pendidikan', 'grup' => 'SETTING AWAL'],
         ['kode' => 'tipe-biaya', 'nama' => 'Tipe Biaya (perilaku alur biaya)', 'grup' => 'SETTING AWAL'],
-        ['kode' => 'jenis-biaya', 'nama' => 'Jenis Biaya (Registrasi, Uang Pangkal, SPP)', 'grup' => 'SETTING AWAL'],
+        ['kode' => 'jenis-biaya', 'nama' => 'Jenis Biaya (akun & unit tiap biaya)', 'grup' => 'SETTING AWAL'],
+        // Dipisah dari jenis-biaya: yang boleh mengubah BESARAN tarif belum tentu
+        // sama dengan yang boleh mengubah pemetaan akunnya.
+        ['kode' => 'tarif', 'nama' => 'Tarif (besaran biaya per T.A / jenjang / jalur)', 'grup' => 'SETTING AWAL'],
         ['kode' => 'company-settings', 'nama' => 'Pengaturan Perusahaan', 'grup' => 'SETTING AWAL'],
         ['kode' => 'reminder-tagihan', 'nama' => 'Reminder Tagihan Jatuh Tempo', 'grup' => 'SETTING AWAL'],
         ['kode' => 'users', 'nama' => 'Pengguna', 'grup' => 'SETTING AWAL'],
@@ -95,7 +98,11 @@ final class ModulRegistry
         // ---- Kependidikan (kode modulnya tetap `…-kesantrian`, lihat Navigation) ----
         ['kode' => 'pembayaran-kesantrian', 'nama' => 'Pembayaran SPP & Tagihan Lain', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
         ['kode' => 'dompet', 'nama' => 'Dompet & Tabungan Santri', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
-        ['kode' => 'spp', 'nama' => 'SPP (Tarif, Penerbitan Tagihan, Prabayar)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
+        ['kode' => 'spp', 'nama' => 'SPP (Penerbitan Tagihan, Prabayar, Auto-debet)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
+        // 'buat' = boleh MENJALANKAN/MENERBITKAN; 'lihat' cukup untuk menyusun
+        // pratinjau, sehingga petugas bisa memeriksa dulu tanpa bisa mengeksekusi.
+        ['kode' => 'kenaikan-tingkat', 'nama' => 'Kenaikan Tingkat & Kelulusan', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
+        ['kode' => 'tagihan-massal', 'nama' => 'Terbitkan Daftar Ulang Massal', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
         ['kode' => 'tagihan-lain', 'nama' => 'Tagihan Lain-lain (seragam, kegiatan, denda)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
 
         // ---- Sistem ----

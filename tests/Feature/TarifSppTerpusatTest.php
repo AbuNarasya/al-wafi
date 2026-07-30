@@ -23,6 +23,7 @@ use Tests\TestCase;
 class TarifSppTerpusatTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const GRP = 'ZZTS';
     private const PEND = '4.ZZTS.SPP';
@@ -45,12 +46,12 @@ class TarifSppTerpusatTest extends TestCase
         Jenjang::create(['kode' => 'SMP', 'nama' => 'SMP', 'urutan' => 2]);
         User::create(['username' => 'adm', 'nama' => 'Admin', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => true]);
 
-        (new JenisBiayaService)->create(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
+        $this->buatBiaya(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
     }
 
     private function buatSpp(string $kode, ?string $nominal, ?string $jenjang, string $status = 'aktif'): void
     {
-        (new JenisBiayaService)->create([
+        $this->buatBiaya([
             'kode' => $kode, 'nama' => 'SPP', 'tipe' => 'spp', 'nominal' => $nominal, 'kode_jenjang' => $jenjang,
             'kode_coa_pendapatan' => self::PEND, 'kode_coa_piutang' => self::PIUT, 'kode_unit' => self::UNIT,
             'tahun_ajaran' => self::TA, 'berulang' => true, 'status' => $status,
@@ -110,7 +111,7 @@ class TarifSppTerpusatTest extends TestCase
             $this->fail('harus 409');
         } catch (AppException $e) {
             $this->assertSame(409, $e->status);
-            $this->assertStringContainsString('sudah ada di jenis biaya "SPP-SD"', $e->getMessage());
+            $this->assertStringContainsString('sudah ada di "SPP-SD"', $e->getMessage());
         }
 
         // Baris UMUM juga hanya boleh satu…
@@ -138,7 +139,10 @@ class TarifSppTerpusatTest extends TestCase
             $this->fail('harus 422');
         } catch (AppException $e) {
             $this->assertSame(422, $e->status);
-            $this->assertStringContainsString('PPSB → Jenis Biaya', $e->getMessage());
+            // Pesannya harus menunjuk tempat yang benar: baris akunnya di Jenis
+            // Biaya, angkanya di menu Tarif.
+            $this->assertStringContainsString('Jenis Biaya', $e->getMessage());
+            $this->assertStringContainsString('Tarif', $e->getMessage());
         }
     }
 

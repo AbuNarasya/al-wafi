@@ -415,13 +415,39 @@ Route::middleware('auth')->group(function () {
         $j = \App\Http\Controllers\JenisBiayaController::class;
         Route::get('/', [$j, 'index'])->name('index')->middleware('hakakses:jenis-biaya,lihat');
         Route::get('/create', [$j, 'create'])->name('create')->middleware('hakakses:jenis-biaya,buat');
-        // Duplikat butuh hak BUAT (menciptakan baris baru), bukan sekadar lihat.
-        Route::get('/duplikat', [$j, 'duplikatForm'])->name('duplikat_form')->middleware('hakakses:jenis-biaya,buat');
-        Route::post('/duplikat', [$j, 'duplikat'])->name('duplikat')->middleware('hakakses:jenis-biaya,buat');
+        // Mesin duplikat-ke-T.A-baru DIBUANG: jenis biaya tak lagi memuat tarif,
+        // jadi barisnya berlaku lintas tahun & tak perlu disalin. Yang punya
+        // tombol salin sekarang adalah menu Tarif.
         Route::post('/', [$j, 'store'])->name('store')->middleware('hakakses:jenis-biaya,buat');
         Route::get('/{kode}/edit', [$j, 'edit'])->name('edit')->middleware('hakakses:jenis-biaya,ubah');
         Route::put('/{kode}', [$j, 'update'])->name('update')->middleware('hakakses:jenis-biaya,ubah');
         Route::delete('/{kode}', [$j, 'destroy'])->name('destroy')->middleware('hakakses:jenis-biaya,hapus');
+    });
+
+    // Tarif — grid besaran biaya per (T.A × jenjang × jalur).
+    Route::prefix('tarif')->name('tarif.')->controller(\App\Http\Controllers\TarifController::class)->group(function () {
+        Route::get('/', 'index')->name('index')->middleware('hakakses:tarif,lihat');
+        Route::put('/', 'simpan')->name('simpan')->middleware('hakakses:tarif,ubah');
+        // Menonaktifkan jalur membuang sel tarif yang mungkin sudah diisi → hak UBAH.
+        Route::post('/jalur', 'nonaktifkanJalur')->name('jalur')->middleware('hakakses:tarif,ubah');
+        // Menyalin = menciptakan sel baru di T.A tujuan → hak BUAT.
+        Route::post('/salin', 'salin')->name('salin')->middleware('hakakses:tarif,buat');
+    });
+
+    // Kenaikan Tingkat & Kelulusan massal (dalam satu jenjang). Naik JENJANG
+    // punya jalurnya sendiri lewat Pendaftaran Lanjutan di halaman santri.
+    Route::prefix('kesantrian/kenaikan-tingkat')->name('kenaikan_tingkat.')->controller(\App\Http\Controllers\KenaikanTingkatController::class)->group(function () {
+        Route::get('/', 'index')->name('index')->middleware('hakakses:kenaikan-tingkat,lihat');
+        Route::post('/pratinjau', 'pratinjau')->name('pratinjau')->middleware('hakakses:kenaikan-tingkat,lihat');
+        Route::post('/eksekusi', 'eksekusi')->name('eksekusi')->middleware('hakakses:kenaikan-tingkat,buat');
+    });
+
+    // Terbitkan Tagihan Massal — daftar ulang santri aktif, jadi KEPENDIDIKAN,
+    // bukan PPSB (PPSB tidak punya penerbitan massal).
+    Route::prefix('kesantrian/tagihan-massal')->name('tagihan_massal.')->controller(\App\Http\Controllers\TagihanMassalController::class)->group(function () {
+        Route::get('/', 'index')->name('index')->middleware('hakakses:tagihan-massal,lihat');
+        Route::post('/pratinjau', 'pratinjau')->name('pratinjau')->middleware('hakakses:tagihan-massal,lihat');
+        Route::post('/terbitkan', 'terbitkan')->name('terbitkan')->middleware('hakakses:tagihan-massal,buat');
     });
 
     // Potongan Gelombang (create/list/remove).
@@ -488,6 +514,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/santri/{id}/edit', 'edit')->name('santri.edit')->middleware('hakakses:santri,ubah')->whereNumber('id');
         Route::put('/santri/{id}', 'update')->name('santri.update')->middleware('hakakses:santri,ubah')->whereNumber('id');
         Route::post('/santri/{id}/aksi/{aksi}', 'aksi')->name('santri.aksi')->middleware('hakakses:santri,ubah')->whereNumber('id');
+    });
+
+    // Pendaftaran lanjutan (kenaikan jenjang internal lewat proses PPSB) —
+    // dijalankan dari halaman detail santri, tanpa menu sidebar sendiri.
+    Route::controller(\App\Http\Controllers\PendaftaranLanjutanController::class)->group(function () {
+        Route::post('/santri/{id}/pendaftaran-lanjutan', 'store')
+            ->name('pendaftaran_lanjutan.store')->middleware('hakakses:santri,ubah')->whereNumber('id');
+        Route::post('/santri/{id}/pendaftaran-lanjutan/{pendaftaran}/aksi/{aksi}', 'aksi')
+            ->name('pendaftaran_lanjutan.aksi')->middleware('hakakses:santri,ubah')->whereNumber(['id', 'pendaftaran']);
     });
 
     // Berkas Santri (dari detail santri; tanpa menu sidebar sendiri).

@@ -20,6 +20,7 @@ use Tests\TestCase;
 class JenjangTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     protected function setUp(): void
     {
@@ -87,15 +88,18 @@ class JenjangTest extends TestCase
     public function test_tarif_spp_terpusat_di_jenis_biaya(): void
     {
         (new JenjangService)->create(['kode' => 'SD', 'nama' => 'Sekolah Dasar', 'urutan' => 1]);
-        $spp = (new JenisBiayaService)->create([
+        $spp = $this->buatBiaya([
             'kode' => 'SPP-SD', 'nama' => 'SPP SD', 'tipe' => 'spp', 'nominal' => '300000', 'kode_jenjang' => 'SD',
             'kode_coa_pendapatan' => '4.ZZJJ.SPP', 'kode_unit' => 'ZZJJU', 'tahun_ajaran' => '2026/2027', 'berulang' => true,
         ]);
 
-        // Tabel tarif terpisah sudah dibuang — tarif hidup di master jenis biaya.
+        // Tabel `tarif_spp` lama sudah dibuang. Tarifnya kini di grid `tarif_biaya`,
+        // sedangkan jenis biaya hanya memegang akun & jenjangnya.
         $this->assertFalse(\Illuminate\Support\Facades\Schema::hasTable('tarif_spp'));
-        $this->assertSame(300000.0, (float) $spp->nominal);
+        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('jenis_biaya', 'nominal'));
         $this->assertSame('SD', $spp->kode_jenjang);
+        $this->assertSame(300000.0, (float) (new \App\Services\Modules\TarifService)
+            ->cari('spp', '2026/2027', 'SD', null)['nominal']);
     }
 
     public function test_target_santri_memakai_kode_jenjang_yang_seragam(): void

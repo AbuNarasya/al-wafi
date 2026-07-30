@@ -11,6 +11,7 @@ use App\Models\PembayaranSantri;
 use App\Models\Pendaftaran;
 use App\Models\PotonganUangPangkal;
 use App\Models\RencanaAngsuranUangPangkal;
+use App\Models\RiwayatTingkat;
 use App\Models\Santri;
 use App\Models\TagihanSantri;
 use App\Models\Wali;
@@ -57,7 +58,11 @@ class SantriService
             throw new AppException(422, 'Tahun ajaran wajib dipilih saat mendaftarkan calon santri.');
         }
         $ta = (new TahunAjaranService)->pastikanAktif($data['tahun_ajaran']);
-        $this->pastikanJalurSah((string) ($data['jalur'] ?? ''));
+        $this->pastikanJalurSah(
+            (string) ($data['jalur'] ?? ''),
+            (string) $data['tahun_ajaran'],
+            ($data['kode_jenjang'] ?? null) ?: null,
+        );
         // Kewajiban mengisi tingkat ditegakkan di FORM pendaftaran (PPSB);
         // di sini yang dijaga kesahihannya — supaya jalur lain (impor santri
         // lama yang memang belum bertingkat) tidak ikut tertolak.
@@ -75,16 +80,29 @@ class SantriService
                 'no_pendaftaran' => DocNumber::nextDocNumber($base, $last),
                 'status' => 'calon',
             ]));
-            Pendaftaran::create(['id_santri' => $santri->id, 'tanggal' => $now->toDateString()]);
-
-            // Tagihan registrasi otomatis dari master (cash basis — belum berjurnal).
-            $registrasi = $this->pilihRegistrasi($santri->kode_jenjang, $santri->tahun_ajaran, $santri->jalur);
-            $santri->tagihan()->create([
-                'kode_jenis' => $registrasi->kode,
-                'nominal' => $registrasi->nominal,
-                'sisa' => $registrasi->nominal,
-                'keterangan' => $registrasi->nama,
+            // Siklus pendaftaran PERTAMA santri ini. Sasaran & tahapannya dicatat
+            // di sini, bukan hanya di santri, karena kenaikan jenjang nanti
+            // menambah siklus berikutnya (lihat PendaftaranLanjutanService).
+            Pendaftaran::create([
+                'id_santri' => $santri->id, 'tanggal' => $now->toDateString(),
+                'tahun_ajaran' => $santri->tahun_ajaran, 'kode_jenjang' => $santri->kode_jenjang,
+                'kode_jalur' => $santri->jalur, 'jenis' => 'baru', 'status' => 'calon',
+                'nomor' => $santri->no_pendaftaran,
             ]);
+
+            // Tagihan registrasi otomatis (cash basis — belum berjurnal).
+            $registrasi = $this->pilihRegistrasi($santri->kode_jenjang, $santri->tahun_ajaran, $santri->jalur);
+            if ($registrasi) {
+                $santri->tagihan()->create([
+                    'kode_jenis' => $registrasi['jenis']->kode,
+                    'perilaku' => 'registrasi',
+                    'kode_jenjang' => $santri->kode_jenjang,
+                    'tahun_ajaran' => $santri->tahun_ajaran,
+                    'nominal' => $registrasi['nominal'],
+                    'sisa' => $registrasi['nominal'],
+                    'keterangan' => $registrasi['jenis']->nama,
+                ]);
+            }
 
             return $santri;
         });
@@ -179,14 +197,42 @@ class SantriService
         if (! $santri) {
             throw new AppException(404, 'Santri tidak ditemukan.');
         }
-        if (! in_array($santri->status, ['diterima', 'lolos_kesehatan'], true)) {
+        // "aktif" ikut diterima: santri yang naik jenjang ditagih uang pangkal
+        // lagi dengan tarif jenjang & T.A barunya. Penjaga ini ada untuk
+        // menghalangi penagihan SEBELUM calon dinyatakan lulus, bukan sesudahnya.
+        if (! in_array($santri->status, ['diterima', 'lolos_kesehatan', 'aktif'], true)) {
             throw new AppException(422, 'Uang pangkal hanya bisa ditagihkan setelah calon dinyatakan lulus. Status sekarang "'.Tahap::labelStatus($santri->status).'".');
         }
 
-        $bebas = JalurPendaftaran::bebasUangPangkal($santri->jalur);
-        $jenis = $bebas ? null : $this->jenisUangPangkal($santri->tahun_ajaran, $santri->kode_jenjang, $santri->jalur);
-        if (! $bebas && $this->tagihanBerperilaku($id, 'uang_pangkal')) {
-            throw new AppException(409, 'Uang pangkal untuk santri ini sudah pernah ditagihkan. Sunting tagihannya, jangan terbitkan yang kedua.');
+        // Penerbitan massal kadang hanya perlu salah satu komponen (mis. uang
+        // pangkalnya sudah terbit, tinggal perlengkapannya). Bawaannya keduanya.
+        $diminta = $data['komponen'] ?? ['uang_pangkal', 'perlengkapan'];
+        $mintaUp = in_array('uang_pangkal', $diminta, true);
+
+        // TAHUN AJARAN TAGIHAN, bukan angkatan. `santri.tahun_ajaran` adalah tahun
+        // MASUK dan tak pernah maju, jadi santri yang naik jenjang harus bisa
+        // ditagih atas nama tahun ajaran tujuan. Tanpa penimpaan ini, tagihan
+        // kenaikan akan tercap tahun angkatan dan ditolak indeks unik.
+        $taTagihan = ($data['tahun_ajaran'] ?? null) ?: $santri->tahun_ajaran;
+
+        $jenis = null;
+        $bebas = true; // "tak menerbitkan uang pangkal" — jalannya sama dengan bebas
+        if ($mintaUp) {
+            ['jenis' => $jenis, 'tarif' => $tarif] = $this->komponen('uang_pangkal', $taTagihan, $santri->kode_jenjang, $santri->jalur);
+            $bebas = $tarif['status'] === 'bebas';
+            if (! $bebas && $tarif['status'] !== 'ada') {
+                throw new AppException(422, $tarif['label'].' Isi selnya di menu Setting Awal → Tarif, '
+                    .'atau tandai Bebas bila jalur ini memang tidak ditagih uang pangkal.');
+            }
+            if ($bebas) {
+                $jenis = null;
+            }
+            // Penjaga per (jenjang, T.A) — BUKAN per santri. Satu santri memang
+            // ditagih uang pangkal lagi setiap kali naik jenjang; yang dilarang
+            // adalah dua tagihan untuk jenjang & tahun ajaran yang sama.
+            if (! $bebas && $this->tagihanBerperilaku($id, 'uang_pangkal', $santri->kode_jenjang, $taTagihan)) {
+                throw new AppException(409, "Uang pangkal {$santri->kode_jenjang} T.A {$taTagihan} untuk santri ini sudah pernah ditagihkan. Sunting tagihannya, jangan terbitkan yang kedua.");
+            }
         }
         $nominalNormal = $bebas ? '0' : Money::of($data['nominal']);
         if (! $bebas && Money::lte($nominalNormal, '0')) {
@@ -199,24 +245,31 @@ class SantriService
         $nominalPerlengkapan = Money::of($data['nominal_perlengkapan'] ?? '0');
         $jenisPerlengkapan = null;
         if (Money::gtZero($nominalPerlengkapan)) {
-            if ($this->tagihanBerperilaku($id, 'perlengkapan')) {
-                throw new AppException(409, 'Biaya perlengkapan untuk santri ini sudah pernah ditagihkan. Sunting tagihannya, jangan terbitkan yang kedua.');
+            if ($this->tagihanBerperilaku($id, 'perlengkapan', $santri->kode_jenjang, $taTagihan)) {
+                throw new AppException(409, "Biaya perlengkapan {$santri->kode_jenjang} T.A {$taTagihan} untuk santri ini sudah pernah ditagihkan. Sunting tagihannya, jangan terbitkan yang kedua.");
             }
-            $jenisPerlengkapan = $this->jenisPerlengkapan($santri->tahun_ajaran, $santri->kode_jenjang, $santri->jalur);
+            $komponenPerlengkapan = $this->komponen('perlengkapan', $taTagihan, $santri->kode_jenjang, $santri->jalur);
+            if ($komponenPerlengkapan['tarif']['status'] === 'bebas') {
+                throw new AppException(422, 'Tarif perlengkapan untuk jalur ini bertanda BEBAS, jadi tagihannya memang tidak diterbitkan. '
+                    .'Kosongkan isian nominal perlengkapan, atau ubah tandanya di menu Setting Awal → Tarif.');
+            }
+            $jenisPerlengkapan = $komponenPerlengkapan['jenis'];
         }
 
         // Jalur bebas: tak ada nominal, jadi tak ada pula potongan yang dihitung.
         $potonganRow = $bebas ? null
-            : (new PotonganGelombangService)->potonganAktif($santri->gelombang, $santri->kode_jenjang, $santri->tahun_ajaran);
+            : (new PotonganGelombangService)->potonganAktif($santri->gelombang, $santri->kode_jenjang, $taTagihan);
         $potongan = $potonganRow ? Money::of($potonganRow->potongan) : '0';
         if (Money::gte($potongan, $nominalNormal) && ! $bebas) {
             throw new AppException(422, "Potongan Gelombang {$santri->gelombang} ({$potongan}) tidak boleh ≥ nominal uang pangkal ({$nominalNormal}).");
         }
         $efektif = Money::sub($nominalNormal, $potongan);
 
-        return DB::transaction(function () use ($id, $data, $jenis, $santri, $nominalNormal, $potongan, $potonganRow, $efektif, $jenisPerlengkapan, $nominalPerlengkapan) {
+        return DB::transaction(function () use ($id, $data, $jenis, $santri, $taTagihan, $nominalNormal, $potongan, $potonganRow, $efektif, $jenisPerlengkapan, $nominalPerlengkapan) {
             $tagihan = $jenis === null ? null : TagihanSantri::create([
-                'id_santri' => $id, 'kode_jenis' => $jenis->kode, 'nominal' => $efektif, 'sisa' => $efektif,
+                'id_santri' => $id, 'kode_jenis' => $jenis->kode,
+                'perilaku' => 'uang_pangkal', 'kode_jenjang' => $santri->kode_jenjang, 'tahun_ajaran' => $taTagihan,
+                'nominal' => $efektif, 'sisa' => $efektif,
                 'jatuh_tempo' => $data['jatuh_tempo'] ?? null, 'keterangan' => $data['keterangan'] ?? $jenis->nama,
             ]);
             if ($tagihan && Money::gtZero($potongan)) {
@@ -231,6 +284,7 @@ class SantriService
             // Terbit UTUH — tak ada baris potongan yang dilekatkan padanya.
             $perlengkapan = $jenisPerlengkapan ? TagihanSantri::create([
                 'id_santri' => $id, 'kode_jenis' => $jenisPerlengkapan->kode,
+                'perilaku' => 'perlengkapan', 'kode_jenjang' => $santri->kode_jenjang, 'tahun_ajaran' => $taTagihan,
                 'nominal' => $nominalPerlengkapan, 'sisa' => $nominalPerlengkapan,
                 'jatuh_tempo' => $data['jatuh_tempo_perlengkapan'] ?? $data['jatuh_tempo'] ?? null,
                 'keterangan' => $data['keterangan_perlengkapan'] ?? $jenisPerlengkapan->nama,
@@ -240,10 +294,10 @@ class SantriService
         });
     }
 
-    /** Santri ini sudah punya tagihan berperilaku tertentu? */
-    private function tagihanBerperilaku(int $idSantri, string $perilaku): bool
+    /** Santri ini sudah punya tagihan berperilaku tertentu untuk (jenjang, T.A) itu? */
+    private function tagihanBerperilaku(int $idSantri, string $perilaku, ?string $kodeJenjang = null, ?string $tahunAjaran = null): bool
     {
-        return $this->tagihanPerilaku($idSantri, $perilaku) !== null;
+        return $this->tagihanPerilaku($idSantri, $perilaku, $kodeJenjang, $tahunAjaran) !== null;
     }
 
     /**
@@ -262,11 +316,11 @@ class SantriService
         if (! $santri) {
             throw new AppException(404, 'Santri tidak ditemukan.');
         }
-        // Cari lewat TIPE tagihannya, bukan dengan menebak ulang baris master:
-        // master bisa berubah (mis. kini ada baris per jenjang) sehingga hasil
-        // tebakan tak lagi cocok dengan tagihan yang sudah terbit.
-        $tagihan = TagihanSantri::where('id_santri', $id)
-            ->whereHas('jenis', fn ($q) => $q->whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku('uang_pangkal')))->first();
+        // Cari lewat PERILAKU yang tercatat di tagihannya, bukan dengan menebak
+        // ulang baris master: master bisa berubah sehingga hasil tebakan tak lagi
+        // cocok dengan tagihan yang sudah terbit. Tagihan batal ikut diambil agar
+        // pesan penolakannya tetap menyebut sebab yang benar.
+        $tagihan = $this->tagihanPerilaku($id, 'uang_pangkal', null, null, true);
         if (! $tagihan) {
             throw new AppException(404, 'Uang pangkal belum ditagihkan untuk santri ini, jadi tidak ada nominal yang bisa dikoreksi.');
         }
@@ -356,7 +410,7 @@ class SantriService
         if (! $santri) {
             throw new AppException(404, 'Santri tidak ditemukan.');
         }
-        $tagihan = $this->tagihanPerilaku($id, 'perlengkapan');
+        $tagihan = $this->tagihanPerilaku($id, 'perlengkapan', null, null, true);
         if (! $tagihan) {
             throw new AppException(404, 'Biaya perlengkapan belum ditagihkan untuk santri ini, jadi tidak ada nominal yang bisa dikoreksi.');
         }
@@ -441,9 +495,12 @@ class SantriService
         // Cari lewat TIPE tagihannya (lihat catatan di koreksiNominalUangPangkal).
         $tagihan = $this->tagihanPerilaku($id, 'uang_pangkal');
         if (! $tagihan) {
-            // Santri berjalur bebas uang pangkal memang tak punya tagihan itu —
-            // menuntutnya akan mengunci mereka selamanya di "lolos kesehatan".
-            if (! JalurPendaftaran::bebasUangPangkal($santri->jalur)) {
+            // Santri yang tarif uang pangkalnya bertanda BEBAS memang tak punya
+            // tagihan itu — menuntutnya akan mengunci mereka selamanya di
+            // "lolos kesehatan". Sel yang BELUM DIISI tetap dianggap kurang
+            // lengkap, bukan bebas: itu beda keadaan.
+            $tarif = (new TarifService)->cari('uang_pangkal', $santri->tahun_ajaran, $santri->kode_jenjang, $santri->jalur);
+            if ($tarif['status'] !== 'bebas') {
                 throw new AppException(422, 'Uang pangkal belum ditagihkan. Terbitkan tagihannya lebih dulu sebelum daftar ulang.');
             }
         } elseif ($tagihan->sudah_akrual) {
@@ -486,7 +543,23 @@ class SantriService
                 }
                 $t->update(['sudah_akrual' => true]);
             }
-            $santri->update(['status' => 'aktif', 'nis' => $this->terbitkanNis()]);
+            $santri->update([
+                'status' => 'aktif',
+                'nis' => $this->terbitkanNis(),
+                // Tahun yang MULAI dijalani. Angkatan (`tahun_ajaran`) tak disentuh.
+                'tahun_ajaran_berjalan' => $santri->tahun_ajaran,
+            ]);
+            Pendaftaran::where('id_santri', $santri->id)->orderByDesc('id')->first()?->update(['status' => 'aktif']);
+
+            // Baris pertama riwayat tingkatnya — supaya tahun yang sedang berjalan
+            // pun tercatat, bukan hanya tahun-tahun sesudah kenaikan.
+            if ($santri->kode_jenjang && $santri->tahun_ajaran) {
+                RiwayatTingkat::updateOrCreate(
+                    ['id_santri' => $santri->id, 'tahun_ajaran' => $santri->tahun_ajaran],
+                    ['kode_jenjang' => $santri->kode_jenjang, 'tingkat' => $santri->tingkat,
+                        'catatan' => 'Masuk lewat daftar ulang PPSB.'],
+                );
+            }
 
             return $santri;
         });
@@ -509,12 +582,28 @@ class SantriService
         return self::LABEL_KOMPONEN[$perilaku] ?? ($tagihan->jenis?->nama ?? 'tagihan');
     }
 
-    /** Tagihan santri berperilaku tertentu (uang pangkal / perlengkapan), lengkap dengan jenisnya. */
-    private function tagihanPerilaku(int $idSantri, string $perilaku): ?TagihanSantri
+    /**
+     * Tagihan santri berperilaku tertentu, lengkap dengan jenisnya.
+     *
+     * Membaca kolom `perilaku` di tagihan — bukan lagi menelusuri tipe jenis
+     * biayanya. Kolom itu SNAPSHOT saat tagihan terbit: kalau perilaku sebuah
+     * tipe diubah di master belakangan, tagihan yang sudah terbit tetap
+     * diperlakukan menurut aturan yang berlaku ketika ia lahir.
+     *
+     * Tanpa (jenjang, T.A) yang dikembalikan adalah tagihan TERBARU — sejak naik
+     * jenjang menagih uang pangkal lagi, satu santri bisa punya lebih dari satu.
+     */
+    private function tagihanPerilaku(int $idSantri, string $perilaku, ?string $kodeJenjang = null, ?string $tahunAjaran = null, bool $termasukBatal = false): ?TagihanSantri
     {
         return TagihanSantri::where('id_santri', $idSantri)
-            ->whereHas('jenis', fn ($q) => $q->whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku($perilaku)))
-            ->with('jenis')->first();
+            ->where('perilaku', $perilaku)
+            ->when($kodeJenjang, fn ($q) => $q->where('kode_jenjang', $kodeJenjang))
+            ->when($tahunAjaran, fn ($q) => $q->where('tahun_ajaran', $tahunAjaran))
+            // Tagihan batal sengaja diabaikan: setelah dibatalkan, santrinya
+            // memang boleh ditagih ulang (indeks unik anti tagih-ganda juga
+            // mengecualikan status batal).
+            ->when(! $termasukBatal, fn ($q) => $q->where('status', '!=', 'batal'))
+            ->with('jenis')->orderByDesc('id')->first();
     }
 
     /** Pengunduran diri — boleh kapan saja sebelum proses berakhir. Tidak membalik jurnal. */
@@ -649,7 +738,10 @@ class SantriService
         Tahap::assertTransisi($santri->status, $ke);
 
         return DB::transaction(function () use ($id, $ke, $pendaftaran, $santri) {
-            Pendaftaran::where('id_santri', $id)->update($pendaftaran);
+            // Hanya siklus TERBARU yang bergerak — siklus lama (kenaikan jenjang
+            // yang sudah selesai) tak boleh ikut tersunting.
+            $terbaru = Pendaftaran::where('id_santri', $id)->orderByDesc('id')->first();
+            $terbaru?->update($pendaftaran + ['status' => $ke]);
             $santri->update(['status' => $ke]);
 
             return $santri;
@@ -657,53 +749,40 @@ class SantriService
     }
 
     /**
-     * Master uang pangkal aktif untuk (TA, jenjang, jalur) santri — urutan
-     * khusus→umum ditentukan JenisBiaya::berlaku(). `nominal`-nya bersifat
-     * DEFAULT (mengisi form penagihan, masih bisa diubah petugas).
+     * Dua hal yang dulu tercampur di satu baris master, kini dicari terpisah:
+     *  • AKUN & unit bisnisnya  → `jenis_biaya`, satu baris per (jenjang, perilaku)
+     *  • BESARANNYA             → grid Tarif, per (T.A, jenjang, jalur)
+     *
+     * Tarif dikembalikan apa adanya beserta statusnya (ada / bebas / kosong);
+     * pemanggilah yang memutuskan artinya. "kosong" JANGAN diperlakukan sama
+     * dengan "bebas" — yang satu berarti petugas belum mengisi, yang lain berarti
+     * memang tidak dipungut.
+     *
+     * @return array{jenis:JenisBiaya, tarif:array{status:string,nominal:?string,asal:?string,label:string}}
      */
-    public function jenisUangPangkal(?string $tahunAjaran = null, ?string $kodeJenjang = null, ?string $kodeJalur = null): JenisBiaya
+    public function komponen(string $perilaku, ?string $tahunAjaran, ?string $kodeJenjang, ?string $kodeJalur): array
     {
-        $jenis = JenisBiaya::berlaku('uang_pangkal', $tahunAjaran, $kodeJenjang, $kodeJalur);
-
+        $jenis = JenisBiaya::untuk($perilaku, $kodeJenjang);
         if (! $jenis) {
-            throw new AppException(422, 'Belum ada jenis biaya Uang Pangkal yang aktif untuk '
-                .$this->labelBerlaku($tahunAjaran, $kodeJenjang, $kodeJalur)
-                .'. Buat barisnya lewat menu PPSB → Jenis Biaya (kosongkan Jalur bila tarifnya berlaku untuk semua jalur).');
+            $label = TarifService::PERILAKU[$perilaku] ?? $perilaku;
+            throw new AppException(422, "Belum ada jenis biaya {$label} yang aktif untuk jenjang \""
+                .($kodeJenjang ?: '—')."\". Buat barisnya di Setting Awal → Jenis Biaya. "
+                .'Cukup sekali: baris itu hanya memegang akun & unit bisnisnya, tarifnya diisi di menu Tarif.');
         }
 
-        return $jenis;
+        return ['jenis' => $jenis, 'tarif' => (new TarifService)->cari($perilaku, $tahunAjaran, $kodeJenjang, $kodeJalur)];
     }
 
-    /**
-     * Master biaya perlengkapan aktif untuk (TA, jenjang, jalur) santri.
-     * `nominal`-nya DEFAULT saja — sama seperti uang pangkal, petugas tetap
-     * boleh mengetiknya sendiri saat menagihkan.
-     */
-    public function jenisPerlengkapan(?string $tahunAjaran = null, ?string $kodeJenjang = null, ?string $kodeJalur = null): JenisBiaya
+    /** Identitas akuntansi uang pangkal untuk jenjang santri. */
+    public function jenisUangPangkal(?string $kodeJenjang = null): JenisBiaya
     {
-        $jenis = JenisBiaya::berlaku('perlengkapan', $tahunAjaran, $kodeJenjang, $kodeJalur);
-
-        if (! $jenis) {
-            throw new AppException(422, 'Belum ada jenis biaya berperilaku Perlengkapan yang aktif untuk '
-                .$this->labelBerlaku($tahunAjaran, $kodeJenjang, $kodeJalur)
-                .'. Buat barisnya lewat menu Setting Awal → Jenis Biaya (pilih Tipe "Biaya Perlengkapan"), '
-                .'atau kosongkan nominal perlengkapan bila memang tidak dipungut.');
-        }
-
-        return $jenis;
+        return $this->komponen('uang_pangkal', null, $kodeJenjang, null)['jenis'];
     }
 
-    /** Label "jenjang X jalur Y pada T.A Z" untuk pesan error yang menuntun. */
-    private function labelBerlaku(?string $tahunAjaran, ?string $kodeJenjang, ?string $kodeJalur): string
+    /** Identitas akuntansi biaya perlengkapan untuk jenjang santri. */
+    public function jenisPerlengkapan(?string $kodeJenjang = null): JenisBiaya
     {
-        $bagian = [];
-        $bagian[] = $kodeJenjang ? "jenjang \"{$kodeJenjang}\"" : 'tanpa jenjang';
-        if ($kodeJalur) {
-            $bagian[] = "jalur \"{$kodeJalur}\"";
-        }
-        $label = implode(' ', $bagian);
-
-        return $tahunAjaran ? "{$label} pada T.A {$tahunAjaran}" : $label;
+        return $this->komponen('perlengkapan', null, $kodeJenjang, null)['jenis'];
     }
 
     /** NIS = <2 digit tahun><4 digit urut>, mis. 260001 (diterbitkan saat daftar ulang). */
@@ -722,29 +801,41 @@ class SantriService
         return $prefix.str_pad((string) $urut, 4, '0', STR_PAD_LEFT);
     }
 
-    /** Registrasi yang berlaku untuk (TA, jenjang, jalur) santri — lihat JenisBiaya::berlaku(). */
-    private function pilihRegistrasi(?string $kodeJenjang, ?string $tahunAjaran, ?string $kodeJalur = null): JenisBiaya
+    /**
+     * Registrasi untuk (TA, jenjang, jalur) santri. Tarif bertanda BEBAS berarti
+     * tagihannya tidak terbit sama sekali (null), bukan terbit bernominal nol.
+     */
+    private function pilihRegistrasi(?string $kodeJenjang, ?string $tahunAjaran, ?string $kodeJalur = null): ?array
     {
-        $registrasi = JenisBiaya::berlaku('registrasi', $tahunAjaran, $kodeJenjang, $kodeJalur);
+        ['jenis' => $jenis, 'tarif' => $tarif] = $this->komponen('registrasi', $tahunAjaran, $kodeJenjang, $kodeJalur);
 
-        if (! $registrasi || $registrasi->nominal === null) {
-            throw new AppException(422, 'Belum ada jenis biaya Registrasi aktif & bernominal untuk '
-                .$this->labelBerlaku($tahunAjaran, $kodeJenjang, $kodeJalur)
-                .'. Isi dulu di menu PPSB → Jenis Biaya (kosongkan Jalur bila tarifnya berlaku untuk semua jalur).');
+        if ($tarif['status'] === 'bebas') {
+            return null;
+        }
+        if ($tarif['status'] !== 'ada') {
+            throw new AppException(422, $tarif['label'].' Isi selnya di menu Setting Awal → Tarif, '
+                .'atau tandai Bebas bila jalur ini memang tidak dipungut biaya registrasi.');
         }
 
-        return $registrasi;
+        return ['jenis' => $jenis, 'nominal' => $tarif['nominal']];
     }
 
     /**
-     * Jalur wajib terdaftar & aktif. TIDAK lagi diperiksa terhadap tahun ajaran:
-     * jalur berlaku lintas T.A (lihat migration jalur_pendaftaran_lintas_tahun_ajaran).
+     * Jalur wajib terdaftar & aktif. Jalur berlaku lintas T.A (lihat migration
+     * jalur_pendaftaran_lintas_tahun_ajaran), TETAPI bisa dinonaktifkan untuk
+     * (tahun ajaran, jenjang) tertentu — mis. SDTQ tak punya jalur OSS. Penjaga
+     * itu ditegakkan di sini, bukan hanya disembunyikan di dropdown: kiriman
+     * langsung & impor tak lewat layar.
      */
-    private function pastikanJalurSah(string $kodeJalur): void
+    private function pastikanJalurSah(string $kodeJalur, ?string $tahunAjaran = null, ?string $kodeJenjang = null): void
     {
         $jalur = \App\Models\JalurPendaftaran::find($kodeJalur);
         if (! $jalur || $jalur->status !== 'aktif') {
             throw new AppException(422, "Jalur pendaftaran \"{$kodeJalur}\" tidak terdaftar / nonaktif.");
+        }
+        if (in_array($kodeJalur, \App\Models\JalurNonaktif::kodeUntuk($tahunAjaran, $kodeJenjang), true)) {
+            throw new AppException(422, "Jalur \"{$jalur->nama}\" tidak berlaku untuk jenjang {$kodeJenjang} pada T.A {$tahunAjaran}. "
+                .'Pilih jalur lain, atau aktifkan kembali jalurnya di Setting Awal → Tarif.');
         }
     }
 

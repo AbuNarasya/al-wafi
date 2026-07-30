@@ -26,6 +26,7 @@ class TipeBiaya extends Model
         'registrasi' => 'Registrasi — tagihan terbit otomatis saat calon mendaftar',
         'uang_pangkal' => 'Uang Pangkal — potongan gelombang & angsuran termin',
         'perlengkapan' => 'Perlengkapan — terbit bersama uang pangkal, TANPA potongan gelombang, termin sendiri',
+        'daftar_ulang' => 'Daftar Ulang — tagihan tahunan santri aktif, diterbitkan massal per tahun ajaran',
         'spp' => 'SPP — terbit berkala per periode',
         'lain' => 'Lain-lain — ditagihkan manual per santri',
     ];

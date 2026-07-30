@@ -26,14 +26,14 @@ class PembayaranSantriService
 {
     private const TIPE_LINGKUP = [
         'ppsb' => ['registrasi', 'uang_pangkal', 'perlengkapan'],
-        'kesantrian' => ['spp', 'lain'],
+        'kesantrian' => ['spp', 'daftar_ulang', 'lain'],
     ];
 
     private const LABEL_LINGKUP = [
         'ppsb' => 'PPSB (registrasi, uang pangkal & perlengkapan)',
         // Label yang DIBACA pemakai — mengikuti nama menunya (kini Kependidikan).
         // Kunci lingkupnya sendiri tetap 'kesantrian': dipakai di URL & kode modul.
-        'kesantrian' => 'Kependidikan (SPP & tagihan lain)',
+        'kesantrian' => 'Kependidikan (SPP, daftar ulang & tagihan lain)',
     ];
 
     /** Langkah 1 — PPSB mencatat setoran. Tidak ada jurnal. */
@@ -127,8 +127,17 @@ class PembayaranSantriService
             $tagihan->update(['sisa' => $sisaBaru, 'status' => Money::isZero($sisaBaru) ? 'lunas' : 'sebagian']);
 
             // Registrasi lunas = gerbang tahap berikutnya (calon → terbayar).
-            if (\App\Models\TipeBiaya::perilakuDari($jenis->tipe) === 'registrasi' && Money::isZero($sisaBaru) && $pembayaran->santri->status === 'calon') {
-                Santri::where('id', $pembayaran->id_santri)->update(['status' => 'terbayar']);
+            if (\App\Models\TipeBiaya::perilakuDari($jenis->tipe) === 'registrasi' && Money::isZero($sisaBaru)) {
+                if ($pembayaran->santri->status === 'calon') {
+                    Santri::where('id', $pembayaran->id_santri)->update(['status' => 'terbayar']);
+                } elseif ($pembayaran->santri->status === 'aktif') {
+                    // Santri AKTIF yang melunasi registrasi = pendaftaran ke jenjang
+                    // lanjutan. Yang maju tahapnya PENDAFTARAN-nya, bukan santrinya:
+                    // ia masih bersekolah di jenjang lama sampai kenaikan dieksekusi.
+                    (new PendaftaranLanjutanService)->tandaiRegistrasiLunas(
+                        (int) $pembayaran->id_santri, $tagihan->kode_jenjang, $tagihan->tahun_ajaran,
+                    );
+                }
             }
 
             $pembayaran->update([

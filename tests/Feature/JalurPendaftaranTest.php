@@ -91,10 +91,14 @@ class JalurPendaftaranTest extends TestCase
 
         // Diperiksa sebagai <option> sungguhan, bukan sekadar "namanya muncul
         // di halaman": versi lamanya pun memuat nama itu di dalam blob JSON
-        // Alpine, padahal dropdownnya kosong.
+        // Alpine, padahal dropdownnya kosong. Penyaringan per (T.A, jenjang)
+        // dikerjakan Alpine lewat x-bind, tetapi option-nya tetap dirender
+        // server — itulah yang membuat isi dropdown bisa diperiksa di sini.
         $this->actingAs($this->admin)->get(route('santri.create'))->assertOk()
-            ->assertSee('<option value="001" >Reguler</option>', false)
-            ->assertSee('<option value="002" >Pindahan</option>', false)
+            ->assertSee('value="001"', false)
+            ->assertSee('>Reguler</option>', false)
+            ->assertSee('value="002"', false)
+            ->assertSee('>Pindahan</option>', false)
             ->assertDontSee('Jalur Lama')            // nonaktif tetap disembunyikan
             ->assertDontSee('belum ada jalur');
     }

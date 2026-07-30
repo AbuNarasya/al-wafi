@@ -92,7 +92,11 @@ class PemetaSantriLama implements Pemeta
             'nis' => ['wajib' => true, 'contoh' => '230015', 'ket' => 'NIS asli santri. Harus unik.'],
             'nama' => ['wajib' => true, 'contoh' => 'Ahmad Fauzi', 'ket' => 'Nama lengkap.'],
             'jenis_kelamin' => ['wajib' => true, 'contoh' => 'L', 'ket' => 'L atau P.'],
-            'kode_jenjang' => ['wajib' => true, 'contoh' => 'SMP', 'ket' => 'Harus ada di master Jenjang.'],
+            'kode_jenjang' => [
+                'wajib' => true,
+                'contoh' => Jenjang::orderBy('urutan')->value('nama') ?? 'SMP',
+                'ket' => 'Boleh diisi KODE (mis. J002) atau NAMA jenjangnya (mis. SMP) — keduanya diterima.',
+            ],
             // Tingkat WAJIB: tanpa itu proses kenaikan tahun depan tak tahu harus
             // menaikkan dari mana, dan ratusan santri harus diisi satu per satu.
             'tingkat' => ['wajib' => true, 'contoh' => '2', 'ket' => 'Tingkat/kelas yang sedang dijalani. Harus dalam jangkauan jenjangnya (lihat Jumlah Tingkat di master Jenjang).'],
@@ -132,8 +136,10 @@ class PemetaSantriLama implements Pemeta
         // yang MASIH BERJALAN disebutkan di keterangan tiap isian.
         $opsi = JenisBiaya::whereNotNull('kode_coa_piutang')
             ->where('status', 'aktif')->orderBy('kode')
-            ->get()->mapWithKeys(fn ($j) => [
-                $j->kode => "{$j->kode} — {$j->nama}".($j->tahun_ajaran ? " (T.A {$j->tahun_ajaran})" : ''),
+            ->with('jenjang')->get()->mapWithKeys(fn ($j) => [
+                // Jenjangnya disebut lewat NAMA, bukan kodenya: sejak kode berformat
+                // J001 ia tak lagi bercerita apa-apa bagi pembaca daftar.
+                $j->kode => "{$j->kode} — {$j->nama}".($j->kode_jenjang ? ' ('.($j->jenjang->nama ?? $j->kode_jenjang).')' : ''),
             ])->all();
 
         $catatan = [
@@ -161,13 +167,49 @@ class PemetaSantriLama implements Pemeta
         // Jenis biaya tunggakan boleh kosong (berkas tanpa tunggakan), tetapi
         // kalau diisi harus benar — memeriksanya di sini menghindari pesan yang
         // sama berulang di ratusan baris.
+        $terpakai = [];
         foreach (array_keys(self::TUNGGAKAN) as $k) {
-            if ($salah = $this->periksaJenis(trim($param["jenis_tunggakan_{$k}"] ?? ''))) {
+            $kode = trim($param["jenis_tunggakan_{$k}"] ?? '');
+            if ($salah = $this->periksaJenis($kode)) {
                 return $salah;
             }
+            if ($kode === '') {
+                continue;
+            }
+            // Dua kolom tunggakan yang menunjuk jenis biaya SEKALI-PER-TAHUN yang
+            // sama akan melanggar indeks unik anti tagih-ganda begitu keduanya
+            // terisi pada satu santri. Ditolak di sini supaya pesannya menuntun,
+            // bukan muncul sebagai galat basis data di tengah impor.
+            $perilaku = \App\Models\TipeBiaya::perilakuDari(JenisBiaya::whereKey($kode)->value('tipe'));
+            if ($perilaku === null || $perilaku === 'lain') {
+                continue;
+            }
+            if (isset($terpakai[$kode])) {
+                return "Kolom tunggakan \"{$terpakai[$kode]}\" dan \"{$k}\" sama-sama menunjuk jenis biaya \"{$kode}\". "
+                    .'Jenis berperilaku '.$perilaku.' hanya boleh satu tagihan per santri per tahun ajaran — '
+                    .'pilih jenis yang berbeda, atau pakai jenis berperilaku Lain-lain untuk salah satunya.';
+            }
+            $terpakai[$kode] = $k;
         }
 
         return null;
+    }
+
+    /**
+     * Jenjang dicari lewat KODE dulu, lalu NAMA.
+     *
+     * Sejak kode jenjang berformat `J001`, angka itu tak bisa ditebak penyusun
+     * berkas — sedangkan berkas pindahan biasanya sudah menuliskan "SDTQ"/"SMP".
+     * Menerima keduanya membuat berkas lama tetap terpakai tanpa ditulis ulang.
+     */
+    private function cariJenjang(string $kodeAtauNama): ?Jenjang
+    {
+        if ($kodeAtauNama === '') {
+            return null;
+        }
+
+        return Jenjang::find($kodeAtauNama)
+            ?? Jenjang::whereRaw('lower(nama) = ?', [mb_strtolower($kodeAtauNama)])->first();
     }
 
     /** Jenis biaya tunggakan sah? Kosong dianggap sah (berkas boleh tanpa tunggakan). */
@@ -204,9 +246,9 @@ class PemetaSantriLama implements Pemeta
         }
 
         $kodeJenjang = trim($baris['kode_jenjang'] ?? '');
-        $jenjang = Jenjang::find($kodeJenjang);
+        $jenjang = $this->cariJenjang($kodeJenjang);
         if (! $jenjang) {
-            return $this->masalah("Jenjang \"{$kodeJenjang}\" tidak ada di master Jenjang.");
+            return $this->masalah("Jenjang \"{$kodeJenjang}\" tidak ada di master Jenjang (boleh diisi kode maupun namanya).");
         }
 
         // Tingkat dibatasi jenjangnya — aturan yang sama dengan form pendaftaran.
@@ -293,10 +335,14 @@ class PemetaSantriLama implements Pemeta
                 'tempat_lahir' => $this->kosongJadiNull($b['tempat_lahir'] ?? ''),
                 'tanggal_lahir' => $this->kosongJadiNull($b['tanggal_lahir'] ?? ''),
                 'nisn' => $this->kosongJadiNull($b['nisn'] ?? ''),
-                'kode_jenjang' => trim($b['kode_jenjang']),
+                'kode_jenjang' => $this->cariJenjang(trim($b['kode_jenjang']))?->kode,
                 'tingkat' => (int) trim($b['tingkat']),
                 'angkatan' => ($a = trim($b['angkatan'] ?? '')) !== '' ? (int) $a : null,
                 'tahun_ajaran' => trim($b['tahun_ajaran']),
+                // Santri lama masuk langsung sebagai aktif, jadi tahun yang sedang
+                // DIJALANI sama dengan tahun pada berkasnya. Tanpa ini, pencarian
+                // tarif SPP mereka akan buntu karena kolomnya kosong.
+                'tahun_ajaran_berjalan' => trim($b['tahun_ajaran']),
                 'jalur' => trim($b['jalur']),
                 // Tanpa gelombang: santri lama tak boleh kena hitungan potongan gelombang.
                 'gelombang' => null,
@@ -305,14 +351,31 @@ class PemetaSantriLama implements Pemeta
             ]);
             $dibuat['santri']++;
 
+            // Baris pertama riwayat tingkatnya. Santri lama tak melewati daftar
+            // ulang PPSB, jadi tanpa ini riwayatnya kosong dan kenaikan pertama
+            // mereka kehilangan titik awalnya.
+            if ($santri->kode_jenjang) {
+                \App\Models\RiwayatTingkat::updateOrCreate(
+                    ['id_santri' => $santri->id, 'tahun_ajaran' => $santri->tahun_ajaran],
+                    ['kode_jenjang' => $santri->kode_jenjang, 'tingkat' => $santri->tingkat,
+                        'catatan' => 'Impor data awal santri lama.'],
+                );
+            }
+
             foreach (self::TUNGGAKAN as $k => $t) {
                 $nilai = $this->angka($b["tunggakan_{$k}"] ?? '');
                 if ($nilai === null || ! Money::gtZero($nilai)) {
                     continue;
                 }
+                $kodeJenis = trim($param["jenis_tunggakan_{$k}"]);
                 TagihanSantri::create([
                     'id_santri' => $santri->id,
-                    'kode_jenis' => trim($param["jenis_tunggakan_{$k}"]),
+                    'kode_jenis' => $kodeJenis,
+                    // Perilaku disalin dari jenis biayanya supaya tunggakan uang
+                    // pangkal warisan tetap dikenali modul yang membacanya.
+                    'perilaku' => \App\Models\TipeBiaya::perilakuDari(JenisBiaya::whereKey($kodeJenis)->value('tipe')),
+                    'kode_jenjang' => $santri->kode_jenjang,
+                    'tahun_ajaran' => $santri->tahun_ajaran,
                     'nominal' => $nilai,
                     'sisa' => $nilai,
                     'status' => 'belum_bayar',
