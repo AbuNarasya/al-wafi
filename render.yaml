@@ -61,7 +61,23 @@ services:
       - key: QUEUE_CONNECTION
         value: database
 
-      # Mengisi data awal + pengguna admin tiap kali container menyala. Ubah ke
-      # "false" setelah Anda mengganti password admin, agar tak dikembalikan lagi.
+      # Mengisi data awal + pengguna admin tiap kali container menyala.
+      #
+      # "false" SEJAK 31 Jul 2026, dan nilainya diubah DI BERKAS INI — bukan cuma
+      # di dashboard. Env ber-`value` literal dikelola blueprint, jadi suntingan
+      # lewat dashboard akan dikembalikan begitu blueprint di-sync ulang.
+      #
+      # Dua sebab:
+      #  • Database produksi kini berisi master yang diisi manual (jenjang, tipe &
+      #    jenis biaya, grid tarif 171 sel, potongan gelombang). Seeder hanya tahu
+      #    data awal, dan menjalankannya tiap container menyala hanya menambahkan
+      #    lagi jalur bawaan serta MENGEMBALIKAN password admin ke bawaannya.
+      #  • Seeder pernah MENGGAGALKAN DEPLOY (29 Jul 2026): migrasi membuang kolom
+      #    `jalur_pendaftaran.tahun_ajaran`, seeder versi lama masih mengisinya,
+      #    container berhenti dengan "column does not exist". Seedernya sudah
+      #    diperbaiki, tetapi gerbang ini membuat kejadian serupa tak fatal lagi.
+      #
+      # Setel "true" hanya saat memasang blueprint ini di database yang BENAR-BENAR
+      # kosong — tanpa itu tak ada pengguna yang bisa login.
       - key: SEED_ON_DEPLOY
-        value: "true"
+        value: "false"
