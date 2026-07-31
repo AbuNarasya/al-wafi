@@ -46,7 +46,7 @@ final class DokumenPolicy
         'pasca_lulus' => 'Berkas Setelah Lulus',
     ];
 
-    private const SUDAH_LULUS = ['diterima', 'lolos_kesehatan', 'aktif', 'alumni'];
+    private const SUDAH_LULUS = ['diterima', 'lolos_kesehatan', 'siap_aktivasi', 'aktif', 'alumni'];
 
     /** @return array{boleh:bool,alasan?:string} */
     public static function bolehUnggah(string $jenis, string $statusSantri): array

@@ -201,6 +201,105 @@ window.searchSelect = function ({ options = [], value = '' } = {}) {
     };
 };
 
+/**
+ * inputRupiah — isian nominal berpemisah ribuan. Dipakai komponen <x-input-rupiah>.
+ *
+ * `<input type="number">` TIDAK BISA menampilkan pemisah ribuan: peramban menolak
+ * nilai yang bukan angka murni, jadi "8.000.000" langsung dianggap kosong. Karena
+ * itu yang dilihat petugas adalah isian TEKS bertopeng, sementara yang terkirim ke
+ * server adalah <input type="hidden"> berisi angka mentah — pola yang sama dengan
+ * searchSelect di atas, dan alasan yang sama: form biasa harus tetap jalan.
+ *
+ * Rupiah utuh saja, tanpa sen. Nominal pesantren tak pernah berpecahan, dan ".00"
+ * yang terbawa dari basis data (Money selalu 2 desimal) justru bikin petugas ragu.
+ *
+ * Posisi kursor dipulihkan lewat HITUNGAN DIGIT sebelum kursor, bukan indeks
+ * karakter: setelah diformat ulang, jumlah titik di kiri kursor bisa bertambah
+ * atau berkurang, dan memakai indeks karakter membuat kursor melompat tiap kali
+ * ribuan baru terbentuk.
+ */
+
+/** Nilai dari PHP: "8000000.00" (Money) atau "8000000" (old() setelah gagal validasi). */
+function rpDariServer(v) {
+    const t = String(v ?? '').trim();
+    if (t === '') return '';
+    const n = Number(t);
+
+    return Number.isFinite(n) ? String(Math.trunc(Math.abs(n))) : t.replace(/\D/g, '');
+}
+
+/**
+ * Yang diketik/ditempel petugas, dalam format Indonesia: titik = pemisah ribuan
+ * (semua digitnya dipertahankan), koma = pemisah desimal (sennya DIBUANG). Tanpa
+ * aturan koma itu, menempel "8000000,00" dari layar lain akan terbaca
+ * 800.000.000 — seratus kali lipat, tanpa peringatan apa pun.
+ */
+function rpDariKetikan(v) {
+    return String(v).split(',')[0].replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+}
+
+/** Indeks karakter tepat setelah digit ke-n pada teks yang sudah diformat. */
+function rpPosisiDigitKe(teks, n) {
+    if (n <= 0) return 0;
+    let hitung = 0;
+    for (let i = 0; i < teks.length; i++) {
+        if (teks[i] >= '0' && teks[i] <= '9' && ++hitung === n) return i + 1;
+    }
+
+    return teks.length;
+}
+
+/** Angka mentah → tampilan berpemisah ribuan. Dipakai juga dari ekspresi Alpine. */
+window.fmtRupiah = function (v) {
+    const digit = rpDariServer(v);
+
+    return digit === '' ? '' : digit.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};
+
+/**
+ * Penangan `@input` untuk isian rupiah yang nilainya dipegang Alpine (baris
+ * berulang cash in/out, jurnal, invoice, termin angsuran — yang totalnya
+ * dihitung hidup). Elemennya diformat di tempat, dan yang DIKEMBALIKAN adalah
+ * angka mentah supaya penjumlahannya tetap berupa angka:
+ *
+ *   <input type="text" inputmode="numeric" :value="fmtRupiah(row.nominal)"
+ *          @input="row.nominal = ketikRupiah($event)">
+ *
+ * Pola dua bagian ini dipakai — bukan <x-input-rupiah> — karena baris berulang
+ * butuh `:name` dinamis dan nilainya harus mengalir ke state Alpine induknya,
+ * dua hal yang tak bisa diberikan komponen ber-hidden-input.
+ */
+window.ketikRupiah = function (ev) {
+    const el = ev.target;
+    const digitKiri = rpDariKetikan(el.value.slice(0, el.selectionStart)).length;
+    const mentah = rpDariKetikan(el.value);
+
+    el.value = window.fmtRupiah(mentah);
+    const pos = rpPosisiDigitKe(el.value, digitKiri);
+    el.setSelectionRange(pos, pos);
+
+    return mentah;
+};
+
+window.inputRupiah = function ({ value = '' } = {}) {
+    return {
+        mentah: '',
+
+        init() {
+            this.mentah = rpDariServer(value);
+            this.$refs.tampil.value = window.fmtRupiah(this.mentah);
+        },
+
+        ketik() {
+            this.mentah = window.ketikRupiah({ target: this.$refs.tampil });
+        },
+    };
+};
+
+// SETELAH semua pembantu `window.*` di atas terdefinisi, bukan sebelumnya:
+// Alpine.start() langsung menyisir DOM, dan ekspresi `x-data="inputRupiah(…)"`
+// yang pembantunya belum ada hanya menghasilkan peringatan di konsol —
+// isiannya diam-diam jadi tak berfungsi.
 Alpine.start();
 
 /**

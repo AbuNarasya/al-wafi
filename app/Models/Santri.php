@@ -95,6 +95,16 @@ class Santri extends Model
         return $this->belongsTo(JalurPendaftaran::class, 'jalur', 'kode');
     }
 
+    /**
+     * Jenjangnya. Ada supaya LAYAR bisa menyebut NAMA jenjang, bukan kode
+     * `J001` — sejak kode berformat itu, ia tak lagi bercerita apa pun bagi
+     * pembaca. Untuk daftar, muat lewat `with('jenjang')` agar tak jadi N+1.
+     */
+    public function jenjang(): BelongsTo
+    {
+        return $this->belongsTo(Jenjang::class, 'kode_jenjang', 'kode');
+    }
+
     public function dokumen(): HasMany
     {
         return $this->hasMany(DokumenSantri::class, 'id_santri', 'id');
@@ -103,6 +113,17 @@ class Santri extends Model
     public function tagihan(): HasMany
     {
         return $this->hasMany(TagihanSantri::class, 'id_santri', 'id');
+    }
+
+    /**
+     * Seluruh NIS yang pernah dipegang santri ini — nomornya diterbitkan ulang
+     * setiap kali ia masuk jenjang baru. `nis` di tabel ini memegang yang
+     * BERLAKU; riwayatnya dipakai agar nomor lama di kartu & rapor tetap bisa
+     * dicari.
+     */
+    public function riwayatNis(): HasMany
+    {
+        return $this->hasMany(NisSantri::class, 'id_santri', 'id');
     }
 
     public function pembayaran(): HasMany

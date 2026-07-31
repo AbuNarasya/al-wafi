@@ -6,7 +6,9 @@ use App\Exceptions\AppException;
 use App\Models\JenisBiaya;
 use App\Models\Santri;
 use App\Models\TagihanSantri;
+use App\Models\TipeBiaya;
 use App\Services\Modules\TagihanLainService;
+use App\Support\Referensi;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -26,7 +28,7 @@ class TagihanLainController extends Controller
         $fJenis = trim((string) $request->query('jenis', ''));
         $fStatus = trim((string) $request->query('status', ''));
 
-        $jenisLain = JenisBiaya::whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku('lain'))->orderBy('nama')->pluck('nama', 'kode');
+        $jenisLain = JenisBiaya::whereIn('tipe', TipeBiaya::kodeBerperilaku('lain'))->orderBy('nama')->pluck('nama', 'kode');
         $rows = TagihanSantri::query()->with(['santri', 'jenis'])
             ->whereIn('kode_jenis', $jenisLain->keys())
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w
@@ -50,12 +52,15 @@ class TagihanLainController extends Controller
     public function create(): View
     {
         return view('tagihan-lain.create', [
-            'jenisOptions' => ['' => '— pilih jenis —'] + JenisBiaya::whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku('lain'))->where('status', 'aktif')->orderBy('kode')->get()
+            'jenisOptions' => ['' => '— pilih jenis —'] + JenisBiaya::whereIn('tipe', TipeBiaya::kodeBerperilaku('lain'))->where('status', 'aktif')->orderBy('kode')->get()
                 // Jenjang ikut ditampilkan: sejak jenjang bisa diisi pada jenis
                 // berperilaku "lain", dua baris bisa bernama mirip dan hanya
                 // dibedakan jenjangnya.
                 ->mapWithKeys(fn ($j) => [$j->kode => "{$j->kode} — {$j->nama}".($j->kode_jenjang ? " ({$j->kode_jenjang})" : '')])->all(),
-            'santriAktif' => Santri::where('status', 'aktif')->orderBy('nama')->get(['id', 'nama', 'kode_jenjang']),
+            // [id => "NIS - Nama - Jenjang - Tingkat"] — daftar centang ini dulu
+            // hanya menampilkan nama + KODE jenjang mentah (`J001`), sehingga dua
+            // santri bernama mirip tak bisa dibedakan sama sekali.
+            'santriAktif' => Referensi::santri('aktif'),
         ]);
     }
 

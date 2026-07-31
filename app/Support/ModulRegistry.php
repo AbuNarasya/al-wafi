@@ -21,22 +21,27 @@ final class ModulRegistry
         ['kode' => 'dashboard-ppsb', 'nama' => 'Dashboard — tab PPSB', 'grup' => 'UMUM'],
 
         // ---- Setting Awal ----
-        ['kode' => 'levels', 'nama' => 'Level Otorisasi Keuangan', 'grup' => 'SETTING AWAL'],
-        ['kode' => 'level-pengajuan', 'nama' => 'Level Pengajuan', 'grup' => 'SETTING AWAL'],
-        ['kode' => 'bagian', 'nama' => 'Bagian / Struktur Organisasi', 'grup' => 'SETTING AWAL'],
-        ['kode' => 'jenjang', 'nama' => 'Jenjang Pendidikan', 'grup' => 'SETTING AWAL'],
-        ['kode' => 'tipe-biaya', 'nama' => 'Tipe Biaya (perilaku alur biaya)', 'grup' => 'SETTING AWAL'],
-        ['kode' => 'jenis-biaya', 'nama' => 'Jenis Biaya (akun & unit tiap biaya)', 'grup' => 'SETTING AWAL'],
-        // Dipisah dari jenis-biaya: yang boleh mengubah BESARAN tarif belum tentu
-        // sama dengan yang boleh mengubah pemetaan akunnya.
-        ['kode' => 'tarif', 'nama' => 'Tarif (besaran biaya per T.A / jenjang / jalur)', 'grup' => 'SETTING AWAL'],
-        ['kode' => 'company-settings', 'nama' => 'Pengaturan Perusahaan', 'grup' => 'SETTING AWAL'],
-        ['kode' => 'reminder-tagihan', 'nama' => 'Reminder Tagihan Jatuh Tempo', 'grup' => 'SETTING AWAL'],
-        ['kode' => 'users', 'nama' => 'Pengguna', 'grup' => 'SETTING AWAL'],
-        ['kode' => 'karyawan', 'nama' => 'Karyawan', 'grup' => 'SETTING AWAL'],
+        // Sub-nya mengikuti sidebar (lihat Navigation::SUB_ORDER): Setting Umum =
+        // lembaga & orangnya, Setting Biaya = besaran yang ditagihkan.
+        ['kode' => 'company-settings', 'nama' => 'Pengaturan Perusahaan', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
+        ['kode' => 'bagian', 'nama' => 'Bagian / Struktur Organisasi', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
+        ['kode' => 'users', 'nama' => 'Pengguna', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
+        ['kode' => 'levels', 'nama' => 'Level Otorisasi Keuangan', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
+        ['kode' => 'level-pengajuan', 'nama' => 'Level Pengajuan', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
+        // 'hak-akses' TIDAK didaftarkan di sini: ia adminOnly & masuk MODUL_BEBAS,
+        // jadi tak punya baris di matriks walau menunya ada di sub yang sama.
+        ['kode' => 'karyawan', 'nama' => 'Karyawan', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
         // Alat pindahan, bukan pemasukan harian. 'buat' = boleh menulis hasil
         // impor; sebaiknya dicabut lagi setelah migrasi selesai.
-        ['kode' => 'impor-data-awal', 'nama' => 'Impor Data Awal (pindahan sistem)', 'grup' => 'SETTING AWAL'],
+        ['kode' => 'impor-data-awal', 'nama' => 'Impor Data Awal (pindahan sistem)', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
+
+        ['kode' => 'jenjang', 'nama' => 'Jenjang Pendidikan', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Biaya'],
+        ['kode' => 'tipe-biaya', 'nama' => 'Tipe Biaya (perilaku alur biaya)', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Biaya'],
+        ['kode' => 'jenis-biaya', 'nama' => 'Jenis Biaya (akun & unit tiap biaya)', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Biaya'],
+        // Dipisah dari jenis-biaya: yang boleh mengubah BESARAN tarif belum tentu
+        // sama dengan yang boleh mengubah pemetaan akunnya.
+        ['kode' => 'tarif', 'nama' => 'Tarif (besaran biaya per T.A / jenjang / jalur)', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Biaya'],
+        ['kode' => 'reminder-tagihan', 'nama' => 'Reminder Tagihan Jatuh Tempo', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Biaya'],
 
         // ---- Anggaran ----
         // 'buat' pada modul ini = boleh MENGAJUKAN anggaran lewat rantai approval
@@ -92,18 +97,26 @@ final class ModulRegistry
         ['kode' => 'termin-filter', 'nama' => 'Setting Filter Termin Jatuh Tempo', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
         ['kode' => 'dokumen-santri', 'nama' => 'Berkas Santri (KTP, akta, KK, med check)', 'grup' => 'PPSB', 'sub' => 'Data Master'],
         ['kode' => 'angsuran-uang-pangkal', 'nama' => 'Angsuran Uang Pangkal (Termin & Reminder)', 'grup' => 'PPSB', 'sub' => 'Data Master'],
-        ['kode' => 'pembayaran-ppsb', 'nama' => 'Pembayaran Registrasi & Uang Pangkal', 'grup' => 'PPSB', 'sub' => 'Transaksi'],
+        ['kode' => 'pembayaran-ppsb', 'nama' => 'Pembayaran Tagihan PPSB (registrasi & uang pangkal)', 'grup' => 'PPSB', 'sub' => 'Transaksi'],
         ['kode' => 'rekap-pembayaran', 'nama' => 'Rekap Pembayaran Santri', 'grup' => 'PPSB', 'sub' => 'Transaksi'],
 
         // ---- Kependidikan (kode modulnya tetap `…-kesantrian`, lihat Navigation) ----
-        ['kode' => 'pembayaran-kesantrian', 'nama' => 'Pembayaran SPP & Tagihan Lain', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
-        ['kode' => 'dompet', 'nama' => 'Dompet & Tabungan Santri', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
-        ['kode' => 'spp', 'nama' => 'SPP (Penerbitan Tagihan, Prabayar, Auto-debet)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
+        ['kode' => 'spp', 'nama' => 'Penagihan SPP (Penerbitan Tagihan, Prabayar, Auto-debet)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Administrasi'],
+        ['kode' => 'tagihan-massal', 'nama' => 'Penagihan Daftar Ulang (massal)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Administrasi'],
         // 'buat' = boleh MENJALANKAN/MENERBITKAN; 'lihat' cukup untuk menyusun
         // pratinjau, sehingga petugas bisa memeriksa dulu tanpa bisa mengeksekusi.
-        ['kode' => 'kenaikan-tingkat', 'nama' => 'Kenaikan Tingkat & Kelulusan', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
-        ['kode' => 'tagihan-massal', 'nama' => 'Terbitkan Daftar Ulang Massal', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
+        ['kode' => 'kenaikan-tingkat', 'nama' => 'Kenaikan Tingkat & Kelulusan', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Administrasi'],
+        // 'buat' = boleh MENERBITKAN NIS; 'ubah' = boleh menyetel formatnya.
+        // Dipisah: menyetel format menyentuh seluruh angkatan berikutnya.
+        ['kode' => 'nis', 'nama' => 'NIS (format & penerbitan massal)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Administrasi'],
+
+        ['kode' => 'pembayaran-kesantrian', 'nama' => 'Pembayaran SPP & Tagihan Lain', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
+        ['kode' => 'dompet', 'nama' => 'Dompet & Tabungan Santri', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
         ['kode' => 'tagihan-lain', 'nama' => 'Tagihan Lain-lain (seragam, kegiatan, denda)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
+        // 'ubah' = boleh mengoreksi nominal tagihan yang salah ketik. Dipisahkan
+        // dari modul `spp` (yang menerbitkan): memeriksa tunggakan adalah pekerjaan
+        // harian, menerbitkan tagihan tidak.
+        ['kode' => 'outstanding-spp', 'nama' => 'Outstanding SPP (tunggakan & koreksi nominal)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Kontrol'],
 
         // ---- Sistem ----
         // 'void-approvals' DIBUANG 2026-07-28: menunya menunjuk /void-approvals
@@ -135,10 +148,11 @@ final class ModulRegistry
 
     /** Urutan sub-grup di dalam grup. */
     public const SUB_ORDER = [
+        'SETTING AWAL' => ['Setting Umum', 'Setting Biaya'],
         'PENGAJUAN PEMBAYARAN' => ['Pengajuan'],
         'KEUANGAN' => ['Vendor & Customer', 'Aset & Persediaan', 'Transaksi', 'Laporan', 'Kontrol'],
         'PPSB' => ['Setting Awal', 'Data Master', 'Transaksi'],
-        'KEPENDIDIKAN' => ['Transaksi'],
+        'KEPENDIDIKAN' => ['Administrasi', 'Transaksi', 'Kontrol'],
     ];
 
     /**

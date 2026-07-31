@@ -283,13 +283,14 @@ class MasterTipeBiayaSumberTest extends TestCase
         $this->actingAs($this->admin)->get('/tipe-biaya')->assertOk()->assertSee('Registrasi')->assertSee('Perilaku');
         $this->actingAs($this->admin)->get('/ppsb/sumber-informasi')->assertOk()->assertSee('Media Sosial');
 
-        // Jenis Biaya kini di grup SETTING AWAL, tak lagi di sub PPSB.
+        // Jenis Biaya kini di SETTING AWAL → Setting Biaya, tak lagi di sub PPSB.
         $item = collect(\App\Support\Navigation::ITEMS)->firstWhere('url', '/ppsb/jenis-biaya');
         $this->assertSame('SETTING AWAL', $item['group']);
-        $this->assertArrayNotHasKey('sub', $item);
+        $this->assertSame('Setting Biaya', $item['sub']);
 
         $modul = collect(\App\Support\ModulRegistry::MODUL)->firstWhere('kode', 'jenis-biaya');
         $this->assertSame('SETTING AWAL', $modul['grup']);
+        $this->assertSame('Setting Biaya', $modul['sub']);
     }
 
     /** Data lama tetap terbaca walau masternya kosong (kode = nama perilaku). */

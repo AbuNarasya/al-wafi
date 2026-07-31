@@ -39,8 +39,8 @@
                     <x-field name="tanggal" label="Tanggal" type="date" :value="old('tanggal', now()->toDateString())" required />
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Nominal Uang Muka Diselesaikan <span class="text-red-500">*</span></label>
-                        <input type="number" step="0.01" min="0" name="nominal_uang_muka" x-model="nominalUm" required
-                               :max="selected?.sisa" class="w-full rounded-lg border-gray-300 px-3 py-2 text-sm">
+                        <input type="text" inputmode="numeric" :value="fmtRupiah(nominalUm)" @input="nominalUm = ketikRupiah($event)" required
+                               :max="selected?.sisa" class="w-full rounded-lg border-gray-300 px-3 py-2 text-sm"><input type="hidden" name="nominal_uang_muka" :value="nominalUm">
                         @error('nominal_uang_muka')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
                 </div>

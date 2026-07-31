@@ -100,7 +100,7 @@
                                 <td class="px-2 py-1.5"><x-search-cell name="`details[${i}][kode_coa]`" model="row.kode_coa" options="coaOpts" placeholder="— pilih akun —" /></td>
                                 <td class="px-2 py-1.5"><x-search-cell name="`details[${i}][kode_unit]`" model="row.kode_unit" options="unitOpts" placeholder="— pilih unit —" /></td>
                                 <td class="px-2 py-1.5"><input type="text" :name="`details[${i}][keterangan]`" x-model="row.keterangan" class="w-full rounded border border-gray-400 px-2 py-1.5 text-sm focus:border-brand focus:ring-1 focus:ring-brand"></td>
-                                <td class="px-2 py-1.5"><input type="number" step="0.01" min="0" :name="`details[${i}][nominal]`" x-model="row.nominal" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm focus:border-brand focus:ring-1 focus:ring-brand"></td>
+                                <td class="px-2 py-1.5"><input type="text" inputmode="numeric" :value="fmtRupiah(row.nominal)" @input="row.nominal = ketikRupiah($event)" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm tabular-nums focus:border-brand focus:ring-1 focus:ring-brand"><input type="hidden" :name="`details[${i}][nominal]`" :value="row.nominal"></td>
                                 <td class="px-1 py-1.5 text-center"><button type="button" @click="hapus(i)" x-show="rows.length > 1" class="text-red-500 hover:text-red-700">&times;</button></td>
                             </tr>
                         </template>

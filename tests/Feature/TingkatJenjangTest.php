@@ -12,11 +12,11 @@ use App\Models\Level;
 use App\Models\Santri;
 use App\Models\TahunAjaran;
 use App\Models\User;
-use App\Services\Modules\JenisBiayaService;
 use App\Services\Modules\SantriService;
 use App\Services\Modules\WaliService;
 use App\Support\Navigation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MembuatTarif;
 use Tests\TestCase;
 
 /**
@@ -28,8 +28,8 @@ use Tests\TestCase;
  */
 class TingkatJenjangTest extends TestCase
 {
+    use MembuatTarif;
     use RefreshDatabase;
-    use \Tests\Concerns\MembuatTarif;
 
     private const TA = '2026/2027';
 
@@ -46,7 +46,6 @@ class TingkatJenjangTest extends TestCase
             'kode_level' => 'L1', 'is_admin' => true, 'status' => 'aktif',
         ]);
 
-        Navigation::lupakan(); // menu per jenjang dimemo — jangan bocor antar-test
         Jenjang::create(['kode' => 'SDTQ', 'nama' => 'SDTQ', 'jumlah_tingkat' => 6, 'urutan' => 1]);
         Jenjang::create(['kode' => 'SMP', 'nama' => 'SMP', 'jumlah_tingkat' => 3, 'urutan' => 2]);
         Jenjang::create(['kode' => 'SMA', 'nama' => 'SMA', 'jumlah_tingkat' => 3, 'urutan' => 3]);
@@ -81,9 +80,23 @@ class TingkatJenjangTest extends TestCase
         $this->assertSame(3, Jenjang::findOrFail('SMP')->jumlah_tingkat);
         $this->assertSame(3, Jenjang::findOrFail('SMA')->jumlah_tingkat);
 
-        // Dipakai form sebagai peta jenjang → jumlah tingkat.
-        $this->assertSame(['SDTQ' => 6, 'SMP' => 3, 'SMA' => 3], Jenjang::petaTingkat());
+        // Dipakai form sebagai peta jenjang → RENTANG tingkatnya. Jumlah saja tak
+        // lagi cukup sejak penomorannya berkelanjutan: SMP bertingkat 3, tetapi
+        // pilihannya 7–9. Fixture ini belum menyetel `tingkat_mulai`, jadi
+        // ketiganya masih mulai dari 1 — itulah bawaan untuk baris master lama.
+        $this->assertSame([
+            'SDTQ' => ['mulai' => 1, 'akhir' => 6],
+            'SMP' => ['mulai' => 1, 'akhir' => 3],
+            'SMA' => ['mulai' => 1, 'akhir' => 3],
+        ], Jenjang::petaTingkat());
         $this->assertSame([1 => 'Tingkat 1', 2 => 'Tingkat 2', 3 => 'Tingkat 3'], Jenjang::findOrFail('SMA')->opsiTingkat());
+
+        // Disetel berkelanjutan → rentangnya bergeser, jumlahnya tetap.
+        Jenjang::findOrFail('SMP')->update(['tingkat_mulai' => 7]);
+        $smp = Jenjang::findOrFail('SMP');
+        $this->assertSame(7, $smp->tingkatMulai());
+        $this->assertSame(9, $smp->tingkatAkhir());
+        $this->assertSame([7 => 'Tingkat 7', 8 => 'Tingkat 8', 9 => 'Tingkat 9'], $smp->opsiTingkat());
     }
 
     public function test_pendaftaran_menyimpan_tingkat(): void
@@ -143,24 +156,51 @@ class TingkatJenjangTest extends TestCase
         (new SantriService)->setTingkat($santri->id, 5);
     }
 
-    public function test_menu_master_data_terpecah_per_jenjang(): void
+    /**
+     * SATU menu untuk seluruh jenjang. Dulu dipecah per baris master Jenjang
+     * ("Santri SDTQ", "Santri SMP", …), sehingga sidebar ikut memanjang tiap
+     * kali jenjang bertambah — padahal tujuannya halaman yang sama dengan satu
+     * penyaring berbeda. Penyaringnya kini ada di halamannya sendiri.
+     */
+    public function test_menu_master_data_santri_digabung_jadi_satu(): void
     {
         $this->actingAs($this->admin);
         $menu = collect(Navigation::items())->where('group', 'KEPENDIDIKAN')->where('sub', 'Master');
 
         $this->assertSame(
-            ['Santri SDTQ', 'Santri SMP', 'Santri SMA'],
+            ['Santri Aktif', 'Alumni', 'Santri Keluar'],
             $menu->pluck('label')->values()->all(),
-            'urut mengikuti urutan master Jenjang',
+            'daftar berjalan dulu, dua daftar arsip di belakangnya',
         );
-        $this->assertSame('/kesantrian/santri?jenjang=SDTQ', $menu->first()['url']);
-        // Ketiganya memakai modul hak akses yang sama — tak ada hak baru.
+        $this->assertSame('/kesantrian/santri', $menu->first()['url']);
+        // Ketiganya memakai modul hak akses yang sama.
         $this->assertSame(['santri'], $menu->pluck('modul')->unique()->values()->all());
 
-        // Jenjang baru langsung menambah menunya, tanpa menyunting kode.
+        // Jenjang baru TIDAK lagi menambah menu.
         Jenjang::create(['kode' => 'MA', 'nama' => 'MA', 'jumlah_tingkat' => 3, 'urutan' => 4]);
-        Navigation::lupakan(); // menu dimemo per request
-        $this->assertContains('Santri MA', collect(Navigation::items())->pluck('label')->all());
+        $this->assertNotContains('Santri MA', collect(Navigation::items())->pluck('label')->all());
+    }
+
+    /**
+     * Menu Santri Aktif menyala apa pun penyaring yang sedang dipakai — query
+     * string tak ikut dinilai activeItem(). Dulu tiap jenjang punya menu sendiri
+     * ber-`?jenjang=…`, jadi pencocokannya harus sampai ke query string.
+     */
+    public function test_menu_santri_menyala_apa_pun_penyaringnya(): void
+    {
+        $this->actingAs($this->admin);
+
+        foreach ([[], ['jenjang' => 'SDTQ'], ['jenjang' => 'SMP'], ['tingkat' => 1]] as $saring) {
+            $this->get(route('santri.aktif', $saring))->assertOk();
+            $this->assertSame('/kesantrian/santri', Navigation::activeUrl());
+            // Accordion-nya ikut terbentang di grup & sub yang benar.
+            $this->assertSame('KEPENDIDIKAN', Navigation::activeGroup());
+            $this->assertSame('Master', Navigation::activeSub());
+        }
+
+        // Halaman lain tak ikut terpengaruh.
+        $this->get(route('spp.index'))->assertOk();
+        $this->assertSame('/kesantrian/spp', Navigation::activeUrl());
     }
 
     /**

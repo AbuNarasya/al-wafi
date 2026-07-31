@@ -5,7 +5,10 @@ namespace App\Services\Modules;
 use App\Exceptions\AppException;
 use App\Models\PembayaranSantri;
 use App\Models\Santri;
+use App\Models\TagihanSantri;
+use App\Models\TipeBiaya;
 use App\Support\Money;
+use Illuminate\Support\Collection;
 
 /**
  * Rekap pembayaran per santri: ringkasan tagihan vs terbayar, rincian tagihan
@@ -21,7 +24,9 @@ class RekapPembayaranService
 
     public function santri(int $idSantri): Santri
     {
-        $santri = Santri::with('wali')->find($idSantri);
+        // `jenjang` ikut dimuat karena rekap & kuitansi menyebut NAMA jenjang,
+        // bukan kode `J001`.
+        $santri = Santri::with(['wali', 'jenjang'])->find($idSantri);
         if (! $santri) {
             throw new AppException(404, 'Santri tidak ditemukan.');
         }
@@ -34,7 +39,7 @@ class RekapPembayaranService
      *   santri:Santri,
      *   ringkasan:array{tagihan:string,terbayar:string,sisa:string,menunggu:string,jumlah_pembayaran:int},
      *   tagihan:list<array<string,mixed>>,
-     *   pembayaran:\Illuminate\Support\Collection
+     *   pembayaran:Collection
      * }
      */
     public function rekap(int $idSantri): array
@@ -72,7 +77,7 @@ class RekapPembayaranService
                 'jenis' => $t->jenis?->nama ?? $t->kode_jenis,
                 // Perilaku, bukan kode tipe: view memberi warna per perilaku dan
                 // tipe buatan sendiri harus tetap kebagian warna yang benar.
-                'tipe' => \App\Models\TipeBiaya::perilakuDari($t->jenis?->tipe) ?? 'lain',
+                'tipe' => TipeBiaya::perilakuDari($t->jenis?->tipe) ?? 'lain',
                 'periode' => $t->periode,
                 'nominal' => Money::of($t->nominal),
                 'terbayar' => $dibayar,
@@ -124,7 +129,7 @@ class RekapPembayaranService
             return [];
         }
 
-        $tagihan = \App\Models\TagihanSantri::whereIn('id_santri', $ids)
+        $tagihan = TagihanSantri::whereIn('id_santri', $ids)
             ->where('status', '!=', 'batal')
             ->selectRaw('id_santri, COALESCE(SUM(nominal), 0) AS total, COALESCE(SUM(sisa), 0) AS sisa')
             ->groupBy('id_santri')->get()->keyBy('id_santri');
@@ -188,7 +193,18 @@ class RekapPembayaranService
     }
 
     /** Daftar santri untuk pemilih (calon & aktif), dengan pencarian. */
-    public function opsiSantri(string $cari = '')
+    /**
+     * Komponen yang menjadi urusan PPSB — dibayar di awal pendaftaran, sekali
+     * seumur masuk. SPP & tagihan lain berulang tiap periode dan itu urusan
+     * Kependidikan, jadi tak ikut menentukan siapa yang tampil di lingkup PPSB.
+     */
+    private const KOMPONEN_PPSB = ['uang_pangkal', 'perlengkapan'];
+
+    /**
+     * @param  'semua'|'ppsb'  $lingkup  'ppsb' = hanya yang MASIH punya kewajiban
+     *                                   uang pangkal / perlengkapan.
+     */
+    public function opsiSantri(string $cari = '', string $lingkup = 'semua')
     {
         return Santri::query()
             ->when($cari !== '', fn ($q) => $q->where(
@@ -196,6 +212,12 @@ class RekapPembayaranService
                     ->orWhere('no_pendaftaran', 'ilike', "%{$cari}%")
                     ->orWhere('nis', 'ilike', "%{$cari}%"),
             ))
+            // Begitu KEDUA komponennya tertutup, santrinya hilang dari daftar PPSB
+            // dengan sendirinya — rekapnya tetap utuh dan tetap terbuka lewat
+            // menu Kependidikan, yang memang memuat seluruh riwayat.
+            ->when($lingkup === 'ppsb', fn ($q) => $q->whereHas('tagihan', fn ($t) => $t
+                ->whereIn('perilaku', self::KOMPONEN_PPSB)
+                ->whereIn('status', ['belum_bayar', 'sebagian'])))
             ->orderBy('nama')->limit(100)->get(['id', 'nama', 'no_pendaftaran', 'nis', 'status']);
     }
 }

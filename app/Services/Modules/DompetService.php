@@ -28,9 +28,19 @@ class DompetService
 {
     private const SUMBER = 'MutasiDompet';
 
+    /**
+     * Hasil auto-debet susulan dari verifikasi top-up terakhir — dibaca controller
+     * untuk pesan di layar. Sengaja properti, bukan nilai kembalian:
+     * `verifikasiTopUp()` dipakai beberapa pemanggil yang tak peduli auto-debet,
+     * dan mengubah tipe kembaliannya akan menyeret mereka semua.
+     *
+     * @var array{tagihan:int,total:string,galat:?string}|array<string,mixed>
+     */
+    public array $autoDebetTerakhir = ['tagihan' => 0, 'total' => '0', 'galat' => null];
+
     public function ringkasanWali(int $idWali): Wali
     {
-        $wali = Wali::with(['dompet', 'santri' => fn ($q) => $q->whereIn('status', ['aktif', 'lolos_kesehatan'])->with(['dompet', 'tabungan'])->orderBy('nama')])->find($idWali);
+        $wali = Wali::with(['dompet', 'santri' => fn ($q) => $q->whereIn('status', ['aktif', 'lolos_kesehatan', 'siap_aktivasi'])->with(['dompet', 'tabungan'])->orderBy('nama')])->find($idWali);
         if (! $wali) {
             throw new AppException(404, 'Wali tidak ditemukan.');
         }
@@ -102,7 +112,7 @@ class DompetService
         }
         $nominal = Money::of($mutasi->nominal);
 
-        return DB::transaction(function () use ($mutasi, $nominal, $idPengguna, $id) {
+        $mutasi = DB::transaction(function () use ($mutasi, $nominal, $idPengguna, $id) {
             $saldo = $this->tambahSaldo($mutasi->pemilik, $mutasi->id_dompet, $nominal);
             $entry = PostingService::postJournal([
                 'referensi' => $mutasi->nomor, 'tanggal' => $mutasi->tanggal, 'sumber_modul' => self::SUMBER,
@@ -120,6 +130,30 @@ class DompetService
 
             return $mutasi;
         });
+
+        // Saldo baru saja bertambah — inilah saat tagihan yang tadi tak
+        // terjangkau bisa terpotong. Terutama SPP, yang sengaja dibiarkan
+        // menggantung utuh selama saldonya kurang (tak boleh dicicil dari
+        // dompet); tanpa panggilan ini, pelunasannya menunggu jadwal harian
+        // berikutnya padahal uangnya sudah ada.
+        //
+        // DI LUAR transaksi & tak boleh menjatuhkan verifikasinya: top-upnya
+        // sendiri sudah sah dan sudah berjurnal. Bila pemotongannya gagal,
+        // sebabnya dilaporkan ke layar dan jadwal harian akan mencobanya lagi.
+        $this->autoDebetTerakhir = ['tagihan' => 0, 'total' => '0', 'galat' => null];
+        if ($mutasi->pemilik === 'wali') {
+            try {
+                $dompet = DompetWali::find($mutasi->id_dompet);
+                if ($dompet) {
+                    $this->autoDebetTerakhir = (new AutoDebetService)
+                        ->jalankan($idPengguna, $mutasi->tanggal, [$dompet->id_wali]) + $this->autoDebetTerakhir;
+                }
+            } catch (AppException $e) {
+                $this->autoDebetTerakhir['galat'] = $e->getMessage();
+            }
+        }
+
+        return $mutasi;
     }
 
     public function tolakTopUp(int $id, string $alasan, int $idPengguna): MutasiDompet

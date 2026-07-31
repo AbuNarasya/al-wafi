@@ -85,14 +85,25 @@ class TagihanMassalService
             ->where('status', '!=', 'batal')
             ->pluck('id_santri')->flip();
 
+        // Tingkat & jenjang yang BERLAKU pada T.A yang ditagih — bukan keadaan
+        // sekarang. Daftar ulang ditagih Juni, saat kenaikannya sudah ditetapkan
+        // tetapi baru berlaku 1 Juli; tanpa ini seluruh angkatan tertolak "masih
+        // di tingkat 1" oleh alasanTakDitagih(), padahal kenaikannya sudah ada.
+        $penempatan = (new PenempatanSantriService)->massal($santri, $ta);
+
         $baris = [];
         $ringkas = [self::TERBIT => 0, self::BEBAS => 0, self::DILEWATI => 0, self::TERHALANG => 0];
         foreach ($santri as $s) {
-            $keputusan = $this->putuskan($s, $ta, isset($sudahAda[$s->id]));
+            $di = $penempatan[$s->id];
+            $keputusan = $this->putuskan($s, $ta, isset($sudahAda[$s->id]), $di);
             $ringkas[$keputusan['keputusan']]++;
             $baris[] = [
                 'id' => $s->id, 'nama' => $s->nama, 'nis' => $s->nis, 'no_pendaftaran' => $s->no_pendaftaran,
-                'tingkat' => $s->tingkat, 'angkatan' => $s->tahun_ajaran,
+                // Tingkat yang DITAMPILKAN adalah tingkat pada T.A tagihan —
+                // itulah yang menentukan tarifnya, jadi itu pula yang harus
+                // dilihat petugas saat memeriksa pratinjau.
+                'tingkat' => $di['tingkat'], 'angkatan' => $s->tahun_ajaran,
+                'tingkat_sekarang' => $s->tingkat,
                 'daftar_ulang' => $keputusan,
                 'ada_yang_terbit' => $keputusan['keputusan'] === self::TERBIT,
             ];
@@ -101,26 +112,33 @@ class TagihanMassalService
         return ['baris' => $baris, 'ringkas' => $ringkas];
     }
 
-    /** Keputusan + angka usulan untuk seorang santri. */
-    private function putuskan(Santri $s, string $tahunAjaran, bool $sudahPunya): array
+    /**
+     * Keputusan + angka usulan untuk seorang santri.
+     *
+     * @param  array{kode_jenjang:?string,tingkat:?int,asal:string}  $di  penempatannya pada T.A yang ditagih
+     */
+    private function putuskan(Santri $s, string $tahunAjaran, bool $sudahPunya, array $di): array
     {
         if ($sudahPunya) {
             return ['keputusan' => self::DILEWATI, 'nominal' => null, 'asal' => null,
                 'alasan' => "Sudah punya tagihan daftar ulang {$s->kode_jenjang} T.A {$tahunAjaran}."];
         }
-        if ($alasan = $this->alasanTakDitagih($s, $tahunAjaran)) {
+        if ($alasan = $this->alasanTakDitagih($s, $tahunAjaran, $di)) {
             return ['keputusan' => self::DILEWATI, 'nominal' => null, 'asal' => null, 'alasan' => $alasan];
         }
 
-        // Tarifnya per KENAIKAN, disimpan pada tingkat TUJUAN — yaitu tingkat santri
-        // sekarang, karena penagihannya menyusul sesudah kenaikan dieksekusi.
-        $tarif = $this->tarif->cari('daftar_ulang', $tahunAjaran, $s->kode_jenjang, null, $s->tingkat);
+        // Tarifnya per KENAIKAN, disimpan pada tingkat TUJUAN — yaitu tingkat yang
+        // BERLAKU pada T.A yang ditagih, bukan tingkat santri hari ini.
+        $tarif = $this->tarif->cari('daftar_ulang', $tahunAjaran, $di['kode_jenjang'], null, $di['tingkat']);
 
+        // `asal_bagian` ikut dibawa supaya pratinjau bisa menebalkan nama jenjang,
+        // jalur, dan tahun ajarannya lewat <x-asal-tarif>.
         return match ($tarif['status']) {
-            'bebas' => ['keputusan' => self::BEBAS, 'nominal' => null, 'asal' => $tarif['asal'],
+            'bebas' => ['keputusan' => self::BEBAS, 'nominal' => null, 'asal' => $tarif['asal'], 'asal_bagian' => $tarif['bagian'] ?? null,
                 'alasan' => 'Sel tarifnya bertanda Bebas — tagihan tidak diterbitkan.'],
-            'ada' => ['keputusan' => self::TERBIT, 'nominal' => $tarif['nominal'], 'asal' => $tarif['asal'], 'alasan' => null],
-            default => ['keputusan' => self::TERHALANG, 'nominal' => null, 'asal' => null, 'alasan' => $tarif['label']],
+            'ada' => ['keputusan' => self::TERBIT, 'nominal' => $tarif['nominal'], 'asal' => $tarif['asal'],
+                'asal_bagian' => $tarif['bagian'] ?? null, 'alasan' => null],
+            default => ['keputusan' => self::TERHALANG, 'nominal' => null, 'asal' => null, 'asal_bagian' => null, 'alasan' => $tarif['label']],
         };
     }
 
@@ -128,23 +146,26 @@ class TagihanMassalService
      * Alasan seorang santri TIDAK ditagih daftar ulang untuk satu T.A, atau `null`
      * bila ia memang harus ditagih.
      *
-     * Daftar ulang ditagih SETELAH kenaikan tingkat dieksekusi, jadi tingkat santri
-     * di sini sudah tingkat yang BARU. Dua golongan dikecualikan:
-     *  • santri di TINGKAT 1 — ia belum pernah naik; yang dibayarnya biaya masuk;
+     * Yang dipakai adalah tingkat yang BERLAKU pada T.A tagihan — hasil kenaikan
+     * yang sudah ditetapkan, walau belum menyala. Dua golongan dikecualikan:
+     *  • santri yang pada tahun itu masih di TINGKAT 1 — ia belum pernah naik;
+     *    yang dibayarnya biaya masuk;
      *  • santri pada TAHUN MASUKNYA — termasuk pindahan dari luar yang langsung
      *    masuk ke tingkat 2 atau lebih. Pada tahun itu ia membayar registrasi,
      *    uang pangkal, & perlengkapan, bukan daftar ulang.
+     *
+     * @param  array{kode_jenjang:?string,tingkat:?int,asal:string}  $di
      */
-    private function alasanTakDitagih(Santri $s, string $tahunAjaran): ?string
+    private function alasanTakDitagih(Santri $s, string $tahunAjaran, array $di): ?string
     {
         if ($s->tahun_ajaran === $tahunAjaran) {
             return "T.A {$tahunAjaran} adalah tahun MASUK santri ini — yang dibayar registrasi, "
                 .'uang pangkal, & perlengkapan, bukan daftar ulang.';
         }
 
-        if ((int) $s->tingkat === 1) {
-            return 'Masih di tingkat 1 — belum pernah naik tingkat, jadi belum ada daftar ulang. '
-                .'Jalankan Kenaikan Tingkat lebih dulu.';
+        if ((int) $di['tingkat'] === 1) {
+            return "Masih di tingkat 1 pada T.A {$tahunAjaran} — belum pernah naik tingkat, jadi belum "
+                .'ada daftar ulang. Tetapkan kenaikannya lebih dulu di Kenaikan Tingkat & Kelulusan.';
         }
 
         return null;
@@ -173,6 +194,10 @@ class TagihanMassalService
         if ($bersih === []) {
             throw new AppException(422, 'Tidak ada baris yang dipilih untuk diterbitkan.');
         }
+        // Daftar ulang boleh diterbitkan untuk tahun berjalan maupun tahun
+        // berikutnya (daftar ulang 2027/2028 lazim dibuka menjelang akhir
+        // 2026/2027) — yang tak boleh adalah menerbitkannya untuk tahun yang lewat.
+        (new TahunAjaranService)->assertTidakMundur($tahunAjaran, 'Penerbitan daftar ulang massal');
 
         $batch = 'MASSAL-'.now()->format('YmdHis');
 
@@ -206,6 +231,10 @@ class TagihanMassalService
         $santri = Santri::whereIn('id', array_keys($nominalPerSantri))
             ->get(['id', 'nama', 'kode_jenjang', 'tingkat', 'status', 'tahun_ajaran'])->keyBy('id');
 
+        // Sumber jenjang & tingkat yang SAMA dengan pratinjau — kalau berbeda,
+        // yang diperiksa petugas di layar bukan yang benar-benar terbit.
+        $penempatan = (new PenempatanSantriService)->massal($santri, $tahunAjaran);
+
         // Dikelompokkan per jenis biaya (satu per jenjang) — satu batch boleh
         // memuat lebih dari satu jenjang bila petugas menjalankannya berulang.
         $perJenis = [];
@@ -217,14 +246,15 @@ class TagihanMassalService
             if (! in_array($s->status, self::STATUS, true)) {
                 throw new AppException(422, "Santri {$s->nama} tidak berstatus aktif, jadi daftar ulangnya tak bisa diterbitkan.");
             }
+            $di = $penempatan[$s->id];
             // Aturan yang sama ditegakkan lagi di sini, bukan hanya di pratinjau:
             // kiriman form bisa disusun sendiri tanpa melewati pratinjau.
-            if ($alasan = $this->alasanTakDitagih($s, $tahunAjaran)) {
+            if ($alasan = $this->alasanTakDitagih($s, $tahunAjaran, $di)) {
                 throw new AppException(422, "{$s->nama} tidak ditagih daftar ulang. {$alasan}");
             }
-            $jenis = JenisBiaya::untuk('daftar_ulang', $s->kode_jenjang);
+            $jenis = JenisBiaya::untuk('daftar_ulang', $di['kode_jenjang']);
             if (! $jenis) {
-                throw new AppException(422, "Belum ada jenis biaya Daftar Ulang yang aktif untuk jenjang \"{$s->kode_jenjang}\". "
+                throw new AppException(422, "Belum ada jenis biaya Daftar Ulang yang aktif untuk jenjang \"{$di['kode_jenjang']}\". "
                     .'Buat barisnya di Setting Awal → Jenis Biaya.');
             }
             if (! $jenis->kode_coa_piutang) {
@@ -236,7 +266,7 @@ class TagihanMassalService
                 throw new AppException(422, "Nominal daftar ulang untuk {$s->nama} harus lebih dari nol.");
             }
             $perJenis[$jenis->kode]['jenis'] = $jenis;
-            $perJenis[$jenis->kode]['baris'][] = ['santri' => $s, 'nominal' => $nominal];
+            $perJenis[$jenis->kode]['baris'][] = ['santri' => $s, 'nominal' => $nominal, 'di' => $di];
         }
 
         $tanggal = $opsi['tanggal'] ?? Carbon::now()->toDateString();
@@ -266,11 +296,11 @@ class TagihanMassalService
 
             TagihanSantri::insert(array_map(fn ($b) => [
                 'id_santri' => $b['santri']->id, 'kode_jenis' => $kode,
-                'perilaku' => 'daftar_ulang', 'kode_jenjang' => $b['santri']->kode_jenjang, 'tahun_ajaran' => $tahunAjaran,
+                'perilaku' => 'daftar_ulang', 'kode_jenjang' => $b['di']['kode_jenjang'], 'tahun_ajaran' => $tahunAjaran,
                 'nominal' => $b['nominal'], 'sisa' => $b['nominal'],
                 'sudah_akrual' => true, 'status' => 'belum_bayar',
                 'jatuh_tempo' => $opsi['jatuh_tempo'] ?? null,
-                'keterangan' => "{$jenis->nama} T.A {$tahunAjaran} tingkat {$b['santri']->tingkat} · akrual {$nomor}",
+                'keterangan' => "{$jenis->nama} T.A {$tahunAjaran} tingkat {$b['di']['tingkat']} · akrual {$nomor}",
                 'created_at' => $now, 'updated_at' => $now,
             ], $kelompok['baris']));
 

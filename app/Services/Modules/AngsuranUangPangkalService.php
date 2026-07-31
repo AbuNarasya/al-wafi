@@ -3,11 +3,14 @@
 namespace App\Services\Modules;
 
 use App\Exceptions\AppException;
+use App\Models\Jenjang;
 use App\Models\PembayaranSantri;
 use App\Models\PotonganUangPangkal;
 use App\Models\RencanaAngsuranUangPangkal;
 use App\Models\TagihanSantri;
 use App\Models\TerminUangPangkal;
+use App\Models\TipeBiaya;
+use App\Services\Ppsb\Tahap;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -56,13 +59,18 @@ class AngsuranUangPangkalService
     public function daftarPenjadwalan(): array
     {
         $tagihan = TagihanSantri::query()
-            ->whereHas('jenis', fn ($q) => $q->whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku(...array_keys(self::KOMPONEN))))
+            ->whereHas('jenis', fn ($q) => $q->whereIn('tipe', TipeBiaya::kodeBerperilaku(...array_keys(self::KOMPONEN))))
             ->where('status', '!=', 'batal')
-            ->with(['santri:id,nama,no_pendaftaran,nis,kode_jenjang', 'jenis:kode,tipe'])
+            // Yang sudah mengundurkan diri tak perlu dijadwalkan angsurannya —
+            // tagihannya sudah ditutup dan rencananya digantikan saat ia mundur.
+            ->whereHas('santri', fn ($q) => $q->whereNotIn('status', Tahap::DISEMBUNYIKAN_DARI_PEMILIH))
+            ->with(['santri:id,nama,no_pendaftaran,nis,kode_jenjang,tingkat', 'jenis:kode,tipe'])
             ->get();
 
         $idRencanaAktif = RencanaAngsuranUangPangkal::where('status', 'aktif')->pluck('id_tagihan')->all();
         $potongan = PotonganUangPangkal::where('status', 'berlaku')->get()->keyBy('id_tagihan');
+        // Jenjang disebut lewat NAMA di layar: kode `J001` tak bercerita apa pun.
+        $petaJenjang = Jenjang::pluck('nama', 'kode')->all();
 
         $perSantri = [];
         foreach ($tagihan as $t) {
@@ -73,7 +81,8 @@ class AngsuranUangPangkalService
                 'nama' => $t->santri?->nama,
                 'no_pendaftaran' => $t->santri?->no_pendaftaran,
                 'nis' => $t->santri?->nis,
-                'jenjang' => $t->santri?->kode_jenjang,
+                'jenjang' => $petaJenjang[$t->santri?->kode_jenjang] ?? $t->santri?->kode_jenjang,
+                'tingkat' => $t->santri?->tingkat,
                 'tenggat_potongan' => null,
                 'ambang_potongan' => null,
                 'syarat_persen' => null,
@@ -609,7 +618,7 @@ class AngsuranUangPangkalService
 
     private function cariTagihan(int $idSantri, string $komponen): ?TagihanSantri
     {
-        return TagihanSantri::whereHas('jenis', fn ($q) => $q->whereIn('tipe', \App\Models\TipeBiaya::kodeBerperilaku($komponen)))
+        return TagihanSantri::whereHas('jenis', fn ($q) => $q->whereIn('tipe', TipeBiaya::kodeBerperilaku($komponen)))
             ->where('id_santri', $idSantri)->first();
     }
 
@@ -623,7 +632,7 @@ class AngsuranUangPangkalService
     /** Komponen sebuah tagihan (untuk melabeli baris daftar & reminder). */
     private function komponenTagihan(?TagihanSantri $tagihan): string
     {
-        $perilaku = \App\Models\TipeBiaya::perilakuDari($tagihan?->jenis?->tipe);
+        $perilaku = TipeBiaya::perilakuDari($tagihan?->jenis?->tipe);
 
         return array_key_exists((string) $perilaku, self::KOMPONEN) ? (string) $perilaku : 'uang_pangkal';
     }

@@ -33,10 +33,12 @@
                                 <div @click="pilihSantri(s)"
                                      class="cursor-pointer px-3 py-2 text-sm hover:bg-brand-soft"
                                      :class="s.id_santri === idSantri ? 'bg-brand-soft font-medium text-brand' : 'text-gray-700'">
+                                    {{-- Susunannya sama dengan pemilih santri lain:
+                                         NIS (atau no. pendaftaran) - Nama - Jenjang - Tingkat. --}}
                                     <div>
-                                        <span x-text="s.no_pendaftaran || '—'" class="font-medium"></span>
-                                        <span x-text="' — ' + s.nama"></span>
-                                        <span class="text-xs text-gray-400" x-text="(s.jenjang ? ' · ' + s.jenjang : '') + (s.nis ? ' · NIS ' + s.nis : '')"></span>
+                                        <span x-text="s.nis || s.no_pendaftaran || '—'" class="font-medium"></span>
+                                        <span x-text="' - ' + s.nama"></span>
+                                        <span class="text-xs text-gray-400" x-text="' - ' + (s.jenjang || '—') + ' - ' + (s.tingkat ? 'Tingkat ' + s.tingkat : '—')"></span>
                                     </div>
                                     {{-- Outstanding-nya ikut terlihat sebelum dipilih. --}}
                                     <div class="text-xs text-gray-500">
@@ -96,7 +98,7 @@
                                                 <td class="px-2 py-1.5" x-text="i + 1"></td>
                                                 <td class="px-2 py-1.5"><input type="date" :name="`termin_{{ $kunci }}[${i}][jatuh_tempo]`" x-model="row.jatuh_tempo" required class="rounded border-gray-300 text-sm"></td>
                                                 <td class="px-2 py-1.5"><input type="text" :name="`termin_{{ $kunci }}[${i}][keterangan]`" x-model="row.keterangan" class="w-full rounded border-gray-300 text-sm"></td>
-                                                <td class="px-2 py-1.5"><input type="number" step="0.01" min="0" :name="`termin_{{ $kunci }}[${i}][nominal]`" x-model="row.nominal" required class="w-32 rounded border-gray-300 text-right text-sm"></td>
+                                                <td class="px-2 py-1.5"><input type="text" inputmode="numeric" :value="fmtRupiah(row.nominal)" @input="row.nominal = ketikRupiah($event)" required class="w-32 rounded border-gray-300 text-right text-sm tabular-nums"><input type="hidden" :name="`termin_{{ $kunci }}[${i}][nominal]`" :value="row.nominal"></td>
                                                 <td class="px-2 py-1.5 text-center"><button type="button" @click="hapus('{{ $kunci }}', i)" x-show="rows['{{ $kunci }}'].length > 1" class="text-red-500">&times;</button></td>
                                             </tr>
                                         </template>
@@ -165,7 +167,10 @@
                 },
                 pilihSantri(s) {
                     this.idSantri = s.id_santri;
-                    this.cari = (s.no_pendaftaran ? s.no_pendaftaran + ' — ' : '') + s.nama;
+                    // Yang terpilih ditulis penuh sampai tingkatnya — supaya salah
+                    // pilih di antara nama yang mirip ketahuan sebelum disimpan.
+                    this.cari = [s.nis || s.no_pendaftaran, s.nama, s.jenjang, s.tingkat ? 'Tingkat ' + s.tingkat : null]
+                        .filter(Boolean).join(' - ');
                     this.buka = false;
                 },
 

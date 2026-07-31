@@ -24,7 +24,9 @@
                 @forelse ($rows as $r)
                     <tr data-row class="hover:bg-gray-50">
                         <td class="px-4 py-3 font-medium text-gray-900">{{ $r->tahun_ajaran }}</td>
-                        <td class="px-4 py-3">{{ $r->kode_jenjang }}<div class="text-xs text-gray-400">{{ $r->jenjang?->nama }}</div></td>
+                        {{-- Nama di depan, kodenya jadi keterangan kecil: yang dicari
+                             pembaca adalah "SMP", bukan "J002". --}}
+                        <td class="px-4 py-3">{{ $r->jenjang?->nama ?? $r->kode_jenjang }}<div class="text-xs text-gray-400">{{ $r->kode_jenjang }}</div></td>
                         <td class="px-4 py-3 text-right tabular-nums">{{ number_format($r->target, 0, ',', '.') }}
                             <div class="text-[11px] font-normal text-gray-400">
                                 @if ($r->target_l !== null || $r->target_p !== null)

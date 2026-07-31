@@ -54,7 +54,7 @@
                         <form method="POST" action="{{ route('dompet.topup') }}" class="mt-4 space-y-2 border-t border-gray-100 pt-3">
                             @csrf <input type="hidden" name="id_wali" value="{{ $wali->id }}"><input type="hidden" name="tanggal" value="{{ now()->toDateString() }}">
                             <div class="text-xs font-semibold text-gray-600">Top-up Dompet Wali</div>
-                            <input type="number" name="nominal" step="0.01" min="0" required placeholder="Nominal" class="w-full rounded border-gray-300 text-sm">
+                            <x-input-rupiah name="nominal" required placeholder="Nominal" />
                             <select name="kode_rekening" required class="w-full rounded border-gray-300 text-sm">@foreach ($rekeningOptions as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select>
                             <button class="w-full rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">Catat Top-up</button>
                         </form>
@@ -76,7 +76,7 @@
                             </select>
                             <label class="block text-xs text-gray-500">Santri</label>
                             <select name="id_santri" required class="w-full rounded border-gray-300 text-sm">@foreach ($santriKeluarga as $id => $nm)<option value="{{ $id }}">{{ $nm }}</option>@endforeach</select>
-                            <input type="number" name="nominal" step="0.01" min="0" required placeholder="Nominal" class="w-full rounded border-gray-300 text-sm">
+                            <x-input-rupiah name="nominal" required placeholder="Nominal" />
                             <button class="w-full rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700">Pindahkan</button>
                         </form>
                     </div>
@@ -181,13 +181,12 @@
                     <p class="rounded bg-slate-50 px-3 py-2 text-xs text-gray-500">Jalur ini bisa dimatikan admin di Pengaturan Perusahaan. Menunggu verifikasi keuangan sebelum saldo bertambah.</p>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-gray-600">Santri</label>
-                        <select name="id_santri" required class="w-full rounded border-gray-300 px-3 py-2 text-sm">
-                            <option value="">— pilih santri —</option>
-                            @foreach ($santriOptions as $id => $nm)<option value="{{ $id }}">{{ $nm }}</option>@endforeach
-                        </select>
+                        {{-- Labelnya panjang ("NIS - Nama - Jenjang - Tingkat"), jadi
+                             dropdown polos tak lagi enak dipindai — pakai yang bisa dicari. --}}
+                        <x-search-select name="id_santri" :options="$santriOptions" placeholder="— pilih santri —" required />
                     </div>
                     <div class="grid grid-cols-2 gap-3">
-                        <div><label class="mb-1 block text-xs font-medium text-gray-600">Nominal</label><input type="number" name="nominal" step="0.01" min="0" required class="w-full rounded border-gray-300 px-3 py-2 text-sm"></div>
+                        <div><label class="mb-1 block text-xs font-medium text-gray-600">Nominal</label><x-input-rupiah name="nominal" required class="px-3 py-2" /></div>
                         <div><label class="mb-1 block text-xs font-medium text-gray-600">Kas/Rekening</label>
                             <select name="kode_rekening" required class="w-full rounded border-gray-300 px-3 py-2 text-sm">@foreach ($rekeningOptions as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select></div>
                     </div>

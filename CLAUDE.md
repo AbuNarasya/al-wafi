@@ -44,6 +44,10 @@ proyek baru di sana alih-alih memasang ke sini.
   `git diff` sesudahnya, tanpa kecuali.
 - **JANGAN menulis tag `<x-komponen>` di dalam komentar `//` atau `/* */` pada Blade** — Blade tetap
   mengompilasinya → "Undefined variable $component" di semua halaman pemakai. Komentar `{{-- --}}` aman.
+- **JANGAN menempelkan dua direktif Blade tanpa pemisah**: `@endif@if ($x)` membuat `@if` kedua TIDAK
+  terkompilasi (regex Blade memakai `\B@`, dan posisi sesudah huruf `f` bukan non-word boundary),
+  sehingga `@endif` pasangannya jadi yatim → "syntax error, unexpected token endif". Beri spasi,
+  komentar `{{-- --}}`, atau baris baru di antaranya. `}}@if(...)` aman (didahului non-huruf).
 - **Nama kelas Tailwind harus muncul di Blade**, bukan dirakit di controller/service. Tailwind
   memindai `resources/views` + `storage/framework/views`, TIDAK memindai `app/**`.
 - `artisan tinker --execute` dengan kutip bersarang sering gagal escaping. Untuk pemeriksaan lebih

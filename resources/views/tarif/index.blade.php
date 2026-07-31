@@ -27,7 +27,7 @@
             <label class="mb-1 block text-xs font-medium text-gray-600">Jenjang</label>
             <select name="jenjang" onchange="this.form.submit()" class="rounded-lg border border-gray-400 px-3 py-2 text-sm">
                 @foreach ($opsiJenjang as $kode => $label)
-                    <option value="{{ $kode }}" @selected($kode === $jenjang)>{{ $kode === '' ? $label : \App\Support\Referensi::label($kode, $label) }}</option>
+                    <option value="{{ $kode }}" @selected($kode === $jenjang)>{{ $label }}</option>
                 @endforeach
             </select>
         </div>

@@ -47,7 +47,7 @@
                 <label class="mb-1 block text-xs font-medium text-gray-600">Jenjang <span class="text-red-500">*</span></label>
                 <select name="kode_jenjang" required class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm">
                     @foreach ($opsiJenjang as $kode => $label)
-                        <option value="{{ $kode }}" @selected(($filter['kode_jenjang'] ?? old('kode_jenjang')) === $kode)>{{ \App\Support\Referensi::label($kode, $label) }}</option>
+                        <option value="{{ $kode }}" @selected(($filter['kode_jenjang'] ?? old('kode_jenjang')) === $kode)>{{ $label }}</option>
                     @endforeach
                 </select>
             </div>
@@ -82,7 +82,11 @@
                 Tidak ada santri aktif yang cocok dengan saringan itu.
             </div>
         @else
-            <form method="POST" action="{{ route('tagihan_massal.terbitkan') }}"
+            {{-- Pratinjau disaring di browser (rowFilter) — barisnya sudah dirender
+                 semua. MENYARING HANYA MENYEMBUNYIKAN: centang & nominal pada baris
+                 yang tersembunyi tetap ikut terkirim. Untuk mengeluarkan satu
+                 santri, lepas centangnya — jangan mengandalkan filter. --}}
+            <form method="POST" action="{{ route('tagihan_massal.terbitkan') }}" x-data="rowFilter" x-cloak
                   onsubmit="return confirm('Terbitkan tagihan daftar ulang untuk baris yang dicentang?')">
                 @csrf
                 {{-- T.A tagihan dibawa apa adanya dari pratinjau: kalau diambil ulang
@@ -103,25 +107,38 @@
                     </div>
                 </div>
 
+                <div class="mb-3 flex flex-wrap items-center gap-3">
+                    <x-filter-bar placeholder="Cari nama / NIS…" />
+                    <span class="text-xs text-gray-400">Menyaring hanya menyembunyikan baris — centang pada baris tersembunyi tetap ikut terkirim.</span>
+                </div>
+
                 <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                             <tr>
                                 <th class="px-3 py-3">
-                                    {{-- Centang semua: hanya menyentuh baris yang memang bisa terbit. --}}
+                                    {{-- Centang semua: hanya menyentuh baris yang memang bisa terbit
+                                         DAN sedang terlihat, supaya "centang semua" sesudah menyaring
+                                         tak diam-diam ikut menyalakan baris yang tersembunyi. --}}
                                     <input type="checkbox" checked
-                                           onclick="this.closest('table').querySelectorAll('input[data-pilih]').forEach(c => c.checked = this.checked)"
+                                           onclick="this.closest('table').querySelectorAll('tbody tr[data-row]:not([style*=none]) input[data-pilih]').forEach(c => c.checked = this.checked)"
                                            class="rounded border-gray-300 text-brand focus:ring-brand">
                                 </th>
                                 <th class="px-3 py-3">Santri</th>
                                 <th class="px-3 py-3">Kenaikan</th>
                                 <th class="px-3 py-3">Daftar Ulang</th>
                             </tr>
+                            <tr class="bg-white">
+                                <x-fcol type="blank" />
+                                <x-fcol :col="1" placeholder="Filter nama / NIS" />
+                                <x-fcol :col="2" type="select" />
+                                <x-fcol type="blank" />
+                            </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             @foreach ($hasil['baris'] as $b)
                                 @php $c = $b['daftar_ulang']; @endphp
-                                <tr class="{{ $b['ada_yang_terbit'] ? '' : 'bg-gray-50/60' }}">
+                                <tr data-row class="{{ $b['ada_yang_terbit'] ? '' : 'bg-gray-50/60' }}">
                                     <td class="px-3 py-3 align-top">
                                         @if ($b['ada_yang_terbit'])
                                             <input type="checkbox" data-pilih name="pilih[]" value="{{ $b['id'] }}" checked
@@ -140,13 +157,13 @@
                                             {{ $ikon[$c['keputusan']] }} {{ ucfirst($c['keputusan']) }}
                                         </span>
                                         @if ($c['keputusan'] === 'terbit')
-                                            <input type="number" step="0.01" min="0"
-                                                   name="nominal[{{ $b['id'] }}]"
-                                                   value="{{ rtrim(rtrim($c['nominal'], '0'), '.') }}"
-                                                   class="mt-1 w-36 rounded-lg border border-gray-400 px-2 py-1 text-right text-sm tabular-nums focus:border-brand focus:ring-1 focus:ring-brand">
+                                            <x-input-rupiah :name="'nominal['.$b['id'].']'" :value="$c['nominal']" lebar="w-36"
+                                                            class="mt-1 rounded-lg border border-gray-400 px-2 py-1 text-right focus:border-brand focus:ring-1 focus:ring-brand" />
                                         @endif
                                         @if ($c['asal'])
-                                            <div class="mt-1 text-[11px] text-gray-400">{{ $c['asal'] }}</div>
+                                            <div class="mt-1 text-[11px] text-gray-400">
+                                                <x-asal-tarif :bagian="$c['asal_bagian'] ?? null" :teks="$c['asal']" />
+                                            </div>
                                         @endif
                                         @if ($c['alasan'])
                                             <div class="mt-1 max-w-md text-[11px] text-gray-500">{{ $c['alasan'] }}</div>
@@ -154,6 +171,7 @@
                                     </td>
                                 </tr>
                             @endforeach
+                            <tr data-empty style="display:none"><td colspan="4" class="px-3 py-10 text-center text-gray-400">Tidak ada baris yang cocok dengan filter.</td></tr>
                         </tbody>
                     </table>
                 </div>

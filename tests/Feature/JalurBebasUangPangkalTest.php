@@ -28,6 +28,7 @@ use Tests\TestCase;
  */
 class JalurBebasUangPangkalTest extends TestCase
 {
+    use \Tests\Concerns\MengaktifkanSantri;
     use RefreshDatabase;
     use \Tests\Concerns\MembuatTarif;
 
@@ -121,11 +122,12 @@ class JalurBebasUangPangkalTest extends TestCase
         $santri = $this->calonLulus('karyawan');
         (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal_perlengkapan' => '5000000']);
 
-        (new SantriService)->daftarUlang($santri->id, $this->admin->id_pengguna);
+        $this->aktifkanSantri($santri->id, $this->admin->id_pengguna);
 
         $santri->refresh();
         $this->assertSame('aktif', $santri->status);
-        $this->assertNotNull($santri->nis);
+        // NIS diterbitkan massal lewat modul Generate NIS, bukan di sini.
+        $this->assertNull($santri->nis);
         // Yang diakrualkan hanya perlengkapannya.
         $this->assertSame(1, JournalEntry::count());
     }
@@ -136,7 +138,7 @@ class JalurBebasUangPangkalTest extends TestCase
         $santri = $this->calonLulus('reguler');
 
         $this->expectExceptionMessage('Uang pangkal belum ditagihkan');
-        (new SantriService)->daftarUlang($santri->id, $this->admin->id_pengguna);
+        $this->aktifkanSantri($santri->id, $this->admin->id_pengguna);
     }
 
     public function test_form_menyembunyikan_isian_uang_pangkal_bagi_jalur_bebas(): void

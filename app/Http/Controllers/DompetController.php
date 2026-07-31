@@ -6,9 +6,12 @@ use App\Exceptions\AppException;
 use App\Models\BankAccount;
 use App\Models\MutasiDompet;
 use App\Models\Wali;
+use App\Services\Modules\AutoDebetService;
 use App\Services\Modules\DompetService;
+use App\Support\Referensi;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -46,8 +49,9 @@ class DompetController extends Controller
             'idWali' => $idWali,
             'waliOptions' => Wali::where('status', 'aktif')->orderBy('nama')->get()
                 ->mapWithKeys(fn ($w) => [$w->id => "{$w->nama} ({$w->telepon})"])->all(),
-            'santriOptions' => \App\Models\Santri::orderBy('nama')->get()
-                ->mapWithKeys(fn ($s) => [$s->id => $s->nama.($s->nis ? " ({$s->nis})" : '')])->all(),
+            // "NIS - Nama - Jenjang - Tingkat" (lihat Referensi::santri) — memilih
+            // santri yang salah di sini berarti uang masuk ke dompet anak lain.
+            'santriOptions' => Referensi::santri(),
             'rekeningOptions' => ['' => '— pilih —'] + BankAccount::where('status', 'aktif')->orderBy('kode_coa')->get()
                 ->mapWithKeys(fn ($r) => [$r->kode_coa => "{$r->nama_rekening} ({$r->kode_coa})"])->all(),
             'pending' => $pending,
@@ -79,7 +83,7 @@ class DompetController extends Controller
     public function jalankanAutoDebet(Request $request): RedirectResponse
     {
         try {
-            $h = (new \App\Services\Modules\AutoDebetService)->jalankan($request->user()->id_pengguna);
+            $h = (new AutoDebetService)->jalankan($request->user()->id_pengguna);
         } catch (AppException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -94,9 +98,9 @@ class DompetController extends Controller
     /** Sajikan berkas bukti mutasi INLINE (bila ada). */
     public function bukti(MutasiDompet $mutasi)
     {
-        abort_if(! $mutasi->bukti_path || ! \Illuminate\Support\Facades\Storage::exists($mutasi->bukti_path), 404);
+        abort_if(! $mutasi->bukti_path || ! Storage::exists($mutasi->bukti_path), 404);
 
-        return response()->file(\Illuminate\Support\Facades\Storage::path($mutasi->bukti_path));
+        return response()->file(Storage::path($mutasi->bukti_path));
     }
 
     public function topUp(Request $request): RedirectResponse
@@ -126,7 +130,19 @@ class DompetController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('status', 'Top-up diverifikasi & jurnal diposting.');
+        // Saldo yang baru masuk langsung dipakai melunasi tagihan yang tadi tak
+        // terjangkau. Hasilnya disebut di layar — kalau tidak, petugas mengira
+        // saldonya menganggur padahal SPP-nya sudah terpotong.
+        $auto = $this->service->autoDebetTerakhir;
+        $pesan = 'Top-up diverifikasi & jurnal diposting.';
+        if (($auto['tagihan'] ?? 0) > 0) {
+            $pesan .= " Saldo baru langsung melunasi {$auto['tagihan']} tagihan (Rp "
+                .number_format((float) $auto['total'], 0, ',', '.').').';
+        } elseif (! empty($auto['galat'])) {
+            $pesan .= ' Pemotongan otomatis tertunda: '.$auto['galat'];
+        }
+
+        return back()->with('status', $pesan);
     }
 
     public function tolakTopUp(Request $request, string $id): RedirectResponse

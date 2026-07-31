@@ -83,7 +83,7 @@
                                     <div class="col-span-6 sm:col-span-3"><label class="mb-1 block text-[11px] text-gray-500">Bagian</label>
                                         <x-search-cell name="`details[${i}][kode_bagian]`" model="row.kode_bagian" options="bagianOpts" placeholder="— tanpa —" /></div>
                                     <div class="col-span-6 sm:col-span-4"><label class="mb-1 block text-[11px] text-gray-500">Nominal</label>
-                                        <input type="number" step="0.01" min="0" :name="`details[${i}][nominal]`" x-model="row.nominal" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm"></div>
+                                        <input type="text" inputmode="numeric" :value="fmtRupiah(row.nominal)" @input="row.nominal = ketikRupiah($event)" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm tabular-nums"><input type="hidden" :name="`details[${i}][nominal]`" :value="row.nominal"></div>
                                     <div class="col-span-12"><label class="mb-1 block text-[11px] text-gray-500">Perlakuan Aset <span class="text-gray-400">(kapitalisasi)</span></label>
                                         <x-search-cell name="`details[${i}][aset_pilih]`" model="row.aset_pilih" options="asetOpts" placeholder="— bukan aset —" /></div>
                                 </div>
@@ -99,7 +99,7 @@
                                         </select>
                                     </div>
                                     <div class="col-span-12 sm:col-span-5"><label class="mb-1 block text-[11px] text-gray-500">Nominal Bayar</label>
-                                        <input type="number" step="0.01" min="0" :name="`details[${i}][nominal]`" x-model="row.nominal" placeholder="≤ sisa hutang" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm"></div>
+                                        <input type="text" inputmode="numeric" :value="fmtRupiah(row.nominal)" @input="row.nominal = ketikRupiah($event)" placeholder="≤ sisa hutang" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm tabular-nums"><input type="hidden" :name="`details[${i}][nominal]`" :value="row.nominal"></div>
                                 </div>
                             </template>
 
@@ -139,7 +139,7 @@
                                     <div class="col-span-4 sm:col-span-2"><label class="mb-1 block text-[11px] text-gray-500">Qty</label>
                                         <input type="number" step="0.0001" min="0" :name="`details[${i}][kuantiti]`" x-model="row.kuantiti" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm"></div>
                                     <div class="col-span-8 sm:col-span-3"><label class="mb-1 block text-[11px] text-gray-500">Harga Satuan</label>
-                                        <input type="number" step="0.01" min="0" :name="`details[${i}][harga_satuan]`" x-model="row.harga_satuan" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm"></div>
+                                        <input type="text" inputmode="numeric" :value="fmtRupiah(row.harga_satuan)" @input="row.harga_satuan = ketikRupiah($event)" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm tabular-nums"><input type="hidden" :name="`details[${i}][harga_satuan]`" :value="row.harga_satuan"></div>
                                     <div class="col-span-12 sm:col-span-2 sm:pt-5 text-right text-sm font-medium tabular-nums" x-text="fmt(lineNominal(row))"></div>
                                 </div>
                             </template>

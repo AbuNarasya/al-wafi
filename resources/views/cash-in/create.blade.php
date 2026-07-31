@@ -63,7 +63,7 @@
                             </div>
                             <div class="col-span-6 sm:col-span-3">
                                 <label class="mb-1 block text-xs font-medium text-gray-600">Nominal</label>
-                                <input type="number" step="0.01" min="0" :name="`details[${i}][nominal]`" x-model="row.nominal" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm focus:border-brand focus:ring-1 focus:ring-brand">
+                                <input type="text" inputmode="numeric" :value="fmtRupiah(row.nominal)" @input="row.nominal = ketikRupiah($event)" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm tabular-nums focus:border-brand focus:ring-1 focus:ring-brand"><input type="hidden" :name="`details[${i}][nominal]`" :value="row.nominal">
                             </div>
                             <div class="col-span-12 sm:col-span-2">
                                 <button type="button" @click="hapus(i)" x-show="rows.length > 1" class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm text-red-600 hover:bg-red-50">Hapus</button>

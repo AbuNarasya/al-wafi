@@ -31,6 +31,20 @@ final class BayarDompet
         if (Money::isNegative($sisaBaru)) {
             throw new AppException(422, 'Nominal melebihi sisa tagihan.');
         }
+
+        // SPP TIDAK BISA DICICIL dari Dompet Wali: pemotongan harus melunasi
+        // seluruh sisanya. Saldo yang kurang dibiarkan utuh dan tagihannya tetap
+        // menggantung, bukan dipotong separuh — cicilan dompet membuat satu
+        // tagihan bulanan tersebar di banyak potongan kecil yang tak pernah
+        // menutup, dan daftar Outstanding SPP jadi tak bisa dibaca.
+        //
+        // Ditegakkan DI SINI karena inilah satu-satunya pintu dompet: auto-debet
+        // maupun tombol "bayar dari dompet" sama-sama lewat sini.
+        if ($tagihan->perilaku === 'spp' && ! Money::isZero($sisaBaru)) {
+            throw new AppException(422, 'SPP tidak bisa dicicil dari Dompet Wali — pemotongan harus melunasi '
+                ."seluruh sisa tagihan (Rp {$tagihan->sisa}). Isi dulu dompetnya sampai cukup; "
+                .'begitu saldonya mencukupi, tagihan ini terpotong penuh dengan sendirinya.');
+        }
         $jenis = $tagihan->jenis;
         $akunKredit = $jenis->kode_coa_pendapatan;
         if ($tagihan->sudah_akrual) {

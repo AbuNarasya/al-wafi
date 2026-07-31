@@ -71,26 +71,44 @@ class TarifService
     /** Tingkat terakhir sebuah jenjang (0 bila jumlah tingkatnya belum diisi). */
     public static function tingkatTerakhir(?string $kodeJenjang): int
     {
-        return (int) (Jenjang::find((string) $kodeJenjang)?->jumlah_tingkat ?? 0);
+        return (int) (Jenjang::find((string) $kodeJenjang)?->tingkatAkhir() ?? 0);
     }
 
     /**
-     * Tingkat TUJUAN yang punya sel daftar ulang: 2 … tingkat terakhir.
-     * Tingkat 1 tak punya karena ia bukan hasil kenaikan.
+     * Tingkat TUJUAN yang punya sel daftar ulang: tingkat KEDUA jenjang ini
+     * sampai tingkat terakhirnya. Tingkat pertama tak punya karena ia bukan
+     * hasil kenaikan — santri yang baru masuk membayar registrasi + uang pangkal.
+     *
+     * Sejak penomorannya berkelanjutan, "tingkat pertama" bukan lagi selalu 1:
+     * SMP mulai di 7, jadi selnya 8–9, bukan 2–3.
      *
      * @return list<int>
      */
     public static function tingkatKenaikan(?string $kodeJenjang): array
     {
-        $terakhir = static::tingkatTerakhir($kodeJenjang);
+        $jenjang = Jenjang::find((string) $kodeJenjang);
+        if (! $jenjang || ! $jenjang->jumlah_tingkat) {
+            return [];
+        }
+        $pertama = $jenjang->tingkatMulai();
+        $terakhir = $jenjang->tingkatAkhir();
 
-        return $terakhir < 2 ? [] : range(2, $terakhir);
+        return $terakhir <= $pertama ? [] : range($pertama + 1, $terakhir);
     }
 
     /**
      * Tarif yang berlaku untuk satu kombinasi.
      *
-     * @return array{status:'ada'|'bebas'|'kosong', nominal:?string, asal:?string, label:string}
+     * `asal`/`label` = kalimatnya sudah jadi, untuk pemanggil yang cuma butuh
+     * teks (pesan galat, cetakan). `bagian` = bahan mentahnya, untuk layar yang
+     * ingin menebalkan namanya sendiri — lihat <x-asal-tarif>. Markup TIDAK
+     * dirakit di sini: nama jenjang & jalur adalah isian pemakai, jadi
+     * penebalannya harus terjadi di Blade agar nilainya tetap ter-escape.
+     * `bagian` null = kalimatnya bukan kalimat asal tarif (mis. tahun ajaran
+     * santri kosong), jadi tak ada yang bisa ditebalkan.
+     *
+     * @return array{status:'ada'|'bebas'|'kosong', nominal:?string, asal:?string, label:string,
+     *               bagian:?array{jenjang:?string,tingkat:?int,jalur:?string,tahun_ajaran:string,catatan:?string}}
      *         status "kosong" = selnya belum diisi — pemanggil WAJIB berhenti,
      *         jangan diperlakukan sama dengan "bebas".
      */
@@ -98,7 +116,7 @@ class TarifService
     {
         $label = static::PERILAKU[$perilaku] ?? $perilaku;
         if (! $tahunAjaran) {
-            return ['status' => 'kosong', 'nominal' => null, 'asal' => null,
+            return ['status' => 'kosong', 'nominal' => null, 'asal' => null, 'bagian' => null,
                 'label' => 'Tahun ajaran santri belum terisi, jadi tarifnya tak bisa dicari.'];
         }
 
@@ -108,7 +126,7 @@ class TarifService
         $perTingkat = in_array($perilaku, static::PER_TINGKAT, true);
         $tingkat = ($tingkat === '' || $tingkat === null) ? null : (int) $tingkat;
         if ($perTingkat && $tingkat === null) {
-            return ['status' => 'kosong', 'nominal' => null, 'asal' => null,
+            return ['status' => 'kosong', 'nominal' => null, 'asal' => null, 'bagian' => null,
                 'label' => "Tarif {$label} dibedakan per tingkat, tetapi tingkat santri ini belum terisi. "
                     .'Isi tingkatnya dulu di data santri.'];
         }
@@ -130,26 +148,84 @@ class TarifService
             ->orderByRaw('kode_jalur IS NULL')
             ->first();
 
-        $labelJenjang = $kodeJenjang ? "jenjang {$kodeJenjang}" : 'tanpa jenjang';
+        // Jenjang & jalur disebut lewat NAMA-nya. Kodenya (`J003`, `005`) tak
+        // bercerita apa pun bagi petugas yang membaca kalimat asal tarif di
+        // layar — dan kalimat ini memang ada supaya ia tak perlu menebak sel
+        // mana yang terpakai. Kode dipakai sebagai cadangan bila baris masternya
+        // sudah tak ada.
+        $namaJenjang = $this->namaJenjang($kodeJenjang);
+        $labelJenjang = $kodeJenjang ? "jenjang {$namaJenjang}" : 'tanpa jenjang';
         $labelTingkat = $perTingkat ? " tingkat {$tingkat}" : '';
         if (! $baris) {
-            return ['status' => 'kosong', 'nominal' => null, 'asal' => null,
+            return ['status' => 'kosong', 'nominal' => null, 'asal' => null, 'bagian' => null,
                 'label' => "Tarif {$label} untuk {$labelJenjang}{$labelTingkat}"
-                    .($kodeJalur ? " jalur {$kodeJalur}" : '')." T.A {$tahunAjaran} belum diisi."];
+                    .($kodeJalur ? ' jalur '.$this->namaJalur($kodeJalur) : '')." T.A {$tahunAjaran} belum diisi."];
         }
 
-        $asal = 'Tarif '.($kodeJenjang ?: 'tanpa jenjang').$labelTingkat
-            .' · '.($baris->kode_jalur ? 'jalur '.$baris->kode_jalur : 'baris Umum').' · T.A '.$tahunAjaran;
+        $namaJalur = $baris->kode_jalur ? $this->namaJalur($baris->kode_jalur) : null;
+        $asal = 'Tarif '.($namaJenjang ?: 'tanpa jenjang').$labelTingkat
+            .' · '.($namaJalur ? 'jalur '.$namaJalur : 'baris Umum')
+            .' · T.A '.$tahunAjaran;
+        $bagian = [
+            'jenjang' => $namaJenjang,
+            'tingkat' => $perTingkat ? $tingkat : null,
+            'jalur' => $namaJalur, // null = baris Umum
+            'tahun_ajaran' => $tahunAjaran,
+            'catatan' => null,
+        ];
 
         if ($baris->bebas) {
-            return ['status' => 'bebas', 'nominal' => null, 'asal' => $asal, 'label' => $asal.' — bebas (tidak dipungut)'];
+            $catatan = '— bebas (tidak dipungut)';
+
+            return ['status' => 'bebas', 'nominal' => null, 'asal' => $asal, 'label' => $asal.' '.$catatan,
+                'bagian' => ['catatan' => $catatan] + $bagian];
         }
         if ($baris->nominal === null) {
-            return ['status' => 'kosong', 'nominal' => null, 'asal' => $asal,
-                'label' => $asal.' ada, tapi nominalnya kosong dan tidak ditandai bebas.'];
+            $catatan = 'ada, tapi nominalnya kosong dan tidak ditandai bebas.';
+
+            return ['status' => 'kosong', 'nominal' => null, 'asal' => $asal, 'label' => $asal.' '.$catatan,
+                'bagian' => ['catatan' => $catatan] + $bagian];
         }
 
-        return ['status' => 'ada', 'nominal' => Money::of($baris->nominal), 'asal' => $asal, 'label' => $asal];
+        return ['status' => 'ada', 'nominal' => Money::of($baris->nominal), 'asal' => $asal,
+            'label' => $asal, 'bagian' => $bagian];
+    }
+
+    /** @var array<string,string>|null peta kode→nama, dimemo PER INSTANCE */
+    private ?array $petaJenjang = null;
+
+    /** @var array<string,string>|null */
+    private ?array $petaJalur = null;
+
+    /**
+     * Nama jenjang/jalur untuk kalimat asal tarif.
+     *
+     * Dimemo per INSTANCE, bukan statis: grid Tarif memanggil cari() puluhan kali
+     * pada instance yang sama (satu kueri, bukan puluhan), sementara pemanggil
+     * lain selalu `new TarifService` sehingga memonya tak pernah basi — termasuk
+     * di test yang menambah jenjang atau jalur di tengah jalan.
+     *
+     * Kode dikembalikan apa adanya bila baris masternya sudah tak ada: lebih baik
+     * menyebut `J003` daripada memutus kalimatnya.
+     */
+    private function namaJenjang(?string $kode): ?string
+    {
+        if (! $kode) {
+            return null;
+        }
+        $this->petaJenjang ??= Jenjang::pluck('nama', 'kode')->all();
+
+        return $this->petaJenjang[$kode] ?? $kode;
+    }
+
+    private function namaJalur(?string $kode): ?string
+    {
+        if (! $kode) {
+            return null;
+        }
+        $this->petaJalur ??= JalurPendaftaran::pluck('nama', 'kode')->all();
+
+        return $this->petaJalur[$kode] ?? $kode;
     }
 
     /**

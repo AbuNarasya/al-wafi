@@ -57,8 +57,8 @@
                                         </div>
                                         <div>
                                             <label class="mb-1 block text-xs font-medium text-gray-600">Nominal Diakui</label>
-                                            <input type="number" step="0.01" min="0" max="{{ $r['sisa'] }}" name="nominal" value="{{ $r['sisa'] }}"
-                                                   class="w-full rounded border border-gray-300 px-2 py-1.5 text-right text-sm">
+                                            <x-input-rupiah name="nominal" :value="$r['sisa']"
+                                                            class="rounded border border-gray-300 px-2 py-1.5 text-right" />
                                             <p class="mt-1 text-[11px] text-gray-400">Kosongkan/penuh = akui seluruh sisa.</p>
                                         </div>
                                         <button class="w-full rounded bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark">Proses Pengakuan</button>

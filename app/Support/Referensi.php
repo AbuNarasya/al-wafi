@@ -8,7 +8,9 @@ use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
 use App\Models\JalurPendaftaran;
 use App\Models\Jenjang;
+use App\Models\Santri;
 use App\Models\Vendor;
+use App\Services\Ppsb\Tahap;
 
 /**
  * Opsi referensi untuk dropdown form (port `referensi.service.ts` dev).
@@ -77,6 +79,60 @@ class Referensi
             ->get(['kode_coa', 'nama_rekening'])
             ->mapWithKeys(fn ($r) => [$r->kode_coa => "{$r->nama_rekening} ({$r->kode_coa})"])
             ->all();
+    }
+
+    /**
+     * Santri untuk dropdown → [id => "NIS - Nama - Jenjang - Tingkat"].
+     *
+     * NAMA SAJA TIDAK CUKUP untuk memilih santri: di pesantren banyak nama yang
+     * mirip atau persis sama, dan memilih yang salah berarti tagihan/keringanan
+     * menempel pada anak orang lain. Keempat keping itu bersama-sama praktis
+     * selalu membedakan — dan ketiganya (jenjang, tingkat) juga yang paling
+     * diingat petugas saat menerima wali di depan meja.
+     *
+     * Diurutkan menurut NAMA, bukan NIS, walau labelnya dimulai dengan NIS:
+     * justru nama-nama yang mirip harus BERDAMPINGAN supaya bedanya terlihat.
+     *
+     * $status membatasi ke satu tahap (mis. 'aktif'); null = semua santri, yang
+     * memang diperlukan modul seperti Nominal SPP Khusus (calon pun boleh disetel).
+     *
+     * Yang sudah MENGUNDURKAN DIRI selalu disingkirkan (lihat
+     * Tahap::DISEMBUNYIKAN_DARI_PEMILIH): tagihannya sudah ditutup saat ia mundur,
+     * jadi menawarkannya di pemilih hanya membuka jalan salah-pilih ke anak yang
+     * sudah tak ada urusannya dengan pesantren.
+     */
+    public static function santri(?string $status = null): array
+    {
+        $peta = Jenjang::pluck('nama', 'kode')->all();
+
+        return Santri::when($status, fn ($q) => $q->where('status', $status))
+            ->whereNotIn('status', Tahap::DISEMBUNYIKAN_DARI_PEMILIH)
+            ->orderBy('nama')
+            ->get(['id', 'nis', 'no_pendaftaran', 'nama', 'kode_jenjang', 'tingkat'])
+            ->mapWithKeys(fn ($s) => [$s->id => static::labelSantri($s, $peta)])
+            ->all();
+    }
+
+    /**
+     * Satu label santri. $petaJenjang ([kode => nama]) sebaiknya dioper bila
+     * dipanggil berulang — tanpa itu master jenjang dibaca sekali per panggilan.
+     *
+     * Calon santri belum ber-NIS, jadi nomor pendaftarannya yang dipakai —
+     * tetap satu kolom identitas, bukan sel kosong yang membingungkan.
+     */
+    public static function labelSantri(Santri $santri, ?array $petaJenjang = null): string
+    {
+        $petaJenjang ??= Jenjang::pluck('nama', 'kode')->all();
+
+        $nomor = trim((string) ($santri->nis ?: $santri->no_pendaftaran));
+        $jenjang = $petaJenjang[$santri->kode_jenjang] ?? (string) $santri->kode_jenjang;
+
+        return implode(' - ', [
+            $nomor !== '' ? $nomor : '—',
+            $santri->nama,
+            $jenjang !== '' ? $jenjang : '—',
+            $santri->tingkat ? "Tingkat {$santri->tingkat}" : '—',
+        ]);
     }
 
     /** Vendor aktif → [kode_vendor => nama_vendor]. */

@@ -35,6 +35,7 @@ use Tests\TestCase;
  */
 class BiayaPerlengkapanTest extends TestCase
 {
+    use \Tests\Concerns\MengaktifkanSantri;
     use RefreshDatabase;
     use \Tests\Concerns\MembuatTarif;
 
@@ -195,7 +196,7 @@ class BiayaPerlengkapanTest extends TestCase
         ]);
 
         $santri->update(['status' => 'lolos_kesehatan']);
-        (new SantriService)->daftarUlang($santri->id, $this->admin);
+        $this->aktifkanSantri($santri->id, $this->admin);
 
         $this->assertTrue((bool) $hasil['uang_pangkal']->refresh()->sudah_akrual);
         $this->assertTrue((bool) $hasil['perlengkapan']->refresh()->sudah_akrual);
@@ -219,7 +220,7 @@ class BiayaPerlengkapanTest extends TestCase
             'nominal' => '5000000', 'nominal_perlengkapan' => '2000000',
         ]);
         $santri->update(['status' => 'lolos_kesehatan']);
-        (new SantriService)->daftarUlang($santri->id, $this->admin);
+        $this->aktifkanSantri($santri->id, $this->admin);
 
         (new SantriService)->mengundurkanDiri($santri->id, 'pindah domisili', $this->admin);
 
@@ -509,7 +510,7 @@ class BiayaPerlengkapanTest extends TestCase
         $santri = $this->buatSantriDiterima();
         (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '5000000', 'nominal_perlengkapan' => '2000000']);
         $santri->update(['status' => 'lolos_kesehatan']);
-        (new SantriService)->daftarUlang($santri->id, $this->admin);
+        $this->aktifkanSantri($santri->id, $this->admin);
 
         $this->expectException(AppException::class);
         $this->expectExceptionMessage('sudah diakrualkan');
@@ -528,6 +529,75 @@ class BiayaPerlengkapanTest extends TestCase
     }
 
     /**
+     * TEMUAN UJI MANUAL (2026-07-30): form "Tagihkan Uang Pangkal & Perlengkapan"
+     * tak mau hilang.
+     *
+     * Penjaganya dulu "santri ini punya tagihan uang pangkal?". Bagi calon
+     * berjalur BEBAS uang pangkal jawabannya SELAMANYA tidak — tagihan itu tak
+     * pernah terbit — sehingga formnya terus muncul walau perlengkapannya sudah
+     * ada. Diganti `SantriController::bisaDitagihkan()` yang menjawab "apa yang
+     * MASIH bisa diterbitkan", per komponen.
+     */
+    public function test_form_penagihan_hilang_setelah_semua_komponen_terbit(): void
+    {
+        $this->masterPerlengkapan();
+        $santri = $this->buatSantriDiterima();
+        $admin = User::find($this->admin);
+
+        $this->actingAs($admin)->get(route('santri.show', $santri->id))->assertOk()
+            ->assertSee('Tagihkan Uang Pangkal', false);
+
+        (new SantriService)->tagihkanUangPangkal($santri->id, [
+            'nominal' => '5000000', 'nominal_perlengkapan' => '2000000',
+        ]);
+
+        // Keduanya sudah terbit → tak ada lagi yang bisa diterbitkan.
+        $this->actingAs($admin)->get(route('santri.show', $santri->id))->assertOk()
+            ->assertDontSee('Tagihkan Uang Pangkal', false);
+    }
+
+    /**
+     * Sisa SATU komponen tetap bisa diterbitkan.
+     *
+     * Tiga tempat harus sejalan, dan test ini menjaga ketiganya sekaligus:
+     * (1) syarat tampil form, (2) `nominal` wajib/tidak di validasi controller,
+     * (3) `komponen` yang dioper ke service — tanpa (3), menerbitkan
+     * perlengkapan untuk santri yang uang pangkalnya sudah terbit ditolak 409.
+     */
+    public function test_sisa_satu_komponen_masih_bisa_diterbitkan(): void
+    {
+        $this->masterPerlengkapan();
+        $santri = $this->buatSantriDiterima();
+        $admin = User::find($this->admin);
+
+        // Uang pangkalnya saja yang terbit lebih dulu.
+        (new SantriService)->tagihkanUangPangkal($santri->id, [
+            'komponen' => ['uang_pangkal'], 'nominal' => '5000000',
+        ]);
+
+        // Formnya TETAP muncul — perlengkapannya belum terbit — tetapi isian
+        // nominal uang pangkalnya sudah tiada.
+        $this->actingAs($admin)->get(route('santri.show', $santri->id))->assertOk()
+            ->assertSee('Tagihkan Uang Pangkal', false)
+            ->assertSee('Uang pangkal sudah ditagihkan', false)
+            ->assertSee('name="nominal_perlengkapan"', false);
+
+        // Dan kirimannya diterima TANPA `nominal`: penjaga 409 tak boleh
+        // menyalak, karena yang diminta hanya komponen yang masih terbuka.
+        $this->actingAs($admin)->post(
+            route('santri.aksi', ['id' => $santri->id, 'aksi' => 'tagih-uang-pangkal']),
+            ['nominal_perlengkapan' => '2000000'],
+        )->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(2000000.0, (float) TagihanSantri::where('id_santri', $santri->id)
+            ->where('perilaku', 'perlengkapan')->sole()->nominal);
+
+        // Sesudah keduanya ada, formnya baru hilang.
+        $this->actingAs($admin)->get(route('santri.show', $santri->id))->assertOk()
+            ->assertDontSee('Tagihkan Uang Pangkal', false);
+    }
+
+    /**
      * Alur HTTP: form penagihan memuat isian perlengkapan (terisi default dari
      * master), satu kiriman menerbitkan dua tagihan, dan halaman angsuran
      * menampilkan kedua komponennya.
@@ -540,7 +610,9 @@ class BiayaPerlengkapanTest extends TestCase
 
         $this->actingAs($admin)->get(route('santri.show', $santri->id))->assertOk()
             ->assertSee('name="nominal_perlengkapan"', false)
-            ->assertSee('value="2000000.00"', false)
+            // Berpemisah ribuan di layar, angka mentah di hidden (<x-input-rupiah>).
+            ->assertSee('value="2.000.000"', false)
+            ->assertSee('name="nominal_perlengkapan" value="2000000"', false)
             ->assertSee('tidak dipotong');
 
         $this->actingAs($admin)->post(route('santri.aksi', ['id' => $santri->id, 'aksi' => 'tagih-uang-pangkal']), [

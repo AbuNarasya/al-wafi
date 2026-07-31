@@ -3,7 +3,7 @@
 @php
     $rt = $lingkup === 'ppsb' ? 'pembayaran_ppsb' : 'pembayaran_kesantrian';
     $kode = $lingkup === 'ppsb' ? 'pembayaran-ppsb' : 'pembayaran-kesantrian';
-    $judul = $lingkup === 'ppsb' ? 'Pembayaran Registrasi & Uang Pangkal' : 'Pembayaran SPP & Tagihan Lain';
+    $judul = $lingkup === 'ppsb' ? 'Pembayaran Tagihan PPSB' : 'Pembayaran SPP & Tagihan Lain';
     $labelStatus = ['menunggu_verifikasi' => 'bg-amber-100 text-amber-700', 'terverifikasi' => 'bg-emerald-100 text-emerald-700', 'ditolak' => 'bg-red-100 text-red-700', 'void' => 'bg-gray-100 text-gray-500'];
     $bolehVerif = auth()->user()->tim_keuangan || auth()->user()->is_admin;
     $bolehDompet = $bolehDompet ?? false;
@@ -122,7 +122,7 @@
                             </div>
                             <div>
                                 <label class="mb-1 block text-sm font-medium text-gray-700">Nominal <span class="text-red-500">*</span></label>
-                                <input type="number" step="0.01" min="0" name="nominal" x-model="nominal" :max="maxSisa" required class="w-full rounded-lg border border-gray-400 px-3 py-2 text-right text-sm">
+                                <input type="text" inputmode="numeric" :value="fmtRupiah(nominal)" @input="nominal = ketikRupiah($event)" required class="w-full rounded-lg border border-gray-400 px-3 py-2 text-right text-sm tabular-nums"><input type="hidden" name="nominal" :value="nominal">
                             </div>
                         </div>
 

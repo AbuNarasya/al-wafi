@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
+use App\Models\JadwalPerubahanSantri;
 use App\Models\Jenjang;
 use App\Models\TahunAjaran;
 use App\Services\Modules\KenaikanTingkatService;
@@ -13,8 +14,11 @@ use Illuminate\View\View;
 /**
  * Kenaikan Tingkat & Kelulusan massal — dalam satu jenjang, serentak satu angkatan.
  *
- * Pratinjau dulu, eksekusi kemudian, dengan tombol yang berbeda: memuat ulang
- * halaman tak boleh menaikkan siapa pun.
+ * Pratinjau dulu, penetapan kemudian, dengan tombol yang berbeda: memuat ulang
+ * halaman tak boleh menetapkan apa pun.
+ *
+ * Yang ditekan petugas MENJADWALKAN, bukan mengubah. Perubahannya menyala saat
+ * tahun ajaran tujuan benar-benar dimulai — lihat KenaikanTingkatService::tetapkan().
  */
 class KenaikanTingkatController extends Controller
 {
@@ -43,7 +47,8 @@ class KenaikanTingkatController extends Controller
         return view('kenaikan-tingkat.index', $this->opsi() + ['filter' => $filter, 'hasil' => $hasil]);
     }
 
-    public function eksekusi(Request $request): RedirectResponse
+    /** Menetapkan perubahan — tidak mengubah santri sekarang juga. */
+    public function tetapkan(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'tahun_ajaran' => ['required', 'string', 'exists:tahun_ajaran,kode'],
@@ -53,7 +58,7 @@ class KenaikanTingkatController extends Controller
         ]);
 
         try {
-            $hasil = $this->service->eksekusi(
+            $hasil = $this->service->tetapkan(
                 $data['tahun_ajaran'],
                 $data['keputusan'],
                 (int) $request->user()->id_pengguna,
@@ -63,18 +68,39 @@ class KenaikanTingkatController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
+        // Kapan berlakunya disebut TERUS TERANG. Tanpa itu petugas mengira
+        // perubahannya sudah jalan, lalu bingung melihat tingkat santri tak
+        // berubah di daftar.
+        $mulai = $hasil['berlaku_mulai']
+            ? ' Berlaku mulai '.\Illuminate\Support\Carbon::parse($hasil['berlaku_mulai'])->format('d/m/Y').'.'
+            : '';
+        $menunggu = $hasil['melanjutkan'] > 0
+            ? " {$hasil['melanjutkan']} santri yang melanjutkan menunggu proses PPSB-nya tuntas lebih dulu."
+            : '';
+
         return redirect()->route('kenaikan_tingkat.index')->with('status',
-            "T.A {$data['tahun_ajaran']}: {$hasil['naik']} santri naik tingkat, "
-            ."{$hasil['mengulang']} mengulang, {$hasil['lulus']} lulus."
+            "Perubahan T.A {$data['tahun_ajaran']} ditetapkan: {$hasil['naik']} naik tingkat, "
+            ."{$hasil['mengulang']} mengulang, {$hasil['melanjutkan']} melanjutkan, "
+            ."{$hasil['lulus']} lulus.{$mulai}{$menunggu}"
         );
     }
 
     private function opsi(): array
     {
+        // Jadwal yang sudah jatuh tempo dinyalakan di sini juga, bukan hanya oleh
+        // penjadwal harian: produksi berjalan di paket gratis yang tidur, jadi
+        // cron bisa tak pernah menyala. Murah karena hanya menyentuh baris yang
+        // benar-benar jatuh tempo (indeks status + tahun ajaran).
+        $this->service->terapkanYangJatuhTempo();
+
         return [
             'opsiTa' => TahunAjaran::orderByDesc('kode')->pluck('kode', 'kode')->all(),
             'opsiJenjang' => Jenjang::orderBy('urutan')->orderBy('kode')->pluck('nama', 'kode')->all(),
             'opsiKeputusan' => KenaikanTingkatService::KEPUTUSAN,
+            // Daftar kerja: apa yang sudah ditetapkan tapi belum menyala.
+            'terjadwal' => JadwalPerubahanSantri::hidup()
+                ->with(['santri:id,nama,nis,no_pendaftaran,kode_jenjang,tingkat', 'jenjangTujuan:kode,nama', 'pendaftaran:id,nomor,status'])
+                ->orderBy('tahun_ajaran')->orderBy('status')->get(),
         ];
     }
 }

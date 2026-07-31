@@ -28,6 +28,7 @@ use Tests\TestCase;
 /** Pengunduran diri SANTRI AKTIF: sisa uang pangkal dihapuskan + akrual dibalik sebesar sisa. */
 class SantriAktifMundurTest extends TestCase
 {
+    use \Tests\Concerns\MengaktifkanSantri;
     use RefreshDatabase;
     use \Tests\Concerns\MembuatTarif;
 
@@ -78,7 +79,7 @@ class SantriAktifMundurTest extends TestCase
         if (Money::gtZero(Money::of($bayarSebelum))) {
             $this->bayarUp($santri, $bayarSebelum);
         }
-        $svc->daftarUlang($santri->id, $this->admin);
+        $this->aktifkanSantri($santri->id, $this->admin);
 
         return $santri->refresh();
     }

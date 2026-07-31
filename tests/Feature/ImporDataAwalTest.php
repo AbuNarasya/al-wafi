@@ -2,24 +2,41 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\AppException;
+use App\Models\Accrue;
+use App\Models\Asset;
+use App\Models\Bagian;
+use App\Models\BankAccount;
+use App\Models\BankLoan;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
 use App\Models\CoaGroup;
 use App\Models\HakAksesModul;
+use App\Models\Invoice;
 use App\Models\JalurPendaftaran;
 use App\Models\JenisBiaya;
 use App\Models\Jenjang;
 use App\Models\JournalEntry;
+use App\Models\JournalLine;
 use App\Models\Karyawan;
 use App\Models\Level;
+use App\Models\OperationalAdvance;
 use App\Models\Pendaftaran;
+use App\Models\PengajuanPembayaran;
+use App\Models\PinjamanKaryawan;
 use App\Models\Santri;
 use App\Models\TagihanSantri;
 use App\Models\TahunAjaran;
 use App\Models\TipeBiaya;
 use App\Models\User;
+use App\Models\Vendor;
+use App\Models\VendorType;
 use App\Models\Wali;
 use App\Services\Impor\ImporSaldoAwal;
+use App\Services\Modules\AssetService;
+use App\Services\Modules\PengajuanPembayaranService;
+use App\Services\Modules\PinjamanKaryawanService;
+use App\Services\Modules\WaliService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
@@ -37,9 +54,11 @@ class ImporDataAwalTest extends TestCase
     use RefreshDatabase;
 
     private const TA = '2026/2027';
+
     private const GRP = 'ZZIM';
 
     private User $admin;
+
     private string $jenisTunggakan = 'TUNGGAKAN-SPP';
 
     protected function setUp(): void
@@ -147,9 +166,9 @@ class ImporDataAwalTest extends TestCase
         }
 
         $path = $this->berkasIsi(
-            "nis,nama,jenis_kelamin,kode_jenjang,tingkat,tahun_ajaran,jalur,wali_nama,wali_telepon,"
+            'nis,nama,jenis_kelamin,kode_jenjang,tingkat,tahun_ajaran,jalur,wali_nama,wali_telepon,'
             ."tunggakan_spp,tunggakan_uang_pangkal,tunggakan_daftar_ulang,tunggakan_lain,ket_tunggakan_lain\n"
-            ."230099,Ahmad,L,SMP,2,".self::TA.",LAMA,Bapak Ahmad,08129999999,1500000,5000000,750000,300000,Seragam\n"
+            .'230099,Ahmad,L,SMP,2,'.self::TA.",LAMA,Bapak Ahmad,08129999999,1500000,5000000,750000,300000,Seragam\n"
         );
         $param = [
             'jenis_tunggakan_spp' => $kode['SPP'], 'jenis_tunggakan_uang_pangkal' => $kode['UP'],
@@ -219,7 +238,7 @@ class ImporDataAwalTest extends TestCase
     {
         $path = $this->berkasIsi(
             "nis,nama,jenis_kelamin,kode_jenjang,tingkat,tahun_ajaran,jalur,wali_nama,wali_telepon,tunggakan_daftar_ulang\n"
-            ."230098,Budi,L,SMP,2,".self::TA.",LAMA,Bapak Budi,08128888888,750000\n"
+            .'230098,Budi,L,SMP,2,'.self::TA.",LAMA,Bapak Budi,08128888888,750000\n"
         );
 
         $hasil = app(ImporSaldoAwal::class)->pratinjau('santri-lama', $path, $this->param());
@@ -263,6 +282,33 @@ class ImporDataAwalTest extends TestCase
         $this->assertSame(['LAMA-0001', 'LAMA-0002'], Santri::orderBy('id')->pluck('no_pendaftaran')->all());
     }
 
+    /**
+     * Wali hasil impor harus LANGSUNG BISA DISUNTING.
+     *
+     * `wali.nama` & `wali.telepon` hanya SALINAN kontak utama; dulu pemeta ini
+     * mengisi salinannya saja dan meninggalkan `nama_ayah`/`telepon_ayah` kosong,
+     * sehingga form sunting wali selalu ditolak "Kontak utama belum lengkap"
+     * padahal namanya terbaca jelas di layar.
+     */
+    public function test_wali_hasil_impor_berkontak_utama_lengkap_dan_bisa_disunting(): void
+    {
+        app(ImporSaldoAwal::class)->jalankan('santri-lama', $this->berkas([$this->barisSah()]), $this->param());
+
+        $wali = Wali::firstOrFail();
+        $this->assertSame('ayah', $wali->kontak_utama);
+        $this->assertSame('Bapak Fauzi', $wali->nama_ayah);
+        $this->assertSame('08123456789', $wali->telepon_ayah);
+        $this->assertSame($wali->nama_ayah, $wali->nama, 'nama = salinan kontak utama');
+        $this->assertSame($wali->telepon_ayah, $wali->telepon);
+
+        // Bukti sebenarnya: menyunting lewat service tidak lagi ditolak.
+        $disunting = (new WaliService)->update($wali->id, [
+            'kontak_utama' => 'ayah', 'alamat' => 'Jl. Uji No. 1', 'status' => 'aktif',
+        ]);
+        $this->assertSame('Jl. Uji No. 1', $disunting->alamat);
+        $this->assertSame('Bapak Fauzi', $disunting->nama);
+    }
+
     public function test_tunggakan_bertanda_sudah_akrual_dan_tidak_menjurnal(): void
     {
         $path = $this->berkas([$this->barisSah(['tunggakan_spp' => '1500000', 'ket_tunggakan_spp' => 'Tunggakan Jan-Jun'])]);
@@ -286,7 +332,7 @@ class ImporDataAwalTest extends TestCase
             $this->barisSah(['nis' => '230018', 'jenis_kelamin' => 'X']),  // kelamin salah
             $this->barisSah(['nis' => '', 'nama' => 'Tanpa NIS']),         // NIS kosong
             $this->barisSah(['nis' => '230019', 'jalur' => 'NGAWUR']),     // jalur tak dikenal
-            $this->barisSah(['nis' => '230020', 'tunggakan_spp' => 'abc']),// bukan angka
+            $this->barisSah(['nis' => '230020', 'tunggakan_spp' => 'abc']), // bukan angka
         ]);
 
         $hasil = app(ImporSaldoAwal::class)->pratinjau('santri-lama', $path, $this->param());
@@ -327,7 +373,7 @@ class ImporDataAwalTest extends TestCase
     {
         $path = sys_get_temp_dir().'/impor-uji-'.uniqid().'.csv';
         file_put_contents($path, "\xEF\xBB\xBFnis;nama;jenis_kelamin;kode_jenjang;tingkat;tahun_ajaran;jalur;wali_nama;wali_telepon\n"
-            ."230021;Excel Indonesia;L;SMP;2;".self::TA.";LAMA;Wali Excel;08999\n");
+            .'230021;Excel Indonesia;L;SMP;2;'.self::TA.";LAMA;Wali Excel;08999\n");
 
         $hasil = app(ImporSaldoAwal::class)->pratinjau('santri-lama', $path, $this->param());
         $this->assertSame(1, $hasil['siap'], 'berkas Excel berpemisah titik koma harus tetap terbaca');
@@ -368,14 +414,14 @@ class ImporDataAwalTest extends TestCase
     {
         // COA dulu — bank_accounts.kode_coa punya kunci asing ke coa_detail.
         CoaDetail::create(['kode_coa' => '1.ZZIM.9', 'nama_coa' => 'Bank Uji', 'kode_grup' => self::GRP, 'jenis_saldo' => 'debet']);
-        \App\Models\BankAccount::create([
+        BankAccount::create([
             'kode_coa' => '1.ZZIM.9', 'nama_rekening' => 'Bank Uji', 'jenis_rekening' => 'bank', 'status' => 'aktif',
         ]);
         CoaDetail::create(['kode_coa' => '2.ZZIM.1', 'nama_coa' => 'Hutang Usaha', 'kode_grup' => self::GRP, 'jenis_saldo' => 'kredit']);
         CoaDetail::create(['kode_coa' => '3.ZZIM.1', 'nama_coa' => 'Saldo Awal', 'kode_grup' => self::GRP, 'jenis_saldo' => 'kredit']);
         CoaDetail::create(['kode_coa' => '5.ZZIM.1', 'nama_coa' => 'Beban ATK', 'kode_grup' => self::GRP, 'jenis_saldo' => 'debet']);
-        \App\Models\VendorType::create(['kode_jenis_vendor' => 'ZZJV', 'nama' => 'Umum']);
-        \App\Models\Vendor::create(['kode_vendor' => 'V001', 'nama_vendor' => 'PT Uji', 'kode_jenis_vendor' => 'ZZJV']);
+        VendorType::create(['kode_jenis_vendor' => 'ZZJV', 'nama' => 'Umum']);
+        Vendor::create(['kode_vendor' => 'V001', 'nama_vendor' => 'PT Uji', 'kode_jenis_vendor' => 'ZZJV']);
 
         return [
             'akun_perantara' => '3.ZZIM.1', 'kode_coa_hutang' => '2.ZZIM.1',
@@ -403,7 +449,7 @@ class ImporDataAwalTest extends TestCase
         $hasil = app(ImporSaldoAwal::class)->jalankan('invoice-vendor', $path, $param);
         $this->assertSame(['invoice' => 1], $hasil['tersimpan']);
 
-        $inv = \App\Models\Invoice::firstOrFail();
+        $inv = Invoice::firstOrFail();
         $this->assertSame(12500000.0, (float) $inv->sisa_hutang);
         // Tanggal invoice = cut-off supaya jurnalnya rapi; jatuh tempo tetap asli
         // karena laporan umur hutang memakai jatuh tempo.
@@ -427,7 +473,7 @@ class ImporDataAwalTest extends TestCase
             ."V001,INV/1,2026-06-30,1000\nV001,INV/2,2026-06-30,2000\n"
         );
 
-        $this->expectException(\App\Exceptions\AppException::class);
+        $this->expectException(AppException::class);
         $this->expectExceptionMessageMatches('/tidak boleh akun Beban/');
         app(ImporSaldoAwal::class)->pratinjau('invoice-vendor', $path, $param);
     }
@@ -446,7 +492,7 @@ class ImporDataAwalTest extends TestCase
 
         $this->assertSame(0, $ulang['siap']);
         $this->assertSame(1, $ulang['lewati']);
-        $this->assertSame(1, \App\Models\Invoice::count());
+        $this->assertSame(1, Invoice::count());
     }
 
     // ---------------- Pembiayaan bank ----------------
@@ -465,7 +511,7 @@ class ImporDataAwalTest extends TestCase
         ]);
 
         $this->assertSame(['pembiayaan' => 1], $hasil['tersimpan']);
-        $loan = \App\Models\BankLoan::firstOrFail();
+        $loan = BankLoan::firstOrFail();
         $this->assertSame(250000000.0, (float) $loan->pokok_awal); // diisi SISA pokok
         $this->assertSame('aktif', $loan->status);
 
@@ -505,7 +551,7 @@ class ImporDataAwalTest extends TestCase
         ]);
 
         $this->assertSame(['uang_muka' => 1], $hasil['tersimpan']);
-        $um = \App\Models\OperationalAdvance::firstOrFail();
+        $um = OperationalAdvance::firstOrFail();
         $this->assertSame(2500000.0, (float) $um->nominal);
         $this->assertSame('outstanding', $um->status);
         $this->assertStringStartsWith('UM/2026/007', $um->keterangan); // penanda idempoten
@@ -530,7 +576,7 @@ class ImporDataAwalTest extends TestCase
         $hasil = app(ImporSaldoAwal::class)->jalankan('accrue-prepaid', $path, ['kode_unit' => 'ZZUNIT']);
 
         $this->assertSame(['accrue' => 1], $hasil['tersimpan']);
-        $acc = \App\Models\Accrue::firstOrFail();
+        $acc = Accrue::firstOrFail();
         // Pasangan akun ASLI dipertahankan supaya pembalikannya nanti benar —
         // bukan diarahkan ke akun perantara seperti invoice vendor.
         $this->assertSame('5.ZZIM.1', $acc->kode_coa_debet);
@@ -567,7 +613,7 @@ class ImporDataAwalTest extends TestCase
         $hasil = app(ImporSaldoAwal::class)->jalankan('aset-tetap', $path, []);
 
         $this->assertSame(['aset' => 1], $hasil['tersimpan']);
-        $aset = \App\Models\Asset::findOrFail('AST-0001');
+        $aset = Asset::findOrFail('AST-0001');
         $this->assertSame(240000000.0, (float) $aset->harga_perolehan);
         $this->assertSame(96000000.0, (float) $aset->akumulasi_depresiasi);
         $this->assertSame('garis_lurus', $aset->metode_depresiasi);
@@ -575,7 +621,7 @@ class ImporDataAwalTest extends TestCase
 
         // Inti fiturnya: nilai buku sudah berkurang, jadi penyusutan berlanjut
         // dari sisa umur — bukan dihitung ulang dari nol.
-        $svc = new \App\Services\Modules\AssetService;
+        $svc = new AssetService;
         $this->assertSame(144000000.0, (float) $svc->bookValue($aset));
     }
 
@@ -598,7 +644,7 @@ class ImporDataAwalTest extends TestCase
     public function test_pengajuan_belum_dibayar_bisa_langsung_dilunasi_kas_keluar(): void
     {
         $this->siapkanVendor();
-        \App\Models\Bagian::create(['kode_bagian' => 'ZZBAG', 'nama_bagian' => 'Bagian Uji', 'level' => 3]);
+        Bagian::create(['kode_bagian' => 'ZZBAG', 'nama_bagian' => 'Bagian Uji', 'level' => 3]);
         $this->actingAs($this->admin);
 
         $path = $this->berkasIsi(
@@ -610,7 +656,7 @@ class ImporDataAwalTest extends TestCase
         ]);
 
         $this->assertSame(['pengajuan' => 1], $hasil['tersimpan']);
-        $p = \App\Models\PengajuanPembayaran::firstOrFail();
+        $p = PengajuanPembayaran::firstOrFail();
         $this->assertSame(7500000.0, (float) $p->sisa_hutang);
         // "diposting" adalah satu-satunya status yang diterima applyPayment().
         $this->assertSame('diposting', $p->status);
@@ -618,7 +664,7 @@ class ImporDataAwalTest extends TestCase
         $this->assertSame(0, JournalEntry::count(), 'bebannya sudah diakui di sistem lama');
 
         // Buktinya benar-benar bisa dibayar lewat jalur normal.
-        (new \App\Services\Modules\PengajuanPembayaranService)->applyPayment($p->id, '7500000');
+        (new PengajuanPembayaranService)->applyPayment($p->id, '7500000');
         $this->assertSame('lunas', $p->refresh()->status);
         $this->assertSame(0.0, (float) $p->sisa_hutang);
     }
@@ -631,7 +677,7 @@ class ImporDataAwalTest extends TestCase
             ."PB/1,2026-08-20,NGAWUR,1000,5.ZZIM.1,ZZUNIT,uji\n"
             ."PB/2,2026-08-20,ZZBAG2,1000,5.ZZIM.1,NGAWUR,uji\n"
         );
-        \App\Models\Bagian::create(['kode_bagian' => 'ZZBAG2', 'nama_bagian' => 'Bagian Uji 2', 'level' => 3]);
+        Bagian::create(['kode_bagian' => 'ZZBAG2', 'nama_bagian' => 'Bagian Uji 2', 'level' => 3]);
 
         $hasil = app(ImporSaldoAwal::class)->pratinjau('pengajuan-belum-dibayar', $path, [
             'kode_coa_hutang' => '2.ZZIM.1',
@@ -648,7 +694,7 @@ class ImporDataAwalTest extends TestCase
     /** Master karyawan seadanya + akun piutangnya. */
     private function siapkanKaryawan(): void
     {
-        \App\Models\Bagian::create(['kode_bagian' => 'ZZKRY', 'nama_bagian' => 'Bagian Karyawan', 'level' => 3]);
+        Bagian::create(['kode_bagian' => 'ZZKRY', 'nama_bagian' => 'Bagian Karyawan', 'level' => 3]);
         Karyawan::create(['kode' => 'KRY-001', 'nama' => 'Ust. Salim', 'kode_bagian' => 'ZZKRY', 'status' => 'aktif']);
         Karyawan::create(['kode' => 'KRY-002', 'nama' => 'Mantan Pegawai', 'kode_bagian' => 'ZZKRY', 'status' => 'nonaktif']);
         CoaDetail::create(['kode_coa' => '1.ZZIM.5', 'nama_coa' => 'Piutang Karyawan', 'kode_grup' => self::GRP, 'jenis_saldo' => 'debet']);
@@ -669,7 +715,7 @@ class ImporDataAwalTest extends TestCase
         ]);
 
         $this->assertSame(['pinjaman' => 1], $hasil['tersimpan']);
-        $pinjaman = \App\Models\PinjamanKaryawan::firstOrFail();
+        $pinjaman = PinjamanKaryawan::firstOrFail();
         $this->assertSame(3000000.0, (float) $pinjaman->pokok);   // diisi SISA pokok
         $this->assertSame(0.0, (float) $pinjaman->terbayar);      // cicilan lama bukan urusan sistem ini
         $this->assertSame('aktif', $pinjaman->status);
@@ -687,12 +733,12 @@ class ImporDataAwalTest extends TestCase
 
         // Yang penting: dokumennya benar-benar bisa dicicil lewat jalur normal,
         // dan cicilannya mengkredit akun piutang yang dipilih saat impor.
-        (new \App\Services\Modules\PinjamanKaryawanService)->bayar($pinjaman->id, [
+        (new PinjamanKaryawanService)->bayar($pinjaman->id, [
             'tanggal' => '2026-09-25', 'nominal' => '1000000', 'cara' => 'tunai', 'kode_rekening' => '1.ZZIM.9',
         ], $this->admin->id_pengguna);
 
         $this->assertSame(2000000.0, (float) $pinjaman->refresh()->sisa);
-        $this->assertSame(1000000.0, (float) \App\Models\JournalLine::where('kode_coa', '1.ZZIM.5')->sum('kredit'));
+        $this->assertSame(1000000.0, (float) JournalLine::where('kode_coa', '1.ZZIM.5')->sum('kredit'));
     }
 
     public function test_pinjaman_karyawan_menolak_karyawan_dan_jadwal_yang_tak_sah(): void
@@ -712,7 +758,7 @@ class ImporDataAwalTest extends TestCase
         ]);
 
         $this->assertSame(4, $hasil['masalah']);
-        $this->assertSame(0, \App\Models\PinjamanKaryawan::count());
+        $this->assertSame(0, PinjamanKaryawan::count());
         $alasan = collect($hasil['baris_masalah'])->pluck('alasan')->join(' | ');
         $this->assertStringContainsString('"NGAWUR" tidak ada di master Karyawan', $alasan);
         $this->assertStringContainsString('nonaktif', $alasan);
@@ -735,7 +781,7 @@ class ImporDataAwalTest extends TestCase
         try {
             app(ImporSaldoAwal::class)->pratinjau('pinjaman-karyawan', $path, ['kode_coa_piutang' => '5.ZZIM.1']);
             $this->fail('Akun laba rugi seharusnya ditolak.');
-        } catch (\App\Exceptions\AppException $e) {
+        } catch (AppException $e) {
             $this->assertStringContainsString('akun laba rugi', $e->getMessage());
         }
 
@@ -747,7 +793,7 @@ class ImporDataAwalTest extends TestCase
 
         $this->assertSame(0, $ulang['siap']);
         $this->assertSame(2, $ulang['lewati']);
-        $this->assertSame(2, \App\Models\PinjamanKaryawan::count());
+        $this->assertSame(2, PinjamanKaryawan::count());
     }
 
     public function test_semua_jenis_impor_terdaftar(): void

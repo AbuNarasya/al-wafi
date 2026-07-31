@@ -13,8 +13,10 @@ use Illuminate\View\View;
 
 /**
  * Export Data (port ExportDataPage dev). Tiga export khusus (Jurnal mentah,
- * Buku Besar, Aset per kategori) + browser 22 dataset (Master & Transaksi).
- * Semua ke CSV / Excel (XLSX) / PDF lewat Exporter.
+ * Buku Besar, Aset per kategori) + browser 25 dataset dalam tiga grup: Master,
+ * Transaksi, & Kesantrian (santri aktif / alumni / santri keluar). Grup di
+ * halaman diturunkan dari `DatasetRegistry::datasets()`, jadi menambah dataset
+ * cukup di registry itu. Semua ke CSV / Excel (XLSX) / PDF lewat Exporter.
  */
 class ExportController extends Controller
 {

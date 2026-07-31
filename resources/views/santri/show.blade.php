@@ -31,7 +31,7 @@
             <div><div class="text-xs text-gray-400">NIS</div><div>{{ $santri->nis ?? '—' }}</div></div>
             <div><div class="text-xs text-gray-400">Nama</div><div>{{ $santri->nama }} ({{ $santri->jenis_kelamin }})</div></div>
             <div><div class="text-xs text-gray-400">Status</div><span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">{{ $labelStatus }}</span></div>
-            <div><div class="text-xs text-gray-400">Jenjang / Jalur</div><div>{{ $santri->kode_jenjang ?? '—' }} · {{ ucfirst($santri->jalur) }}</div></div>
+            <div><div class="text-xs text-gray-400">Jenjang / Jalur</div><div>{{ $santri->jenjang?->nama ?? $santri->kode_jenjang ?? '—' }} · {{ $santri->jalurPendaftaran?->nama ?? ucfirst((string) $santri->jalur) }}</div></div>
             {{-- Tingkat bisa diubah di tempat: santri lama & hasil impor belum
                  punya nilainya, dan tak ada form sunting santri yang lengkap. --}}
             <div x-data="{ ubah: false }">
@@ -55,8 +55,46 @@
                     </form>
                 @endif
             </div>
-            <div><div class="text-xs text-gray-400">Tahun Ajaran</div><div>{{ $santri->tahun_ajaran ?? '—' }}</div></div>
+            <div><div class="text-xs text-gray-400">Tahun Ajaran (angkatan)</div><div>{{ $santri->tahun_ajaran ?? '—' }}</div></div>
+            {{-- Tahun BERJALAN, dipisahkan dari angkatan: angkatan tak pernah maju,
+                 sedangkan yang ini maju tiap kenaikan. Bisa dikoreksi di tempat —
+                 berkas impor yang kolom tahun ajarannya salah dulu tak punya jalan
+                 diperbaiki sama sekali, dan santri yang selisihnya lebih dari satu
+                 tahun akan terus dilewati Kenaikan Tingkat demi menjaga riwayatnya. --}}
+            @if ($santri->status === 'aktif')
+                <div x-data="{ ubahTa: false }">
+                    <div class="text-xs text-gray-400">T.A Berjalan</div>
+                    <div class="flex items-center gap-2" x-show="!ubahTa">
+                        <span>{{ $santri->taBerjalan() ?? '—' }}</span>
+                        @if (\App\Support\Akses::boleh('santri', 'ubah'))
+                            <button type="button" @click="ubahTa = true" class="text-xs text-brand hover:underline">ubah</button>
+                        @endif
+                    </div>
+                    @if (\App\Support\Akses::boleh('santri', 'ubah'))
+                        <form x-show="ubahTa" x-cloak method="POST" action="{{ $act('set-tahun-berjalan') }}" class="flex items-center gap-1"
+                              data-confirm="Koreksi tahun ajaran berjalan? Tingkat, jenjang, dan tagihan yang sudah terbit TIDAK ikut berubah.">
+                            @csrf
+                            <select name="tahun_ajaran_berjalan" required class="rounded border-gray-300 py-1 text-sm">
+                                @foreach ($opsiTaBerjalan as $kodeTa)
+                                    <option value="{{ $kodeTa }}" @selected($santri->taBerjalan() === $kodeTa)>{{ $kodeTa }}</option>
+                                @endforeach
+                            </select>
+                            <button class="text-xs font-semibold text-brand hover:underline">simpan</button>
+                            <button type="button" @click="ubahTa = false" class="text-xs text-gray-400 hover:underline">batal</button>
+                        </form>
+                    @endif
+                </div>
+            @endif
             <div><div class="text-xs text-gray-400">Gelombang</div><div>{{ $santri->gelombang ?? 'Tanpa Gelombang' }}</div></div>
+            {{-- Tanggal lulus hanya bermakna bagi alumni. Dulu kolomnya terisi saat
+                 kelulusan tapi TAK PERNAH ditampilkan di layar mana pun — tanggal
+                 ijazah tersimpan diam-diam. --}}
+            @if ($santri->status === 'alumni')
+                <div>
+                    <div class="text-xs text-gray-400">Tanggal Lulus</div>
+                    <div class="font-medium text-purple-700">{{ $santri->tanggal_lulus ? $santri->tanggal_lulus->format('d/m/Y') : '—' }}</div>
+                </div>
+            @endif
             <div class="sm:col-span-2"><div class="text-xs text-gray-400">Wali</div><div>{{ $santri->wali?->nama ?? '—' }} · {{ $santri->wali?->telepon }}</div></div>
         </div>
 
@@ -176,7 +214,11 @@
                         </form>
                         <form method="POST" action="{{ $act('medcheck') }}">@csrf<input type="hidden" name="lolos" value="0"><button class="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100">Med Check: Gagal</button></form>
                     @endif
-                    @if (in_array($santri->status, ['diterima', 'lolos_kesehatan'], true) && ! $sudahAdaUangPangkal)
+                    {{-- Formnya muncul hanya bila MASIH ADA yang bisa diterbitkan. Dulu
+                         syaratnya "belum ada tagihan uang pangkal", sehingga calon berjalur
+                         bebas uang pangkal — yang tak pernah punya tagihan itu — terus
+                         disodori form walau perlengkapannya sudah terbit. --}}
+                    @if (in_array($santri->status, ['diterima', 'lolos_kesehatan'], true) && $bisaTagih['ada'])
                         {{-- Tagihkan uang pangkal: nominal diinput per calon (agar keringanan/potongan bisa) --}}
                         <form method="POST" action="{{ $act('tagih-uang-pangkal') }}" class="w-full space-y-2 rounded-lg border border-amber-200 bg-amber-50/40 p-3">@csrf
                             <div class="text-sm font-semibold text-gray-700">Tagihkan Uang Pangkal &amp; Perlengkapan</div>
@@ -194,30 +236,42 @@
                                     <div class="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
                                         <b>Bebas uang pangkal.</b> Jalur {{ $santri->jalurPendaftaran?->nama ?? $santri->jalur }}
                                         tidak ditagih uang pangkal — yang terbit hanya biaya perlengkapan.
-                                        <span class="mt-0.5 block text-[11px] text-emerald-700/80">{{ $asalTarifUangPangkal }}</span>
+                                        <span class="mt-0.5 block text-[11px] text-emerald-700/80">
+                                            <x-asal-tarif :bagian="$asalTarifUangPangkal['bagian']" :teks="$asalTarifUangPangkal['label']" />
+                                        </span>
+                                    </div>
+                                @elseif (! $bisaTagih['uang_pangkal'])
+                                    {{-- Sudah terbit: isiannya ditiadakan, bukan dibiarkan lalu
+                                         ditolak 409 saat disimpan. Yang tersisa di form ini
+                                         tinggal perlengkapannya. --}}
+                                    <div class="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                                        <b>Uang pangkal sudah ditagihkan.</b> Untuk mengubah nominalnya,
+                                        pakai <i>Koreksi Nominal</i> di bawah — jangan terbitkan yang kedua.
                                     </div>
                                 @else
                                     <label class="block text-xs text-gray-600">Nominal Normal <span class="text-red-500">*</span>
-                                        <input type="number" step="0.01" min="0" name="nominal" required placeholder="mis. 20000000"
-                                               value="{{ old('nominal', $nominalDefaultUangPangkal) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                        <x-input-rupiah name="nominal" required placeholder="mis. 20.000.000"
+                                                        :value="old('nominal', $nominalDefaultUangPangkal)" class="mt-0.5" />
                                         {{-- Asal angkanya selalu disebut: petugas harus bisa tahu sel
                                              tarif mana yang terpakai tanpa menebak. --}}
                                         <span class="mt-0.5 block text-[11px] {{ $nominalDefaultUangPangkal !== null ? 'text-gray-400' : 'text-red-600' }}">
-                                            {{ $asalTarifUangPangkal }}
+                                            <x-asal-tarif :bagian="$asalTarifUangPangkal['bagian']" :teks="$asalTarifUangPangkal['label']" />
                                             @if ($nominalDefaultUangPangkal !== null) — boleh diubah bila calon ini berbeda. @endif
                                         </span>
                                     </label>
                                 @endif
                                 {{-- Perlengkapan TIDAK dipotong potongan gelombang: terbit utuh
                                      sebagai tagihan tersendiri, dengan jadwal termin sendiri. --}}
-                                <label class="block text-xs text-gray-600">Biaya Perlengkapan
-                                    <input type="number" step="0.01" min="0" name="nominal_perlengkapan" placeholder="kosongkan bila tidak dipungut"
-                                           value="{{ old('nominal_perlengkapan', $nominalDefaultPerlengkapan) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
-                                    <span class="mt-0.5 block text-[11px] text-gray-400">
-                                        Terbit sebagai tagihan terpisah dan <b>tidak dipotong</b> potongan gelombang.
-                                        {{ $asalTarifPerlengkapan }}
-                                    </span>
-                                </label>
+                                @if ($bisaTagih['perlengkapan'])
+                                    <label class="block text-xs text-gray-600">Biaya Perlengkapan
+                                        <x-input-rupiah name="nominal_perlengkapan" placeholder="kosongkan bila tidak dipungut"
+                                                        :value="old('nominal_perlengkapan', $nominalDefaultPerlengkapan)" class="mt-0.5" />
+                                        <span class="mt-0.5 block text-[11px] text-gray-400">
+                                            Terbit sebagai tagihan terpisah dan <b>tidak dipotong</b> potongan gelombang.
+                                            <x-asal-tarif :bagian="$asalTarifPerlengkapan['bagian']" :teks="$asalTarifPerlengkapan['label']" />
+                                        </span>
+                                    </label>
+                                @endif
                                 <label class="block text-xs text-gray-600">Jatuh Tempo
                                     <input type="date" name="jatuh_tempo" class="mt-0.5 w-full rounded border-gray-300 text-sm">
                                 </label>
@@ -225,6 +279,74 @@
                                     <input type="text" name="keterangan" placeholder="opsional" class="mt-0.5 w-full rounded border-gray-300 text-sm">
                                 </label>
                             </div>
+
+                            {{-- SPP bulanan: DITAMPILKAN di sini, tidak diterbitkan. SPP baru
+                                 ditagih setelah daftar ulang, tetapi inilah saat wali duduk
+                                 membicarakan seluruh biayanya — angkanya harus terlihat.
+
+                                 Isiannya baru ADA di DOM setelah "ubah" diklik (template x-if,
+                                 bukan x-show): tanpa itu `nominal_spp` tak ikut terkirim, dan
+                                 santrinya tetap mengikuti tarif jenjang — ikut naik saat tarif
+                                 naik. "Batalkan Perubahan" membuang isiannya lagi dari DOM,
+                                 jadi yang sudah terlanjur diketik pun tak jadi terkirim. --}}
+                            @if ($sppSantri)
+                                {{-- Warnanya sengaja BEDA SENDIRI di halaman ini: indigo pekat di
+                                     atas dasar putih, di tengah form yang serba amber. Petugas
+                                     harus menyadari ada satu angka lagi yang perlu dipastikan
+                                     sebelum menekan Terbitkan — blok bernada sama dengan
+                                     sekitarnya terlewat begitu saja. --}}
+                                <div class="rounded-lg border-2 border-indigo-500 border-l-8 bg-white px-3 py-2.5 text-xs text-indigo-950 shadow-sm" x-data="{ ubahSpp: false }">
+                                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                        <span class="text-sm font-bold uppercase tracking-wide text-indigo-700">SPP Bulanan</span>
+                                        @if ($sppSantri['nominal'] !== null)
+                                            <b class="text-sm">@rp($sppSantri['nominal'])</b>
+                                        @else
+                                            <b class="text-sm text-red-600">belum bisa ditentukan</b>
+                                        @endif
+                                        @if ($sppSantri['khusus'])
+                                            <span class="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white">khusus</span>
+                                        @endif
+                                        @if ($bolehUbahSpp)
+                                            <button type="button" x-show="!ubahSpp" @click="ubahSpp = true"
+                                                    class="rounded-md border border-indigo-500 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100">ubah</button>
+                                            <button type="button" x-show="ubahSpp" x-cloak @click="ubahSpp = false"
+                                                    class="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-50">Batalkan Perubahan</button>
+                                        @endif
+                                    </div>
+                                    <p class="mt-1 text-[11px] font-medium text-indigo-700">
+                                        <x-asal-tarif :bagian="$sppSantri['bagian']" :teks="$sppSantri['label']" />
+
+                                        @if ($sppSantri['keterangan'])
+                                            — {{ $sppSantri['keterangan'] }}
+                                        @endif
+                                    </p>
+                                    <p class="mt-0.5 text-[11px] text-gray-500">
+                                        Tagihan SPP <b>tidak</b> ikut terbit sekarang — SPP mulai ditagih setelah daftar ulang.
+                                        Yang tersimpan hanya nominalnya, dan itu dipakai penerbitan periode berikutnya.
+                                    </p>
+
+                                    @if ($bolehUbahSpp)
+                                        <template x-if="ubahSpp">
+                                            <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                                                <input type="hidden" name="ubah_spp" value="1">
+                                                <label class="block text-xs text-gray-600">Nominal SPP Khusus
+                                                    <x-input-rupiah name="nominal_spp" :value="$sppSantri['nominal']"
+                                                                    placeholder="kosongkan = ikut tarif jenjang" class="mt-0.5" />
+                                                    <span class="mt-0.5 block text-[11px] text-gray-400">
+                                                        <b>0</b> = beasiswa penuh (tagihan tetap terbit senilai nol).
+                                                        <b>Kosongkan</b> = kembali mengikuti tarif jenjang.
+                                                    </span>
+                                                </label>
+                                                <label class="block text-xs text-gray-600">Alasan
+                                                    <input type="text" name="keterangan_spp" value="{{ $sppSantri['keterangan'] }}"
+                                                           placeholder="mis. beasiswa 50%" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                                </label>
+                                            </div>
+                                        </template>
+                                    @endif
+                                </div>
+                            @endif
+
                             <button class="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-700">Terbitkan Tagihan</button>
                         </form>
                     @endif
@@ -265,7 +387,7 @@
                                 @endif
                                 <div class="grid gap-2 sm:grid-cols-3">
                                     <label class="block text-xs text-gray-600">Nominal Normal yang Benar <span class="text-red-500">*</span>
-                                        <input type="number" step="0.01" min="0" name="nominal" required value="{{ old('nominal', $k['nominal_normal']) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                        <x-input-rupiah name="nominal" required :value="old('nominal', $k['nominal_normal'])" class="mt-0.5" />
                                     </label>
                                     <label class="block text-xs text-gray-600">Jatuh Tempo
                                         <input type="date" name="jatuh_tempo" value="{{ old('jatuh_tempo', optional($k['tagihan']->jatuh_tempo)->format('Y-m-d')) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
@@ -312,7 +434,7 @@
                                 @endif
                                 <div class="grid gap-2 sm:grid-cols-3">
                                     <label class="block text-xs text-gray-600">Nominal yang Benar <span class="text-red-500">*</span>
-                                        <input type="number" step="0.01" min="0" name="nominal" required value="{{ old('nominal', $kp['tagihan']->nominal) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                        <x-input-rupiah name="nominal" required :value="old('nominal', $kp['tagihan']->nominal)" class="mt-0.5" />
                                     </label>
                                     <label class="block text-xs text-gray-600">Jatuh Tempo
                                         <input type="date" name="jatuh_tempo" value="{{ old('jatuh_tempo', optional($kp['tagihan']->jatuh_tempo)->format('Y-m-d')) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
@@ -325,8 +447,31 @@
                             </form>
                         </div>
                     @endif
-                    @if (in_array($santri->status, ['diterima', 'lolos_kesehatan'], true))
-                        <form method="POST" action="{{ $act('daftar-ulang') }}">@csrf<button class="rounded-lg bg-brand-dark px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">Daftar Ulang → Aktif</button></form>
+                    @if ($santri->status === 'lolos_kesehatan')
+                        {{-- Labelnya sengaja TIDAK menyebut "daftar ulang": "daftar ulang"
+                             juga nama sebuah BIAYA tahunan, dan satu nama untuk dua hal
+                             berbeda membuat petugas ragu tombol ini menerbitkan tagihan
+                             atau tidak.
+
+                             Tombol ini MENANDAI SIAP, bukan mengaktifkan. Jurnal akrual
+                             uang pangkal & perlengkapan baru terbit saat aktivasinya
+                             menyala — lihat SantriService::siapkanAktivasi(). --}}
+                        <form method="POST" action="{{ $act('siap-aktivasi') }}"
+                              data-confirm="Tandai siap diaktifkan? Santri BELUM menjadi aktif sekarang — aktivasinya (beserta jurnal akrualnya) berlaku saat T.A {{ $santri->tahun_ajaran }} dimulai.">
+                            @csrf
+                            <button class="rounded-lg bg-brand-dark px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">Siap di Aktifkan</button>
+                        </form>
+                    @endif
+
+                    @if ($santri->status === 'siap_aktivasi')
+                        {{-- Tombol manual: santri yang masuk di TENGAH tahun ajaran harus
+                             bisa aktif hari itu juga; menunggu 1 Juli berikutnya akan
+                             menahannya setahun penuh. --}}
+                        <form method="POST" action="{{ $act('aktifkan-sekarang') }}"
+                              data-confirm="Aktifkan sekarang juga, tanpa menunggu T.A {{ $santri->tahun_ajaran }} dimulai? Jurnal akrual uang pangkal & perlengkapan akan terbit.">
+                            @csrf
+                            <button class="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700">Aktifkan Sekarang</button>
+                        </form>
                     @endif
 
                     <div x-data="{ open: false }" class="relative">
@@ -354,7 +499,7 @@
                     {{-- Belum ada siklus: tawarkan membukanya. --}}
                     @if ($lanjutan['sasaran'] && ! $lanjutan['sasaran']['alasan'])
                         <p class="mt-1 text-xs text-gray-500">
-                            Naik ke <b>{{ \App\Support\Referensi::label($lanjutan['sasaran']['kode_jenjang'], $lanjutan['sasaran']['nama_jenjang']) }}</b>,
+                            Naik ke <b>{{ $lanjutan['sasaran']['nama_jenjang'] ?: $lanjutan['sasaran']['kode_jenjang'] }}</b>,
                             jalur <b>{{ $lanjutan['sasaran']['kode_jalur'] }}</b>. Prosesnya melewati PPSB (seleksi &amp; med check);
                             <b>tahap berkas dilewati</b> karena dokumennya sudah ada.
                         </p>
@@ -383,7 +528,7 @@
                 @else
                     @php $act = fn ($a) => route('pendaftaran_lanjutan.aksi', ['id' => $santri->id, 'pendaftaran' => $p->id, 'aksi' => $a]); @endphp
                     <p class="mt-1 text-xs text-gray-500">
-                        {{ $p->nomor }} &middot; ke <b>{{ $p->kode_jenjang }}</b> jalur <b>{{ $p->kode_jalur }}</b> &middot;
+                        {{ $p->nomor }} &middot; ke <b>{{ $p->jenjang?->nama ?? $p->kode_jenjang }}</b> jalur <b>{{ $p->jalur?->nama ?? $p->kode_jalur }}</b> &middot;
                         T.A <b>{{ $p->tahun_ajaran }}</b> &middot; tahap
                         <span class="rounded bg-brand/10 px-1.5 py-0.5 font-semibold text-brand">{{ $p->labelStatus() }}</span>
                     </p>
@@ -432,7 +577,7 @@
                                 <p class="text-xs text-gray-500">
                                     Sekali dieksekusi: jenjang, tingkat, jalur, &amp; tahun ajaran berjalan santri berubah,
                                     riwayat tingkatnya ditulis, lalu uang pangkal &amp; perlengkapan ditagihkan dengan tarif
-                                    <b>{{ $p->kode_jenjang }} T.A {{ $p->tahun_ajaran }}</b>.
+                                    <b>{{ $p->jenjang?->nama ?? $p->kode_jenjang }} T.A {{ $p->tahun_ajaran }}</b>.
                                 </p>
                                 <div class="grid gap-2 sm:grid-cols-4">
                                     <label class="block text-xs text-gray-600">Tingkat Baru <span class="text-red-500">*</span>
@@ -445,14 +590,12 @@
                                     @php $tu = $lanjutan['tarif']['uang_pangkal'] ?? null; $tp = $lanjutan['tarif']['perlengkapan'] ?? null; @endphp
                                     @if (($tu['status'] ?? null) !== 'bebas')
                                         <label class="block text-xs text-gray-600">Uang Pangkal
-                                            <input type="number" step="0.01" min="0" name="nominal_uang_pangkal"
-                                                   value="{{ $tu['nominal'] ?? '' }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                            <x-input-rupiah name="nominal_uang_pangkal" :value="$tu['nominal'] ?? ''" class="mt-0.5" />
                                         </label>
                                     @endif
                                     <label class="block text-xs text-gray-600">Perlengkapan
-                                        <input type="number" step="0.01" min="0" name="nominal_perlengkapan"
-                                               value="{{ ($tp['status'] ?? null) === 'ada' ? $tp['nominal'] : '' }}"
-                                               placeholder="kosongkan bila tak dipungut" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                        <x-input-rupiah name="nominal_perlengkapan" :value="($tp['status'] ?? null) === 'ada' ? $tp['nominal'] : ''"
+                                                        placeholder="kosongkan bila tak dipungut" class="mt-0.5" />
                                     </label>
                                     <label class="block text-xs text-gray-600">Jatuh Tempo
                                         <input type="date" name="jatuh_tempo" class="mt-0.5 w-full rounded border-gray-300 text-sm">
@@ -485,7 +628,7 @@
                     <div class="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-500">
                         <div class="mb-1 font-medium text-gray-600">Riwayat pendaftaran lanjutan</div>
                         @foreach ($lanjutan['riwayat'] as $r)
-                            <div>{{ $r->nomor }} &middot; {{ $r->kode_jenjang }} T.A {{ $r->tahun_ajaran }} &middot; {{ $r->labelStatus() }}</div>
+                            <div>{{ $r->nomor }} &middot; {{ $r->jenjang?->nama ?? $r->kode_jenjang }} T.A {{ $r->tahun_ajaran }} &middot; {{ $r->labelStatus() }}</div>
                         @endforeach
                     </div>
                 @endif

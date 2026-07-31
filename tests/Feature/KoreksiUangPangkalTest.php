@@ -27,6 +27,7 @@ use Tests\TestCase;
 /** Koreksi nominal uang pangkal (salah input): hitung ulang + pagar keselamatan. */
 class KoreksiUangPangkalTest extends TestCase
 {
+    use \Tests\Concerns\MengaktifkanSantri;
     use RefreshDatabase;
     use \Tests\Concerns\MembuatTarif;
 
@@ -127,7 +128,7 @@ class KoreksiUangPangkalTest extends TestCase
         $santri = $this->calonDenganUangPangkal('10000000');
         $svc = new SantriService;
         $svc->medcheck($santri->id, ['lolos' => true]);
-        $svc->daftarUlang($santri->id, $this->admin);
+        $this->aktifkanSantri($santri->id, $this->admin);
         $this->assertTrue((bool) $this->tagihanUp($santri)->sudah_akrual);
 
         $this->expectException(AppException::class);

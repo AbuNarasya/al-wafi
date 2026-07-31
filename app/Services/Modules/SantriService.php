@@ -4,6 +4,8 @@ namespace App\Services\Modules;
 
 use App\Exceptions\AppException;
 use App\Models\ActivityLog;
+use App\Models\JadwalPerubahanSantri;
+use App\Models\JalurNonaktif;
 use App\Models\JalurPendaftaran;
 use App\Models\JenisBiaya;
 use App\Models\Jenjang;
@@ -11,9 +13,9 @@ use App\Models\PembayaranSantri;
 use App\Models\Pendaftaran;
 use App\Models\PotonganUangPangkal;
 use App\Models\RencanaAngsuranUangPangkal;
-use App\Models\RiwayatTingkat;
 use App\Models\Santri;
 use App\Models\TagihanSantri;
+use App\Models\TipeBiaya;
 use App\Models\Wali;
 use App\Services\Ledger\DocNumber;
 use App\Services\Ledger\PostingService;
@@ -57,7 +59,10 @@ class SantriService
         if (empty($data['tahun_ajaran'])) {
             throw new AppException(422, 'Tahun ajaran wajib dipilih saat mendaftarkan calon santri.');
         }
-        $ta = (new TahunAjaranService)->pastikanAktif($data['tahun_ajaran']);
+        // PPSB boleh mendaftarkan untuk tahun berjalan maupun tahun yang AKAN
+        // DATANG (pendaftaran 2027/2028 dibuka pada 2026) — tetapi tidak mundur
+        // ke tahun yang sudah lewat.
+        $ta = (new TahunAjaranService)->assertTidakMundur($data['tahun_ajaran'], 'Pendaftaran calon santri');
         $this->pastikanJalurSah(
             (string) ($data['jalur'] ?? ''),
             (string) $data['tahun_ajaran'],
@@ -83,7 +88,7 @@ class SantriService
             // Siklus pendaftaran PERTAMA santri ini. Sasaran & tahapannya dicatat
             // di sini, bukan hanya di santri, karena kenaikan jenjang nanti
             // menambah siklus berikutnya (lihat PendaftaranLanjutanService).
-            Pendaftaran::create([
+            $pendaftaran = Pendaftaran::create([
                 'id_santri' => $santri->id, 'tanggal' => $now->toDateString(),
                 'tahun_ajaran' => $santri->tahun_ajaran, 'kode_jenjang' => $santri->kode_jenjang,
                 'kode_jalur' => $santri->jalur, 'jenis' => 'baru', 'status' => 'calon',
@@ -102,6 +107,18 @@ class SantriService
                     'sisa' => $registrasi['nominal'],
                     'keterangan' => $registrasi['jenis']->nama,
                 ]);
+            } else {
+                // BEBAS biaya registrasi (mis. jalur Anak Karyawan): tak ada tagihan,
+                // jadi tahap registrasinya LANGSUNG DILEWATI.
+                //
+                // Tanpa ini calonnya tertahan selamanya di "Calon": satu-satunya
+                // yang menulis status `terbayar` adalah verifikasi pembayaran
+                // registrasi, dan halaman detailnya pun tak punya tombol apa pun
+                // untuk status `calon`. Pendaftaran lanjutan sudah lama
+                // memperlakukannya begini (PendaftaranLanjutanService::buka) —
+                // pendaftaran baru tertinggal, dan itulah bedanya.
+                $santri->update(['status' => 'terbayar']);
+                $pendaftaran->update(['status' => 'terbayar']);
             }
 
             return $santri;
@@ -200,7 +217,7 @@ class SantriService
         // "aktif" ikut diterima: santri yang naik jenjang ditagih uang pangkal
         // lagi dengan tarif jenjang & T.A barunya. Penjaga ini ada untuk
         // menghalangi penagihan SEBELUM calon dinyatakan lulus, bukan sesudahnya.
-        if (! in_array($santri->status, ['diterima', 'lolos_kesehatan', 'aktif'], true)) {
+        if (! in_array($santri->status, ['diterima', 'lolos_kesehatan', 'siap_aktivasi', 'aktif'], true)) {
             throw new AppException(422, 'Uang pangkal hanya bisa ditagihkan setelah calon dinyatakan lulus. Status sekarang "'.Tahap::labelStatus($santri->status).'".');
         }
 
@@ -214,11 +231,21 @@ class SantriService
         // ditagih atas nama tahun ajaran tujuan. Tanpa penimpaan ini, tagihan
         // kenaikan akan tercap tahun angkatan dan ditolak indeks unik.
         $taTagihan = ($data['tahun_ajaran'] ?? null) ?: $santri->tahun_ajaran;
+        // Uang pangkal & perlengkapan boleh ditagih untuk tahun berjalan atau
+        // tahun berikutnya (calon 2027/2028 ditagih pada 2026) — tak boleh mundur.
+        (new TahunAjaranService)->assertTidakMundur((string) $taTagihan, 'Penagihan uang pangkal & perlengkapan');
+
+        // JENJANG & JALUR TAGIHAN — bisa ditimpa dengan alasan yang sama seperti
+        // tahun ajaran di atas. Kenaikan jenjang kini MENAGIH LEBIH DULU dan baru
+        // memindahkan santrinya saat tahun ajaran tujuan dimulai; tanpa penimpaan
+        // ini, tagihannya akan memakai tarif jenjang LAMA yang sedang ditinggalkan.
+        $jenjangTagihan = ($data['kode_jenjang'] ?? null) ?: $santri->kode_jenjang;
+        $jalurTagihan = ($data['jalur'] ?? null) ?: $santri->jalur;
 
         $jenis = null;
         $bebas = true; // "tak menerbitkan uang pangkal" — jalannya sama dengan bebas
         if ($mintaUp) {
-            ['jenis' => $jenis, 'tarif' => $tarif] = $this->komponen('uang_pangkal', $taTagihan, $santri->kode_jenjang, $santri->jalur);
+            ['jenis' => $jenis, 'tarif' => $tarif] = $this->komponen('uang_pangkal', $taTagihan, $jenjangTagihan, $jalurTagihan);
             $bebas = $tarif['status'] === 'bebas';
             if (! $bebas && $tarif['status'] !== 'ada') {
                 throw new AppException(422, $tarif['label'].' Isi selnya di menu Setting Awal → Tarif, '
@@ -230,8 +257,8 @@ class SantriService
             // Penjaga per (jenjang, T.A) — BUKAN per santri. Satu santri memang
             // ditagih uang pangkal lagi setiap kali naik jenjang; yang dilarang
             // adalah dua tagihan untuk jenjang & tahun ajaran yang sama.
-            if (! $bebas && $this->tagihanBerperilaku($id, 'uang_pangkal', $santri->kode_jenjang, $taTagihan)) {
-                throw new AppException(409, "Uang pangkal {$santri->kode_jenjang} T.A {$taTagihan} untuk santri ini sudah pernah ditagihkan. Sunting tagihannya, jangan terbitkan yang kedua.");
+            if (! $bebas && $this->tagihanBerperilaku($id, 'uang_pangkal', $jenjangTagihan, $taTagihan)) {
+                throw new AppException(409, "Uang pangkal {$jenjangTagihan} T.A {$taTagihan} untuk santri ini sudah pernah ditagihkan. Sunting tagihannya, jangan terbitkan yang kedua.");
             }
         }
         $nominalNormal = $bebas ? '0' : Money::of($data['nominal']);
@@ -245,10 +272,10 @@ class SantriService
         $nominalPerlengkapan = Money::of($data['nominal_perlengkapan'] ?? '0');
         $jenisPerlengkapan = null;
         if (Money::gtZero($nominalPerlengkapan)) {
-            if ($this->tagihanBerperilaku($id, 'perlengkapan', $santri->kode_jenjang, $taTagihan)) {
-                throw new AppException(409, "Biaya perlengkapan {$santri->kode_jenjang} T.A {$taTagihan} untuk santri ini sudah pernah ditagihkan. Sunting tagihannya, jangan terbitkan yang kedua.");
+            if ($this->tagihanBerperilaku($id, 'perlengkapan', $jenjangTagihan, $taTagihan)) {
+                throw new AppException(409, "Biaya perlengkapan {$jenjangTagihan} T.A {$taTagihan} untuk santri ini sudah pernah ditagihkan. Sunting tagihannya, jangan terbitkan yang kedua.");
             }
-            $komponenPerlengkapan = $this->komponen('perlengkapan', $taTagihan, $santri->kode_jenjang, $santri->jalur);
+            $komponenPerlengkapan = $this->komponen('perlengkapan', $taTagihan, $jenjangTagihan, $jalurTagihan);
             if ($komponenPerlengkapan['tarif']['status'] === 'bebas') {
                 throw new AppException(422, 'Tarif perlengkapan untuk jalur ini bertanda BEBAS, jadi tagihannya memang tidak diterbitkan. '
                     .'Kosongkan isian nominal perlengkapan, atau ubah tandanya di menu Setting Awal → Tarif.');
@@ -258,17 +285,17 @@ class SantriService
 
         // Jalur bebas: tak ada nominal, jadi tak ada pula potongan yang dihitung.
         $potonganRow = $bebas ? null
-            : (new PotonganGelombangService)->potonganAktif($santri->gelombang, $santri->kode_jenjang, $taTagihan);
+            : (new PotonganGelombangService)->potonganAktif($santri->gelombang, $jenjangTagihan, $taTagihan);
         $potongan = $potonganRow ? Money::of($potonganRow->potongan) : '0';
         if (Money::gte($potongan, $nominalNormal) && ! $bebas) {
             throw new AppException(422, "Potongan Gelombang {$santri->gelombang} ({$potongan}) tidak boleh ≥ nominal uang pangkal ({$nominalNormal}).");
         }
         $efektif = Money::sub($nominalNormal, $potongan);
 
-        return DB::transaction(function () use ($id, $data, $jenis, $santri, $taTagihan, $nominalNormal, $potongan, $potonganRow, $efektif, $jenisPerlengkapan, $nominalPerlengkapan) {
+        return DB::transaction(function () use ($id, $data, $jenis, $santri, $taTagihan, $jenjangTagihan, $nominalNormal, $potongan, $potonganRow, $efektif, $jenisPerlengkapan, $nominalPerlengkapan) {
             $tagihan = $jenis === null ? null : TagihanSantri::create([
                 'id_santri' => $id, 'kode_jenis' => $jenis->kode,
-                'perilaku' => 'uang_pangkal', 'kode_jenjang' => $santri->kode_jenjang, 'tahun_ajaran' => $taTagihan,
+                'perilaku' => 'uang_pangkal', 'kode_jenjang' => $jenjangTagihan, 'tahun_ajaran' => $taTagihan,
                 'nominal' => $efektif, 'sisa' => $efektif,
                 'jatuh_tempo' => $data['jatuh_tempo'] ?? null, 'keterangan' => $data['keterangan'] ?? $jenis->nama,
             ]);
@@ -284,7 +311,7 @@ class SantriService
             // Terbit UTUH — tak ada baris potongan yang dilekatkan padanya.
             $perlengkapan = $jenisPerlengkapan ? TagihanSantri::create([
                 'id_santri' => $id, 'kode_jenis' => $jenisPerlengkapan->kode,
-                'perilaku' => 'perlengkapan', 'kode_jenjang' => $santri->kode_jenjang, 'tahun_ajaran' => $taTagihan,
+                'perilaku' => 'perlengkapan', 'kode_jenjang' => $jenjangTagihan, 'tahun_ajaran' => $taTagihan,
                 'nominal' => $nominalPerlengkapan, 'sisa' => $nominalPerlengkapan,
                 'jatuh_tempo' => $data['jatuh_tempo_perlengkapan'] ?? $data['jatuh_tempo'] ?? null,
                 'keterangan' => $data['keterangan_perlengkapan'] ?? $jenisPerlengkapan->nama,
@@ -484,16 +511,74 @@ class SantriService
      * satu jurnal gabungan akan menempelkan unit yang salah pada separuh
      * barisnya — dan laba rugi per unit ikut keliru.
      */
-    public function daftarUlang(int $id, int $idPengguna): Santri
+    public function siapkanAktivasi(int $id, int $idPengguna): Santri
     {
         $santri = Santri::find($id);
         if (! $santri) {
             throw new AppException(404, 'Santri tidak ditemukan.');
         }
-        Tahap::assertTransisi($santri->status, 'aktif');
+        Tahap::assertTransisi($santri->status, 'siap_aktivasi');
 
+        // Syaratnya diperiksa SEKARANG, bukan nanti saat jadwalnya menyala:
+        // petugas masih di layar dan bisa memperbaiki; penerap jadwal berjalan
+        // tanpa seorang pun menunggui.
+        $this->pastikanSiapDiaktifkan($santri);
+
+        $ta = (string) $santri->tahun_ajaran;
+        (new TahunAjaranService)->pastikanAktif($ta);
+
+        DB::transaction(function () use ($santri, $ta, $idPengguna) {
+            $santri->update(['status' => 'siap_aktivasi']);
+            Pendaftaran::where('id_santri', $santri->id)->orderByDesc('id')->first()
+                ?->update(['status' => 'siap_aktivasi']);
+
+            // Jadwalnya memakai tabel yang sama dengan kenaikan tingkat: satu
+            // pintu, satu penerap, satu perilaku. Berlaku saat T.A MASUK-nya
+            // dimulai — untuk calon yang mendaftar di tengah tahun berjalan,
+            // tanggal itu sudah lewat sehingga jadwalnya langsung menyala.
+            JadwalPerubahanSantri::updateOrCreate(
+                ['id_santri' => $santri->id, 'tahun_ajaran' => $ta, 'status' => 'siap'],
+                [
+                    'keputusan' => 'aktivasi',
+                    'kode_jenjang_tujuan' => $santri->kode_jenjang,
+                    'tingkat_tujuan' => $santri->tingkat,
+                    'kode_jalur_tujuan' => $santri->jalur,
+                    'ditetapkan_oleh' => $idPengguna,
+                    'ditetapkan_pada' => now(),
+                    'catatan' => 'Ditandai siap diaktifkan dari PPSB.',
+                ],
+            );
+
+            ActivityLog::create([
+                'id_pengguna' => $idPengguna,
+                'aksi' => 'santri_siap_aktivasi',
+                'detail' => json_encode([
+                    'id_santri' => $santri->id, 'no_pendaftaran' => $santri->no_pendaftaran,
+                    'nama' => $santri->nama, 'tahun_ajaran' => $ta,
+                ], JSON_UNESCAPED_UNICODE),
+            ]);
+        });
+
+        // Calon yang mendaftar di TENGAH tahun ajaran berjalan: tahun masuknya
+        // sudah dimulai, jadi tak ada gunanya menunggu — jadwalnya langsung
+        // menyala di sini, sama seperti penetapan kenaikan tingkat yang telat.
+        (new JadwalPerubahanService)->terapkanYangJatuhTempo();
+
+        return $santri->refresh();
+    }
+
+    /**
+     * Syarat menjadi santri: uang pangkalnya sudah ditagihkan (atau tarifnya
+     * memang bertanda Bebas) dan belum pernah diakrualkan.
+     *
+     * Dipakai DUA kali: saat menandai siap (supaya petugas tahu sedini mungkin)
+     * dan saat aktivasinya benar-benar menyala (karena keadaan bisa berubah di
+     * antara keduanya — tagihannya bisa dibatalkan).
+     */
+    private function pastikanSiapDiaktifkan(Santri $santri): void
+    {
         // Cari lewat TIPE tagihannya (lihat catatan di koreksiNominalUangPangkal).
-        $tagihan = $this->tagihanPerilaku($id, 'uang_pangkal');
+        $tagihan = $this->tagihanPerilaku($santri->id, 'uang_pangkal');
         if (! $tagihan) {
             // Santri yang tarif uang pangkalnya bertanda BEBAS memang tak punya
             // tagihan itu — menuntutnya akan mengunci mereka selamanya di
@@ -501,52 +586,46 @@ class SantriService
             // lengkap, bukan bebas: itu beda keadaan.
             $tarif = (new TarifService)->cari('uang_pangkal', $santri->tahun_ajaran, $santri->kode_jenjang, $santri->jalur);
             if ($tarif['status'] !== 'bebas') {
-                throw new AppException(422, 'Uang pangkal belum ditagihkan. Terbitkan tagihannya lebih dulu sebelum daftar ulang.');
+                throw new AppException(422, 'Uang pangkal belum ditagihkan. Terbitkan tagihannya lebih dulu.');
             }
         } elseif ($tagihan->sudah_akrual) {
             throw new AppException(422, 'Uang pangkal santri ini sudah pernah diakrualkan.');
         }
+    }
 
+    /**
+     * AKTIVASI — calon benar-benar menjadi santri. Dipanggil penerap jadwal,
+     * bukan langsung dari layar.
+     *
+     * INILAH saat jurnal akrualnya terbit. Dulu jurnal itu terbit bersamaan
+     * dengan penekanan tombol, yang bisa berbulan-bulan sebelum tahun ajarannya
+     * mulai — sehingga pendapatan tahun depan diakui di tahun ini. Menundanya
+     * ke sini juga membuat pengunduran diri tetap sederhana: calon yang mundur
+     * pada masa `siap_aktivasi` tak meninggalkan jurnal yang perlu dibalik,
+     * karena memang belum ada.
+     */
+    public function aktifkan(Santri $santri, ?int $idPengguna = null): Santri
+    {
+        Tahap::assertTransisi($santri->status, 'aktif');
+        $this->pastikanSiapDiaktifkan($santri);
+
+        $tagihan = $this->tagihanPerilaku($santri->id, 'uang_pangkal');
         // Perlengkapan ikut bila ada, belum diakrualkan, dan tidak dibatalkan.
-        $perlengkapan = $this->tagihanPerilaku($id, 'perlengkapan');
+        $perlengkapan = $this->tagihanPerilaku($santri->id, 'perlengkapan');
         if ($perlengkapan && ($perlengkapan->sudah_akrual || $perlengkapan->status === 'batal')) {
             $perlengkapan = null;
         }
-
-        $akrual = [];
-        foreach (array_filter([$tagihan, $perlengkapan]) as $t) {
-            $label = $t->jenis->nama;
-            $menunggu = PembayaranSantri::where('id_tagihan', $t->id)->where('status', 'menunggu_verifikasi')->count();
-            if ($menunggu > 0) {
-                throw new AppException(422, "Masih ada {$menunggu} pembayaran \"{$label}\" yang menunggu verifikasi keuangan. Selesaikan dulu agar nilai yang diakrualkan tidak keliru.");
-            }
-            if (! $t->jenis->kode_coa_piutang) {
-                throw new AppException(422, "Jenis biaya \"{$label}\" belum punya akun piutang. Isi dulu di master Jenis Biaya.");
-            }
-            $akrual[] = $t;
-        }
+        $akrual = array_values(array_filter([$tagihan, $perlengkapan]));
 
         return DB::transaction(function () use ($idPengguna, $santri, $akrual) {
-            foreach ($akrual as $t) {
-                $jenis = $t->jenis;
-                $sisa = Money::of($t->sisa);
-                if (Money::gtZero($sisa)) {
-                    PostingService::postJournal([
-                        'referensi' => $santri->no_pendaftaran, 'tanggal' => Carbon::now()->toDateString(),
-                        'kode_unit' => $jenis->kode_unit, 'sumber_modul' => 'PembayaranSantri', 'id_sumber' => (string) $t->id,
-                        'id_pengguna' => $idPengguna, 'keterangan' => 'Akrual '.$this->labelKomponen($t)." daftar ulang — {$santri->nama}",
-                        'lines' => [
-                            ['kode_coa' => $jenis->kode_coa_piutang, 'debet' => $sisa, 'kredit' => '0'],
-                            ['kode_coa' => $jenis->kode_coa_pendapatan, 'debet' => '0', 'kredit' => $sisa],
-                        ],
-                    ]);
-                }
-                $t->update(['sudah_akrual' => true]);
-            }
+            $this->akrualkanTagihan($santri, $akrual, $idPengguna, 'aktivasi santri baru');
             $santri->update([
                 'status' => 'aktif',
-                'nis' => $this->terbitkanNis(),
-                // Tahun yang MULAI dijalani. Angkatan (`tahun_ajaran`) tak disentuh.
+                // NIS TIDAK diterbitkan di sini. Nomornya berurut menurut ABJAD
+                // dalam satu angkatan jenjang, dan abjad baru bisa ditentukan
+                // setelah seluruh angkatan diterima — menerbitkannya per santri
+                // di sini hanya akan menghasilkan urutan kedatangan.
+                // Lihat Kependidikan → Kontrol → Generate NIS (NisService).
                 'tahun_ajaran_berjalan' => $santri->tahun_ajaran,
             ]);
             Pendaftaran::where('id_santri', $santri->id)->orderByDesc('id')->first()?->update(['status' => 'aktif']);
@@ -554,14 +633,10 @@ class SantriService
             // Baris pertama riwayat tingkatnya — supaya tahun yang sedang berjalan
             // pun tercatat, bukan hanya tahun-tahun sesudah kenaikan.
             if ($santri->kode_jenjang && $santri->tahun_ajaran) {
-                RiwayatTingkat::updateOrCreate(
-                    ['id_santri' => $santri->id, 'tahun_ajaran' => $santri->tahun_ajaran],
-                    ['kode_jenjang' => $santri->kode_jenjang, 'tingkat' => $santri->tingkat,
-                        'catatan' => 'Masuk lewat daftar ulang PPSB.'],
-                );
+                (new JadwalPerubahanService)->catatRiwayatMasuk($santri->refresh(), (string) $santri->tahun_ajaran);
             }
 
-            return $santri;
+            return $santri->refresh();
         });
     }
 
@@ -575,9 +650,74 @@ class SantriService
         'perlengkapan' => 'biaya perlengkapan',
     ];
 
+    /**
+     * AKRUALKAN sisa uang pangkal / perlengkapan — D Piutang / K Pendapatan.
+     *
+     * Dipakai DUA jalur yang membawa santri ke jenjang barunya, dan keduanya
+     * WAJIB berperilaku sama:
+     *  • daftar ulang — calon baru menjadi santri aktif;
+     *  • kenaikan jenjang — santri aktif pindah jenjang (SDTQ→SMP, SMP→SMA).
+     *
+     * Dulu hanya jalur pertama yang mengakru. Akibatnya dua santri dengan
+     * kewajiban yang sama persis tercatat berbeda di buku besar semata karena
+     * yang satu masuk lewat pendaftaran baru dan yang lain lewat kenaikan
+     * jenjang: piutangnya tak pernah muncul, dan pendapatannya baru diakui saat
+     * uang datang — padahal jasanya sudah diberikan.
+     *
+     * Yang sudah diakrualkan atau dibatalkan DILEWATI, jadi aman dipanggil ulang.
+     *
+     * @param  list<TagihanSantri>  $tagihan
+     * @return list<array{id:int, komponen:string, sisa:string}> yang benar-benar dijurnal
+     */
+    public function akrualkanTagihan(Santri $santri, array $tagihan, int $idPengguna, string $konteks, ?string $referensi = null): array
+    {
+        $garap = [];
+        foreach ($tagihan as $t) {
+            if (! $t || $t->sudah_akrual || $t->status === 'batal') {
+                continue;
+            }
+            $label = $t->jenis?->nama ?? 'tagihan';
+            $menunggu = PembayaranSantri::where('id_tagihan', $t->id)->where('status', 'menunggu_verifikasi')->count();
+            if ($menunggu > 0) {
+                throw new AppException(422, "Masih ada {$menunggu} pembayaran \"{$label}\" yang menunggu verifikasi keuangan. "
+                    .'Selesaikan dulu agar nilai yang diakrualkan tidak keliru.');
+            }
+            if (! $t->jenis?->kode_coa_piutang) {
+                throw new AppException(422, "Jenis biaya \"{$label}\" belum punya akun piutang. Isi dulu di master Jenis Biaya.");
+            }
+            $garap[] = $t;
+        }
+
+        $dijurnal = [];
+        foreach ($garap as $t) {
+            $jenis = $t->jenis;
+            $sisa = Money::of($t->sisa);
+            // Sisa nol tetap ditandai akrual (tanpa jurnal): tagihannya sudah
+            // lunas lebih dulu, jadi tak ada piutang yang perlu diakui — tetapi
+            // menandainya mencegah pemanggilan berikutnya menjurnalnya lagi.
+            if (Money::gtZero($sisa)) {
+                PostingService::postJournal([
+                    'referensi' => $referensi ?: ($santri->no_pendaftaran ?: $santri->nis),
+                    'tanggal' => Carbon::now()->toDateString(),
+                    'kode_unit' => $jenis->kode_unit, 'sumber_modul' => 'PembayaranSantri', 'id_sumber' => (string) $t->id,
+                    'id_pengguna' => $idPengguna,
+                    'keterangan' => 'Akrual '.$this->labelKomponen($t)." {$konteks} — {$santri->nama}",
+                    'lines' => [
+                        ['kode_coa' => $jenis->kode_coa_piutang, 'debet' => $sisa, 'kredit' => '0'],
+                        ['kode_coa' => $jenis->kode_coa_pendapatan, 'debet' => '0', 'kredit' => $sisa],
+                    ],
+                ]);
+                $dijurnal[] = ['id' => $t->id, 'komponen' => $this->labelKomponen($t), 'sisa' => $sisa];
+            }
+            $t->update(['sudah_akrual' => true]);
+        }
+
+        return $dijurnal;
+    }
+
     private function labelKomponen(TagihanSantri $tagihan): string
     {
-        $perilaku = (string) \App\Models\TipeBiaya::perilakuDari($tagihan->jenis?->tipe);
+        $perilaku = (string) TipeBiaya::perilakuDari($tagihan->jenis?->tipe);
 
         return self::LABEL_KOMPONEN[$perilaku] ?? ($tagihan->jenis?->nama ?? 'tagihan');
     }
@@ -606,7 +746,16 @@ class SantriService
             ->with('jenis')->orderByDesc('id')->first();
     }
 
-    /** Pengunduran diri — boleh kapan saja sebelum proses berakhir. Tidak membalik jurnal. */
+    /**
+     * Perilaku tagihan yang IKUT DITUTUP saat seorang CALON mengundurkan diri.
+     *
+     * Ketiganya melekat pada penerimaan yang batal terjadi: tak ada jasa yang
+     * diberikan, jadi tak ada yang boleh terus ditagih. SPP tidak ada di sini —
+     * calon belum pernah bersekolah, jadi ia memang tak punya.
+     */
+    private const PERILAKU_DITUTUP_SAAT_MUNDUR = ['registrasi', 'uang_pangkal', 'perlengkapan'];
+
+    /** Pengunduran diri — boleh kapan saja sebelum proses berakhir. */
     public function mengundurkanDiri(int $id, string $alasan, ?int $idPengguna = null): Santri
     {
         $santri = Santri::find($id);
@@ -620,10 +769,119 @@ class SantriService
             return $this->keluarkanSantriAktif($santri, $alasan, $idPengguna);
         }
 
-        $santri->update(['status' => 'mengundurkan_diri']);
-        Pendaftaran::where('id_santri', $id)->update(['catatan' => "Mengundurkan diri: {$alasan}"]);
+        $tutup = $this->siapkanPenutupanTagihan($santri);
 
-        return $santri;
+        return DB::transaction(function () use ($santri, $id, $alasan, $idPengguna, $tutup) {
+            $ditutup = [];
+            foreach ($tutup as $t) {
+                $ditutup[] = $this->tutupTagihanMundur($t, $santri, $alasan, $idPengguna);
+            }
+
+            $santri->update(['status' => 'mengundurkan_diri']);
+            Pendaftaran::where('id_santri', $id)->update(['catatan' => "Mengundurkan diri: {$alasan}"]);
+
+            if ($ditutup !== []) {
+                ActivityLog::create([
+                    'id_pengguna' => $idPengguna,
+                    'aksi' => 'calon_mengundurkan_diri_tagihan_ditutup',
+                    'detail' => json_encode([
+                        'id_santri' => $santri->id, 'no_pendaftaran' => $santri->no_pendaftaran,
+                        'nama' => $santri->nama, 'alasan' => $alasan, 'tagihan' => $ditutup,
+                    ], JSON_UNESCAPED_UNICODE),
+                ]);
+            }
+
+            return $santri->refresh();
+        });
+    }
+
+    /**
+     * Kumpulkan tagihan yang harus ditutup, sekaligus tolak lebih dulu keadaan
+     * yang membuat angkanya masih bisa berubah.
+     *
+     * Yang DILEWATI: tagihan `batal` (sudah tak menagih apa pun) dan `lunas`
+     * (sudah dibayar penuh — barisnya adalah jejak kuitansinya, bukan tagihan
+     * yang menggantung; membatalkannya sama saja menghapus bukti penerimaan).
+     *
+     * @return list<TagihanSantri>
+     */
+    private function siapkanPenutupanTagihan(Santri $santri): array
+    {
+        $tagihan = TagihanSantri::where('id_santri', $santri->id)
+            ->whereIn('perilaku', self::PERILAKU_DITUTUP_SAAT_MUNDUR)
+            ->whereIn('status', ['belum_bayar', 'sebagian'])
+            ->with('jenis')->orderBy('id')->get();
+
+        foreach ($tagihan as $t) {
+            $label = $t->jenis?->nama ?? 'tagihan';
+            $menunggu = PembayaranSantri::where('id_tagihan', $t->id)->where('status', 'menunggu_verifikasi')->count();
+            if ($menunggu > 0) {
+                throw new AppException(422, "Masih ada {$menunggu} pembayaran \"{$label}\" yang menunggu verifikasi keuangan. "
+                    .'Verifikasi atau tolak dulu, agar sisa yang dihapuskan bukan angka yang masih berubah.');
+            }
+            // Calon belum pernah daftar ulang, jadi tagihannya semestinya masih
+            // cash basis. Bila ternyata sudah diakrualkan, piutangnya WAJIB
+            // dibalik — dan itu butuh akun piutang yang lengkap.
+            if ($t->sudah_akrual && Money::gtZero($t->sisa) && ! $t->jenis?->kode_coa_piutang) {
+                throw new AppException(422, "Jenis biaya \"{$label}\" belum punya akun piutang, sehingga akrualnya tidak bisa dibalik. "
+                    .'Lengkapi dulu di master Jenis Biaya.');
+            }
+        }
+
+        return $tagihan->all();
+    }
+
+    /**
+     * Tutup satu tagihan calon yang mundur.
+     *
+     * Dua nasib yang sengaja DIBEDAKAN di keterangannya, karena uangnya berbeda:
+     *  • belum ada pembayaran → tagihannya HILANG, tak pernah ada uang yang masuk;
+     *  • sudah ada pembayaran → sisanya dihapus dan yang telanjur dibayar HANGUS
+     *    (tetap menjadi penerimaan pesantren, tidak dikembalikan). Registrasi &
+     *    uang pangkal calon diakui saat uang diterima (cash basis), jadi jurnalnya
+     *    sudah benar sejak awal dan tak ada yang perlu dibalik.
+     *
+     * @return array{id:int, komponen:string, sisa_dihapus:string, sudah_dibayar:string, akrual_dibalik:bool}
+     */
+    private function tutupTagihanMundur(TagihanSantri $t, Santri $santri, string $alasan, ?int $idPengguna): array
+    {
+        $sisa = Money::of($t->sisa);
+        $dibayar = Money::sub($t->nominal, $sisa);
+        $adaPembayaran = Money::gtZero($dibayar);
+        $balik = (bool) $t->sudah_akrual && Money::gtZero($sisa);
+
+        if ($balik) {
+            $jenis = $t->jenis;
+            PostingService::postJournal([
+                'referensi' => $santri->nis ?? $santri->no_pendaftaran,
+                'tanggal' => Carbon::now()->toDateString(),
+                'kode_unit' => $jenis->kode_unit,
+                'sumber_modul' => 'PembayaranSantri',
+                'id_sumber' => (string) $t->id,
+                'id_pengguna' => $idPengguna,
+                'keterangan' => 'Pembatalan sisa '.$this->labelKomponen($t)." — pengunduran diri {$santri->nama}",
+                'lines' => [
+                    ['kode_coa' => $jenis->kode_coa_pendapatan, 'debet' => $sisa, 'kredit' => '0'],
+                    ['kode_coa' => $jenis->kode_coa_piutang, 'debet' => '0', 'kredit' => $sisa],
+                ],
+            ]);
+        }
+
+        $jejak = $adaPembayaran
+            ? 'Hangus — mengundurkan diri: '.$alasan.' (sudah dibayar '.$dibayar.', tidak dikembalikan)'
+            : 'Dibatalkan — mengundurkan diri: '.$alasan;
+
+        $t->update([
+            'sisa' => '0',
+            'status' => 'batal',
+            'keterangan' => trim(($t->keterangan ? $t->keterangan.' · ' : '').$jejak),
+        ]);
+
+        RencanaAngsuranUangPangkal::where('id_tagihan', $t->id)->where('status', 'aktif')
+            ->update(['status' => 'digantikan', 'alasan' => "Santri mengundurkan diri: {$alasan}"]);
+
+        return ['id' => $t->id, 'komponen' => $this->labelKomponen($t), 'sisa_dihapus' => $sisa,
+            'sudah_dibayar' => $dibayar, 'akrual_dibalik' => $balik];
     }
 
     /**
@@ -766,7 +1024,7 @@ class SantriService
         if (! $jenis) {
             $label = TarifService::PERILAKU[$perilaku] ?? $perilaku;
             throw new AppException(422, "Belum ada jenis biaya {$label} yang aktif untuk jenjang \""
-                .($kodeJenjang ?: '—')."\". Buat barisnya di Setting Awal → Jenis Biaya. "
+                .($kodeJenjang ?: '—').'". Buat barisnya di Setting Awal → Jenis Biaya. '
                 .'Cukup sekali: baris itu hanya memegang akun & unit bisnisnya, tarifnya diisi di menu Tarif.');
         }
 
@@ -785,25 +1043,13 @@ class SantriService
         return $this->komponen('perlengkapan', null, $kodeJenjang, null)['jenis'];
     }
 
-    /** NIS = <2 digit tahun><4 digit urut>, mis. 260001 (diterbitkan saat daftar ulang). */
-    private function terbitkanNis(): string
-    {
-        $prefix = substr((string) Carbon::now()->year, 2);
-        $last = Santri::where('nis', 'like', $prefix.'%')->orderByDesc('nis')->value('nis');
-        $urut = 1;
-        if ($last) {
-            $tail = substr($last, strlen($prefix));
-            if (is_numeric($tail)) {
-                $urut = ((int) $tail) + 1;
-            }
-        }
-
-        return $prefix.str_pad((string) $urut, 4, '0', STR_PAD_LEFT);
-    }
-
     /**
      * Registrasi untuk (TA, jenjang, jalur) santri. Tarif bertanda BEBAS berarti
      * tagihannya tidak terbit sama sekali (null), bukan terbit bernominal nol.
+     *
+     * NULL karena itu berarti PERSIS SATU hal: bebas. Sel yang belum diisi
+     * melempar galat di sini, jadi pemanggil boleh memperlakukan null sebagai
+     * "tahap registrasi tak perlu dilalui" tanpa memeriksa apa pun lagi.
      */
     private function pilihRegistrasi(?string $kodeJenjang, ?string $tahunAjaran, ?string $kodeJalur = null): ?array
     {
@@ -829,14 +1075,46 @@ class SantriService
      */
     private function pastikanJalurSah(string $kodeJalur, ?string $tahunAjaran = null, ?string $kodeJenjang = null): void
     {
-        $jalur = \App\Models\JalurPendaftaran::find($kodeJalur);
+        $jalur = JalurPendaftaran::find($kodeJalur);
         if (! $jalur || $jalur->status !== 'aktif') {
             throw new AppException(422, "Jalur pendaftaran \"{$kodeJalur}\" tidak terdaftar / nonaktif.");
         }
-        if (in_array($kodeJalur, \App\Models\JalurNonaktif::kodeUntuk($tahunAjaran, $kodeJenjang), true)) {
+        if (in_array($kodeJalur, JalurNonaktif::kodeUntuk($tahunAjaran, $kodeJenjang), true)) {
             throw new AppException(422, "Jalur \"{$jalur->nama}\" tidak berlaku untuk jenjang {$kodeJenjang} pada T.A {$tahunAjaran}. "
                 .'Pilih jalur lain, atau aktifkan kembali jalurnya di Setting Awal → Tarif.');
         }
+    }
+
+    /**
+     * KOREKSI `tahun_ajaran_berjalan` seorang santri.
+     *
+     * Kolom ini biasanya bergerak sendiri: daftar ulang mengisinya, kenaikan
+     * tingkat & pendaftaran lanjutan memajukannya. Yang tak punya jalan adalah
+     * santri hasil IMPOR yang kolom tahun ajaran di berkasnya salah — nilainya
+     * tak pernah bisa dibetulkan dari layar mana pun, dan begitu selisihnya
+     * lebih dari satu tahun, `KenaikanTingkatService` melewatinya terus-menerus
+     * supaya riwayat tingkatnya tidak bolong. Inilah pintu keluarnya.
+     *
+     * Yang SENGAJA tidak ikut berubah: `tahun_ajaran` (angkatan/tahun masuk —
+     * ia memang tak pernah maju), tingkat, dan jenjang. Ini koreksi satu kolom,
+     * bukan kenaikan tingkat lewat pintu belakang; tingkatnya dikoreksi
+     * tersendiri lewat setTingkat().
+     *
+     * Tagihan yang SUDAH terbit tidak disentuh — tagihan membawa tahun ajarannya
+     * sendiri sebagai snapshot, dan mengubahnya dari sini akan membuat angka
+     * yang sudah dijanjikan ke wali berubah tanpa jejak.
+     */
+    public function setTahunBerjalan(int $id, string $tahunAjaran): Santri
+    {
+        $santri = Santri::find($id);
+        if (! $santri) {
+            throw new AppException(404, 'Santri tidak ditemukan.');
+        }
+        (new TahunAjaranService)->pastikanAktif($tahunAjaran);
+
+        $santri->update(['tahun_ajaran_berjalan' => $tahunAjaran]);
+
+        return $santri->refresh();
     }
 
     /** Ubah tingkat seorang santri (mis. mengisi data lama, atau naik tingkat). */
@@ -853,7 +1131,7 @@ class SantriService
     }
 
     /**
-     * Tingkat harus berada dalam rentang jenjangnya (1..jumlah_tingkat).
+     * Tingkat harus berada dalam rentang jenjangnya (tingkat_mulai..tingkat_akhir).
      *
      * Diperiksa di SERVICE, bukan cuma di form: batas atasnya data master yang
      * bisa berubah, dan aturan ini harus tetap tegak bagi pemanggil lain
@@ -869,8 +1147,9 @@ class SantriService
             throw new AppException(422, "Jumlah tingkat jenjang \"{$jenjang->nama}\" belum diisi. Lengkapi dulu di Setting Awal → Jenjang Pendidikan.");
         }
         $tingkat = (int) $tingkat;
-        if ($tingkat < 1 || $tingkat > $jenjang->jumlah_tingkat) {
-            throw new AppException(422, "Tingkat {$tingkat} tidak ada di jenjang \"{$jenjang->nama}\" (hanya tingkat 1–{$jenjang->jumlah_tingkat}).");
+        if ($tingkat < $jenjang->tingkatMulai() || $tingkat > $jenjang->tingkatAkhir()) {
+            throw new AppException(422, "Tingkat {$tingkat} tidak ada di jenjang \"{$jenjang->nama}\" "
+                ."(hanya tingkat {$jenjang->tingkatMulai()}–{$jenjang->tingkatAkhir()}).");
         }
     }
 

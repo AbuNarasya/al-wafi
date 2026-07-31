@@ -106,8 +106,11 @@ class TarifPerJalurTest extends TestCase
         $this->assertSame('50000000.00', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'REG')['nominal']);
         // Jalur yang tak punya selnya sendiri ikut baris Umum, bukan sel OSS.
         $this->assertSame('50000000.00', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'YTM')['nominal']);
-        // Asal angkanya selalu bisa disebut — inilah yang dulu tak terlihat.
-        $this->assertStringContainsString('jalur OSS', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'OSS')['asal']);
+        // Asal angkanya selalu bisa disebut — inilah yang dulu tak terlihat. Yang
+        // disebut adalah NAMA jalurnya, bukan kode `OSS`: kalimat ini dibaca
+        // petugas, dan kode jalur tak bercerita apa pun baginya.
+        $asalOss = $tarif->cari('uang_pangkal', self::TA, 'SMP', 'OSS')['asal'];
+        $this->assertStringContainsString('jalur SMP (OSS)', $asalOss);
         $this->assertStringContainsString('baris Umum', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'YTM')['asal']);
     }
 
@@ -207,15 +210,21 @@ class TarifPerJalurTest extends TestCase
         $this->actingAs(User::find($this->admin))
             ->get(route('santri.show', $this->calonLulus('SMP', 'REG')->id))
             ->assertOk()
-            ->assertSee('value="50000000.00"', false)
-            ->assertDontSee('value="70000000.00"', false)
-            // Asal tarifnya ikut tampil di layar.
-            ->assertSee('baris Umum');
+            // Yang DILIHAT petugas berpemisah ribuan & tanpa sen…
+            ->assertSee('value="50.000.000"', false)
+            // …sedangkan yang TERKIRIM tetap angka mentah (<x-input-rupiah>).
+            ->assertSee('name="nominal" value="50000000"', false)
+            ->assertDontSee('70.000.000', false)
+            // Asal tarifnya ikut tampil di layar, dengan namanya DITEBALKAN —
+            // itulah yang membedakannya dari teks bantu di sekitarnya.
+            ->assertSee('baris <b>Umum</b>', false)
+            ->assertSee('T.A <b>'.self::TA.'</b>', false);
 
         $this->actingAs(User::find($this->admin))
             ->get(route('santri.show', $this->calonLulus('SMP', 'OSS')->id))
             ->assertOk()
-            ->assertSee('value="70000000.00"', false);
+            ->assertSee('value="70.000.000"', false)
+            ->assertSee('name="nominal" value="70000000"', false);
     }
 
     /** Tagihan dicari lewat PERILAKU, jadi baris master lain tak membuatnya "hilang". */

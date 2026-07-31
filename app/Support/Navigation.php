@@ -26,21 +26,25 @@ final class Navigation
         ['url' => '/dashboard', 'label' => 'Dashboard', 'group' => '', 'modulAny' => ['dashboard', 'dashboard-ppsb']],
 
         // ---- 1. Setting Awal ----
-        ['url' => '/levels', 'label' => 'Level Otorisasi Keuangan', 'group' => 'SETTING AWAL', 'modul' => 'levels'],
-        ['url' => '/level-pengajuan', 'label' => 'Level Pengajuan', 'group' => 'SETTING AWAL', 'modul' => 'level-pengajuan'],
-        ['url' => '/bagian', 'label' => 'Bagian / Struktur Organisasi', 'group' => 'SETTING AWAL', 'modul' => 'bagian'],
-        ['url' => '/jenjang', 'label' => 'Jenjang Pendidikan', 'group' => 'SETTING AWAL', 'modul' => 'jenjang'],
+        // Dipecah dua sub: yang menyetel LEMBAGA & ORANGNYA (Setting Umum) vs yang
+        // menyetel BIAYA (Setting Biaya). Urutan di dalam Setting Biaya = urutan
+        // pengisiannya: jenjang → tipe → jenis → tarif.
+        ['url' => '/company-settings', 'label' => 'Pengaturan Perusahaan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'company-settings'],
+        ['url' => '/bagian', 'label' => 'Bagian / Struktur Organisasi', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'bagian'],
+        ['url' => '/users', 'label' => 'Pengguna', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'users'],
+        ['url' => '/levels', 'label' => 'Level Otorisasi Keuangan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'levels'],
+        ['url' => '/level-pengajuan', 'label' => 'Level Pengajuan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'level-pengajuan'],
+        ['url' => '/hak-akses', 'label' => 'Hak Akses Modul', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'adminOnly' => true],
+        ['url' => '/karyawan', 'label' => 'Karyawan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'karyawan'],
+        ['url' => '/impor-data-awal', 'label' => 'Impor Data Awal', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'impor-data-awal'],
+
+        ['url' => '/jenjang', 'label' => 'Jenjang Pendidikan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Biaya', 'modul' => 'jenjang'],
         // Tipe Biaya mendahului Jenis Biaya: jenis biaya memilih tipenya dari sini.
-        ['url' => '/tipe-biaya', 'label' => 'Tipe Biaya', 'group' => 'SETTING AWAL', 'modul' => 'tipe-biaya'],
-        ['url' => '/ppsb/jenis-biaya', 'label' => 'Jenis Biaya', 'group' => 'SETTING AWAL', 'modul' => 'jenis-biaya'],
+        ['url' => '/tipe-biaya', 'label' => 'Tipe Biaya', 'group' => 'SETTING AWAL', 'sub' => 'Setting Biaya', 'modul' => 'tipe-biaya'],
+        ['url' => '/ppsb/jenis-biaya', 'label' => 'Jenis Biaya', 'group' => 'SETTING AWAL', 'sub' => 'Setting Biaya', 'modul' => 'jenis-biaya'],
         // Tarif menyusul Jenis Biaya: selnya baru bisa dipakai kalau baris akunnya ada.
-        ['url' => '/tarif', 'label' => 'Tarif', 'group' => 'SETTING AWAL', 'modul' => 'tarif'],
-        ['url' => '/company-settings', 'label' => 'Pengaturan Perusahaan', 'group' => 'SETTING AWAL', 'modul' => 'company-settings'],
-        ['url' => '/reminder-tagihan', 'label' => 'Reminder Tagihan Jatuh Tempo', 'group' => 'SETTING AWAL', 'modul' => 'reminder-tagihan'],
-        ['url' => '/users', 'label' => 'Pengguna', 'group' => 'SETTING AWAL', 'modul' => 'users'],
-        ['url' => '/karyawan', 'label' => 'Karyawan', 'group' => 'SETTING AWAL', 'modul' => 'karyawan'],
-        ['url' => '/impor-data-awal', 'label' => 'Impor Data Awal', 'group' => 'SETTING AWAL', 'modul' => 'impor-data-awal'],
-        ['url' => '/hak-akses', 'label' => 'Hak Akses Modul', 'group' => 'SETTING AWAL', 'adminOnly' => true],
+        ['url' => '/tarif', 'label' => 'Tarif', 'group' => 'SETTING AWAL', 'sub' => 'Setting Biaya', 'modul' => 'tarif'],
+        ['url' => '/reminder-tagihan', 'label' => 'Reminder Tagihan Jatuh Tempo', 'group' => 'SETTING AWAL', 'sub' => 'Setting Biaya', 'modul' => 'reminder-tagihan'],
 
         // ---- 2. Anggaran ----
         ['url' => '/budget', 'label' => 'Input Anggaran', 'group' => 'ANGGARAN', 'modul' => 'budget'],
@@ -118,18 +122,51 @@ final class Navigation
         ['url' => '/ppsb/termin-filter', 'label' => 'Setting Filter Termin Jatuh Tempo', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'termin-filter'],
         ['url' => '/wali', 'label' => 'Wali / Keluarga', 'group' => 'PPSB', 'sub' => 'Data Master', 'modul' => 'wali'],
         ['url' => '/ppsb/calon-santri', 'label' => 'Calon Santri', 'group' => 'PPSB', 'sub' => 'Data Master', 'modul' => 'santri'],
+        // Arsip, sejajar dengan Alumni & Santri Keluar di Kependidikan: calon yang
+        // mundur bukan lagi pekerjaan berjalan, dan membiarkannya di daftar Calon
+        // membuat jumlah pendaftar di layar tak pernah sama dengan yang ditunggu.
+        // Berkasnya tuntas, tinggal menunggu tahun ajarannya dimulai. Dipisah dari
+        // Calon Santri supaya jumlah yang MASIH diproses tak bercampur dengan yang
+        // sudah selesai diurus — dan supaya aktivasi massalnya punya satu tempat.
+        ['url' => '/ppsb/siap-aktivasi', 'label' => 'Calon Santri Siap Aktivasi', 'group' => 'PPSB', 'sub' => 'Data Master', 'modul' => 'santri'],
+        ['url' => '/ppsb/calon-mundur', 'label' => 'Calon Mengundurkan Diri', 'group' => 'PPSB', 'sub' => 'Data Master', 'modul' => 'santri'],
         ['url' => '/ppsb/angsuran-uang-pangkal', 'label' => 'Angsuran Uang Pangkal', 'group' => 'PPSB', 'sub' => 'Data Master', 'modul' => 'angsuran-uang-pangkal'],
-        ['url' => '/ppsb/pembayaran', 'label' => 'Pembayaran Registrasi & Uang Pangkal', 'group' => 'PPSB', 'sub' => 'Transaksi', 'modul' => 'pembayaran-ppsb'],
-        ['url' => '/rekap-pembayaran', 'label' => 'Rekap Pembayaran Santri', 'group' => 'PPSB', 'sub' => 'Transaksi', 'modul' => 'rekap-pembayaran'],
-        ['url' => '/kesantrian/santri', 'label' => 'Santri', 'group' => 'KEPENDIDIKAN', 'sub' => 'Master', 'modul' => 'santri'],
+        ['url' => '/ppsb/pembayaran', 'label' => 'Pembayaran Tagihan PPSB', 'group' => 'PPSB', 'sub' => 'Transaksi', 'modul' => 'pembayaran-ppsb'],
+        // URL-nya BEDA dari kembarannya di Kependidikan: yang ini hanya memuat
+        // santri yang masih punya kewajiban uang pangkal / perlengkapan. Dulu
+        // keduanya menunjuk /rekap-pembayaran yang sama persis, sehingga menu
+        // PPSB menampilkan seluruh santri — termasuk yang sudah lama lunas.
+        ['url' => '/ppsb/rekap-pembayaran', 'label' => 'Rekap Pembayaran Santri', 'group' => 'PPSB', 'sub' => 'Transaksi', 'modul' => 'rekap-pembayaran'],
+        // SATU daftar untuk seluruh jenjang. Penyaring jenjang ada DI HALAMANNYA
+        // (`?jenjang=…`), bukan dipecah jadi menu sendiri-sendiri seperti dulu:
+        // sidebar jadi memanjang seiring bertambahnya jenjang, padahal isinya
+        // halaman yang sama dengan satu penyaring berbeda.
+        ['url' => '/kesantrian/santri', 'label' => 'Santri Aktif', 'group' => 'KEPENDIDIKAN', 'sub' => 'Master', 'modul' => 'santri'],
+        // Alumni & santri keluar berdaftar SENDIRI: dulu keduanya ikut nongol di
+        // daftar Santri, sehingga jumlah di layar tak pernah sama dengan jumlah
+        // santri yang benar-benar bersekolah. Modul hak aksesnya tetap `santri`.
+        ['url' => '/kesantrian/alumni', 'label' => 'Alumni', 'group' => 'KEPENDIDIKAN', 'sub' => 'Master', 'modul' => 'santri'],
+        ['url' => '/kesantrian/santri-keluar', 'label' => 'Santri Keluar', 'group' => 'KEPENDIDIKAN', 'sub' => 'Master', 'modul' => 'santri'],
+
+        // Administrasi = pekerjaan BERKALA yang MENERBITKAN sesuatu (tagihan,
+        // tingkat baru, nomor induk) — dipisah dari Transaksi yang menerima uang
+        // harian. PERINGATAN URUTAN KERJA (bukan urutan menu): kenaikan tingkat
+        // harus DIJALANKAN LEBIH DULU daripada penagihan daftar ulang, karena
+        // tarif daftar ulang mengikuti tingkat yang BARU.
+        ['url' => '/kesantrian/spp', 'label' => 'Penagihan SPP', 'group' => 'KEPENDIDIKAN', 'sub' => 'Administrasi', 'modul' => 'spp'],
+        ['url' => '/kesantrian/tagihan-massal', 'label' => 'Penagihan Daftar Ulang', 'group' => 'KEPENDIDIKAN', 'sub' => 'Administrasi', 'modul' => 'tagihan-massal'],
+        ['url' => '/kesantrian/kenaikan-tingkat', 'label' => 'Kenaikan Tingkat & Kelulusan', 'group' => 'KEPENDIDIKAN', 'sub' => 'Administrasi', 'modul' => 'kenaikan-tingkat'],
+        // Penerbitan NIS: sengaja manual & massal, karena nomornya berurut
+        // menurut abjad satu angkatan jenjang — bukan urutan kedatangan.
+        ['url' => '/kesantrian/nis', 'label' => 'Generate NIS', 'group' => 'KEPENDIDIKAN', 'sub' => 'Administrasi', 'modul' => 'nis'],
+
         ['url' => '/kesantrian/pembayaran', 'label' => 'Pembayaran SPP & Tagihan Lain', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'pembayaran-kesantrian'],
-        ['url' => '/kesantrian/spp', 'label' => 'SPP', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'spp'],
-        // Urutannya sengaja: kenaikan tingkat dulu, baru penagihan daftar ulangnya
-        // — tarif daftar ulang mengikuti tingkat yang BARU.
-        ['url' => '/kesantrian/kenaikan-tingkat', 'label' => 'Kenaikan Tingkat & Kelulusan', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'kenaikan-tingkat'],
-        ['url' => '/kesantrian/tagihan-massal', 'label' => 'Terbitkan Daftar Ulang Massal', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'tagihan-massal'],
         ['url' => '/kesantrian/dompet', 'label' => 'Dompet & Tabungan', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'dompet'],
         ['url' => '/rekap-pembayaran', 'label' => 'Rekap Pembayaran Santri', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'rekap-pembayaran'],
+        // Kontrol = memeriksa yang MASIH menggantung, bukan menerbitkan yang baru.
+        // Sejajar dengan sub "Kontrol" di KEUANGAN, dan sengaja dipisah dari menu
+        // Penagihan SPP: yang satu pekerjaan bulanan, yang ini pekerjaan harian.
+        ['url' => '/kesantrian/outstanding-spp', 'label' => 'Daftar Outstanding SPP', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'outstanding-spp'],
 
         // ---- 6. Sistem ----
         ['url' => '/approvals', 'label' => 'Persetujuan Saya', 'group' => 'SISTEM'],
@@ -140,85 +177,78 @@ final class Navigation
     public const GROUP_ORDER = ['', 'SETTING AWAL', 'ANGGARAN', 'PENGAJUAN PEMBAYARAN', 'KEUANGAN', 'PPSB', 'KEPENDIDIKAN', 'SISTEM'];
 
     public const SUB_ORDER = [
+        'SETTING AWAL' => ['Setting Umum', 'Setting Biaya'],
         'PENGAJUAN PEMBAYARAN' => ['Buat Pengajuan', 'Pengajuan'],
         'KEUANGAN' => ['Vendor & Customer', 'Aset & Persediaan', 'Transaksi', 'Laporan', 'Kontrol'],
         'PPSB' => ['Setting Awal', 'Data Master', 'Transaksi'],
-        'KEPENDIDIKAN' => ['Master', 'Transaksi'],
+        'KEPENDIDIKAN' => ['Master', 'Administrasi', 'Transaksi', 'Kontrol'],
     ];
 
-    /** URL item yang paling cocok dengan path sekarang (prefix terpanjang). */
     /**
-     * ITEMS + item yang lahir dari DATA, bukan dari daftar tetap.
+     * Daftar item menu.
      *
-     * Master data siswa dipecah PER JENJANG mengikuti master Jenjang: menambah
-     * jenjang baru langsung menambah menunya, tanpa menyunting berkas ini.
-     * Ketiganya memakai modul hak akses `santri` yang sama — yang berbeda hanya
-     * penyaringnya, jadi tak ada hak akses baru yang perlu diberikan.
+     * Dulu fungsi ini menyisipkan item yang lahir dari DATA: satu menu Santri per
+     * baris master Jenjang. Sejak daftar santri digabung jadi SATU menu "Santri
+     * Aktif" — penyaring jenjangnya pindah ke halamannya — tak ada lagi item
+     * dinamis, dan sidebar tak lagi ikut memanjang tiap kali jenjang bertambah.
+     * Pembungkusnya dipertahankan karena seluruh berkas ini memanggilnya.
      *
      * @return list<array<string,mixed>>
      */
     public static function items(): array
     {
-        $perJenjang = self::itemPerJenjang();
-        if ($perJenjang === []) {
-            return self::ITEMS; // master jenjang kosong → tetap satu menu Santri
-        }
-
-        // Menu "Santri" umum digantikan oleh yang per jenjang.
-        $items = array_values(array_filter(self::ITEMS, fn ($n) => $n['url'] !== '/kesantrian/santri'));
-
-        return array_merge($items, $perJenjang);
+        return self::ITEMS;
     }
 
-    /** @var list<array<string,mixed>>|null memo per request */
-    private static ?array $memoJenjang = null;
-
-    /** Buang memo menu per jenjang (dipakai test yang menambah jenjang di tengah jalan). */
-    public static function lupakan(): void
-    {
-        self::$memoJenjang = null;
-    }
-
-    /** @return list<array<string,mixed>> */
-    private static function itemPerJenjang(): array
-    {
-        if (self::$memoJenjang !== null) {
-            return self::$memoJenjang;
-        }
-
-        try {
-            $jenjang = \App\Models\Jenjang::where('status', 'aktif')
-                ->orderBy('urutan')->orderBy('kode')->get(['kode', 'nama']);
-        } catch (\Throwable) {
-            return self::$memoJenjang = []; // tabelnya belum ada (migrasi awal) — jangan menggagalkan halaman
-        }
-
-        return self::$memoJenjang = $jenjang->map(fn ($j) => [
-            'url' => '/kesantrian/santri?jenjang='.$j->kode,
-            'label' => 'Santri '.$j->nama,
-            'group' => 'KEPENDIDIKAN',
-            'sub' => 'Master',
-            'modul' => 'santri',
-        ])->all();
-    }
-
+    /**
+     * URL item menu yang sedang dibuka; sidebar menyalakan item dengan
+     * `$item['url'] === $aktif`. String kosong = tak ada yang disorot.
+     */
     public static function activeUrl(): string
     {
+        return self::activeItem()['url'] ?? '';
+    }
+
+    /**
+     * Item yang paling cocok dengan permintaan sekarang: prefix path TERPANJANG
+     * yang menang (`/ppsb/jenis-biaya` mengalahkan `/ppsb`).
+     *
+     * Query string TIDAK ikut dinilai — tak ada lagi item menu yang membawa
+     * penyaring. `/kesantrian/santri?jenjang=SMP` tetap menyalakan menu Santri
+     * Aktif, apa pun penyaring yang sedang dipakai di halamannya.
+     *
+     * @return array<string,mixed>|null
+     */
+    private static function activeItem(): ?array
+    {
         $path = '/'.trim(request()->path(), '/');
-        $best = '';
+        $terbaik = null;
+        $skorTerbaik = -1;
+
         foreach (self::items() as $n) {
-            // Penyaring jenjang dibawa di query string; yang dibandingkan hanya
-            // bagian path-nya, kalau tidak menu per jenjang tak pernah menyala.
-            $url = strtok($n['url'], '?');
-            if ($url !== '/dashboard' && str_starts_with($path, $url) && strlen($url) > strlen($best)) {
-                $best = $url;
+            $url = $n['url'];
+
+            // Dashboard tak ikut bersaing lewat prefix; ia hanya dipakai sebagai
+            // cadangan terakhir di bawah.
+            if ($url === '/dashboard' || ! str_starts_with($path, $url)) {
+                continue;
+            }
+
+            if (strlen($url) > $skorTerbaik) {
+                $skorTerbaik = strlen($url);
+                $terbaik = $n;
             }
         }
-        if ($best === '' && str_starts_with($path, '/dashboard')) {
-            $best = '/dashboard';
+
+        if ($terbaik === null && str_starts_with($path, '/dashboard')) {
+            foreach (self::items() as $n) {
+                if ($n['url'] === '/dashboard') {
+                    return $n;
+                }
+            }
         }
 
-        return $best;
+        return $terbaik;
     }
 
     /** Label menu sebuah URL (dipakai lonceng menyebut asal pekerjaan). */
@@ -243,21 +273,6 @@ final class Navigation
     public static function activeSub(): ?string
     {
         return self::activeItem()['sub'] ?? null;
-    }
-
-    /** @return array<string,mixed>|null */
-    private static function activeItem(): ?array
-    {
-        $active = self::activeUrl();
-        foreach (self::items() as $n) {
-            // Yang per jenjang berbagi path yang sama; grup & sub-nya identik,
-            // jadi yang pertama cocok sudah cukup untuk membuka accordion.
-            if (strtok($n['url'], '?') === $active) {
-                return $n;
-            }
-        }
-
-        return null;
     }
 
     /** Apakah item terlihat untuk pengguna login (replika filter AppShell). */

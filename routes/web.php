@@ -439,7 +439,9 @@ Route::middleware('auth')->group(function () {
     Route::prefix('kesantrian/kenaikan-tingkat')->name('kenaikan_tingkat.')->controller(\App\Http\Controllers\KenaikanTingkatController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:kenaikan-tingkat,lihat');
         Route::post('/pratinjau', 'pratinjau')->name('pratinjau')->middleware('hakakses:kenaikan-tingkat,lihat');
-        Route::post('/eksekusi', 'eksekusi')->name('eksekusi')->middleware('hakakses:kenaikan-tingkat,buat');
+        // Namanya `tetapkan`, bukan `eksekusi`: yang terjadi adalah PENJADWALAN.
+        // Perubahannya menyala saat tahun ajaran tujuan benar-benar dimulai.
+        Route::post('/tetapkan', 'tetapkan')->name('tetapkan')->middleware('hakakses:kenaikan-tingkat,buat');
     });
 
     // Terbitkan Tagihan Massal — daftar ulang santri aktif, jadi KEPENDIDIKAN,
@@ -450,12 +452,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/terbitkan', 'terbitkan')->name('terbitkan')->middleware('hakakses:tagihan-massal,buat');
     });
 
-    // Potongan Gelombang (create/list/remove).
+    // Potongan Gelombang (list/create/edit/remove).
     Route::prefix('ppsb/potongan-gelombang')->name('potongan_gelombang.')->group(function () {
         $p = \App\Http\Controllers\PotonganGelombangController::class;
         Route::get('/', [$p, 'index'])->name('index')->middleware('hakakses:potongan-gelombang,lihat');
         Route::get('/create', [$p, 'create'])->name('create')->middleware('hakakses:potongan-gelombang,buat');
         Route::post('/', [$p, 'store'])->name('store')->middleware('hakakses:potongan-gelombang,buat');
+        Route::get('/{id}/edit', [$p, 'edit'])->name('edit')->middleware('hakakses:potongan-gelombang,ubah')->whereNumber('id');
+        Route::put('/{id}', [$p, 'update'])->name('update')->middleware('hakakses:potongan-gelombang,ubah')->whereNumber('id');
         Route::delete('/{id}', [$p, 'destroy'])->name('destroy')->middleware('hakakses:potongan-gelombang,hapus')->whereNumber('id');
     });
 
@@ -502,10 +506,24 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{id}', [$t, 'destroy'])->name('destroy')->middleware('hakakses:target-santri,hapus')->whereNumber('id');
     });
 
-    // Santri (calon = PPSB, aktif = Kesantrian; satu model, filter status).
+    // Santri — SATU model, EMPAT daftar yang dipisahkan menurut daur hidupnya:
+    // calon (PPSB) · aktif (Kependidikan) · alumni · keluar. Pemisahan ini murni
+    // TAMPILAN: barisnya tetap di tabel `santri` yang sama, jadi tagihan bersisa
+    // milik alumni tetap bisa ditagih & dibayar, dan riwayat serta dokumennya
+    // tetap menempel pada orang yang sama. Keempatnya memakai modul hak akses
+    // `santri` — tak ada hak akses baru yang perlu diberikan.
     Route::controller(\App\Http\Controllers\SantriController::class)->group(function () {
         Route::get('/ppsb/calon-santri', 'index')->name('santri.calon')->defaults('lingkup', 'calon')->middleware('hakakses:santri,lihat');
+        // Calon yang mundur berdaftar sendiri — arsip PPSB, bukan pekerjaan berjalan.
+        Route::get('/ppsb/calon-mundur', 'index')->name('santri.mundur')->defaults('lingkup', 'mundur')->middleware('hakakses:santri,lihat');
+        // Calon yang berkasnya sudah tuntas & tinggal menunggu tahun ajarannya
+        // dimulai. Berdaftar sendiri supaya jumlah "calon yang masih diproses"
+        // di layar tak bercampur dengan yang sudah selesai diurus.
+        Route::get('/ppsb/siap-aktivasi', 'index')->name('santri.siap_aktivasi')->defaults('lingkup', 'siap_aktivasi')->middleware('hakakses:santri,lihat');
+        Route::post('/ppsb/siap-aktivasi/aktifkan', 'aktivasiMassal')->name('santri.aktivasi_massal')->middleware('hakakses:santri,ubah');
         Route::get('/kesantrian/santri', 'index')->name('santri.aktif')->defaults('lingkup', 'aktif')->middleware('hakakses:santri,lihat');
+        Route::get('/kesantrian/alumni', 'index')->name('santri.alumni')->defaults('lingkup', 'alumni')->middleware('hakakses:santri,lihat');
+        Route::get('/kesantrian/santri-keluar', 'index')->name('santri.keluar')->defaults('lingkup', 'keluar')->middleware('hakakses:santri,lihat');
         Route::get('/santri/create', 'create')->name('santri.create')->middleware('hakakses:santri,buat');
         Route::post('/santri', 'store')->name('santri.store')->middleware('hakakses:santri,buat');
         Route::get('/santri/{id}', 'show')->name('santri.show')->middleware('hakakses:santri,lihat')->whereNumber('id');
@@ -555,10 +573,17 @@ Route::middleware('auth')->group(function () {
 
     // Rekap Pembayaran Santri (riwayat tagihan + pembayaran per santri, + cetak).
     Route::prefix('rekap-pembayaran')->name('rekap_pembayaran.')->controller(\App\Http\Controllers\RekapPembayaranController::class)->group(function () {
-        Route::get('/', 'index')->name('index')->middleware('hakakses:rekap-pembayaran,lihat');
+        Route::get('/', 'index')->name('index')->defaults('lingkup', 'semua')->middleware('hakakses:rekap-pembayaran,lihat');
         Route::get('/{idSantri}/cetak', 'cetak')->name('cetak')->middleware('hakakses:rekap-pembayaran,lihat')->whereNumber('idSantri');
         Route::get('/{idSantri}', 'show')->name('show')->middleware('hakakses:rekap-pembayaran,lihat')->whereNumber('idSantri');
     });
+
+    // Lingkup PPSB dari halaman yang sama: hanya santri yang MASIH punya kewajiban
+    // uang pangkal / perlengkapan. Rutenya terpisah (bukan query string) supaya
+    // menunya bisa menyala dengan benar dan tautannya bisa dibagikan apa adanya.
+    Route::get('ppsb/rekap-pembayaran', [\App\Http\Controllers\RekapPembayaranController::class, 'index'])
+        ->name('rekap_pembayaran.ppsb')->defaults('lingkup', 'ppsb')
+        ->middleware('hakakses:rekap-pembayaran,lihat');
 
     // Tagihan Lain-lain (tanpa menu sidebar sendiri — dari Pembayaran Kesantrian).
     Route::prefix('kesantrian/tagihan-lain')->name('tagihan_lain.')->controller(\App\Http\Controllers\TagihanLainController::class)->group(function () {
@@ -585,9 +610,30 @@ Route::middleware('auth')->group(function () {
     Route::prefix('kesantrian/spp')->name('spp.')->controller(\App\Http\Controllers\SppController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:spp,lihat');
         Route::post('/generate', 'generate')->name('generate')->middleware('hakakses:spp,ubah');
-        Route::put('/santri/{id}/nominal', 'setNominalKhusus')->name('nominal_khusus')->middleware('hakakses:spp,ubah')->whereNumber('id');
+        // Santri dikirim di BADAN kiriman, bukan di path: dropdown santrinya kini
+        // dropdown-yang-bisa-dicari (nilainya di input hidden), sehingga tak ada
+        // lagi <select> yang bisa dipakai merangkai URL dari sisi Alpine.
+        Route::put('/nominal-khusus', 'setNominalKhusus')->name('nominal_khusus')->middleware('hakakses:spp,ubah');
         Route::post('/prabayar', 'prabayar')->name('prabayar')->middleware('hakakses:spp,buat');
     });
+
+    // NIS — format & penerbitan massal. Diterbitkan MANUAL karena nomornya
+    // berurut menurut abjad satu angkatan jenjang, bukan urutan kedatangan.
+    Route::prefix('kesantrian/nis')->name('nis.')
+        ->controller(\App\Http\Controllers\NisController::class)->group(function () {
+            Route::get('/', 'index')->name('index')->middleware('hakakses:nis,lihat');
+            Route::put('/format', 'simpanFormat')->name('format')->middleware('hakakses:nis,ubah');
+            Route::post('/terbitkan', 'terbitkan')->name('terbitkan')->middleware('hakakses:nis,buat');
+        });
+
+    // Outstanding SPP — kontrol tunggakan + koreksi nominal yang salah ketik.
+    // Modulnya SENDIRI (bukan `spp`): memeriksa tunggakan pekerjaan harian,
+    // menerbitkan tagihan tidak — dan keduanya tak selalu di tangan orang yang sama.
+    Route::prefix('kesantrian/outstanding-spp')->name('outstanding_spp.')
+        ->controller(\App\Http\Controllers\OutstandingSppController::class)->group(function () {
+            Route::get('/', 'index')->name('index')->middleware('hakakses:outstanding-spp,lihat');
+            Route::put('/{idTagihan}', 'koreksi')->name('koreksi')->middleware('hakakses:outstanding-spp,ubah')->whereNumber('idTagihan');
+        });
 
     // Wali / Keluarga Santri.
     Route::prefix('wali')->name('wali.')->group(function () {

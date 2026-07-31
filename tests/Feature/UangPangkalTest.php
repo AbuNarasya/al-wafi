@@ -23,6 +23,7 @@ use Tests\TestCase;
 /** Uang pangkal: tagihkan (potongan), daftar ulang (akrual), angsuran, evaluasi hangus. */
 class UangPangkalTest extends TestCase
 {
+    use \Tests\Concerns\MengaktifkanSantri;
     use RefreshDatabase;
     use \Tests\Concerns\MembuatTarif;
 
@@ -82,11 +83,13 @@ class UangPangkalTest extends TestCase
 
         // Menuju aktif: diterima → lolos_kesehatan → daftar ulang.
         $santri->update(['status' => 'lolos_kesehatan']);
-        (new SantriService)->daftarUlang($santri->id, $this->admin);
+        $this->aktifkanSantri($santri->id, $this->admin);
 
         $santri->refresh();
         $this->assertSame('aktif', $santri->status);
-        $this->assertNotNull($santri->nis);
+        // NIS SENGAJA belum terbit di sini — nomornya berurut menurut abjad satu
+        // angkatan, jadi diterbitkan massal lewat modul Generate NIS.
+        $this->assertNull($santri->nis);
         $this->assertTrue((bool) $tagihan->refresh()->sudah_akrual);
         // Akrual sisa 5jt: D Piutang UP / K Pendapatan UP.
         $entry = JournalEntry::with('lines')->where('sumber_modul', 'PembayaranSantri')->where('id_sumber', (string) $tagihan->id)->first();

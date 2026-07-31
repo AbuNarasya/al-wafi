@@ -1,14 +1,26 @@
 @extends('layouts.app')
 
-@section('title', 'Rekap Pembayaran Santri')
+@section('title', $lingkup === 'ppsb' ? 'Rekap Pembayaran — Uang Pangkal & Perlengkapan' : 'Rekap Pembayaran Santri')
 
 @section('content')
-    <p class="mb-3 text-sm text-gray-500">Pilih santri untuk melihat seluruh tagihan &amp; riwayat pembayarannya (registrasi, uang pangkal, SPP, tagihan lain).</p>
+    @if ($lingkup === 'ppsb')
+        <h2 class="mb-1 text-xl font-semibold text-gray-900">Rekap Pembayaran Santri</h2>
+        {{-- Sebabnya disebut, bukan hanya daftarnya: tanpa kalimat ini petugas akan
+             mengira santri yang sudah lunas "hilang" dari sistem. --}}
+        <p class="mb-3 text-sm text-gray-500">
+            Hanya santri yang <b>masih punya kewajiban uang pangkal atau perlengkapan</b> —
+            keduanya dibayar di awal pendaftaran. Begitu keduanya lunas, santrinya keluar dari
+            daftar ini; rekapnya tetap utuh dan tetap bisa dibuka lewat
+            <b>Kependidikan → Rekap Pembayaran Santri</b>.
+        </p>
+    @else
+        <p class="mb-3 text-sm text-gray-500">Pilih santri untuk melihat seluruh tagihan &amp; riwayat pembayarannya (registrasi, uang pangkal, SPP, tagihan lain).</p>
+    @endif
 
     <form method="GET" id="filterRekap"></form>
     <div class="mb-4">
         <x-filter-server placeholder="Cari nama / no. pendaftaran / NIS…" :total="$rows->count()"
-                         :reset="route('rekap_pembayaran.index')" :aktif="$q !== ''" form="filterRekap" />
+                         :reset="route($rute)" :aktif="$q !== ''" form="filterRekap" />
     </div>
 
     <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -29,7 +41,13 @@
                     </tr>
                 @empty
                     <tr><td colspan="5" class="px-4 py-10 text-center text-gray-400">
-                        {{ $q !== '' ? 'Tidak ada santri yang cocok dengan pencarian.' : 'Belum ada data santri.' }}
+                        @if ($q !== '')
+                            Tidak ada santri yang cocok dengan pencarian.
+                        @elseif ($lingkup === 'ppsb')
+                            Tidak ada kewajiban uang pangkal / perlengkapan yang masih menggantung — semuanya sudah lunas.
+                        @else
+                            Belum ada data santri.
+                        @endif
                     </td></tr>
                 @endforelse
             </tbody>

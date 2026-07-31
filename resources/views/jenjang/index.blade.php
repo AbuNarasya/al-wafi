@@ -27,7 +27,10 @@
                         <td class="px-4 py-3">{{ $r->nama }}</td>
                         <td class="px-4 py-3 text-right tabular-nums">
                             @if ($r->jumlah_tingkat)
+                                {{-- Rentangnya disebut, bukan cuma jumlahnya: sejak penomoran
+                                     berkelanjutan, "3 tingkat" tak lagi memberi tahu tingkat berapa. --}}
                                 <span class="text-gray-700">{{ $r->jumlah_tingkat }} tingkat</span>
+                                <span class="block text-xs text-gray-400">Tingkat {{ $r->tingkatMulai() }}–{{ $r->tingkatAkhir() }}</span>
                             @else
                                 <span class="text-xs text-amber-600" title="Tanpa ini, Tingkat tak bisa dipilih saat mendaftarkan calon santri">belum diisi</span>
                             @endif

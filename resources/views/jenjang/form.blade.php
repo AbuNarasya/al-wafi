@@ -22,7 +22,22 @@
                 <x-field name="nama" label="Nama Jenjang" :value="old('nama', $row->nama)" required placeholder="mis. Sekolah Dasar" />
                 <x-field name="jumlah_tingkat" label="Jumlah Tingkat" type="number" :value="old('jumlah_tingkat', $row->jumlah_tingkat)"
                          placeholder="mis. 6"
-                         hint="Berapa tingkat (kelas) yang ada di jenjang ini — SDTQ 6, SMP 3, SMA 3. Menentukan pilihan Tingkat saat calon santri didaftarkan." />
+                         hint="Berapa tingkat (kelas) yang ada di jenjang ini — SDTQ 6, SMP 3, SMA 3." />
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+                <x-field name="tingkat_mulai" label="Tingkat Dimulai Dari" type="number" :value="old('tingkat_mulai', $row->tingkat_mulai)"
+                         placeholder="mis. 7"
+                         hint="Nomor kelas pertama jenjang ini: SDTQ 1, SMP 7, SMA 10. Penomorannya berkelanjutan supaya “Tingkat 8” hanya punya satu arti. Kosongkan bila jenjang ini mulai dari 1." />
+                <div class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                    <b>Rentang tingkat jenjang ini:</b>
+                    @if ($row->jumlah_tingkat)
+                        Tingkat {{ $row->tingkatMulai() }}–{{ $row->tingkatAkhir() }}
+                    @else
+                        <span class="text-amber-700">belum bisa dihitung — jumlah tingkatnya belum diisi.</span>
+                    @endif
+                    <span class="mt-1 block text-gray-500">Tingkat ini ikut tercetak di NIS santri, jadi mengubahnya tidak mengubah NIS yang sudah terbit.</span>
+                </div>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">

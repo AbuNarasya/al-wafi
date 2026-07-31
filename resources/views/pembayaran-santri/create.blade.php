@@ -33,10 +33,12 @@
                                 <div @click="pilihSantri(s)"
                                      class="cursor-pointer px-3 py-2 text-sm hover:bg-brand-soft"
                                      :class="s.id === santriId ? 'bg-brand-soft font-medium text-brand' : 'text-gray-700'">
-                                    <span x-text="s.no_pendaftaran || '—'" class="font-medium"></span>
-                                    <span x-text="' — ' + s.nama"></span>
+                                    {{-- Susunannya sama dengan pemilih santri lain:
+                                         NIS (atau no. pendaftaran) - Nama - Jenjang - Tingkat. --}}
+                                    <span x-text="s.nis || s.no_pendaftaran || '—'" class="font-medium"></span>
+                                    <span x-text="' - ' + s.nama"></span>
                                     <span class="text-xs text-gray-400"
-                                          x-text="(s.jenjang ? ' · ' + s.jenjang : '') + (s.nis ? ' · NIS ' + s.nis : '')"></span>
+                                          x-text="' - ' + (s.jenjang || '—') + ' - ' + (s.tingkat ? 'Tingkat ' + s.tingkat : '—')"></span>
                                 </div>
                             </template>
                             <div x-show="hasilCari().length === 0" class="px-3 py-2 text-sm text-gray-400">
@@ -61,7 +63,7 @@
                     <x-field name="tanggal" label="Tanggal" type="date" :value="old('tanggal', now()->toDateString())" required />
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Nominal <span class="text-red-500">*</span></label>
-                        <input type="number" step="0.01" min="0" name="nominal" x-model="nominal" :max="maxSisa" required class="w-full rounded-lg border-gray-300 px-3 py-2 text-sm">
+                        <input type="text" inputmode="numeric" :value="fmtRupiah(nominal)" @input="nominal = ketikRupiah($event)" required class="w-full rounded-lg border-gray-300 px-3 py-2 text-sm tabular-nums"><input type="hidden" name="nominal" :value="nominal">
                         <p class="mt-1 text-xs text-brand" x-show="maxSisa > 0" x-cloak>Sisa tagihan: <span x-text="fmt(maxSisa)"></span></p>
                     </div>
                 </div>
@@ -104,8 +106,11 @@
                 },
                 pilihSantri(s) {
                     this.santriId = s.id;
-                    // Kotak pencarian menampilkan pilihannya, jadi jelas siapa yang terpilih.
-                    this.cari = (s.no_pendaftaran ? s.no_pendaftaran + ' — ' : '') + s.nama;
+                    // Kotak pencarian menampilkan pilihannya, jadi jelas siapa yang
+                    // terpilih — lengkap sampai tingkatnya, supaya salah pilih di
+                    // antara nama yang mirip masih ketahuan sebelum disimpan.
+                    this.cari = [s.nis || s.no_pendaftaran, s.nama, s.jenjang, s.tingkat ? 'Tingkat ' + s.tingkat : null]
+                        .filter(Boolean).join(' - ');
                     this.bukaSantri = false;
                 },
 

@@ -24,7 +24,7 @@
         <div class="mt-1 grid gap-2 text-sm text-gray-600 sm:grid-cols-4">
             <div><span class="text-xs text-gray-400">No. Daftar</span><div>{{ $santri->no_pendaftaran }}</div></div>
             <div><span class="text-xs text-gray-400">NIS</span><div>{{ $santri->nis ?? '—' }}</div></div>
-            <div><span class="text-xs text-gray-400">Jenjang / T.A</span><div>{{ $santri->kode_jenjang ?? '—' }} · {{ $santri->tahun_ajaran ?? '—' }}</div></div>
+            <div><span class="text-xs text-gray-400">Jenjang / T.A</span><div>{{ $santri->jenjang?->nama ?? $santri->kode_jenjang ?? '—' }} · {{ $santri->tahun_ajaran ?? '—' }}</div></div>
             <div><span class="text-xs text-gray-400">Wali</span><div>{{ $santri->wali?->nama ?? '—' }}</div></div>
         </div>
     </div>

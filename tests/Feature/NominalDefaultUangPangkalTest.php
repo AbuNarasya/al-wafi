@@ -22,6 +22,7 @@ use Tests\TestCase;
 /** Nominal uang pangkal di master = DEFAULT: mengisi form penagihan, tetap bisa diubah. */
 class NominalDefaultUangPangkalTest extends TestCase
 {
+    use \Tests\Concerns\MengaktifkanSantri;
     use RefreshDatabase;
     use \Tests\Concerns\MembuatTarif;
 
@@ -103,9 +104,15 @@ class NominalDefaultUangPangkalTest extends TestCase
         $this->actingAs(User::find($this->admin))
             ->get(route('santri.show', $santri->id))
             ->assertOk()
-            ->assertSee('value="18000000.00"', false)
+            // Yang DILIHAT petugas berpemisah ribuan & tanpa sen…
+            ->assertSee('value="18.000.000"', false)
+            // …sedangkan yang TERKIRIM tetap angka mentah (<x-input-rupiah>).
+            ->assertSee('name="nominal" value="18000000"', false)
             // Asal angkanya disebut, bukan sekadar "terisi dari master".
-            ->assertSee('Tarif SD');
+            // …dan jenjangnya disebut lewat NAMA (bukan kode `SD` yang tak
+            // bercerita) serta DITEBALKAN, agar tak lebur dengan teks bantu.
+            ->assertSee('<b>Sekolah Dasar</b>', false)
+            ->assertDontSee('<b>SD</b>', false);
     }
 
     public function test_nominal_default_tetap_bisa_diubah_saat_menagih(): void
@@ -156,7 +163,7 @@ class NominalDefaultUangPangkalTest extends TestCase
         $this->buatUangPangkal('UP-SD', '30000000', 'SD');
 
         $svc->medcheck($santri->id, ['lolos' => true]);
-        $svc->daftarUlang($santri->id, $this->admin);
+        $this->aktifkanSantri($santri->id, $this->admin);
 
         // Tagihan lama tetap ditemukan & terakrual, bukan dianggap belum ditagihkan.
         $this->assertTrue((bool) TagihanSantri::find($tagihan->id)->sudah_akrual);

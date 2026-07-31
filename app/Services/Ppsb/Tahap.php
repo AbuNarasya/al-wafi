@@ -14,6 +14,19 @@ final class Tahap
     /** Status yang MENGAKHIRI proses. */
     public const STATUS_FINAL = ['tidak_lulus', 'gagal_medcheck', 'mengundurkan_diri', 'alumni', 'keluar'];
 
+    /**
+     * Status yang TIDAK BOLEH lagi muncul di pemilih santri mana pun (pembayaran,
+     * penjadwalan angsuran, dompet, nominal SPP khusus).
+     *
+     * Hanya `mengundurkan_diri`. `alumni` & `keluar` sengaja TIDAK ikut: keduanya
+     * pernah benar-benar bersekolah dan bisa meninggalkan tunggakan SPP yang masih
+     * sah ditagih. `tidak_lulus` & `gagal_medcheck` juga tidak, karena tagihan
+     * registrasinya sudah dibayar sebelum sampai tahap itu — barisnya jejak
+     * kuitansi, bukan tagihan menggantung, dan menyembunyikannya hanya akan
+     * menghalangi bila ternyata ada sisa yang benar-benar perlu diselesaikan.
+     */
+    public const DISEMBUNYIKAN_DARI_PEMILIH = ['mengundurkan_diri'];
+
     /** Perpindahan yang sah: [status sekarang => tujuan yang diizinkan]. */
     public const TRANSISI = [
         'calon' => ['terbayar'],
@@ -21,7 +34,11 @@ final class Tahap
         'terverifikasi' => ['diseleksi'],
         'diseleksi' => ['diterima', 'tidak_lulus'],
         'diterima' => ['lolos_kesehatan', 'gagal_medcheck'],
-        'lolos_kesehatan' => ['aktif'],
+        // `siap_aktivasi` disisipkan di sini, bukan langsung ke `aktif`: keputusan
+        // menerima sudah final, tetapi akibatnya (jurnal akrual, penagihan SPP,
+        // ikut kenaikan tingkat) baru berlaku saat tahun ajaran masuknya dimulai.
+        'lolos_kesehatan' => ['siap_aktivasi'],
+        'siap_aktivasi' => ['aktif'],
         'aktif' => ['alumni', 'keluar'],
     ];
 
@@ -46,6 +63,7 @@ final class Tahap
     private const LABEL = [
         'calon' => 'Calon', 'terbayar' => 'Registrasi Terbayar', 'terverifikasi' => 'Berkas Terverifikasi',
         'diseleksi' => 'Sudah Diseleksi', 'diterima' => 'Diterima', 'lolos_kesehatan' => 'Lolos Kesehatan',
+        'siap_aktivasi' => 'Siap Diaktifkan',
         'aktif' => 'Santri Aktif', 'naik' => 'Naik Jenjang', 'alumni' => 'Alumni', 'tidak_lulus' => 'Tidak Lulus',
         'gagal_medcheck' => 'Gagal Med Check', 'mengundurkan_diri' => 'Mengundurkan Diri', 'keluar' => 'Keluar',
     ];

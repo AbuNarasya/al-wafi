@@ -38,11 +38,11 @@
                             </div>
                             <div class="col-span-5 sm:col-span-3">
                                 <label class="mb-1 block text-xs font-medium text-gray-600">Debet</label>
-                                <input type="number" step="0.01" min="0" :name="`lines[${i}][debet]`" x-model="row.debet" @input="if (row.debet) row.kredit = ''" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm focus:border-brand focus:ring-1 focus:ring-brand">
+                                <input type="text" inputmode="numeric" :value="fmtRupiah(row.debet)" @input="row.debet = ketikRupiah($event); if (row.debet) row.kredit = ''" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm tabular-nums focus:border-brand focus:ring-1 focus:ring-brand"><input type="hidden" :name="`lines[${i}][debet]`" :value="row.debet">
                             </div>
                             <div class="col-span-5 sm:col-span-2">
                                 <label class="mb-1 block text-xs font-medium text-gray-600">Kredit</label>
-                                <input type="number" step="0.01" min="0" :name="`lines[${i}][kredit]`" x-model="row.kredit" @input="if (row.kredit) row.debet = ''" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm focus:border-brand focus:ring-1 focus:ring-brand">
+                                <input type="text" inputmode="numeric" :value="fmtRupiah(row.kredit)" @input="row.kredit = ketikRupiah($event); if (row.kredit) row.debet = ''" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm tabular-nums focus:border-brand focus:ring-1 focus:ring-brand"><input type="hidden" :name="`lines[${i}][kredit]`" :value="row.kredit">
                             </div>
                             <div class="col-span-2 sm:col-span-1 pb-1 text-center">
                                 <button type="button" @click="hapus(i)" x-show="rows.length > 2" class="text-red-500 hover:text-red-700" title="Hapus baris">&times;</button>

@@ -6,11 +6,15 @@ use App\Exceptions\AppException;
 use App\Models\BankAccount;
 use App\Models\CompanySettings;
 use App\Models\DompetWali;
+use App\Models\Jenjang;
 use App\Models\PembayaranSantri;
 use App\Models\TagihanSantri;
+use App\Models\TipeBiaya;
 use App\Services\Modules\PembayaranSantriService;
+use App\Services\Ppsb\Tahap;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -31,10 +35,10 @@ class PembayaranSantriController extends Controller
     private function tipe(string $lingkup): array
     {
         return $lingkup === 'ppsb'
-            ? \App\Models\TipeBiaya::kodeBerperilaku('registrasi', 'uang_pangkal', 'perlengkapan')
+            ? TipeBiaya::kodeBerperilaku('registrasi', 'uang_pangkal', 'perlengkapan')
             // Daftar ulang masuk KEPENDIDIKAN: penerimanya santri yang sudah
             // aktif, bukan calon yang sedang diproses PPSB.
-            : \App\Models\TipeBiaya::kodeBerperilaku('spp', 'daftar_ulang', 'lain');
+            : TipeBiaya::kodeBerperilaku('spp', 'daftar_ulang', 'lain');
     }
 
     public function __construct(private readonly PembayaranSantriService $service) {}
@@ -81,7 +85,7 @@ class PembayaranSantriController extends Controller
     }
 
     /** Tagihan yang bisa dibayar dari Dompet Wali: santri aktif + wali punya dompet. */
-    private function tagihanDompet(): \Illuminate\Support\Collection
+    private function tagihanDompet(): Collection
     {
         $waliBerdompet = DompetWali::pluck('id_wali')->all();
 
@@ -91,7 +95,7 @@ class PembayaranSantriController extends Controller
             ->get()
             ->map(fn ($t) => [
                 'id' => $t->id,
-                'label' => "{$t->santri?->nama} — {$t->jenis?->nama} · sisa Rp " . number_format((float) $t->sisa, 0, ',', '.'),
+                'label' => "{$t->santri?->nama} — {$t->jenis?->nama} · sisa Rp ".number_format((float) $t->sisa, 0, ',', '.'),
                 'sisa' => (float) $t->sisa,
             ])->values();
     }
@@ -102,19 +106,27 @@ class PembayaranSantriController extends Controller
         $tagihan = TagihanSantri::query()->with(['santri', 'jenis'])
             ->whereIn('status', ['belum_bayar', 'sebagian'])
             ->whereHas('jenis', fn ($q) => $q->whereIn('tipe', $tipes))
+            // Yang sudah mengundurkan diri tak boleh ditawarkan. Tagihannya memang
+            // sudah ditutup saat ia mundur, tetapi penyaring ini tetap ada sebagai
+            // jaring kedua: satu baris tersisa dari data lama sudah cukup untuk
+            // membuat petugas mencatat setoran atas nama anak yang salah.
+            ->whereHas('santri', fn ($q) => $q->whereNotIn('status', Tahap::DISEMBUNYIKAN_DARI_PEMILIH))
             ->get();
 
-        // Kelompokkan tagihan per santri untuk selector Alpine. No. pendaftaran &
-        // NIS ikut dikirim: nama saja tak cukup membedakan santri yang namanya
-        // mirip, dan petugas biasanya memegang nomor pendaftarannya.
+        // Kelompokkan tagihan per santri untuk selector Alpine. Nomor identitas,
+        // jenjang, & tingkat ikut dikirim: nama saja tak cukup membedakan santri
+        // yang namanya mirip, dan petugas biasanya memegang nomornya. Jenjang
+        // disebut lewat NAMA — kode `J001` tak bercerita apa pun bagi pembaca.
+        $petaJenjang = Jenjang::pluck('nama', 'kode')->all();
         $santriData = $tagihan->groupBy('id_santri')->map(fn ($items) => [
             'id' => $items->first()->id_santri,
             'nama' => $items->first()->santri?->nama,
             'no_pendaftaran' => $items->first()->santri?->no_pendaftaran,
             'nis' => $items->first()->santri?->nis,
-            'jenjang' => $items->first()->santri?->kode_jenjang,
+            'jenjang' => $petaJenjang[$items->first()->santri?->kode_jenjang] ?? $items->first()->santri?->kode_jenjang,
+            'tingkat' => $items->first()->santri?->tingkat,
             'tagihan' => $items->map(fn ($t) => [
-                'id' => $t->id, 'label' => "{$t->jenis?->nama} — sisa Rp " . number_format((float) $t->sisa, 0, ',', '.'), 'sisa' => (float) $t->sisa,
+                'id' => $t->id, 'label' => "{$t->jenis?->nama} — sisa Rp ".number_format((float) $t->sisa, 0, ',', '.'), 'sisa' => (float) $t->sisa,
             ])->values(),
         ])->values();
 
@@ -157,7 +169,7 @@ class PembayaranSantriController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route($this->rt($lingkup) . '.index')->with('status', 'Pembayaran dicatat, menunggu verifikasi keuangan.');
+        return redirect()->route($this->rt($lingkup).'.index')->with('status', 'Pembayaran dicatat, menunggu verifikasi keuangan.');
     }
 
     /** Bayar tagihan langsung dari Dompet Wali (berlaku seketika, tanpa verifikasi). */
@@ -177,7 +189,7 @@ class PembayaranSantriController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route($this->rt($lingkup) . '.index')->with('status', 'Tagihan dibayar dari Dompet Wali.');
+        return redirect()->route($this->rt($lingkup).'.index')->with('status', 'Tagihan dibayar dari Dompet Wali.');
     }
 
     /**
@@ -201,7 +213,8 @@ class PembayaranSantriController extends Controller
     public function kuitansi(string $id, string $lingkup): View
     {
         $pembayaran = PembayaranSantri::with([
-            'santri.wali', 'tagihan.jenis', 'pencatat', 'pemverifikasi', 'rekening',
+            // `santri.jenjang` — kuitansi menyebut NAMA jenjang, bukan kode `J001`.
+            'santri.wali', 'santri.jenjang', 'tagihan.jenis', 'pencatat', 'pemverifikasi', 'rekening',
         ])->findOrFail((int) $id);
 
         abort_unless($pembayaran->status === 'terverifikasi', 403, 'Kuitansi hanya bisa dicetak untuk pembayaran yang sudah diverifikasi keuangan.');
@@ -221,7 +234,7 @@ class PembayaranSantriController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route($this->rt($lingkup) . '.index')->with('status', 'Pembayaran diverifikasi & jurnal diposting.');
+        return redirect()->route($this->rt($lingkup).'.index')->with('status', 'Pembayaran diverifikasi & jurnal diposting.');
     }
 
     public function tolak(Request $request, string $id, string $lingkup): RedirectResponse
@@ -234,6 +247,6 @@ class PembayaranSantriController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route($this->rt($lingkup) . '.index')->with('status', 'Pembayaran ditolak.');
+        return redirect()->route($this->rt($lingkup).'.index')->with('status', 'Pembayaran ditolak.');
     }
 }

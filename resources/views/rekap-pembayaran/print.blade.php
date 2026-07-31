@@ -53,7 +53,7 @@
             </tr>
             <tr>
                 <td class="py-0.5 text-gray-500">Jenjang / T.A</td>
-                <td class="py-0.5 text-gray-900">{{ $santri->kode_jenjang ?? '—' }} · {{ $santri->tahun_ajaran ?? '—' }}</td>
+                <td class="py-0.5 text-gray-900">{{ $santri->jenjang?->nama ?? $santri->kode_jenjang ?? '—' }} · {{ $santri->tahun_ajaran ?? '—' }}</td>
                 <td class="py-0.5 text-gray-500">Status</td>
                 <td class="py-0.5 text-gray-900">{{ ucfirst(str_replace('_', ' ', $santri->status)) }}</td>
             </tr>

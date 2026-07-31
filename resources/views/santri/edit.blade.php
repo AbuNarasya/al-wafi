@@ -49,9 +49,11 @@
                      jenjang: @js(old('kode_jenjang', $santri->kode_jenjang)),
                      tingkat: @js((string) old('tingkat', $santri->tingkat)),
                      peta: @js(\App\Models\Jenjang::petaTingkat()),
-                     get jumlah() { return this.peta[this.jenjang] ?? 0 },
+                     get rentang() { return this.peta[this.jenjang] ?? null },
+                  get jumlah() { return this.rentang ? this.rentang.akhir - this.rentang.mulai + 1 : 0 },
+                  get tingkatOpsi() { return this.rentang ? Array.from({ length: this.jumlah }, (_, k) => this.rentang.mulai + k) : [] },
                  }"
-                 x-init="$watch('jenjang', () => { if (Number(tingkat) > jumlah) tingkat = '' })">
+                 x-init="$watch('jenjang', () => { if (!tingkatOpsi.includes(Number(tingkat))) tingkat = '' })">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Jenjang <span class="text-red-500">*</span></label>
                     <select name="kode_jenjang" x-model="jenjang" required
@@ -69,7 +71,7 @@
                     <select name="tingkat" x-model="tingkat" required :disabled="!jenjang"
                             class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-gray-100">
                         <option value="">— pilih tingkat —</option>
-                        <template x-for="i in jumlah" :key="i">
+                        <template x-for="i in tingkatOpsi" :key="i">
                             <option :value="i" x-text="'Tingkat ' + i" :selected="String(i) === tingkat"></option>
                         </template>
                     </select>

@@ -44,6 +44,7 @@ class JenjangService
             'kode' => $data['kode'],
             'nama' => $data['nama'],
             'jumlah_tingkat' => $data['jumlah_tingkat'] ?? null,
+            'tingkat_mulai' => $data['tingkat_mulai'] ?? null,
             'kode_jenjang_lanjutan' => $data['kode_jenjang_lanjutan'] ?? null,
             'urutan' => $data['urutan'] ?? 0,
             'status' => $data['status'] ?? 'aktif',
@@ -57,6 +58,7 @@ class JenjangService
         $row->update([
             'nama' => $data['nama'] ?? $row->nama,
             'jumlah_tingkat' => array_key_exists('jumlah_tingkat', $data) ? $data['jumlah_tingkat'] : $row->jumlah_tingkat,
+            'tingkat_mulai' => array_key_exists('tingkat_mulai', $data) ? $data['tingkat_mulai'] : $row->tingkat_mulai,
             'kode_jenjang_lanjutan' => array_key_exists('kode_jenjang_lanjutan', $data)
                 ? ($data['kode_jenjang_lanjutan'] ?: null) : $row->kode_jenjang_lanjutan,
             'urutan' => $data['urutan'] ?? $row->urutan,

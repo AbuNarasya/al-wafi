@@ -13,8 +13,18 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * AUTO-DEBET — memotong saldo Dompet Wali untuk melunasi tagihan santri bagi
- * keluarga yang opt-in (Wali.auto_debet). Tunggakan tertua dulu, boleh sebagian,
- * tak pernah minus, hanya Dompet Wali.
+ * keluarga yang opt-in (Wali.auto_debet). Tunggakan tertua dulu, tak pernah
+ * minus, hanya Dompet Wali.
+ *
+ * REGISTRASI dikecualikan sama sekali: itu biaya tahap pendaftaran yang disetor
+ * di meja PPSB, dan pelunasannya yang memajukan tahap calon. Membayarnya lewat
+ * proses latar akan memajukan tahap tanpa ada petugas yang menyaksikannya.
+ *
+ * SEBAGIAN boleh untuk tagihan yang memang bisa diangsur (uang pangkal punya
+ * modul Angsurannya sendiri) — TETAPI TIDAK UNTUK SPP. SPP dipotong penuh atau
+ * tidak sama sekali; yang saldonya kurang dibiarkan menggantung utuh sampai
+ * dompetnya diisi, lalu terpotong penuh dengan sendirinya (verifikasi top-up
+ * memanggil kembali auto-debet — lihat DompetService::verifikasiTopUp).
  */
 class AutoDebetService
 {
@@ -56,6 +66,12 @@ class AutoDebetService
 
             $tagihanList = TagihanSantri::whereHas('santri', fn ($q) => $q->where('id_wali', $w->id)->where('status', 'aktif'))
                 ->whereIn('status', ['belum_bayar', 'sebagian'])
+                // REGISTRASI tak pernah ikut auto-debet. Biaya itu milik tahap
+                // PENDAFTARAN — disetor di meja PPSB sebagai syarat calon boleh
+                // maju, dan pelunasannyalah yang memajukan tahapnya. Membiarkan
+                // dompet memotongnya diam-diam memindahkan keputusan itu ke
+                // proses latar yang tak dilihat petugas PPSB.
+                ->where('perilaku', '!=', 'registrasi')
                 ->with(['jenis', 'santri'])
                 ->orderBy('jatuh_tempo')->orderBy('periode')->orderBy('id')->get();
 
@@ -68,7 +84,21 @@ class AutoDebetService
                 if (Money::lte($ruang, '0')) {
                     continue;
                 }
-                $bayar = Money::lt($ruang, $saldo) ? $ruang : $saldo;
+
+                if ($t->perilaku === 'spp') {
+                    // SPP: penuh atau tidak sama sekali. `continue` — bukan `break`
+                    // — supaya satu SPP yang tak terjangkau tidak ikut membekukan
+                    // tagihan lain keluarga yang sama yang saldonya cukup.
+                    // Setoran yang belum diverifikasi juga menahan: sisanya masih
+                    // bisa berubah, jadi "penuh" belum tentu benar-benar penuh.
+                    if (Money::gtZero($menunggu) || Money::lt($saldo, $t->sisa)) {
+                        continue;
+                    }
+                    $bayar = Money::of($t->sisa);
+                } else {
+                    $bayar = Money::lt($ruang, $saldo) ? $ruang : $saldo;
+                }
+
                 if (Money::lte($bayar, '0')) {
                     continue;
                 }

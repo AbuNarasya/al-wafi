@@ -22,6 +22,7 @@ use App\Services\Modules\SppService;
 use App\Services\Modules\TarifService;
 use App\Services\Modules\WaliService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
@@ -41,17 +42,28 @@ class PendaftaranLanjutanTest extends TestCase
     use RefreshDatabase;
 
     private const GRP = 'ZZPL';
+
     private const PEND = '4.ZZPL.PEND';
+
     private const PIUT = '1.ZZPL.PIUT';
+
     private const UNIT = 'ZZPLU';
+
     private const TA1 = '2026/2027';
+
     private const TA2 = '2027/2028';
+
+    /** Tanggal uji dibekukan di dalam T.A1: kenaikan diurus SEBELUM T.A2 mulai. */
+    private const HARI_UJI = '2026-09-15';
 
     private User $admin;
 
     protected function setUp(): void
     {
         parent::setUp();
+        // Sejak perpindahan santri dijadwalkan (menyala saat T.A tujuan dimulai),
+        // "kapan sekarang" ikut menentukan hasilnya.
+        Carbon::setTestNow(self::HARI_UJI);
         CoaGroup::create(['kode_grup' => self::GRP, 'nama_grup' => 'PL']);
         foreach ([[self::PEND, 'Pendapatan', 'kredit'], [self::PIUT, 'Piutang', 'debet']] as [$k, $n, $s]) {
             CoaDetail::create(['kode_coa' => $k, 'nama_coa' => $n, 'kode_grup' => self::GRP, 'jenis_saldo' => $s]);
@@ -118,6 +130,12 @@ class PendaftaranLanjutanTest extends TestCase
         return $santri->refresh();
     }
 
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
+
     /** Bawa satu siklus lanjutan sampai lolos kesehatan. */
     private function sampaiLolos(Santri $santri): Pendaftaran
     {
@@ -134,6 +152,29 @@ class PendaftaranLanjutanTest extends TestCase
         return $p->refresh();
     }
 
+    /**
+     * Eksekusi kenaikan, LALU majukan kalender ke T.A tujuan supaya perpindahannya
+     * menyala.
+     *
+     * Eksekusi sendiri hanya menerbitkan tagihan & mengakru — perpindahan
+     * jenjang/tingkat/jalur/tahun berjalan menunggu tahun ajaran tujuan dimulai,
+     * sama seperti naik tingkat biasa. Tanpa itu santri yang PPSB-nya tuntas
+     * bulan Mei sudah ber-jenjang SMP sementara kalender masih tahun lama.
+     */
+    private function naikkanLaluBerlaku(Pendaftaran $p, array $data): array
+    {
+        $hasil = (new PendaftaranLanjutanService)->eksekusiKenaikan($p->id, $data, $this->admin->id_pengguna);
+
+        $mulai = TahunAjaran::where('kode', $p->tahun_ajaran)->value('tanggal_mulai');
+        Carbon::setTestNow(Carbon::parse($mulai));
+        (new \App\Services\Modules\KenaikanTingkatService)->terapkanYangJatuhTempo();
+        Carbon::setTestNow(self::HARI_UJI);
+
+        $hasil['santri'] = $hasil['santri']->refresh();
+
+        return $hasil;
+    }
+
     // ---- Sasaran kenaikan ----
 
     public function test_sasaran_mengikuti_master_jenjang_dan_jalur(): void
@@ -143,6 +184,89 @@ class PendaftaranLanjutanTest extends TestCase
         $this->assertSame('J002', $sasaran['kode_jenjang']);
         $this->assertSame('003', $sasaran['kode_jalur'], 'Reguler → Lanjutan Reguler');
         $this->assertNull($sasaran['alasan']);
+    }
+
+    /**
+     * NAIK JENJANG HANYA DARI TINGKAT TERAKHIR.
+     *
+     * Dulu tak diperiksa sama sekali: santri SDTQ tingkat 1 pun ditawari naik ke
+     * SMP dan bisa dieksekusi, melewati sisa tingkatnya tanpa gejala apa pun.
+     */
+    public function test_belum_tingkat_terakhir_tidak_boleh_naik_jenjang(): void
+    {
+        $svc = new PendaftaranLanjutanService;
+        $santri = $this->santriKelasAkhir();
+
+        foreach ([1, 5] as $tingkat) {
+            $santri->update(['tingkat' => $tingkat]);
+            $sasaran = $svc->sasaran($santri->refresh());
+
+            // Sasarannya tetap disebut (SMP), tapi dengan alasan mengapa belum boleh.
+            $this->assertSame('J002', $sasaran['kode_jenjang']);
+            $this->assertStringContainsString("masih tingkat {$tingkat} dari 6", $sasaran['alasan']);
+            $this->assertStringContainsString('Kenaikan Tingkat', $sasaran['alasan']);
+
+            // Dan kiriman langsung pun ditolak — bukan cuma formulirnya disembunyikan.
+            try {
+                $svc->buat($santri->id, ['tahun_ajaran' => self::TA2], $this->admin->id_pengguna);
+                $this->fail('harus 422');
+            } catch (AppException $e) {
+                $this->assertSame(422, $e->status);
+            }
+            $this->assertSame(0, Pendaftaran::where('id_santri', $santri->id)->lanjutan()->count());
+        }
+
+        // Di tingkat terakhir barulah boleh.
+        $santri->update(['tingkat' => 6]);
+        $this->assertNull($svc->sasaran($santri->refresh())['alasan']);
+    }
+
+    /**
+     * Siklus yang SUDAH TERBUKA pun tak bisa dieksekusi bila tingkatnya turun di
+     * tengah jalan. Eksekusi adalah satu-satunya langkah yang mengubah data
+     * santri, jadi penjaganya harus ada di situ juga — bukan cuma saat membuka.
+     * Ini juga yang menutup siklus yang dibuka sebelum penjaga ini ada.
+     */
+    public function test_eksekusi_menolak_bila_santri_tak_lagi_di_tingkat_terakhir(): void
+    {
+        $svc = new PendaftaranLanjutanService;
+        $santri = $this->santriKelasAkhir();
+        $p = $svc->buat($santri->id, ['tahun_ajaran' => self::TA2], $this->admin->id_pengguna);
+
+        // Bawa siklusnya sampai siap dieksekusi.
+        $p->update(['status' => 'lolos_kesehatan']);
+        // …lalu tingkatnya ternyata bukan tingkat terakhir.
+        $santri->update(['tingkat' => 4]);
+
+        try {
+            $svc->eksekusiKenaikan($p->id, ['tingkat' => 1], $this->admin->id_pengguna);
+            $this->fail('harus 422');
+        } catch (AppException $e) {
+            $this->assertSame(422, $e->status);
+            $this->assertStringContainsString('masih tingkat 4 dari 6', $e->getMessage());
+        }
+
+        // Data santri tak tersentuh sama sekali.
+        $this->assertSame('J001', $santri->refresh()->kode_jenjang);
+        $this->assertSame(4, $santri->tingkat);
+    }
+
+    /**
+     * Yang TAK BISA DIPASTIKAN juga dihalangi, dan dikatakan terus terang —
+     * santri hasil impor boleh belum bertingkat, dan jenjang boleh belum
+     * mengisi jumlah tingkatnya. Keduanya jangan diloloskan diam-diam.
+     */
+    public function test_tingkat_atau_jumlah_tingkat_kosong_menghalangi_dengan_pesan_menuntun(): void
+    {
+        $svc = new PendaftaranLanjutanService;
+        $santri = $this->santriKelasAkhir();
+
+        $santri->update(['tingkat' => null]);
+        $this->assertStringContainsString('Tingkat santri ini belum terisi', $svc->sasaran($santri->refresh())['alasan']);
+
+        $santri->update(['tingkat' => 6]);
+        Jenjang::whereKey('J001')->update(['jumlah_tingkat' => null]);
+        $this->assertStringContainsString('Jumlah tingkat jenjang', $svc->sasaran($santri->refresh())['alasan']);
     }
 
     public function test_jenjang_terakhir_tak_punya_sasaran(): void
@@ -275,9 +399,9 @@ class PendaftaranLanjutanTest extends TestCase
         $santri = $this->santriKelasAkhir();
         $p = $this->sampaiLolos($santri);
 
-        $hasil = (new PendaftaranLanjutanService)->eksekusiKenaikan($p->id, [
+        $hasil = $this->naikkanLaluBerlaku($p, [
             'tingkat' => 1, 'nominal_uang_pangkal' => '20000000', 'nominal_perlengkapan' => '13000000',
-        ], $this->admin->id_pengguna);
+        ]);
 
         $s = $hasil['santri'];
         $this->assertSame('J002', $s->kode_jenjang);
@@ -342,7 +466,7 @@ class PendaftaranLanjutanTest extends TestCase
         $this->assertSame(1500000.0, (float) (new SppService)->nominalSppSantri($santri->id)['nominal']);
 
         $p = $this->sampaiLolos($santri);
-        (new PendaftaranLanjutanService)->eksekusiKenaikan($p->id, ['tingkat' => 1, 'nominal_uang_pangkal' => '20000000'], $this->admin->id_pengguna);
+        $this->naikkanLaluBerlaku($p, ['tingkat' => 1, 'nominal_uang_pangkal' => '20000000']);
 
         // Tarif SMP T.A 2027/2028, bukan SDTQ T.A 2026/2027.
         $this->assertSame(4200000.0, (float) (new SppService)->nominalSppSantri($santri->id)['nominal']);
@@ -363,6 +487,99 @@ class PendaftaranLanjutanTest extends TestCase
         $this->assertSame(self::TA1, $santri->tahun_ajaran_berjalan);
         // Siklus baru boleh dibuka lagi setelah yang lama ditutup.
         $this->assertSame('calon', $svc->buat($santri->id, ['tahun_ajaran' => self::TA2], $this->admin->id_pengguna)->status);
+    }
+
+    // ---- Sambungan ke jadwal perubahan ----
+
+    /**
+     * Eksekusi kenaikan MENAGIH sekarang, MEMINDAHKAN nanti.
+     *
+     * Dulu keduanya terjadi bersamaan, sehingga siklus yang tuntas bulan Mei
+     * membuat santri ber-jenjang SMP sementara kalender masih tahun lama — dan
+     * setiap pencarian tarif yang bersandar pada jenjang & tahun berjalan ikut
+     * mendahului kalender.
+     */
+    public function test_eksekusi_menagih_sekarang_memindahkan_saat_tahun_tujuan_mulai(): void
+    {
+        $santri = $this->santriKelasAkhir();
+        $p = $this->sampaiLolos($santri);
+
+        $hasil = (new PendaftaranLanjutanService)->eksekusiKenaikan($p->id, [
+            'tingkat' => 1, 'nominal_uang_pangkal' => '20000000',
+        ], $this->admin->id_pengguna);
+
+        // TAGIHANNYA sudah terbit, memakai jenjang & T.A TUJUAN — walau santrinya
+        // belum berpindah. Inilah gunanya siklus dibuka jauh hari.
+        $this->assertSame('J002', $hasil['uang_pangkal']->kode_jenjang);
+        $this->assertSame(self::TA2, $hasil['uang_pangkal']->tahun_ajaran);
+        $this->assertTrue((bool) $hasil['uang_pangkal']->refresh()->sudah_akrual);
+
+        // SANTRINYA belum.
+        $santri->refresh();
+        $this->assertSame('J001', $santri->kode_jenjang);
+        $this->assertSame(6, $santri->tingkat);
+        $this->assertSame(self::TA1, $santri->tahun_ajaran_berjalan);
+        $this->assertDatabaseHas('jadwal_perubahan_santri', [
+            'id_santri' => $santri->id, 'tahun_ajaran' => self::TA2,
+            'status' => 'siap', 'tingkat_tujuan' => 1, 'kode_jenjang_tujuan' => 'J002',
+        ]);
+
+        // 1 Juli tiba → menyala, lengkap dengan riwayat tingkatnya.
+        Carbon::setTestNow('2027-07-01');
+        (new \App\Services\Modules\KenaikanTingkatService)->terapkanYangJatuhTempo();
+
+        $santri->refresh();
+        $this->assertSame('J002', $santri->kode_jenjang);
+        $this->assertSame(1, $santri->tingkat);
+        $this->assertSame('003', $santri->jalur);
+        $this->assertSame(self::TA2, $santri->tahun_ajaran_berjalan);
+        $this->assertSame(1, RiwayatTingkat::where('id_santri', $santri->id)
+            ->where('tahun_ajaran', self::TA2)->where('kode_jenjang', 'J002')->count());
+    }
+
+    /**
+     * SPP SUSULAN untuk periode tahun LALU memakai jenjang tahun itu.
+     *
+     * Dulu jenjangnya diambil dari keadaan sekarang: santri yang sudah naik ke
+     * SMP ditagih dengan tarif DAN akun SMP untuk bulan ketika ia masih di SDTQ.
+     * Akun itu menentukan pendapatan unit bisnis mana yang bertambah, jadi yang
+     * keliru bukan cuma angkanya.
+     */
+    public function test_spp_susulan_memakai_jenjang_tahun_itu(): void
+    {
+        $santri = $this->santriKelasAkhir();
+        $p = $this->sampaiLolos($santri);
+        $this->naikkanLaluBerlaku($p, ['tingkat' => 1, 'nominal_uang_pangkal' => '20000000']);
+
+        // Sekarang ia SMP pada T.A2 — dan itu memang benar untuk T.A2.
+        Carbon::setTestNow('2027-09-10');
+        $santri->refresh();
+        $this->assertSame('J002', $santri->kode_jenjang);
+        $this->assertSame(4200000.0, (float) (new SppService)->nominalSppSantri($santri->id, self::TA2)['nominal']);
+
+        // Tetapi SPP susulan untuk periode T.A1 harus memakai SDTQ — jenjangnya
+        // pada tahun itu, bukan jenjangnya hari ini.
+        $susulan = (new SppService)->nominalSppSantri($santri->id, self::TA1);
+        $this->assertSame(1500000.0, (float) $susulan['nominal'], 'tarif SDTQ T.A1, bukan SMP');
+        $this->assertStringContainsString('SDTQ', $susulan['asal_label']);
+        // Akun & unit bisnisnya ikut benar, karena jenis biayanya per jenjang.
+        $this->assertSame('J001', \App\Models\JenisBiaya::find($susulan['kode_jenis'])->kode_jenjang);
+    }
+
+    /** PPSB baru tuntas SETELAH tahun tujuannya berjalan → langsung berlaku. */
+    public function test_ppsb_tuntas_setelah_tahun_mulai_langsung_memindahkan(): void
+    {
+        $santri = $this->santriKelasAkhir();
+        $p = $this->sampaiLolos($santri);
+
+        Carbon::setTestNow('2027-08-20'); // T.A2 sudah berjalan
+        (new PendaftaranLanjutanService)->eksekusiKenaikan($p->id, [
+            'tingkat' => 1, 'nominal_uang_pangkal' => '20000000',
+        ], $this->admin->id_pengguna);
+
+        $santri->refresh();
+        $this->assertSame('J002', $santri->kode_jenjang);
+        $this->assertSame(self::TA2, $santri->tahun_ajaran_berjalan);
     }
 
     // ---- Alur lewat HTTP ----
@@ -394,6 +611,15 @@ class PendaftaranLanjutanTest extends TestCase
         )->assertRedirect();
 
         $this->assertSame('naik', $p->refresh()->status);
+        // Siklusnya tuntas, tetapi santrinya BELUM pindah: T.A tujuan belum mulai.
+        $this->assertSame('J001', $santri->refresh()->kode_jenjang, 'perpindahan menunggu tahun ajarannya');
+        $this->assertDatabaseHas('jadwal_perubahan_santri', [
+            'id_santri' => $santri->id, 'tahun_ajaran' => self::TA2, 'status' => 'siap',
+        ]);
+
+        // Tahun barunya tiba → membuka daftar santri saja sudah menyalakannya.
+        Carbon::setTestNow('2027-07-01');
+        $this->actingAs($this->admin)->get(route('santri.aktif'))->assertOk();
         $this->assertSame('J002', $santri->refresh()->kode_jenjang);
     }
 }

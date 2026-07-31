@@ -6,7 +6,7 @@
     <div class="mx-auto max-w-2xl">
         <a href="{{ route('tagihan_lain.index') }}" class="mb-3 inline-block text-sm text-gray-500 hover:text-gray-700">&larr; Kembali</a>
 
-        @if ($santriAktif->isEmpty())
+        @if (empty($santriAktif))
             <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-12 text-center text-gray-400">Belum ada santri aktif.</div>
         @else
             <form method="POST" action="{{ route('tagihan_lain.store') }}" x-data="{ all: false }"
@@ -23,14 +23,14 @@
 
                 <div>
                     <div class="mb-2 flex items-center justify-between">
-                        <label class="text-sm font-medium text-gray-700">Santri ({{ $santriAktif->count() }} aktif)</label>
+                        <label class="text-sm font-medium text-gray-700">Santri ({{ count($santriAktif) }} aktif)</label>
                         <label class="flex items-center gap-1 text-xs text-gray-500"><input type="checkbox" x-model="all" @change="document.querySelectorAll('.santri-cb').forEach(c => c.checked = all)" class="rounded border-gray-300"> Pilih semua</label>
                     </div>
                     <div class="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-3">
-                        @foreach ($santriAktif as $s)
+                        @foreach ($santriAktif as $idSantri => $label)
                             <label class="flex items-center gap-2 text-sm">
-                                <input type="checkbox" class="santri-cb rounded border-gray-300 text-brand" name="id_santri[]" value="{{ $s->id }}">
-                                {{ $s->nama }} <span class="text-xs text-gray-400">{{ $s->kode_jenjang }}</span>
+                                <input type="checkbox" class="santri-cb rounded border-gray-300 text-brand" name="id_santri[]" value="{{ $idSantri }}">
+                                {{ $label }}
                             </label>
                         @endforeach
                     </div>

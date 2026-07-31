@@ -79,7 +79,7 @@
                             </div>
                             <div class="col-span-4 sm:col-span-3">
                                 <label class="mb-1 block text-xs font-medium text-gray-600">Harga</label>
-                                <input type="number" step="0.01" min="0" :name="`details[${i}][harga_satuan]`" x-model="row.harga_satuan" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm focus:border-brand focus:ring-1 focus:ring-brand">
+                                <input type="text" inputmode="numeric" :value="fmtRupiah(row.harga_satuan)" @input="row.harga_satuan = ketikRupiah($event)" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm tabular-nums focus:border-brand focus:ring-1 focus:ring-brand"><input type="hidden" :name="`details[${i}][harga_satuan]`" :value="row.harga_satuan">
                             </div>
                             <div class="col-span-3 sm:col-span-2 pb-2 text-right text-xs text-gray-600 tabular-nums" x-text="fmt((parseFloat(row.kuantiti)||0) * (parseFloat(row.harga_satuan)||0))"></div>
                             <div class="col-span-1">

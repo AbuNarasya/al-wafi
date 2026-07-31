@@ -5,10 +5,13 @@ namespace App\Services\Impor\Pemeta;
 use App\Models\JalurPendaftaran;
 use App\Models\JenisBiaya;
 use App\Models\Jenjang;
+use App\Models\RiwayatTingkat;
 use App\Models\Santri;
 use App\Models\TagihanSantri;
 use App\Models\TahunAjaran;
+use App\Models\TipeBiaya;
 use App\Models\Wali;
+use App\Services\Impor\BantuanPemeta;
 use App\Services\Impor\Pemeta;
 use App\Support\Money;
 
@@ -30,7 +33,7 @@ use App\Support\Money;
  */
 class PemetaSantriLama implements Pemeta
 {
-    use \App\Services\Impor\BantuanPemeta;
+    use BantuanPemeta;
 
     /**
      * Jenis tunggakan yang bisa dibawa santri lama, mengikuti daftar Tipe Biaya.
@@ -180,7 +183,7 @@ class PemetaSantriLama implements Pemeta
             // sama akan melanggar indeks unik anti tagih-ganda begitu keduanya
             // terisi pada satu santri. Ditolak di sini supaya pesannya menuntun,
             // bukan muncul sebagai galat basis data di tengah impor.
-            $perilaku = \App\Models\TipeBiaya::perilakuDari(JenisBiaya::whereKey($kode)->value('tipe'));
+            $perilaku = TipeBiaya::perilakuDari(JenisBiaya::whereKey($kode)->value('tipe'));
             if ($perilaku === null || $perilaku === 'lain') {
                 continue;
             }
@@ -259,8 +262,12 @@ class PemetaSantriLama implements Pemeta
         if (! $jenjang->jumlah_tingkat) {
             return $this->masalah("Jumlah tingkat jenjang \"{$jenjang->nama}\" belum diisi di master Jenjang, jadi tingkat santri tak bisa diperiksa.");
         }
-        if ((int) $tingkat < 1 || (int) $tingkat > $jenjang->jumlah_tingkat) {
-            return $this->masalah("Tingkat {$tingkat} tidak ada di jenjang \"{$jenjang->nama}\" (hanya tingkat 1–{$jenjang->jumlah_tingkat}).");
+        // Penomoran tingkat berkelanjutan: SMP 7–9, SMA 10–12. Berkas impor
+        // WAJIB memakai penomoran itu juga — memaksanya di sini lebih baik
+        // daripada menerima "2" lalu diam-diam menaruhnya di kelas yang salah.
+        if ((int) $tingkat < $jenjang->tingkatMulai() || (int) $tingkat > $jenjang->tingkatAkhir()) {
+            return $this->masalah("Tingkat {$tingkat} tidak ada di jenjang \"{$jenjang->nama}\" "
+                ."(hanya tingkat {$jenjang->tingkatMulai()}–{$jenjang->tingkatAkhir()}).");
         }
 
         $ta = trim($baris['tahun_ajaran'] ?? '');
@@ -317,8 +324,21 @@ class PemetaSantriLama implements Pemeta
             $telepon = trim($b['wali_telepon']);
             $wali = Wali::where('telepon', $telepon)->first();
             if (! $wali) {
+                $nama = trim($b['wali_nama']);
+                // `nama` & `telepon` di tabel wali adalah SALINAN kontak utama,
+                // bukan isian tersendiri — jadi sumbernya wajib ikut diisi.
+                // Sebelumnya hanya salinannya yang ditulis, sehingga wali hasil
+                // impor tak bisa disunting sama sekali: WaliService::update
+                // menuntut kontak utama lengkap dan menolak dengan "Kontak utama
+                // belum lengkap" walau di layar namanya jelas terbaca.
+                // Berkasnya tak menyebut peran, jadi diperlakukan sebagai ayah —
+                // sama dengan bawaan kolom `kontak_utama`, dan petugas bisa
+                // memindahkannya ke ibu/wali dari form kapan saja.
                 $wali = Wali::create([
-                    'nama' => trim($b['wali_nama']),
+                    'kontak_utama' => 'ayah',
+                    'nama_ayah' => $nama,
+                    'telepon_ayah' => $telepon,
+                    'nama' => $nama,
                     'telepon' => $telepon,
                     'status' => 'aktif',
                 ]);
@@ -355,12 +375,22 @@ class PemetaSantriLama implements Pemeta
             // ulang PPSB, jadi tanpa ini riwayatnya kosong dan kenaikan pertama
             // mereka kehilangan titik awalnya.
             if ($santri->kode_jenjang) {
-                \App\Models\RiwayatTingkat::updateOrCreate(
+                RiwayatTingkat::updateOrCreate(
                     ['id_santri' => $santri->id, 'tahun_ajaran' => $santri->tahun_ajaran],
                     ['kode_jenjang' => $santri->kode_jenjang, 'tingkat' => $santri->tingkat,
                         'catatan' => 'Impor data awal santri lama.'],
                 );
             }
+
+            // NIS bawaan dari berkas ikut dicatat sebagai riwayat pertamanya.
+            // Tanpa ini ia berdiri di luar catatan, dan layar Generate NIS akan
+            // mengira santri ini belum pernah bernomor lalu menawarkan yang baru.
+            \App\Models\NisSantri::create([
+                'id_santri' => $santri->id, 'nis' => $santri->nis,
+                'kode_jenjang' => $santri->kode_jenjang, 'tingkat' => $santri->tingkat,
+                'tahun_ajaran' => $santri->tahun_ajaran, 'berlaku' => true,
+                'diterbitkan_pada' => now()->toDateString(),
+            ]);
 
             foreach (self::TUNGGAKAN as $k => $t) {
                 $nilai = $this->angka($b["tunggakan_{$k}"] ?? '');
@@ -373,7 +403,7 @@ class PemetaSantriLama implements Pemeta
                     'kode_jenis' => $kodeJenis,
                     // Perilaku disalin dari jenis biayanya supaya tunggakan uang
                     // pangkal warisan tetap dikenali modul yang membacanya.
-                    'perilaku' => \App\Models\TipeBiaya::perilakuDari(JenisBiaya::whereKey($kodeJenis)->value('tipe')),
+                    'perilaku' => TipeBiaya::perilakuDari(JenisBiaya::whereKey($kodeJenis)->value('tipe')),
                     'kode_jenjang' => $santri->kode_jenjang,
                     'tahun_ajaran' => $santri->tahun_ajaran,
                     'nominal' => $nilai,
@@ -398,5 +428,4 @@ class PemetaSantriLama implements Pemeta
 
         return $last ? (int) substr($last, 5) : 0;
     }
-
 }

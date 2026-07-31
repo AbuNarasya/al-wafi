@@ -81,7 +81,7 @@
             </tr>
             <tr>
                 <td class="py-0.5 align-top text-gray-500">Jenjang / T.A</td>
-                <td class="py-0.5 text-gray-900">{{ $santri->kode_jenjang ?? '—' }} · {{ $santri->tahun_ajaran ?? '—' }}</td>
+                <td class="py-0.5 text-gray-900">{{ $santri->jenjang?->nama ?? $santri->kode_jenjang ?? '—' }} · {{ $santri->tahun_ajaran ?? '—' }}</td>
                 <td class="py-0.5 align-top text-gray-500">Metode</td>
                 <td class="py-0.5 text-gray-900">{{ $p->metode ?: $labelSumber }}</td>
             </tr>

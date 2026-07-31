@@ -28,11 +28,6 @@ class AppServiceProvider extends ServiceProvider
         $this->daftarApprovalPengajuan();
         $this->daftarApprovalAnggaran();
 
-        // Menu master data siswa per jenjang dimemo agar tak menambah query di
-        // tiap render; dibuang saat boot supaya memonya benar-benar sebatas
-        // satu permintaan — dan tidak basi antar-test yang berbagi proses.
-        \App\Support\Navigation::lupakan();
-
         // @rp(nilai) → "Rp 1.234.567" (nilai boleh string desimal "1234567.00").
         // Dibungkus <span class="rp"> + spasi tak-putus: "Rp" tak pernah pindah
         // baris meninggalkan angkanya, dan digit-nya tabular agar kolom lurus.

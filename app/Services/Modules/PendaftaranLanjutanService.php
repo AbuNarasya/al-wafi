@@ -7,7 +7,6 @@ use App\Models\ActivityLog;
 use App\Models\JalurPendaftaran;
 use App\Models\Jenjang;
 use App\Models\Pendaftaran;
-use App\Models\RiwayatTingkat;
 use App\Models\Santri;
 use App\Models\TagihanSantri;
 use App\Services\Ledger\DocNumber;
@@ -43,6 +42,10 @@ class PendaftaranLanjutanService
      * Dipakai layar untuk memutuskan apakah tombolnya ditampilkan, dan dipakai
      * `buat()` sebagai satu-satunya sumber jenjang & jalur tujuan.
      *
+     * `null` = jenjangnya memang tak punya lanjutan (santrinya jadi alumni).
+     * `alasan` terisi = sasarannya ada tapi BELUM boleh dijalankan; layar
+     * menampilkan kalimatnya alih-alih formulir, dan `buat()` menolaknya.
+     *
      * @return array{kode_jenjang:string,nama_jenjang:string,kode_jalur:?string,alasan:?string}|null
      */
     public function sasaran(Santri $santri): ?array
@@ -70,9 +73,52 @@ class PendaftaranLanjutanService
             'kode_jenjang' => $tujuan->kode,
             'nama_jenjang' => $tujuan->nama,
             'kode_jalur' => $jalurTujuan,
-            'alasan' => $jalurTujuan ? null
-                : 'Jalur "'.$santri->jalur.'" belum punya "Jalur Setelah Naik Jenjang" di master Jalur Pendaftaran.',
+            // Tingkat diperiksa LEBIH DULU: ia penghalang yang datang lebih awal,
+            // dan menyebut urusan jalur pada santri yang belum kelas akhir hanya
+            // menyesatkan.
+            'alasan' => $this->alasanBelumBolehNaik($santri, $jenjang)
+                ?? ($jalurTujuan ? null
+                    : 'Jalur "'.$santri->jalur.'" belum punya "Jalur Setelah Naik Jenjang" di master Jalur Pendaftaran.'),
         ];
+    }
+
+    /**
+     * NAIK JENJANG HANYA DARI TINGKAT TERAKHIR jenjang asalnya.
+     *
+     * Tanpa penjaga ini santri SDTQ tingkat 1 bisa didaftarkan ke SMP dan
+     * dieksekusi — melewati sisa tingkatnya tanpa gejala apa pun, dan
+     * `riwayat_tingkat`-nya mencatat lompatan itu sebagai kenaikan yang sah.
+     * Modul Kenaikan Tingkat massal sudah lama mengenal batas ini
+     * (`KenaikanTingkatService::usulkan` menawarkan `naik` selama tingkat <
+     * terakhir, dan menyerahkan tingkat terakhir ke Pendaftaran Lanjutan);
+     * jalur per santri inilah yang tertinggal.
+     *
+     * Dua keadaan yang TIDAK bisa dipastikan sengaja ikut dihalangi & dikatakan
+     * terus terang, bukan diloloskan: jumlah tingkat jenjang yang belum diisi,
+     * dan santri (mis. hasil impor) yang tingkatnya masih kosong.
+     */
+    private function alasanBelumBolehNaik(Santri $santri, Jenjang $jenjang): ?string
+    {
+        // Tingkat TERAKHIR jenjang ini menurut penomoran berkelanjutan — SMP
+        // berakhir di 9, bukan di 3. Memakai `jumlah_tingkat` apa adanya akan
+        // menganggap santri SMP tingkat 9 "belum tingkat terakhir dari 3".
+        $terakhir = $jenjang->tingkatAkhir();
+        $tingkat = (int) $santri->tingkat;
+
+        if ($terakhir < 1) {
+            return "Jumlah tingkat jenjang \"{$jenjang->nama}\" belum diisi, jadi tak bisa dipastikan "
+                .'santri ini sudah di tingkat terakhir. Lengkapi dulu di Setting Awal → Jenjang Pendidikan.';
+        }
+        if ($tingkat < 1) {
+            return 'Tingkat santri ini belum terisi, jadi tak bisa dipastikan ia sudah di tingkat terakhir. '
+                .'Isi tingkatnya dulu di data santri.';
+        }
+        if ($tingkat < $terakhir) {
+            return "Naik jenjang hanya dari tingkat terakhir. Santri ini masih tingkat {$tingkat} dari {$terakhir} "
+                ."di {$jenjang->nama} — naikkan tingkatnya dulu lewat Kependidikan → Kenaikan Tingkat.";
+        }
+
+        return null;
     }
 
     /**
@@ -107,6 +153,10 @@ class PendaftaranLanjutanService
         if ($taTujuan === $santri->taBerjalan()) {
             throw new AppException(422, "T.A tujuan tidak boleh sama dengan tahun yang sedang dijalani ({$taTujuan}).");
         }
+        // Kenaikan jenjang selalu menuju DEPAN. Penjaga di atas hanya menolak
+        // tahun yang sama dengan tahun santrinya; ini yang menolak tahun yang
+        // sudah lewat menurut kalender.
+        (new TahunAjaranService)->assertTidakMundur($taTujuan, 'Pendaftaran lanjutan (kenaikan jenjang)');
 
         // Satu siklus per (santri, T.A, jenjang tujuan) — indeks unik juga menjaga,
         // tetapi pesan di sini jauh lebih menuntun daripada galat basis data.
@@ -245,6 +295,15 @@ class PendaftaranLanjutanService
             throw new AppException(422, 'Kenaikan hanya bisa dieksekusi untuk santri yang masih aktif.');
         }
 
+        // Batas tingkat diperiksa ULANG di sini, bukan hanya saat siklusnya dibuka:
+        // inilah satu-satunya langkah yang benar-benar mengubah data santri, dan
+        // siklus yang dibuka SEBELUM penjaga ini ada (atau yang tingkatnya berubah
+        // di tengah proses) masih akan sampai ke sini.
+        $jenjangAsal = $santri->kode_jenjang ? Jenjang::find($santri->kode_jenjang) : null;
+        if ($jenjangAsal && ($alasan = $this->alasanBelumBolehNaik($santri, $jenjangAsal))) {
+            throw new AppException(422, $alasan);
+        }
+
         $tingkatBaru = (int) ($data['tingkat'] ?? 1);
         $this->santri->pastikanTingkatSah((string) $p->kode_jenjang, $tingkatBaru);
 
@@ -252,29 +311,46 @@ class PendaftaranLanjutanService
         $dariTingkat = $santri->tingkat;
 
         return DB::transaction(function () use ($p, $santri, $tingkatBaru, $data, $idPengguna, $dariJenjang, $dariTingkat) {
-            $santri->update([
-                'kode_jenjang' => $p->kode_jenjang,
-                'tingkat' => $tingkatBaru,
-                'jalur' => $p->kode_jalur ?: $santri->jalur,
-                // Yang MAJU adalah tahun berjalan; angkatan tetap tahun masuknya.
-                'tahun_ajaran_berjalan' => $p->tahun_ajaran,
-            ]);
-
-            RiwayatTingkat::updateOrCreate(
-                ['id_santri' => $santri->id, 'tahun_ajaran' => $p->tahun_ajaran],
-                ['kode_jenjang' => $p->kode_jenjang, 'tingkat' => $tingkatBaru,
-                    'catatan' => "Naik dari {$dariJenjang} tingkat {$dariTingkat} lewat pendaftaran {$p->nomor}."],
-            );
+            // PERPINDAHANNYA TIDAK DIKERJAKAN DI SINI. Dulu keempat kolom santri
+            // (jenjang, tingkat, jalur, tahun berjalan) berubah seketika di baris
+            // ini — sehingga siklus yang tuntas bulan Mei membuat santri ber-jenjang
+            // SMP sementara kalender masih tahun lama, dan setiap pencarian tarif
+            // yang bersandar pada kolom itu ikut mendahului kalender.
+            //
+            // Yang tetap dikerjakan sekarang: TAGIHAN & AKRUALNYA. Justru itulah
+            // gunanya siklus dibuka jauh hari — keluarga perlu waktu mencicil.
+            // Riwayat tingkatnya ikut ditulis oleh penerap jadwal, bersama
+            // perpindahannya, supaya keduanya tak pernah terpisah.
+            (new KenaikanTingkatService)->tandaiSiapDariPpsb($p, $tingkatBaru);
 
             // Tarif dicari pada jenjang & T.A TUJUAN — inilah gunanya penimpa
             // `tahun_ajaran` di tagihkanUangPangkal.
             $tagihan = $this->santri->tagihkanUangPangkal($santri->id, [
                 'komponen' => ['uang_pangkal', 'perlengkapan'],
                 'tahun_ajaran' => $p->tahun_ajaran,
+                // Jenjang & jalur TUJUAN disebut eksplisit: santrinya belum tentu
+                // sudah berpindah — perpindahannya menunggu tahun ajaran tujuan
+                // dimulai. Tanpa ini tarifnya diambil dari jenjang yang ditinggalkan.
+                'kode_jenjang' => $p->kode_jenjang,
+                'jalur' => $p->kode_jalur ?: $santri->jalur,
                 'nominal' => $data['nominal_uang_pangkal'] ?? null,
                 'nominal_perlengkapan' => $data['nominal_perlengkapan'] ?? '0',
                 'jatuh_tempo' => $data['jatuh_tempo'] ?? null,
             ]);
+
+            // AKRUAL — persis seperti daftar ulang. Santrinya sudah benar-benar
+            // pindah jenjang di baris atas: jenjangnya berubah, riwayat tingkatnya
+            // tercatat, dan SPP jenjang barunya sudah bisa ditagih. Jasanya
+            // dianggap mulai diberikan, jadi piutangnya diakui sekarang — bukan
+            // menunggu uangnya datang. Tanpa ini, santri yang naik jenjang tak
+            // pernah memunculkan piutang sama sekali.
+            $akrual = $this->santri->akrualkanTagihan(
+                $santri,
+                array_values(array_filter([$tagihan['uang_pangkal'] ?? null, $tagihan['perlengkapan'] ?? null])),
+                $idPengguna,
+                "kenaikan jenjang ke {$p->kode_jenjang}",
+                $p->nomor,
+            );
 
             $p->update(['status' => 'naik']);
 
@@ -288,6 +364,7 @@ class PendaftaranLanjutanService
                     'tahun_ajaran' => $p->tahun_ajaran,
                     'uang_pangkal' => $tagihan['uang_pangkal']?->nominal,
                     'perlengkapan' => $tagihan['perlengkapan']?->nominal,
+                    'akrual' => $akrual,
                 ], JSON_UNESCAPED_UNICODE),
             ]);
 
