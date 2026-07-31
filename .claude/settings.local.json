@@ -391,7 +391,10 @@
       "PowerShell($d = Get-Item \"D:\\\\\"; Write-Output \"Drive D: siap.\"; try { $sp = Get-CimInstance -ClassName Win32_ShadowCopy -ErrorAction Stop; if \\($sp\\) { Write-Output \"Shadow copy ditemukan: $\\($sp.Count\\)\"; $sp | Select-Object VolumeName, InstallDate | Format-Table } else { Write-Output \"Tidak ada shadow copy \\(Previous Versions kemungkinan kosong\\).\" } } catch { Write-Output \"Tidak bisa membaca shadow copy: $\\($_.Exception.Message\\)\" })",
       "Bash(grep -n \"UangPangkalTest\\\\` \\\\*\\\\*\\\\|UangPangkalTest.*test\" handoff-resume.md)",
       "Bash(C:/php/php.exe \"C:/Users/ABUNAR~1/AppData/Local/Temp/claude/D--Works-AL-WAFI-Reborn-Project-Aplikasi-Project-Aplikasi-Al-Wafi-Konversi-PHP/5f9fff49-4e21-4ba6-9eea-a31cedd93472/scratchpad/cek_cache_test.php\")",
-      "Bash(C:/php/php.exe -l tests/Concerns/MengaktifkanSantri.php)"
+      "Bash(C:/php/php.exe -l tests/Concerns/MengaktifkanSantri.php)",
+      "WebFetch(domain:render.com)",
+      "WebSearch",
+      "Bash(git commit -m '@ *)"
     ]
   }
 }
