@@ -28,3 +28,7 @@ Thumbs.db
 
 # Arsip cadangan proyek yang dibuat manual — jangan ikut ter-commit.
 /*.zip
+
+# Setelan Claude Code per-mesin: ditulis ulang otomatis oleh alatnya, memuat
+# jalur & kredensial lokal. Bukan berkas yang layak dibagikan.
+/.claude/settings.local.json
