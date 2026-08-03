@@ -13,6 +13,19 @@ class CashIn extends Model
 
     protected $primaryKey = 'kode_transaksi';
 
+    /**
+     * Label jenis kas masuk per rincian. Ditaruh di model karena dipakai tiga
+     * layar — form isian, halaman rincian, dan bukti cetak. Saat daftarnya masih
+     * ditulis ulang di tiap layar, halaman rincian menyebut `pelunasan` dan
+     * `lain` sebagai "Pendapatan", dan itu ikut tercetak di bukti resmi.
+     */
+    public const JENIS = [
+        'pendapatan' => 'Pendapatan',
+        'pelunasan' => 'Pelunasan',
+        'uang_muka' => 'Pendapatan Diterima Dimuka',
+        'lain' => 'Lain-lain',
+    ];
+
     protected $fillable = [
         'nomor_transaksi', 'tanggal', 'kode_unit', 'kode_rekening', 'kode_customer',
         'referensi', 'keterangan', 'nominal', 'status',

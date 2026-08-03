@@ -1,0 +1,718 @@
+<title>Rancangan Tagihan Lain-lain — Al Wafi</title>
+
+<style>
+  :root {
+    --ground: #f5f6f8;
+    --surface: #ffffff;
+    --ink: #1a2130;
+    --ink-soft: #4e5a6e;
+    --ink-faint: #7b8699;
+    --rule: #dfe3ea;
+    --rule-soft: #eceff4;
+    --brand: #164a9e;
+    --brand-dark: #0e3168;
+    --brand-soft: #e8edf6;
+    --accent: #f8c400;
+    --ok: #047857;
+    --ok-soft: #e7f5ef;
+    --warn: #a16207;
+    --warn-soft: #fdf5e3;
+    --bad: #b42318;
+    --bad-soft: #fdecea;
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #12151b;
+      --surface: #191d25;
+      --ink: #e7eaf0;
+      --ink-soft: #aab4c4;
+      --ink-faint: #7d8798;
+      --rule: #2b3240;
+      --rule-soft: #232936;
+      --brand: #7ba4e8;
+      --brand-dark: #a8c4f0;
+      --brand-soft: #1c2740;
+      --ok: #5cc59a;
+      --ok-soft: #16281f;
+      --warn: #e0b34d;
+      --warn-soft: #2a2314;
+      --bad: #ef8579;
+      --bad-soft: #2b1918;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #12151b;
+    --surface: #191d25;
+    --ink: #e7eaf0;
+    --ink-soft: #aab4c4;
+    --ink-faint: #7d8798;
+    --rule: #2b3240;
+    --rule-soft: #232936;
+    --brand: #7ba4e8;
+    --brand-dark: #a8c4f0;
+    --brand-soft: #1c2740;
+    --ok: #5cc59a;
+    --ok-soft: #16281f;
+    --warn: #e0b34d;
+    --warn-soft: #2a2314;
+    --bad: #ef8579;
+    --bad-soft: #2b1918;
+  }
+  :root[data-theme="light"] {
+    --ground: #f5f6f8;
+    --surface: #ffffff;
+    --ink: #1a2130;
+    --ink-soft: #4e5a6e;
+    --ink-faint: #7b8699;
+    --rule: #dfe3ea;
+    --rule-soft: #eceff4;
+    --brand: #164a9e;
+    --brand-dark: #0e3168;
+    --brand-soft: #e8edf6;
+    --ok: #047857;
+    --ok-soft: #e7f5ef;
+    --warn: #a16207;
+    --warn-soft: #fdf5e3;
+    --bad: #b42318;
+    --bad-soft: #fdecea;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 61rem;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+  }
+
+  .prose { max-width: 40rem; display: flex; flex-direction: column; gap: 0.9rem; }
+
+  h1, h2, h3 { text-wrap: balance; margin: 0; font-family: var(--serif); font-weight: 600; letter-spacing: -0.01em; }
+  h1 { font-size: clamp(2rem, 4vw, 2.7rem); line-height: 1.12; }
+  h2 { font-size: 1.6rem; line-height: 1.2; }
+  h3 { font-size: 1.15rem; font-family: var(--sans); font-weight: 650; letter-spacing: 0; }
+  p { margin: 0; }
+  a { color: var(--brand); }
+
+  .eyebrow {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--ink-faint); font-family: var(--sans);
+  }
+  .lede { font-size: 1.1rem; color: var(--ink-soft); }
+  .meta { font-size: 0.85rem; color: var(--ink-faint); font-family: var(--mono); }
+
+  section { display: flex; flex-direction: column; gap: 1.4rem; }
+  .sec-head { display: flex; flex-direction: column; gap: 0.5rem; border-top: 2px solid var(--ink); padding-top: 1rem; }
+  :root[data-theme="dark"] .sec-head, .sec-head { border-top-color: var(--rule); }
+
+  ul.list { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  ul.list li { padding-left: 0.2rem; }
+  strong { font-weight: 650; }
+  code { font-family: var(--mono); font-size: 0.86em; background: var(--rule-soft); padding: 0.1em 0.35em; border-radius: 4px; }
+
+  /* ---- tabel dokumen ---- */
+  .tablebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+  table.doc { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 34rem; }
+  table.doc th, table.doc td { text-align: left; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  table.doc th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-faint); background: var(--rule-soft); font-weight: 700; }
+  table.doc tr:last-child td { border-bottom: 0; }
+  table.doc td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+
+  .callout {
+    border-left: 3px solid var(--brand); background: var(--brand-soft);
+    padding: 0.85rem 1rem; border-radius: 0 8px 8px 0; font-size: 0.94rem; color: var(--ink);
+    display: flex; flex-direction: column; gap: 0.4rem; max-width: 42rem;
+  }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout .k { font-weight: 700; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+
+  /* =========================================================
+     KERANGKA MOCKUP — meniru tampilan aplikasi (selalu terang,
+     karena aplikasinya memang bertema terang; ini gambar layar,
+     bukan bagian dokumen yang ikut berganti tema).
+     ========================================================= */
+  .shot { display: flex; flex-direction: column; gap: 0.55rem; }
+  .shot-cap { font-size: 0.82rem; color: var(--ink-faint); display: flex; gap: 0.5rem; align-items: baseline; }
+  .shot-cap b { color: var(--ink-soft); font-weight: 650; }
+
+  .screen {
+    background: #eef0f3; border: 1px solid var(--rule); border-radius: 12px;
+    overflow: hidden; box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px rgb(16 24 40 / 0.06);
+    color: #1f2937; font-size: 13px; line-height: 1.5;
+  }
+  .screen * { box-sizing: border-box; }
+  .chrome {
+    background: #0e3168; color: #dbe4f3; padding: 7px 12px; font-size: 11px;
+    display: flex; align-items: center; gap: 8px; letter-spacing: 0.02em;
+  }
+  .chrome .dot { width: 8px; height: 8px; border-radius: 50%; background: #f8c400; flex: none; }
+  .chrome .path { opacity: 0.72; font-family: var(--mono); font-size: 10px; }
+  .stage { padding: 14px; display: flex; flex-direction: column; gap: 12px; overflow-x: auto; }
+
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+  .card > .hd {
+    background: #f9fafb; border-bottom: 1px solid #e5e7eb; padding: 7px 12px;
+    font-size: 12px; font-weight: 650; color: #374151; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .card > .bd { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+  .card > .ft { border-top: 1px solid #eceff3; padding: 9px 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #fcfcfd; }
+
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 640px) { .grid3, .grid4 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+  .fld { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .fld > label { font-size: 11px; font-weight: 600; color: #374151; }
+  .fld > .inp {
+    border: 1px solid #d1d5db; border-radius: 7px; padding: 5px 8px; background: #fff;
+    font-size: 12px; color: #111827; min-height: 27px; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  }
+  .fld > .inp.ph { color: #9ca3af; }
+  .fld > .hint { font-size: 10px; color: #6b7280; }
+  .caret { color: #9ca3af; font-size: 9px; }
+  .req { color: #dc2626; }
+
+  .btn { border-radius: 7px; padding: 5px 11px; font-size: 12px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+  .btn.pri { background: #164a9e; color: #fff; }
+  .btn.sec { background: #fff; border-color: #d1d5db; color: #374151; }
+  .btn.danger { background: #fff; border-color: #fca5a5; color: #b42318; }
+  .btn.mini { padding: 3px 8px; font-size: 11px; }
+
+  .pill { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 1px 7px; font-size: 10px; font-weight: 650; }
+  .pill.final { background: #e0e7ff; color: #3730a3; }
+  .pill.kas { background: #f1f5f9; color: #475569; }
+  .pill.ok { background: #dcfce7; color: #166534; }
+  .pill.wait { background: #fef3c7; color: #92400e; }
+  .pill.off { background: #f3f4f6; color: #6b7280; }
+  .pill.err { background: #fee2e2; color: #991b1b; }
+  .pill.acc { background: #fff6d6; color: #8a6d00; }
+
+  table.ui { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.ui th, table.ui td { padding: 6px 9px; text-align: left; border-bottom: 1px solid #f1f3f6; white-space: nowrap; }
+  table.ui thead th { background: #f9fafb; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; font-weight: 700; border-bottom: 1px solid #e5e7eb; }
+  table.ui td.num, table.ui th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+  table.ui tr.on { background: #f7faff; }
+  .box { width: 13px; height: 13px; border: 1px solid #9ca3af; border-radius: 3px; display: inline-block; vertical-align: -2px; background: #fff; }
+  .box.on { background: #164a9e; border-color: #164a9e; position: relative; }
+  .box.on::after { content: "✓"; color: #fff; font-size: 10px; position: absolute; inset: 0; display: grid; place-items: center; line-height: 1; }
+  .nom { border: 1px solid #d1d5db; border-radius: 6px; padding: 2px 7px; background: #fff; font-family: var(--mono); font-size: 11.5px; display: inline-block; min-width: 96px; text-align: right; }
+  .nom.empty { color: #c3c8d0; }
+  .nom.dis { background: #f3f4f6; color: #c3c8d0; border-style: dashed; }
+
+  .banner { border-radius: 8px; padding: 9px 12px; font-size: 12px; display: flex; flex-direction: column; gap: 5px; }
+  .banner.ok { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+  .banner.warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+  .banner.info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+  .banner b { font-weight: 700; }
+
+  .radio { display: flex; gap: 9px; align-items: flex-start; border: 1px solid #d1d5db; border-radius: 9px; padding: 9px 11px; background: #fff; }
+  .radio.on { border-color: #164a9e; background: #f5f8fd; box-shadow: inset 0 0 0 1px #164a9e; }
+  .dotr { width: 13px; height: 13px; border-radius: 50%; border: 1px solid #9ca3af; flex: none; margin-top: 2px; background: #fff; }
+  .radio.on .dotr { border-color: #164a9e; border-width: 4px; }
+  .radio .t { display: flex; flex-direction: column; gap: 2px; }
+  .radio .t b { font-size: 12px; font-weight: 650; color: #111827; }
+  .radio .t span { font-size: 11px; color: #6b7280; }
+
+  .modalbg { background: rgba(15, 23, 42, 0.45); padding: 22px 14px; display: grid; place-items: start center; }
+  .modal { background: #fff; border-radius: 11px; width: 100%; max-width: 430px; overflow: hidden; box-shadow: 0 18px 40px rgb(0 0 0 / 0.28); }
+
+  .flow { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+  @media (max-width: 700px) { .flow { grid-template-columns: 1fr; } }
+  .flowcard { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.55rem; }
+  .flowcard h4 { margin: 0; font-size: 0.95rem; font-weight: 650; display: flex; align-items: center; gap: 0.45rem; }
+  .flowcard .step { font-family: var(--mono); font-size: 0.78rem; color: var(--ink-soft); display: flex; gap: 0.45rem; }
+  .flowcard .step em { font-style: normal; color: var(--ink-faint); flex: none; width: 4.6rem; }
+  .tag { font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
+  .tag.final { background: #e0e7ff; color: #3730a3; }
+  .tag.kas { background: #f1f5f9; color: #475569; }
+  :root[data-theme="dark"] .tag.final { background: #26305a; color: #c7d2fe; }
+  :root[data-theme="dark"] .tag.kas { background: #263040; color: #cbd5e1; }
+
+  .q { display: flex; flex-direction: column; gap: 0.3rem; border-left: 3px solid var(--accent); padding-left: 0.9rem; }
+  .q b { font-weight: 650; }
+</style>
+
+<div class="wrap">
+
+  <header class="prose">
+    <div class="eyebrow">Rancangan · sebelum implementasi</div>
+    <h1>Tagihan Lain-lain</h1>
+    <p class="lede">Laundry, ekskul, dan program khusus — dengan sifat final/tidak final yang dinyatakan, nominal per individu, pelunasan sekaligus, dan penerbitan yang bisa manual maupun terjadwal.</p>
+    <p class="meta">Al Wafi · disusun 1 Agustus 2026 · belum ada baris kode yang diubah</p>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">1</div>
+      <h2>Lima aturan yang dikunci</h2>
+    </div>
+    <div class="prose">
+      <p>Semua rancangan di bawah turun dari lima aturan ini. Kalau ada satu yang salah tangkap, hentikan saya di sini — sesudah ini semuanya menempel ke sana.</p>
+    </div>
+    <div class="tablebox">
+      <table class="doc">
+        <thead>
+          <tr><th style="width: 12rem;">Aturan</th><th>Wujudnya di aplikasi</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Sifat final</b></td>
+            <td>Ditetapkan per <b>jenis biaya</b>, bukan per tagihan. Final ⇒ akrual saat terbit ⇒ <b>tidak bisa dibatalkan</b>, hanya bisa dikoreksi lewat jurnal balik. Tidak final ⇒ tanpa jurnal saat terbit ⇒ boleh dibatalkan selama belum dibayar.</td>
+          </tr>
+          <tr>
+            <td><b>Pengakuan</b></td>
+            <td>Final: Piutang D / Pendapatan K saat <b>terbit</b>, lalu Kas D / Piutang K saat dibayar. Tidak final: tak ada jurnal saat terbit, Kas D / Pendapatan K saat <b>pembayaran diverifikasi</b>.</td>
+          </tr>
+          <tr>
+            <td><b>Lunas sekaligus</b></td>
+            <td>Tak bisa dicicil — baik lewat pembayaran manual maupun potong dompet. Dompet yang saldonya kurang tidak memotong sama sekali.</td>
+          </tr>
+          <tr>
+            <td><b>Nominal per individu</b></td>
+            <td>Tiap santri boleh berbeda nominalnya, tetapi penerbitannya tetap sekali jalan untuk banyak santri.</td>
+          </tr>
+          <tr>
+            <td><b>Dua cara terbit</b></td>
+            <td>Manual (pilih santri, isi nominal, terbitkan) <b>dan</b> terjadwal (daftar peserta tetap + nominalnya, terbit sendiri tiap periode).</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">2</div>
+      <h2>Layar 1 — Master Jenis Biaya</h2>
+    </div>
+    <div class="prose">
+      <p>Sifat final <em>dipilih sadar</em>, bukan disimpulkan dari terisinya akun piutang seperti sekarang. Ini bagian yang paling mahal salahnya, jadi pilihannya ditulis sebagai akibat yang akan terjadi, bukan sebagai istilah akuntansi.</p>
+    </div>
+
+    <div class="shot">
+      <div class="screen">
+        <div class="chrome"><span class="dot"></span> Al Wafi <span class="path">/ jenis-biaya / LDR / edit</span></div>
+        <div class="stage">
+          <div class="card">
+            <div class="hd">Ubah Jenis Biaya — LDR</div>
+            <div class="bd">
+              <div class="grid3">
+                <div class="fld"><label>Kode <span class="req">*</span></label><div class="inp">LDR</div></div>
+                <div class="fld"><label>Nama <span class="req">*</span></label><div class="inp">Laundry</div></div>
+                <div class="fld"><label>Tipe Biaya <span class="req">*</span></label><div class="inp">006 — Lain-lain <span class="caret">▾</span></div></div>
+              </div>
+
+              <div class="fld">
+                <label>Pengakuan <span class="req">*</span></label>
+                <div class="grid2">
+                  <div class="radio on">
+                    <span class="dotr"></span>
+                    <span class="t">
+                      <b>Final — piutang diakui saat ditagihkan</b>
+                      <span>Jurnal terbit begitu tagihan dibuat. Tagihan <b>tidak bisa dibatalkan</b>; kekeliruan diperbaiki lewat Koreksi (jurnal balik).</span>
+                    </span>
+                  </div>
+                  <div class="radio">
+                    <span class="dotr"></span>
+                    <span class="t">
+                      <b>Tidak final — diakui saat dibayar</b>
+                      <span>Belum ada jurnal saat terbit. Boleh dibatalkan selama belum ada pembayaran.</span>
+                    </span>
+                  </div>
+                </div>
+                <div class="hint">Hanya muncul untuk tipe biaya berperilaku Lain-lain. Registrasi, uang pangkal, SPP &amp; daftar ulang punya aturan pengakuannya sendiri.</div>
+              </div>
+
+              <div class="grid3">
+                <div class="fld"><label>Akun Pendapatan <span class="req">*</span></label><div class="inp">4.1.02.001 — Pendapatan Laundry <span class="caret">▾</span></div></div>
+                <div class="fld">
+                  <label>Akun Piutang <span class="req">*</span></label>
+                  <div class="inp">1.1.03.003 — Piutang Santri Lainnya <span class="caret">▾</span></div>
+                  <div class="hint">Wajib karena pengakuannya Final.</div>
+                </div>
+                <div class="fld"><label>Unit Bisnis <span class="req">*</span></label><div class="inp">U005 — Unit Usaha <span class="caret">▾</span></div></div>
+              </div>
+
+              <div class="fld">
+                <label>Penerbitan</label>
+                <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;">
+                  <span style="font-size:12px;"><span class="box on"></span> Berulang tiap periode</span>
+                </div>
+                <div class="hint">Yang berulang <b>wajib</b> mengisi periode saat diterbitkan (mis. <code>2026-08</code>), dan hanya yang berulang bisa dipasang jadwal otomatis.</div>
+              </div>
+            </div>
+            <div class="ft" style="justify-content:flex-end;">
+              <span class="btn sec">Batal</span><span class="btn pri">Simpan</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="shot-cap"><b>Perubahan:</b> blok “Pengakuan” baru; label akun piutang jadi wajib mengikuti pilihan; keterangan pada centang “Berulang” yang selama ini sekadar hiasan.</div>
+    </div>
+
+    <div class="callout warn">
+      <span class="k">Akibat langsung</span>
+      <p>Centang <b>Berulang</b> sudah ada di master hari ini, lengkap dengan label “berulang” di daftar — tetapi <b>tak dipakai logika mana pun</b>. Setelah perubahan ini ia mulai menentukan wajib-tidaknya periode. Tiga baris yang kini bercentang perlu Anda periksa ulang sebelum rilis.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">3</div>
+      <h2>Layar 2 — Terbitkan Tagihan (manual)</h2>
+    </div>
+    <div class="prose">
+      <p>Satu layar, bukan wizard: parameter di atas, santri di bawah, nominal diisi pada baris masing-masing. Kolom nominal <b>sengaja kosong</b> — sesuai keputusan Anda, tidak ada angka yang terisi sendiri, supaya tak ada nominal yang lolos hanya karena tak sempat dilihat.</p>
+      <p>Daftar santrinya juga akhirnya bisa disaring. Yang sekarang menampilkan <em>seluruh</em> santri aktif dalam satu daftar centang tanpa penyaring apa pun — tak terpakai begitu santrinya ratusan.</p>
+    </div>
+
+    <div class="shot">
+      <div class="screen">
+        <div class="chrome"><span class="dot"></span> Al Wafi <span class="path">/ kesantrian / tagihan-lain / create</span></div>
+        <div class="stage">
+          <div class="card">
+            <div class="hd">Terbitkan Tagihan Lain-lain</div>
+            <div class="bd">
+              <div class="grid4">
+                <div class="fld"><label>Jenis Biaya <span class="req">*</span></label><div class="inp">LDR — Laundry <span class="caret">▾</span></div></div>
+                <div class="fld"><label>Periode <span class="req">*</span></label><div class="inp">2026-08</div><div class="hint">Wajib — jenis berulang.</div></div>
+                <div class="fld"><label>Tanggal <span class="req">*</span></label><div class="inp">01/08/2026</div></div>
+                <div class="fld"><label>Jatuh Tempo</label><div class="inp">10/08/2026</div><div class="hint">Dipakai Reminder Tagihan.</div></div>
+              </div>
+              <div class="fld"><label>Keterangan</label><div class="inp ph">Laundry Agustus 2026</div></div>
+
+              <div class="banner info">
+                <span><b>Laundry bersifat Final.</b> Begitu diterbitkan, piutang langsung diakui dan tagihannya <b>tidak bisa dibatalkan</b> — hanya bisa dikoreksi lewat jurnal balik oleh tim keuangan.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="hd">
+              Pilih santri &amp; nominal
+              <span style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+                <span class="fld" style="min-width:120px;"><span class="inp" style="min-height:24px; padding:3px 8px;">Semua jenjang <span class="caret">▾</span></span></span>
+                <span class="fld" style="min-width:96px;"><span class="inp" style="min-height:24px; padding:3px 8px;">Tingkat <span class="caret">▾</span></span></span>
+                <span class="fld" style="min-width:150px;"><span class="inp ph" style="min-height:24px; padding:3px 8px;">Cari nama / NIS…</span></span>
+              </span>
+            </div>
+            <div class="bd" style="padding:0;">
+              <div style="padding:9px 12px; border-bottom:1px solid #f1f3f6; display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fcfcfd;">
+                <span style="font-size:12px;"><span class="box on"></span> Pilih semua yang tersaring (24)</span>
+                <span style="margin-left:auto; display:flex; align-items:center; gap:6px; font-size:11px; color:#6b7280;">
+                  Terapkan ke yang dicentang: <span class="nom">75.000</span> <span class="btn sec mini">Terapkan</span>
+                </span>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="ui">
+                  <thead>
+                    <tr><th style="width:34px;"></th><th>NIS</th><th>Nama</th><th>Jenjang · Tingkat</th><th class="num">Nominal <span class="req">*</span></th></tr>
+                  </thead>
+                  <tbody>
+                    <tr class="on"><td><span class="box on"></span></td><td>2601001</td><td>Ahmad Fauzi</td><td>SMP · 1</td><td class="num"><span class="nom">75.000</span></td></tr>
+                    <tr class="on"><td><span class="box on"></span></td><td>2601002</td><td>Bilal Ramadhan</td><td>SMP · 1</td><td class="num"><span class="nom">75.000</span></td></tr>
+                    <tr class="on"><td><span class="box on"></span></td><td>2601007</td><td>Hafizh Nur Rahman</td><td>SMP · 2</td><td class="num">120.000</td></tr>
+                    <tr><td><span class="box"></span></td><td>2601011</td><td>Ikhsan Maulana</td><td>SMP · 2</td><td class="num"><span class="nom dis">—</span></td></tr>
+                    <tr class="on"><td><span class="box on"></span></td><td>2601014</td><td>Naufal Hakim</td><td>SMP · 3</td><td class="num"><span class="nom empty">isi nominal</span></td></tr>
+                    <tr><td><span class="box"></span></td><td>2601018</td><td>Rizky Pratama</td><td>SMP · 3</td><td class="num"><span class="nom dis">—</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="ft">
+              <span style="font-size:12px;"><b>4 santri dicentang</b> · total <b style="font-family:var(--mono);">Rp 345.000</b></span>
+              <span style="font-size:11px; color:#b42318;">1 baris belum bernominal</span>
+              <span style="margin-left:auto; display:flex; gap:8px;"><span class="btn sec">Batal</span><span class="btn pri">Terbitkan</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="shot-cap"><b>Perubahan:</b> penyaring jenjang/tingkat/nama · kolom nominal per baris · “terapkan ke yang dicentang” · isian Periode, Jatuh Tempo &amp; Keterangan yang selama ini tak pernah tersimpan · ringkasan total yang menahan penerbitan selama masih ada baris kosong.</div>
+    </div>
+
+    <div class="shot">
+      <div class="screen">
+        <div class="chrome"><span class="dot"></span> Al Wafi <span class="path">/ kesantrian / tagihan-lain</span></div>
+        <div class="stage">
+          <div class="banner ok">
+            <span><b>18 tagihan terbit</b> — Laundry 2026-08, total Rp 1.485.000. Jurnal akrual <b>TGL/2608/0004</b>.</span>
+            <span style="font-size:11px;">3 santri dilewati: <b>Naufal Hakim</b>, <b>Rizky Pratama</b> — sudah punya tagihan Laundry 2026-08; <b>Salman Alfarisi</b> — sudah tidak berstatus aktif.</span>
+          </div>
+        </div>
+      </div>
+      <div class="shot-cap"><b>Perubahan:</b> santri yang dilewati disebut satu per satu berikut alasannya. Sekarang jumlahnya dihitung lalu dibuang — pesannya cuma “Tagihan lain berhasil diterbitkan”.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">4</div>
+      <h2>Layar 3 — Daftar &amp; Koreksi</h2>
+    </div>
+    <div class="prose">
+      <p>Daftar mendapat kolom <b>Sifat</b>, dan aksinya mengikuti sifat itu: yang tidak final punya <b>Batalkan</b>, yang final punya <b>Koreksi</b>. Tak ada lagi tombol yang muncul lalu menolak dengan pesan yang menyuruh ke modul keuangan — jalur itu tidak pernah ada wujudnya.</p>
+    </div>
+
+    <div class="shot">
+      <div class="screen">
+        <div class="chrome"><span class="dot"></span> Al Wafi <span class="path">/ kesantrian / tagihan-lain</span></div>
+        <div class="stage">
+          <div class="card">
+            <div class="hd">Tagihan Lain-lain <span class="pill off">126 baris</span>
+              <span style="margin-left:auto; display:flex; gap:6px;"><span class="btn sec mini">Jadwal Berulang</span><span class="btn pri mini">+ Terbitkan</span></span>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="ui">
+                <thead>
+                  <tr><th>Santri</th><th>Jenis</th><th>Sifat</th><th>Periode</th><th>Jatuh Tempo</th><th class="num">Nominal</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Ahmad Fauzi</td><td>Laundry</td><td><span class="pill final">Final</span></td><td>2026-08</td><td>10/08/2026</td><td class="num">75.000</td><td><span class="pill wait">Belum Bayar</span></td><td><span class="btn danger mini">Koreksi</span></td></tr>
+                  <tr><td>Bilal Ramadhan</td><td>Laundry</td><td><span class="pill final">Final</span></td><td>2026-08</td><td>10/08/2026</td><td class="num">75.000</td><td><span class="pill ok">Lunas</span></td><td><span style="font-size:11px; color:#9ca3af;">—</span></td></tr>
+                  <tr><td>Hafizh Nur Rahman</td><td>Ekskul Panahan</td><td><span class="pill kas">Tidak final</span></td><td>—</td><td>15/08/2026</td><td class="num">250.000</td><td><span class="pill wait">Belum Bayar</span></td><td><span class="btn sec mini">Batalkan</span></td></tr>
+                  <tr><td>Ikhsan Maulana</td><td>Tahfizh Intensif</td><td><span class="pill kas">Tidak final</span></td><td>—</td><td>20/08/2026</td><td class="num">400.000</td><td><span class="pill ok">Lunas</span></td><td><span style="font-size:11px; color:#9ca3af;">—</span></td></tr>
+                  <tr><td>Naufal Hakim</td><td>Laundry</td><td><span class="pill final">Final</span></td><td>2026-07</td><td>10/07/2026</td><td class="num">75.000</td><td><span class="pill err">Dikoreksi</span></td><td><span style="font-size:11px; color:#9ca3af;">JBL/2607/0002</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="shot-cap"><b>Perubahan:</b> kolom Sifat · aksi mengikuti sifat · status baru <b>Dikoreksi</b> yang membawa nomor jurnal baliknya, jadi jejaknya terbaca tanpa membuka buku besar.</div>
+    </div>
+
+    <div class="shot">
+      <div class="screen">
+        <div class="chrome"><span class="dot"></span> Al Wafi <span class="path">/ kesantrian / tagihan-lain</span></div>
+        <div class="modalbg">
+          <div class="modal">
+            <div style="padding:11px 14px; border-bottom:1px solid #e5e7eb; font-weight:650; font-size:13px;">Koreksi tagihan final</div>
+            <div style="padding:14px; display:flex; flex-direction:column; gap:11px;">
+              <div style="font-size:12px; color:#374151;">
+                <b>Laundry 2026-08</b> — Ahmad Fauzi · Rp 75.000<br>
+                <span style="color:#6b7280;">Akrual terbit 01/08/2026, referensi TGL/2608/0004.</span>
+              </div>
+              <div class="banner warn">
+                <span>Jurnal balik <b>Pendapatan D / Piutang K Rp 75.000</b> akan terbit hari ini. Tagihan berstatus <b>Dikoreksi</b> dan sisanya menjadi nol. Langkah ini tidak bisa dibatalkan.</span>
+              </div>
+              <div class="fld">
+                <label>Alasan koreksi <span class="req">*</span></label>
+                <div class="inp ph" style="min-height:52px; align-items:flex-start;">Salah nominal — seharusnya Rp 120.000, akan diterbitkan ulang.</div>
+                <div class="hint">Tersimpan pada tagihan dan pada keterangan jurnal baliknya.</div>
+              </div>
+            </div>
+            <div style="padding:11px 14px; border-top:1px solid #eceff3; display:flex; justify-content:flex-end; gap:8px; background:#fcfcfd;">
+              <span class="btn sec">Batal</span><span class="btn danger">Koreksi &amp; terbitkan jurnal balik</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="shot-cap"><b>Baru.</b> Hanya untuk tagihan final yang <b>belum dibayar</b>, hanya tim keuangan. Yang sudah lunas tidak lewat sini — itu pengembalian uang, ranah kas keluar, dan tak boleh diotomatiskan diam-diam.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">5</div>
+      <h2>Layar 4 — Jadwal berulang &amp; peserta</h2>
+    </div>
+    <div class="prose">
+      <p>Untuk laundry bulanan. Nominal tiap santri berbeda dan jarang berubah, jadi ia disimpan sebagai <b>daftar peserta</b>: sekali disusun, tiap periode tinggal terbit sendiri. Penerbitan manual tetap ada dan tidak saling meniadakan — jadwal hanya mengotomatiskan jenis yang berulang.</p>
+      <p>Pemicunya mengikuti pola yang sudah dipakai kenaikan tingkat: dijalankan saat halaman yang relevan dibuka, plus tombol <b>Jalankan sekarang</b>. Cron harian tak bisa diandalkan di paket gratis yang tidur, dan penerbitannya idempoten per (jenis, periode) sehingga aman dipanggil berulang.</p>
+    </div>
+
+    <div class="shot">
+      <div class="screen">
+        <div class="chrome"><span class="dot"></span> Al Wafi <span class="path">/ kesantrian / tagihan-lain / jadwal</span></div>
+        <div class="stage">
+          <div class="card">
+            <div class="hd">Jadwal Tagihan Berulang <span style="margin-left:auto;"><span class="btn pri mini">+ Jadwal baru</span></span></div>
+            <div style="overflow-x:auto;">
+              <table class="ui">
+                <thead>
+                  <tr><th>Jenis</th><th>Terbit tiap</th><th>Jatuh tempo</th><th class="num">Peserta</th><th>Terakhir terbit</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Laundry <span class="pill final">Final</span></td><td>tanggal 1</td><td>+9 hari</td><td class="num">24</td>
+                    <td>2026-07 · 01/07/2026</td><td><span class="pill ok">Aktif</span></td>
+                    <td><span class="btn sec mini">Peserta</span> <span class="btn sec mini">Jalankan sekarang</span></td>
+                  </tr>
+                  <tr>
+                    <td>Katering Tambahan <span class="pill kas">Tidak final</span></td><td>tanggal 5</td><td>+10 hari</td><td class="num">7</td>
+                    <td>—</td><td><span class="pill off">Nonaktif</span></td>
+                    <td><span class="btn sec mini">Peserta</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="ft"><span style="font-size:11px; color:#6b7280;">Periode berikutnya <b>2026-08</b> belum terbit. Akan berjalan sendiri saat halaman ini atau daftar tagihan dibuka pada / setelah 01/08/2026.</span></div>
+          </div>
+
+          <div class="card">
+            <div class="hd">Peserta — Laundry <span class="pill acc">nominal per santri</span>
+              <span style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+                <span class="fld" style="min-width:150px;"><span class="inp ph" style="min-height:24px; padding:3px 8px;">Cari nama / NIS…</span></span>
+                <span class="btn sec mini">+ Tambah peserta</span>
+              </span>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="ui">
+                <thead><tr><th>NIS</th><th>Nama</th><th>Jenjang · Tingkat</th><th class="num">Nominal</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                  <tr><td>2601001</td><td>Ahmad Fauzi</td><td>SMP · 1</td><td class="num"><span class="nom">75.000</span></td><td><span class="pill ok">Ikut</span></td><td><span class="btn sec mini">Hentikan</span></td></tr>
+                  <tr><td>2601007</td><td>Hafizh Nur Rahman</td><td>SMP · 2</td><td class="num"><span class="nom">120.000</span></td><td><span class="pill ok">Ikut</span></td><td><span class="btn sec mini">Hentikan</span></td></tr>
+                  <tr><td>2601018</td><td>Rizky Pratama</td><td>SMP · 3</td><td class="num"><span class="nom">75.000</span></td><td><span class="pill off">Berhenti</span></td><td><span class="btn sec mini">Ikutkan</span></td></tr>
+                  <tr style="background:#fffbeb;"><td>2601022</td><td>Salman Alfarisi</td><td>SMA · 1</td><td class="num"><span class="nom">90.000</span></td><td><span class="pill err">Santri tidak aktif</span></td><td><span class="btn sec mini">Hentikan</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="ft"><span style="font-size:11px; color:#6b7280;">Peserta yang santrinya tak lagi berstatus aktif <b>dilewati</b> saat penerbitan dan disebutkan di hasilnya — barisnya tidak dihapus sendiri, supaya kepesertaannya tetap terlihat bila ia kembali aktif.</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="shot-cap"><b>Baru seluruhnya.</b> Dua tabel baru di basis data — lihat bagian berikutnya.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">6</div>
+      <h2>Jalur jurnalnya</h2>
+    </div>
+    <div class="flow">
+      <div class="flowcard">
+        <h4>Laundry <span class="tag final">Final</span></h4>
+        <div class="step"><em>Terbit</em><span>Piutang D / Pendapatan K — satu jurnal bertotal untuk seluruh santri sekali terbit</span></div>
+        <div class="step"><em>Dibayar</em><span>Kas atau Dompet D / Piutang K</span></div>
+        <div class="step"><em>Keliru</em><span>Koreksi → Pendapatan D / Piutang K (jurnal balik), status <b>Dikoreksi</b></span></div>
+        <div class="step"><em>Batal</em><span style="color:var(--ink-faint);">tidak tersedia</span></div>
+      </div>
+      <div class="flowcard">
+        <h4>Ekskul / program khusus <span class="tag kas">Tidak final</span></h4>
+        <div class="step"><em>Terbit</em><span style="color:var(--ink-faint);">tidak menjurnal apa pun</span></div>
+        <div class="step"><em>Dibayar</em><span>Kas atau Dompet D / <b>Pendapatan</b> K</span></div>
+        <div class="step"><em>Keliru</em><span>Batalkan — selama belum ada pembayaran; tak ada jurnal yang perlu dibalik</span></div>
+        <div class="step"><em>Koreksi</em><span style="color:var(--ink-faint);">tidak perlu</span></div>
+      </div>
+    </div>
+    <div class="callout">
+      <span class="k">Sudah berjalan hari ini</span>
+      <p>Sisi kredit yang berpindah antara Pendapatan dan Piutang menurut <code>sudah_akrual</code> <b>sudah benar</b> di kode yang ada. Yang berubah hanya <em>siapa yang menentukan</em> nilai <code>sudah_akrual</code> itu: dari “kebetulan akun piutangnya terisi” menjadi “pengakuan yang dipilih di master”.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">7</div>
+      <h2>Perubahan basis data</h2>
+    </div>
+    <div class="tablebox">
+      <table class="doc">
+        <thead><tr><th style="width:14rem;">Objek</th><th>Perubahan</th><th style="width:10rem;">Risiko data lama</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>jenis_biaya.pengakuan</code></td>
+            <td>Kolom baru, <code>akrual</code> | <code>kas</code>, NOT NULL. Diisi mundur: <code>akrual</code> bila akun piutang terisi, selain itu <code>kas</code> — persis aturan implisit yang berlaku sekarang, jadi perilaku data lama tak berubah sama sekali.</td>
+            <td>Tidak ada</td>
+          </tr>
+          <tr>
+            <td><code>tagihan_santri.status</code></td>
+            <td>Tambah nilai <code>dikoreksi</code>. Enum di sini = varchar + CHECK, jadi constraint-nya di-<em>drop</em> lalu dibuat ulang.</td>
+            <td>Tidak ada — belum ada baris berstatus itu</td>
+          </tr>
+          <tr>
+            <td><code>tagihan_santri.referensi_koreksi</code><br><code>tagihan_santri.alasan_koreksi</code></td>
+            <td>Dua kolom baru, boleh kosong. Menyimpan nomor jurnal balik &amp; alasannya.</td>
+            <td>Tidak ada</td>
+          </tr>
+          <tr>
+            <td><code>jadwal_tagihan_lain</code></td>
+            <td>Tabel baru: jenis biaya, tanggal terbit tiap bulan, offset jatuh tempo, status aktif, periode terakhir yang sudah terbit.</td>
+            <td>Tabel baru</td>
+          </tr>
+          <tr>
+            <td><code>peserta_tagihan_lain</code></td>
+            <td>Tabel baru: jadwal, santri, nominal, status ikut/berhenti. Unik per (jadwal, santri).</td>
+            <td>Tabel baru</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">8</div>
+      <h2>Pengaruh ke data yang sudah masuk</h2>
+    </div>
+    <div class="prose">
+      <p>Saya periksa basis data kerja hari ini. Hasilnya menentukan seberapa aman perubahan ini — dan kebetulan waktunya sedang bagus.</p>
+    </div>
+    <div class="tablebox">
+      <table class="doc">
+        <thead><tr><th>Yang diperiksa</th><th class="num" style="width:6rem;">Jumlah</th><th>Artinya</th></tr></thead>
+        <tbody>
+          <tr><td>Tagihan berperilaku <code>lain</code> yang sudah terbit</td><td class="num">0</td><td><b>Tidak ada tagihan hidup yang terpengaruh.</b> Aturan lunas-sekaligus, penjaga anti tagih-ganda, dan status baru bisa diberlakukan tanpa menyentuh satu baris pun yang sudah jalan.</td></tr>
+          <tr><td>Jenis biaya berperilaku <code>lain</code></td><td class="num">3</td><td>SMA-06, SMP-06, SDTQ-06 — <em>“Tagihan Lainnya”</em> satu per jenjang. Ketiganya berakun piutang, jadi ketiganya akan terisi mundur sebagai <b>Final</b>.</td></tr>
+          <tr><td>Jenis biaya bercentang “Berulang”</td><td class="num">3</td><td>Ketiganya bukan jenis <code>lain</code>. Perlu diperiksa ulang karena centang itu mulai bermakna.</td></tr>
+          <tr><td>Santri &amp; tagihan di basis data kerja</td><td class="num">0</td><td>Basis data baru disetel ulang dan dikloning ke produksi, jadi angka di atas berlaku untuk keduanya.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout warn">
+      <span class="k">Pekerjaan data, bukan pekerjaan kode</span>
+      <p>Ketiga jenis yang ada sekarang adalah keranjang serba-guna <em>“Tagihan Lainnya”</em> per jenjang. Rancangan ini menuntut sifat final ditempelkan pada <b>jenis</b>, sehingga laundry (final) dan ekskul (tidak final) tidak bisa lagi berbagi satu baris.</p>
+      <p>Jadi sebelum dipakai, ketiganya perlu dipecah menjadi jenis tersendiri — <em>Laundry</em>, <em>Ekskul</em>, <em>Program Khusus</em>, dan seterusnya, masing-masing dengan pengakuannya. Karena belum ada tagihan yang terbit, pemecahan ini tak meninggalkan riwayat yang perlu dipindahkan. Kalau ditunda sampai tagihan mengalir, biayanya berlipat.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">9</div>
+      <h2>Yang ikut berubah di luar layar</h2>
+    </div>
+    <ul class="list">
+      <li><b>Auto-debet dompet</b> — <code>lain</code> masuk ke aturan “penuh atau tidak sama sekali” yang selama ini hanya berlaku untuk SPP. Saldo yang kurang tidak memotong sebagian lagi. Ini yang paling mudah terlewat: hari ini laundry Rp 150.000 dengan saldo Rp 40.000 <em>terpotong Rp 40.000</em>, jadi tagihan cicilan, tanpa siapa pun menekan apa pun.</li>
+      <li><b>Pembayaran manual</b> — nominal untuk tagihan <code>lain</code> harus sama dengan sisanya. Akibat sampingannya menyenangkan: status <em>sebagian</em> tak akan pernah muncul untuk tagihan lain.</li>
+      <li><b>Reminder Tagihan</b> — begitu jatuh tempo tersimpan, tagihan lain akhirnya ikut terjaring. Sekarang ia tak pernah muncul di sana sama sekali, karena jatuh temponya selalu kosong.</li>
+      <li><b>Sumber jurnal</b> — akrual tagihan lain kini tercatat sebagai modul <code>TagihanLain</code>, bukan <code>TagihanSpp</code> seperti sekarang; penelusuran jurnal per modul jadi benar.</li>
+      <li><b>Penjaga anti tagih-ganda</b> — tagihan berstatus <em>batal</em> tak lagi memblokir penerbitan ulang, dan jenis tak-berulang tak diblokir sama sekali. Hari ini satu jenis tanpa periode hanya bisa ditagihkan sekali seumur hidup per santri.</li>
+      <li><b>Uji otomatis</b> — modul ini sama sekali belum punya berkas ujinya sendiri. Akan dibuat bersamaan: terbit, akrual, koreksi, larangan cicilan, idempotensi jadwal.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div class="eyebrow">10</div>
+      <h2>Yang masih perlu Anda putuskan</h2>
+    </div>
+    <div class="prose" style="gap: 1.1rem;">
+      <div class="q"><b>Santri baru di tengah periode.</b> Ia masuk 20 Agustus, sementara laundry Agustus sudah terbit tanggal 1. Ditagih penuh, atau tidak ditagih bulan itu dan mulai September? Saya sarankan <b>tidak otomatis</b> — cukup terbitkan manual bila perlu, karena aturan prorata akan menyeret perhitungan hari ke modul yang seharusnya sederhana.</div>
+      <div class="q"><b>Peserta jadwal saat naik jenjang.</b> Nominal laundry SMP dan SMA bisa berbeda. Ketika santri naik, nominalnya ikut disesuaikan sendiri, atau dibiarkan sampai diubah manual? Saran saya <b>dibiarkan</b>, tapi tandai barisnya supaya terlihat.</div>
+      <div class="q"><b>Siapa yang boleh memasang jadwal.</b> Hak akses <code>tagihan-lain</code> yang sudah ada, atau hak tersendiri? Jadwal berulang menerbitkan uang tanpa ada yang menekan tombol tiap bulan — saya condong ke hak tersendiri.</div>
+    </div>
+  </section>
+
+  <footer class="prose">
+    <p class="meta">Belum ada kode yang diubah. Setujui bagian mana yang dikerjakan lebih dulu, atau koreksi rancangannya.</p>
+  </footer>
+
+</div>

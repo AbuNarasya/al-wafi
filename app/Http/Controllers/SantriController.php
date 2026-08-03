@@ -26,8 +26,11 @@ use App\Services\Modules\TahunAjaranService;
 use App\Services\Modules\TarifService;
 use App\Services\Ppsb\Tahap;
 use App\Support\Akses;
+use App\Support\Export\BarisSantri;
+use App\Support\Export\Exporter;
 use App\Support\Money;
 use App\Support\Referensi;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -40,32 +43,6 @@ use Illuminate\View\View;
  */
 class SantriController extends Controller
 {
-    /**
-     * Status yang termasuk "calon" (lingkup PPSB).
-     *
-     * `mengundurkan_diri` sengaja TIDAK di sini — ia berdaftar sendiri, sama
-     * seperti alumni & santri keluar. Calon yang mundur sudah selesai urusannya
-     * (tagihannya pun ditutup saat ia mundur), jadi membiarkannya berbaur di
-     * daftar kerja PPSB hanya menaikkan angka pendaftar yang tak pernah datang.
-     */
-    private const CALON = ['calon', 'terbayar', 'terverifikasi', 'diseleksi', 'diterima', 'lolos_kesehatan', 'tidak_lulus', 'gagal_medcheck'];
-
-    /**
-     * Status per daftar. LIMA daftar terpisah, bukan satu daftar bercampur:
-     * alumni & santri keluar dulu ikut nongol di daftar Santri Kependidikan,
-     * sehingga jumlah "santri" di layar tak pernah sama dengan jumlah santri yang
-     * benar-benar bersekolah. Pemisahannya murni tampilan — barisnya tetap satu
-     * tabel, jadi tagihan bersisa milik alumni tetap bisa ditagih.
-     */
-    private const LINGKUP = [
-        'calon' => self::CALON,
-        'siap_aktivasi' => ['siap_aktivasi'],
-        'aktif' => ['aktif'],
-        'alumni' => ['alumni'],
-        'keluar' => ['keluar'],
-        'mundur' => ['mengundurkan_diri'],
-    ];
-
     /** Judul halaman & nama rute per lingkup — dipakai judul, tombol Reset, & tautan Kembali. */
     private const JUDUL = [
         'calon' => 'Calon Santri',
@@ -110,44 +87,12 @@ class SantriController extends Controller
         (new KenaikanTingkatService)->terapkanYangJatuhTempo();
 
         $q = trim((string) $request->query('q', ''));
-        // Filter per kolom. Sengaja DIKERJAKAN SERVER (bukan komponen rowFilter
-        // yang menyaring di browser) karena daftar ini berpaginasi — filter sisi
-        // browser hanya akan menyaring 25 baris yang sedang tampil.
-        $fJenjang = trim((string) $request->query('jenjang', ''));
-        $fTingkat = trim((string) $request->query('tingkat', ''));
-        $fJalur = trim((string) $request->query('jalur', ''));
-        $fStatus = trim((string) $request->query('status', ''));
-        $fBayar = trim((string) $request->query('bayar', ''));
-
-        $statusLingkup = self::LINGKUP[$lingkup] ?? self::LINGKUP['aktif'];
+        $filter = $this->filterDaftar($request);
+        $statusLingkup = Santri::LINGKUP[$lingkup] ?? Santri::LINGKUP['aktif'];
 
         // `jenjang` ikut dimuat supaya kolomnya bisa menyebut NAMA jenjang tanpa
         // satu kueri per baris — kode `J001` tak bercerita apa pun bagi pembaca.
-        $rows = Santri::query()->with(['wali', 'jalurPendaftaran', 'jenjang'])
-            // Daftar CALON juga memuat santri yang sedang MELANJUTKAN ke jenjang
-            // berikutnya. Statusnya sengaja tetap `aktif` (ia masih bersekolah &
-            // masih ditagih SPP sampai kenaikannya dieksekusi), jadi tanpa baris
-            // ini pekerjaan PPSB atas mereka — seleksi, med check — tak pernah
-            // muncul di daftar tempat PPSB bekerja.
-            ->when($lingkup === 'calon',
-                fn ($query) => $query->where(fn ($w) => $w
-                    ->whereIn('status', $statusLingkup)
-                    ->orWhereHas('pendaftaranSemua', fn ($p) => $p->lanjutan()->terbuka())),
-                fn ($query) => $query->whereIn('status', $statusLingkup))
-            // NIS LAMA ikut dicari. Sejak nomornya diterbitkan ulang tiap naik
-            // jenjang, nomor di kartu atau rapor yang dibawa wali sering kali
-            // bukan lagi nomor yang berlaku — dan itulah satu-satunya pegangan
-            // mereka saat bertanya di meja administrasi.
-            ->when($q !== '', fn ($query) => $query->where(
-                fn ($w) => $w->where('nama', 'ilike', "%{$q}%")->orWhere('no_pendaftaran', 'ilike', "%{$q}%")
-                    ->orWhere('nisn', 'ilike', "%{$q}%")->orWhere('nis', 'ilike', "%{$q}%")
-                    ->orWhereHas('riwayatNis', fn ($n) => $n->where('nis', 'ilike', "%{$q}%")),
-            ))
-            ->when($fJenjang !== '', fn ($query) => $query->where('kode_jenjang', $fJenjang))
-            ->when($fTingkat !== '', fn ($query) => $query->where('tingkat', (int) $fTingkat))
-            ->when($fJalur !== '', fn ($query) => $query->where('jalur', $fJalur))
-            ->when($fStatus !== '' && in_array($fStatus, $statusLingkup, true), fn ($query) => $query->where('status', $fStatus))
-            ->when($fBayar !== '', fn ($query) => $this->saringStatusBayar($query, $fBayar))
+        $rows = $this->kueriDaftar($request, $lingkup)->with(['wali', 'jalurPendaftaran', 'jenjang'])
             ->orderByDesc('id')->paginate(25)->withQueryString();
 
         // Seluruh master jalur (bukan hanya baris di halaman ini) agar warna
@@ -178,11 +123,11 @@ class SantriController extends Controller
             'spp' => $lingkup === 'aktif'
                 ? (new SppService)->ringkasMassal($rows->getCollection())
                 : [],
-            'filter' => ['jenjang' => $fJenjang, 'tingkat' => $fTingkat, 'jalur' => $fJalur, 'status' => $fStatus, 'bayar' => $fBayar],
+            'filter' => $filter,
             'opsiJenjang' => Referensi::jenjang(),
             // Pilihan tingkat mengikuti jenjang yang sedang disaring; tanpa
             // penyaring jenjang, ditawarkan sebanyak jenjang terpanjang.
-            'opsiTingkat' => $this->opsiTingkat($fJenjang),
+            'opsiTingkat' => $this->opsiTingkat($filter['jenjang']),
             // Daftar berstatus TUNGGAL (alumni, keluar) tak perlu penyaring status:
             // dropdown berisi satu pilihan hanya menambah sel yang tak berguna.
             'opsiStatus' => count($statusLingkup) > 1
@@ -191,6 +136,75 @@ class SantriController extends Controller
             'judul' => self::JUDUL[$lingkup] ?? 'Santri',
             'rute' => self::RUTE[$lingkup] ?? 'santri.aktif',
         ]);
+    }
+
+    /**
+     * Unduh daftar yang SEDANG TAMPIL (CSV / Excel / PDF).
+     *
+     * Sengaja membawa penyaring & pencarian yang aktif, bukan seluruh lingkup:
+     * yang menekan tombolnya baru saja menyaring "jenjang X tingkat 1 yang belum
+     * lunas" di layar, dan berkas yang berisi semua orang bukan itu yang diminta.
+     * Tanpa penyaring, isinya sama persis dengan dataset di halaman Export Data.
+     *
+     * Tak berpaginasi — seluruh baris yang cocok ikut, bukan 25 yang tampak.
+     */
+    public function unduh(Request $request, string $lingkup)
+    {
+        $rows = BarisSantri::dari($lingkup, $this->kueriDaftar($request, $lingkup));
+
+        return Exporter::download(
+            (string) $request->query('format', 'csv'),
+            'santri_'.$lingkup,
+            self::JUDUL[$lingkup] ?? 'Santri',
+            $rows,
+        );
+    }
+
+    /**
+     * Penyaring daftar santri, dibaca dari query string. Sengaja DIKERJAKAN
+     * SERVER (bukan komponen rowFilter yang menyaring di browser) karena daftar
+     * ini berpaginasi — filter sisi browser hanya akan menyaring 25 baris yang
+     * sedang tampil.
+     *
+     * @return array{jenjang:string,tingkat:string,jalur:string,status:string,bayar:string}
+     */
+    private function filterDaftar(Request $request): array
+    {
+        return [
+            'jenjang' => trim((string) $request->query('jenjang', '')),
+            'tingkat' => trim((string) $request->query('tingkat', '')),
+            'jalur' => trim((string) $request->query('jalur', '')),
+            'status' => trim((string) $request->query('status', '')),
+            'bayar' => trim((string) $request->query('bayar', '')),
+        ];
+    }
+
+    /**
+     * Kueri daftar santri satu lingkup + penyaringnya, TANPA urutan & paginasi —
+     * dipakai bersama oleh daftar di layar dan tombol Unduh, supaya keduanya tak
+     * pernah menampilkan himpunan yang berbeda.
+     */
+    private function kueriDaftar(Request $request, string $lingkup): Builder
+    {
+        $q = trim((string) $request->query('q', ''));
+        $f = $this->filterDaftar($request);
+        $statusLingkup = Santri::LINGKUP[$lingkup] ?? Santri::LINGKUP['aktif'];
+
+        return Santri::query()->lingkup($lingkup)
+            // NIS LAMA ikut dicari. Sejak nomornya diterbitkan ulang tiap naik
+            // jenjang, nomor di kartu atau rapor yang dibawa wali sering kali
+            // bukan lagi nomor yang berlaku — dan itulah satu-satunya pegangan
+            // mereka saat bertanya di meja administrasi.
+            ->when($q !== '', fn ($query) => $query->where(
+                fn ($w) => $w->where('nama', 'ilike', "%{$q}%")->orWhere('no_pendaftaran', 'ilike', "%{$q}%")
+                    ->orWhere('nisn', 'ilike', "%{$q}%")->orWhere('nis', 'ilike', "%{$q}%")
+                    ->orWhereHas('riwayatNis', fn ($n) => $n->where('nis', 'ilike', "%{$q}%")),
+            ))
+            ->when($f['jenjang'] !== '', fn ($query) => $query->where('kode_jenjang', $f['jenjang']))
+            ->when($f['tingkat'] !== '', fn ($query) => $query->where('tingkat', (int) $f['tingkat']))
+            ->when($f['jalur'] !== '', fn ($query) => $query->where('jalur', $f['jalur']))
+            ->when($f['status'] !== '' && in_array($f['status'], $statusLingkup, true), fn ($query) => $query->where('status', $f['status']))
+            ->when($f['bayar'] !== '', fn ($query) => $this->saringStatusBayar($query, $f['bayar']));
     }
 
     /**
@@ -303,7 +317,7 @@ class SantriController extends Controller
             return $asal;
         }
 
-        if (in_array($santri->status, self::CALON, true)) {
+        if (in_array($santri->status, Santri::CALON, true)) {
             return route('santri.calon');
         }
 

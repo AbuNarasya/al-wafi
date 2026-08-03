@@ -74,6 +74,9 @@
                 Aktifkan yang Dicentang
             </button>
         @endif
+
+        {{-- Unduhan mengikuti penyaring yang sedang aktif, bukan seluruh daftar. --}}
+        @include('santri._unduh', ['lingkup' => $lingkup])
     </div>
 
     @if ($lingkup === 'siap_aktivasi')

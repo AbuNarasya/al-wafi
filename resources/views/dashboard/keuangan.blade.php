@@ -43,10 +43,8 @@
                         <button type="button" @click="mode[panel.key] = 'total'" :class="mode[panel.key] === 'total' ? 'bg-brand text-white' : 'bg-white text-gray-600 hover:bg-gray-50'" class="px-2.5 py-1">Total</button>
                         <button type="button" @click="mode[panel.key] = 'bulanan'" :class="mode[panel.key] === 'bulanan' ? 'bg-brand text-white' : 'bg-white text-gray-600 hover:bg-gray-50'" class="px-2.5 py-1">Bulanan</button>
                     </div>
-                    <template x-for="f in ['csv','xlsx','pdf']" :key="f">
-                        <a :href="`{{ url('dashboard/export') }}/${panel.dl}?format=${f}&mode=${mode[panel.key]}`"
-                           class="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600 hover:bg-gray-100" x-text="f === 'xlsx' ? 'Excel' : f.toUpperCase()"></a>
-                    </template>
+                    {{-- Alamatnya dirakit dari state panel & mode yang sedang dipilih. --}}
+                    <x-unduh url-js="`{{ url('dashboard/export') }}/${panel.dl}?mode=${mode[panel.key]}`" label="" />
                 </div>
             </div>
             <div class="overflow-x-auto p-4">
@@ -108,9 +106,7 @@
                     </tbody>
                 </table>
                 <div class="mt-3 flex justify-end gap-1">
-                    <template x-for="f in ['csv','xlsx','pdf']" :key="f">
-                        <a :href="`{{ url('dashboard/export') }}/kas-rekening?format=${f}`" class="rounded border border-gray-200 px-2 py-0.5 text-[10px] text-gray-600 hover:bg-gray-100" x-text="f === 'xlsx' ? 'Excel' : f.toUpperCase()"></a>
-                    </template>
+                    <x-unduh :url="url('dashboard/export/kas-rekening')" label="" />
                 </div>
             </div>
         </div>
@@ -145,9 +141,7 @@
                 </table>
                 <p class="mt-2 text-xs text-gray-500">Penambahan = kredit (hutang bertambah), Pengurangan = debet (hutang dibayar/berkurang).</p>
                 <div class="mt-3 flex justify-end gap-1">
-                    <template x-for="f in ['csv','xlsx','pdf']" :key="f">
-                        <a :href="`{{ url('dashboard/export') }}/hutang?jenis=${hutangJenis}&format=${f}`" class="rounded border border-gray-200 px-2 py-0.5 text-[10px] text-gray-600 hover:bg-gray-100" x-text="f === 'xlsx' ? 'Excel' : f.toUpperCase()"></a>
-                    </template>
+                    <x-unduh url-js="`{{ url('dashboard/export') }}/hutang?jenis=${hutangJenis}`" label="" />
                 </div>
             </div>
         </div>

@@ -20,13 +20,10 @@ use App\Models\Level;
 use App\Models\OpeningBalance;
 use App\Models\OperationalAdvance;
 use App\Models\PurchaseOrder;
-use App\Models\Santri;
-use App\Models\TagihanSantri;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorType;
 use App\Services\Modules\BookTransferService;
-use App\Services\Ppsb\Tahap;
 use Illuminate\Support\Carbon;
 
 /**
@@ -92,9 +89,14 @@ class DatasetRegistry
             ['key' => 'book-transfer', 'label' => 'Pindah Buku', 'group' => 'Transaksi', 'file' => 'pindah_buku'],
             ['key' => 'accrue', 'label' => 'Accrue & Prepaid', 'group' => 'Transaksi', 'file' => 'accrue'],
 
-            // Kesantrian. Empat daftar santri yang paling sering diminta di luar
-            // aplikasi: yang bersekolah, yang lulus, yang berhenti, dan calon yang
-            // batal masuk — yang terakhir dipakai menghitung ulang target penerimaan.
+            // Kesantrian. Enam daftar santri yang paling sering diminta di luar
+            // aplikasi: yang masih diproses PPSB, yang tinggal menunggu tahun
+            // ajarannya dimulai, yang bersekolah, yang lulus, yang berhenti, dan
+            // calon yang batal masuk — dua yang terakhir dipakai menghitung ulang
+            // target penerimaan. Isinya persis daftar di layar: keenamnya memakai
+            // lingkup yang sama (`Santri::LINGKUP`) lewat BarisSantri.
+            ['key' => 'calon-santri', 'label' => 'Calon Santri', 'group' => 'Kesantrian', 'file' => 'calon_santri'],
+            ['key' => 'siap-aktivasi', 'label' => 'Calon Santri Siap Aktivasi', 'group' => 'Kesantrian', 'file' => 'calon_siap_aktivasi'],
             ['key' => 'santri-aktif', 'label' => 'Santri Aktif', 'group' => 'Kesantrian', 'file' => 'santri_aktif'],
             ['key' => 'alumni', 'label' => 'Alumni (Lulusan)', 'group' => 'Kesantrian', 'file' => 'alumni'],
             ['key' => 'santri-keluar', 'label' => 'Santri Keluar', 'group' => 'Kesantrian', 'file' => 'santri_keluar'],
@@ -242,61 +244,14 @@ class DatasetRegistry
                 'Unit Bisnis' => $this->nm($this->unit, $r->kode_unit), 'Nominal' => $r->nominal, 'Status' => $r->status,
             ])->all(),
 
-            'santri-aktif' => $this->barisSantri(['aktif']),
-            'alumni' => $this->barisSantri(['alumni']),
-            'santri-keluar' => $this->barisSantri(['keluar']),
-            'calon-mundur' => $this->barisSantri(['mengundurkan_diri']),
+            'calon-santri' => BarisSantri::dari('calon'),
+            'siap-aktivasi' => BarisSantri::dari('siap_aktivasi'),
+            'santri-aktif' => BarisSantri::dari('aktif'),
+            'alumni' => BarisSantri::dari('alumni'),
+            'santri-keluar' => BarisSantri::dari('keluar'),
+            'calon-mundur' => BarisSantri::dari('mundur'),
 
             default => [],
         };
-    }
-
-    /**
-     * Baris santri untuk export, dipisah menurut status — sama seperti daftar di
-     * layar (Santri / Alumni / Santri Keluar).
-     *
-     * SISA TAGIHAN ikut dibawa karena itulah yang paling sering dicari saat
-     * daftarnya ditarik keluar: alumni yang masih menunggak tetap boleh ditagih,
-     * jadi angkanya harus terlihat tanpa membuka satu per satu. Dihitung dengan
-     * satu kueri agregat, bukan per baris.
-     *
-     * @param  list<string>  $status
-     * @return array<int,array<string,scalar|null>>
-     */
-    private function barisSantri(array $status): array
-    {
-        $santri = Santri::with(['wali', 'jenjang', 'jalurPendaftaran'])
-            ->whereIn('status', $status)
-            ->orderBy('kode_jenjang')->orderBy('tingkat')->orderBy('nama')
-            ->get();
-
-        $sisa = TagihanSantri::whereIn('id_santri', $santri->pluck('id'))
-            ->where('status', '!=', 'batal')
-            ->selectRaw('id_santri, COALESCE(SUM(sisa), 0) AS sisa')
-            ->groupBy('id_santri')->pluck('sisa', 'id_santri');
-
-        $alumni = $status === ['alumni'];
-
-        return $santri->map(fn ($s) => array_filter([
-            'NIS' => $s->nis ?? '',
-            'No. Pendaftaran' => $s->no_pendaftaran,
-            'Nama' => $s->nama,
-            'L/P' => $s->jenis_kelamin,
-            'Tempat Lahir' => $s->tempat_lahir ?? '',
-            'Tanggal Lahir' => $this->tgl($s->tanggal_lahir),
-            'NISN' => $s->nisn ?? '',
-            'Jenjang' => $s->jenjang?->nama ?? $s->kode_jenjang ?? '',
-            $alumni ? 'Tingkat Akhir' : 'Tingkat' => $s->tingkat ?? '',
-            'Jalur' => $s->jalurPendaftaran?->nama ?? $s->jalur ?? '',
-            'Angkatan (T.A Masuk)' => $s->tahun_ajaran ?? '',
-            'T.A Berjalan' => $s->taBerjalan() ?? '',
-            // Kolom ini hanya terisi untuk alumni; disisipkan bersyarat supaya
-            // berkas Santri Aktif/Keluar tak punya kolom yang selalu kosong.
-            'Tanggal Lulus' => $alumni ? $this->tgl($s->tanggal_lulus) : null,
-            'Wali' => $s->wali?->nama ?? '',
-            'Telepon Wali' => $s->wali?->telepon ?? '',
-            'Sisa Tagihan' => $sisa[$s->id] ?? 0,
-            'Status' => Tahap::labelStatus((string) $s->status),
-        ], fn ($v) => $v !== null))->all();
     }
 }

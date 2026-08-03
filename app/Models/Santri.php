@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,53 @@ class Santri extends Model
     protected $guarded = ['id'];
 
     protected $appends = ['umur', 'umur_terbaca'];
+
+    /**
+     * Status yang termasuk "calon" (lingkup PPSB).
+     *
+     * `mengundurkan_diri` sengaja TIDAK di sini — ia berdaftar sendiri, sama
+     * seperti alumni & santri keluar. Calon yang mundur sudah selesai urusannya
+     * (tagihannya pun ditutup saat ia mundur), jadi membiarkannya berbaur di
+     * daftar kerja PPSB hanya menaikkan angka pendaftar yang tak pernah datang.
+     */
+    public const CALON = ['calon', 'terbayar', 'terverifikasi', 'diseleksi', 'diterima', 'lolos_kesehatan', 'tidak_lulus', 'gagal_medcheck'];
+
+    /**
+     * Status per daftar. ENAM daftar terpisah, bukan satu daftar bercampur:
+     * alumni & santri keluar dulu ikut nongol di daftar Santri Kependidikan,
+     * sehingga jumlah "santri" di layar tak pernah sama dengan jumlah santri yang
+     * benar-benar bersekolah. Pemisahannya murni tampilan — barisnya tetap satu
+     * tabel, jadi tagihan bersisa milik alumni tetap bisa ditagih.
+     */
+    public const LINGKUP = [
+        'calon' => self::CALON,
+        'siap_aktivasi' => ['siap_aktivasi'],
+        'aktif' => ['aktif'],
+        'alumni' => ['alumni'],
+        'keluar' => ['keluar'],
+        'mundur' => ['mengundurkan_diri'],
+    ];
+
+    /**
+     * Saring menurut DAFTAR tempat santri ditampilkan. Ditaruh di model, bukan
+     * di controller, karena dipakai dua tempat yang isinya HARUS sama: daftar di
+     * layar dan berkas unduhannya. Lingkup tak dikenal jatuh ke `aktif`.
+     */
+    public function scopeLingkup(Builder $query, string $lingkup): Builder
+    {
+        $status = self::LINGKUP[$lingkup] ?? self::LINGKUP['aktif'];
+
+        // Daftar CALON juga memuat santri yang sedang MELANJUTKAN ke jenjang
+        // berikutnya. Statusnya sengaja tetap `aktif` (ia masih bersekolah &
+        // masih ditagih SPP sampai kenaikannya dieksekusi), jadi tanpa baris
+        // ini pekerjaan PPSB atas mereka — seleksi, med check — tak pernah
+        // muncul di daftar tempat PPSB bekerja.
+        return $lingkup === 'calon'
+            ? $query->where(fn ($w) => $w
+                ->whereIn('status', $status)
+                ->orWhereHas('pendaftaranSemua', fn ($p) => $p->lanjutan()->terbuka()))
+            : $query->whereIn('status', $status);
+    }
 
     /** Umur (tahun penuh) dari tanggal_lahir — dihitung, tidak disimpan. */
     protected function umur(): Attribute

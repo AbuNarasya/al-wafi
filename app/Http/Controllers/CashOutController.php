@@ -79,6 +79,18 @@ class CashOutController extends Controller
         return view('cash-out.show', ['rec' => $cash_out]);
     }
 
+    /** Bukti Kas Keluar siap tanda tangan (view cetaknya dipakai bersama Kas Masuk). */
+    public function print(CashOut $cash_out): View
+    {
+        $cash_out->load(['details', 'vendor', 'unit', 'rekening', 'user']);
+
+        return view('cash.print', [
+            'rec' => $cash_out,
+            'jenis' => 'keluar',
+            'company' => \App\Models\CompanySettings::find(1),
+        ]);
+    }
+
     public function void(Request $request, CashOut $cash_out): RedirectResponse
     {
         $request->validate(['alasan' => ['required', 'string', 'max:255']]);

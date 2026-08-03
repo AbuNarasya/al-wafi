@@ -33,6 +33,7 @@
                         @foreach ($labelFmt as $f => $lbl)
                             <button type="submit" name="format" value="{{ $f }}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">{{ $lbl }}</button>
                         @endforeach
+                        <x-unduh form />
                     </div>
                 </div>
             </form>
@@ -49,6 +50,7 @@
                         @foreach ($labelFmt as $f => $lbl)
                             <button type="submit" name="format" value="{{ $f }}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">{{ $lbl }}</button>
                         @endforeach
+                        <x-unduh form />
                     </div>
                 </div>
             </form>
@@ -63,6 +65,7 @@
                         @foreach ($labelFmt as $f => $lbl)
                             <button type="submit" name="format" value="{{ $f }}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">{{ $lbl }}</button>
                         @endforeach
+                        <x-unduh form />
                     </div>
                 </div>
             </form>
@@ -79,11 +82,8 @@
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 py-2 text-gray-800">{{ $ds['label'] }}</td>
                             <td class="px-4 py-2 text-right">
-                                <div class="flex justify-end gap-1">
-                                    @foreach ($labelFmt as $f => $lbl)
-                                        <a href="{{ route('export.dataset', $ds['key']) }}?format={{ $f }}"
-                                           class="rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">{{ $lbl }}</a>
-                                    @endforeach
+                                <div class="flex justify-end">
+                                    <x-unduh :url="route('export.dataset', $ds['key'])" label="" />
                                 </div>
                             </td>
                         </tr>

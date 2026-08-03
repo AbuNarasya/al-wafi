@@ -394,7 +394,26 @@
       "Bash(C:/php/php.exe -l tests/Concerns/MengaktifkanSantri.php)",
       "WebFetch(domain:render.com)",
       "WebSearch",
-      "Bash(git commit -m '@ *)"
+      "Bash(git commit -m '@ *)",
+      "Bash(C:/php/php.exe -l app/Models/Santri.php)",
+      "Bash(C:/php/php.exe -l app/Support/Export/BarisSantri.php)",
+      "Bash(C:/php/php.exe -l app/Support/Export/Exporter.php)",
+      "PowerShell($p = Get-NetTCPConnection -LocalPort 8123 -State Listen -ErrorAction SilentlyContinue; if \\($p\\) { Stop-Process -Id $p.OwningProcess -Force; \"server 8123 dihentikan\" } else { \"tidak ada yang mendengarkan di 8123\" })",
+      "Bash(C:/php/php.exe -l docs/render-rancangan.php)",
+      "Bash(C:/php/php.exe docs/render-rancangan.php)",
+      "Bash(\"C:/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --screenshot=\"C:/Users/ABUNAR~1/AppData/Local/Temp/claude/D--Works-AL-WAFI-Reborn-Project-Aplikasi-Project-Aplikasi-Al-Wafi-Konversi-PHP/663979e1-08ba-4003-ab85-16a606fb0655/scratchpad/cek.png\" --window-size=1240,1754 --virtual-time-budget=5000 \"file:///D:/Works/AL%20WAFI%20Reborn/Project%20Aplikasi/Project%20Aplikasi%20Al%20Wafi%20Konversi%20PHP/docs/Rancangan-Tagihan-Lain-lain.pdf\")",
+      "PowerShell($p = Get-NetTCPConnection -LocalPort 8123 -State Listen -ErrorAction SilentlyContinue; if \\($p\\) { Stop-Process -Id $p.OwningProcess -Force; \"server dihentikan\" } else { \"tidak ada server di 8123\" })",
+      "Bash(cd \"D:/Works/AL WAFI Reborn/Project Aplikasi/Project Aplikasi Al Wafi Konversi PHP\" && echo \"dilacak:\"; git ls-files | grep \"^\\\\.env\"; echo \"=== pernah ada di riwayat? ===\"; git log --all --oneline -- .env | head -5 || true; echo \"\\(selesai\\)\"; echo \"=== waktu berkas ===\"; stat -c '%y %n' .env .env.example 2>/dev/null)",
+      "PowerShell($paths = @\\(\"$env:APPDATA\\\\Code\\\\User\\\\History\", \"$env:APPDATA\\\\JetBrains\", \"$env:APPDATA\\\\Cursor\\\\User\\\\History\", \"$env:APPDATA\\\\Zed\"\\); foreach \\($p in $paths\\) { if \\(Test-Path $p\\) { \"ADA: $p\" } else { \"tidak ada: $p\" } })",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} — halaman login\\\\n\" http://localhost:8123/login)",
+      "Bash(curl -s http://localhost:8123/login)",
+      "Bash(git grep *)",
+      "Bash(grep -vEi \"password_hash|password_confirmation|'password'|\\\\\"password\\\\\"|password\\\\\\)|password\\\\]|PASSWORD=\\\\\\\\\\\\$|sync: false|env\\\\\\(\")",
+      "PowerShell($psql = \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\"; if \\(Test-Path $psql\\) { \"psql: ADA — $psql\" } else { \"psql tidak di lokasi itu\"; Get-ChildItem \"C:\\\\Program Files\\\\PostgreSQL\" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name }; $pgpass = \"$env:APPDATA\\\\postgresql\\\\pgpass.conf\"; if \\(Test-Path $pgpass\\) { \"pgpass.conf: ADA — $pgpass \\(menyimpan sandi juga\\)\" } else { \"pgpass.conf: tidak ada\" })",
+      "Bash(awk '{print \"  \"$NF}')",
+      "Bash(cp .claude/settings.local.json \"C:/Users/ABUNAR~1/AppData/Local/Temp/claude/D--Works-AL-WAFI-Reborn-Project-Aplikasi-Project-Aplikasi-Al-Wafi-Konversi-PHP/663979e1-08ba-4003-ab85-16a606fb0655/scratchpad/settings.local.json.bak\")",
+      "PowerShell($f = Get-Item \"Project Aplikasi Al Wafi Konversi PHP.zip\"; \"{0:N1} MB — dibuat {1}\" -f \\($f.Length/1MB\\), $f.LastWriteTime)",
+      "Bash(git log *)"
     ]
   }
 }

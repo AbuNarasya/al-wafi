@@ -295,6 +295,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/create', [$c, 'create'])->name('create')->middleware('hakakses:cash-out,buat');
         Route::post('/', [$c, 'store'])->name('store')->middleware('hakakses:cash-out,buat');
         Route::get('/{cash_out}', [$c, 'show'])->name('show')->middleware('hakakses:cash-out,lihat');
+        // Bukti siap tanda tangan. Haknya `lihat` — mencetak tidak mengubah apa pun,
+        // dan yang perlu bukti fisik justru sering hanya berhak melihat.
+        Route::get('/{cash_out}/print', [$c, 'print'])->name('print')->middleware('hakakses:cash-out,lihat');
         Route::delete('/{cash_out}', [$c, 'void'])->name('void')->middleware('hakakses:cash-out,hapus');
     });
 
@@ -306,6 +309,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [$c, 'store'])->name('store')->middleware('hakakses:cash-in,buat');
         Route::post('/{cash_in}/akui', [$c, 'akui'])->name('akui')->middleware('hakakses:cash-in,buat');
         Route::get('/{cash_in}', [$c, 'show'])->name('show')->middleware('hakakses:cash-in,lihat');
+        Route::get('/{cash_in}/print', [$c, 'print'])->name('print')->middleware('hakakses:cash-in,lihat');
         Route::delete('/{cash_in}', [$c, 'void'])->name('void')->middleware('hakakses:cash-in,hapus');
     });
 
@@ -524,6 +528,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/kesantrian/santri', 'index')->name('santri.aktif')->defaults('lingkup', 'aktif')->middleware('hakakses:santri,lihat');
         Route::get('/kesantrian/alumni', 'index')->name('santri.alumni')->defaults('lingkup', 'alumni')->middleware('hakakses:santri,lihat');
         Route::get('/kesantrian/santri-keluar', 'index')->name('santri.keluar')->defaults('lingkup', 'keluar')->middleware('hakakses:santri,lihat');
+        // Unduh daftar yang sedang tampil — satu rute untuk keenam daftar, membawa
+        // penyaring & pencarian yang aktif lewat query string.
+        Route::get('/santri/unduh/{lingkup}', 'unduh')->name('santri.unduh')
+            ->whereIn('lingkup', ['calon', 'siap_aktivasi', 'aktif', 'alumni', 'keluar', 'mundur'])
+            ->middleware('hakakses:santri,lihat');
         Route::get('/santri/create', 'create')->name('santri.create')->middleware('hakakses:santri,buat');
         Route::post('/santri', 'store')->name('santri.store')->middleware('hakakses:santri,buat');
         Route::get('/santri/{id}', 'show')->name('santri.show')->middleware('hakakses:santri,lihat')->whereNumber('id');

@@ -101,10 +101,7 @@
                     {{ $rincian->total() }} santri{{ $cari !== '' ? ' cocok' : '' }}
                 </span>
                 <div class="ml-auto flex items-center gap-1">
-                    @foreach (['csv' => 'CSV', 'xlsx' => 'Excel', 'pdf' => 'PDF'] as $format => $labelFormat)
-                        <a href="{{ route('dashboard.ppsb_export', ['jenis' => $detail, 'ta' => $ta, 'cari' => $cari, 'format' => $format]) }}"
-                           class="rounded border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600 hover:bg-gray-100">{{ $labelFormat }}</a>
-                    @endforeach
+                    <x-unduh :url="route('dashboard.ppsb_export', ['jenis' => $detail, 'ta' => $ta, 'cari' => $cari])" label="" />
                 </div>
             </div>
             <div class="overflow-x-auto">

@@ -1,10 +1,9 @@
 @extends('layouts.app')
 
 @php
-    $pendapatanOpts = [
-        '' => '—', 'di_bawah_5' => '< Rp 5 juta', 'juta_5_10' => 'Rp 5–10 juta',
-        'juta_10_15' => 'Rp 10–15 juta', 'juta_15_25' => 'Rp 15–25 juta', 'di_atas_25' => '> Rp 25 juta',
-    ];
+    // Daftarnya di model — dipakai bersama berkas unduhan santri, yang harus
+    // menyebut rentang yang sama persis dengan yang dipilih di sini.
+    $pendapatanOpts = ['' => '—'] + \App\Models\Wali::PENDAPATAN;
 @endphp
 
 @section('title', $baru ? 'Tambah Wali' : 'Ubah Wali ' . $wali->nama)
@@ -19,13 +18,14 @@
 
             <div class="grid gap-4 sm:grid-cols-3">
                 <x-field name="kontak_utama" label="Kontak Utama" :value="$wali->kontak_utama ?? 'ayah'"
-                         :options="['ayah' => 'Ayah', 'ibu' => 'Ibu', 'wali' => 'Wali']" required
+                         :options="\App\Models\Wali::PERAN" required
                          hint="Nama & telepon wali diambil dari kontak utama ini." />
                 <x-field name="nik" label="NIK" :value="$wali->nik" />
                 <x-field name="status" label="Status" :value="$wali->status ?? 'aktif'" :options="['aktif' => 'Aktif', 'nonaktif' => 'Nonaktif']" />
             </div>
 
             @foreach (['ayah' => 'Data Ayah', 'ibu' => 'Data Ibu', 'wali' => 'Data Wali (bila bukan orang tua)'] as $p => $judul)
+                {{-- Peran & isian per peran sama dengan Wali::PERAN. --}}
                 <fieldset class="rounded-lg border border-gray-200 p-4">
                     <legend class="px-2 text-sm font-semibold text-gray-700">{{ $judul }}</legend>
                     <div class="grid gap-3 sm:grid-cols-2">

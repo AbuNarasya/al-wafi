@@ -6,6 +6,9 @@
     <div class="mx-auto max-w-4xl">
         <div class="mb-4 flex items-center justify-between">
             <a href="{{ route('cash_in.index') }}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Kembali</a>
+            <div class="flex items-center gap-2">
+            <a href="{{ route('cash_in.print', $rec->kode_transaksi) }}" target="_blank"
+               class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">🖨 Cetak Bukti</a>
             @if ($rec->status === 'aktif' && \App\Support\Akses::boleh('cash-in', 'hapus'))
                 <div x-data="{ open: false }" class="relative">
                     <button @click="open = !open" class="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100">Void</button>
@@ -20,6 +23,7 @@
                     </form>
                 </div>
             @endif
+            </div>
         </div>
 
         <div class="mb-4 grid gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:grid-cols-4">
@@ -42,7 +46,7 @@
                     @foreach ($rec->details as $d)
                         <tr>
                             <td class="px-4 py-2">{{ $d->kode_coa }} — {{ $d->nama_coa }}</td>
-                            <td class="px-4 py-2 text-gray-500">{{ $d->jenis_kas_masuk === 'uang_muka' ? 'Uang Muka' : 'Pendapatan' }}</td>
+                            <td class="px-4 py-2 text-gray-500">{{ \App\Models\CashIn::JENIS[$d->jenis_kas_masuk] ?? $d->jenis_kas_masuk }}</td>
                             <td class="px-4 py-2 text-gray-600">{{ $d->keterangan }}</td>
                             <td class="px-4 py-2 text-right tabular-nums">@rp($d->nominal)</td>
                         </tr>

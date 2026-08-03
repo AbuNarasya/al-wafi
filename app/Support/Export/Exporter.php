@@ -4,6 +4,7 @@ namespace App\Support\Export;
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -11,16 +12,46 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * Mesin export terpusat (port perilaku exportRows dev): terima baris asosiatif
  * [label => nilai] dan hasilkan CSV / XLSX / PDF. Header kolom = kunci baris
  * pertama. Dipakai semua halaman (Export Data, Laporan, Kontrol, Dashboard).
+ *
+ * PEMILIHAN KOLOM ditangani DI SINI, bukan di tiap pemanggil. Seluruh unduhan
+ * di aplikasi ini berakhir di download(), jadi menaruhnya di sini membuat
+ * fasilitasnya berlaku serentak — termasuk untuk unduhan yang ditambahkan
+ * nanti, yang kalau tidak begitu pasti terlupa. Dua parameter `kolom`:
+ *
+ *   ?kolom=daftar   → JSON berisi NAMA KOLOM yang tersedia (tanpa datanya),
+ *                     dipakai panel "Kolom" untuk mengisi centangnya.
+ *   ?kolom[]=A&…    → berkas hanya berisi kolom itu.
+ *   (tanpa kolom)   → seluruh kolom, seperti sebelum fasilitas ini ada.
  */
 class Exporter
 {
     public const FORMATS = ['csv', 'xlsx', 'pdf'];
 
+    /** Nama parameter kueri & nilai khusus "sebutkan kolomnya saja". */
+    public const PARAM_KOLOM = 'kolom';
+
+    public const MINTA_DAFTAR = 'daftar';
+
     /**
      * @param  array<int,array<string,scalar|null>>  $rows
+     * @param  array<int,string>|string|null  $kolom  kolom yang diminta; null = baca dari query
      */
-    public static function download(string $format, string $baseName, string $title, array $rows): Response|StreamedResponse
+    public static function download(string $format, string $baseName, string $title, array $rows, array|string|null $kolom = null): Response|StreamedResponse|JsonResponse
     {
+        $minta = $kolom ?? request()->query(self::PARAM_KOLOM);
+
+        // Panel pemilih bertanya "kolom apa saja yang ada?" ke ALAMAT UNDUHAN
+        // YANG SAMA. Sengaja begitu, bukan ke daftar kolom yang ditulis
+        // terpisah: daftar terpisah pasti menyimpang begitu satu pembangun
+        // baris diubah, dan menyimpangnya tanpa gejala apa pun. Harganya:
+        // barisnya memang dibangun untuk pertanyaan ini — hanya saat panelnya
+        // DIBUKA, sekali per target.
+        if ($minta === self::MINTA_DAFTAR) {
+            return response()->json(['kolom' => $rows ? array_keys($rows[0]) : []]);
+        }
+
+        $rows = self::saring($rows, is_array($minta) ? $minta : null);
+
         $format = in_array($format, self::FORMATS, true) ? $format : 'csv';
         $header = $rows ? array_keys($rows[0]) : [];
         $file = $baseName.'_'.now()->format('Ymd_His');
@@ -30,6 +61,39 @@ class Exporter
             'pdf' => self::pdf($file, $title, $header, $rows),
             default => self::csv($file, $header, $rows),
         };
+    }
+
+    /**
+     * Ambil kolom yang diminta saja.
+     *
+     * Urutannya mengikuti SUMBER, bukan urutan centang — berkas yang susunan
+     * kolomnya berpindah-pindah tiap kali diunduh tak bisa ditempelkan ke
+     * lembar kerja yang sama. Kolom yang diminta tapi tak dikenal diabaikan;
+     * bila TAK SATU PUN cocok (mis. tautan lama setelah kolomnya berganti
+     * nama), seluruh kolom yang diterbitkan — berkas kosong tanpa sebab yang
+     * terlihat jauh lebih menyesatkan daripada berkas yang kelebihan kolom.
+     *
+     * @param  array<int,array<string,scalar|null>>  $rows
+     * @param  array<int,string>|null  $kolom
+     * @return array<int,array<string,scalar|null>>
+     */
+    private static function saring(array $rows, ?array $kolom): array
+    {
+        if (! $rows || ! $kolom) {
+            return $rows;
+        }
+
+        $pilih = array_values(array_intersect(array_keys($rows[0]), $kolom));
+        if (! $pilih) {
+            return $rows;
+        }
+
+        // array_replace atas kerangka kosong: baris yang kebetulan tak punya
+        // salah satu kunci tetap sejajar dengan headernya (CSV & XLSX menulis
+        // array_values, jadi kunci yang hilang akan menggeser seluruh sel).
+        $kerangka = array_fill_keys($pilih, '');
+
+        return array_map(fn ($r) => array_replace($kerangka, array_intersect_key($r, $kerangka)), $rows);
     }
 
     /** @param array<int,string> $header @param array<int,array<string,scalar|null>> $rows */

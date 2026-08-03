@@ -110,6 +110,86 @@ document.addEventListener('alpine:init', () => {
 });
 
 /**
+ * unduhKolom — panel "Kolom" pada setiap tombol unduh (lihat komponen <x-unduh>).
+ *
+ * Daftar kolomnya TIDAK ditulis di layar: ia diminta ke alamat unduhan yang sama
+ * dengan `?kolom=daftar`, yang dijawab Exporter dengan nama kolom apa adanya.
+ * Jadi kolom yang muncul di panel selalu kolom yang benar-benar akan terbit,
+ * termasuk kolom yang baru ditambahkan hari itu.
+ *
+ * Dua bentuk pemakaian:
+ *   • tautan  — komponen merakit href CSV/Excel/PDF berikut `kolom[]`;
+ *   • form    — komponen hanya menaruh centang `name="kolom[]"` di dalam form
+ *               yang sudah punya tombol formatnya sendiri (halaman Export Data).
+ *
+ * `alamatFn` sengaja berupa FUNGSI, bukan string: di dashboard alamatnya dirakit
+ * dari state Alpine di sekitarnya (panel & mode yang sedang dipilih) dan baru
+ * bernilai benar saat ditekan.
+ */
+document.addEventListener('alpine:init', () => {
+    Alpine.data('unduhKolom', (alamatFn, opts = {}) => ({
+        terbuka: false,
+        // Mulai dari "Data Lengkap": ini perilaku sebelum panel ini ada, jadi
+        // yang tak menyentuh panelnya mendapat berkas yang sama seperti dulu.
+        lengkap: true,
+        kolom: [], // [{ nama, pilih }]
+        status: '', // '' | 'memuat' | 'kosong' | 'gagal'
+
+        get dipilih() { return this.kolom.filter((k) => k.pilih).map((k) => k.nama); },
+        get formMode() { return !!opts.form; },
+
+        /** Form: alamat + isian form saat ini (tanpa kolom[] & format). */
+        alamatDasar() {
+            const form = this.formMode ? this.$root.closest('form') : null;
+            if (!form) return alamatFn();
+            const q = new URLSearchParams();
+            new FormData(form).forEach((v, k) => {
+                if (k !== 'kolom[]' && k !== 'format' && v !== '') q.append(k, v);
+            });
+            return form.getAttribute('action') + (q.toString() ? '?' + q : '');
+        },
+
+        tautan(format) {
+            const u = new URL(this.alamatDasar(), window.location.origin);
+            u.searchParams.set('format', format);
+            if (!this.lengkap) {
+                this.dipilih.forEach((n) => u.searchParams.append('kolom[]', n));
+            }
+            return u.pathname + u.search;
+        },
+
+        async buka() {
+            this.terbuka = !this.terbuka;
+            if (this.terbuka && !this.kolom.length && this.status !== 'memuat') await this.muat();
+        },
+
+        async muat() {
+            this.status = 'memuat';
+            try {
+                const u = new URL(this.alamatDasar(), window.location.origin);
+                u.searchParams.set('kolom', 'daftar');
+                const r = await fetch(u, { headers: { Accept: 'application/json' } });
+                if (!r.ok) throw new Error(r.status);
+                const data = await r.json();
+                // Semua tercentang di awal supaya mematikan "Data Lengkap" tidak
+                // membuat panel berisi nol kolom — orang lalu menekan Unduh dan
+                // mengira fasilitasnya rusak.
+                this.kolom = (data.kolom || []).map((nama) => ({ nama, pilih: true }));
+                // Kolom diturunkan dari baris yang benar-benar akan terbit, jadi
+                // daftar tanpa data memang tak punya kolom — dan berkasnya pun
+                // akan kosong. Dibedakan dari kegagalan supaya orang tak mengira
+                // panelnya rusak padahal memang belum ada yang bisa diunduh.
+                this.status = this.kolom.length ? '' : 'kosong';
+            } catch (e) {
+                this.status = 'gagal';
+            }
+        },
+
+        semua(pilih) { this.kolom.forEach((k) => { k.pilih = pilih; }); },
+    }));
+});
+
+/**
  * berkasPreview — pratinjau berkas santri di dalam app (port BerkasSantriModal +
  * PdfViewer.tsx). PDF dirender via PDF.js (pdf-preview.js, dynamic import agar
  * pdfjs-dist tidak masuk bundel utama); gambar via <img>; jenis lain → tautan

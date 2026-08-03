@@ -75,18 +75,30 @@
                                 <input type="text" :name="`details[${i}][keterangan]`" x-model="row.keterangan" class="w-full rounded border border-gray-400 px-2 py-1.5 text-sm focus:border-brand focus:ring-1 focus:ring-brand">
                             </div>
                         </div>
-                        <div class="grid grid-cols-12 items-end gap-2">
+                        {{-- Persediaan terjual jarang dipakai — hanya bila kas masuknya
+                             memang menjual barang. Dua isian yang hampir selalu kosong
+                             membuat baris rincian tampak lebih rumit daripada
+                             pekerjaannya, jadi keduanya disembunyikan sampai diminta.
+                             Muncul sendiri bila barisnya sudah berisi persediaan
+                             (mis. isian lama setelah validasi gagal). --}}
+                        <div x-show="!row.pakaiPersediaan">
+                            <button type="button" @click="row.pakaiPersediaan = true"
+                                    class="text-xs font-medium text-brand hover:underline">+ Persediaan terjual</button>
+                        </div>
+                        <div class="grid grid-cols-12 items-end gap-2" x-show="row.pakaiPersediaan" x-cloak>
                             <div class="col-span-12 sm:col-span-7">
-                                <label class="mb-1 block text-xs font-medium text-gray-600">Persediaan Terjual <span class="font-normal text-gray-400">(opsional &rarr; stok keluar)</span></label>
+                                <label class="mb-1 block text-xs font-medium text-gray-600">Persediaan Terjual <span class="font-normal text-gray-400">(&rarr; stok keluar)</span></label>
                                 <x-search-cell name="`details[${i}][kode_persediaan]`" model="row.kode_persediaan" options="inventoryOpts" placeholder="— tanpa persediaan —" />
                             </div>
                             <div class="col-span-6 sm:col-span-3">
                                 <label class="mb-1 block text-xs font-medium text-gray-600">Qty Keluar</label>
                                 <input type="number" step="0.0001" min="0" :name="`details[${i}][kuantiti]`" x-model="row.kuantiti" :disabled="!row.kode_persediaan"
                                        class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-gray-100 disabled:text-gray-400">
+                                <p class="mt-1 text-xs text-gray-400" x-show="row.kode_persediaan && parseFloat(row.kuantiti) > 0">&darr; stok keluar</p>
                             </div>
-                            <div class="col-span-6 sm:col-span-2 pb-2 text-right text-xs text-gray-400">
-                                <span x-show="row.kode_persediaan && parseFloat(row.kuantiti) > 0">&darr; stok keluar</span>
+                            <div class="col-span-6 sm:col-span-2 pb-2 text-right">
+                                <button type="button" @click="lepasPersediaan(row)"
+                                        class="text-xs text-gray-400 hover:text-red-600">Hapus</button>
                             </div>
                         </div>
                         <div class="grid grid-cols-12 items-end gap-2">
@@ -114,14 +126,22 @@
 
     <script>
         function kasMasuk(initRows, opts) {
+            // `pakaiPersediaan` hanya menyetel tampilan (tak ikut terkirim). Dihidupkan
+            // untuk baris yang SUDAH berisi persediaan supaya isian lama — yang kembali
+            // setelah validasi gagal — tidak tersembunyi tanpa jejak.
+            const siapkan = (r) => ({ kode_coa: '', jenis_kas_masuk: 'pendapatan', keterangan: '', kode_bagian: '', nominal: '', kode_persediaan: '', kuantiti: '', ...r, pakaiPersediaan: !!r.kode_persediaan });
+
             return {
-                rows: initRows.length ? initRows : [{}],
+                rows: (initRows.length ? initRows : [{}]).map(siapkan),
                 coaOpts: opts.coa || [],
                 bagianOpts: opts.bagian || [],
                 jenisOpts: opts.jenis || [],
                 inventoryOpts: opts.inventory || [],
-                tambah() { this.rows.push({ kode_coa: '', jenis_kas_masuk: 'pendapatan', keterangan: '', kode_bagian: '', nominal: '', kode_persediaan: '', kuantiti: '' }); },
+                tambah() { this.rows.push(siapkan({})); },
                 hapus(i) { if (this.rows.length > 1) this.rows.splice(i, 1); },
+                /** Tutup blok persediaan SEKALIGUS mengosongkan isinya — kalau tidak,
+                    persediaan yang tak terlihat lagi tetap ikut terkirim & mengurangi stok. */
+                lepasPersediaan(row) { row.kode_persediaan = ''; row.kuantiti = ''; row.pakaiPersediaan = false; },
                 get total() { return this.rows.reduce((s, r) => s + (parseFloat(r.nominal) || 0), 0); },
                 fmt(n) { return 'Rp ' + (n || 0).toLocaleString('id-ID'); },
             };

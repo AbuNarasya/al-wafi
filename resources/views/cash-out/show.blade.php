@@ -6,6 +6,9 @@
     <div class="mx-auto max-w-4xl">
         <div class="mb-4 flex items-center justify-between">
             <a href="{{ route('cash_out.index') }}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Kembali</a>
+            <div class="flex items-center gap-2">
+            <a href="{{ route('cash_out.print', $rec->kode_transaksi) }}" target="_blank"
+               class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">🖨 Cetak Bukti</a>
             @if ($rec->status === 'aktif' && \App\Support\Akses::boleh('cash-out', 'hapus'))
                 <div x-data="{ open: false }" class="relative">
                     <button @click="open = !open" class="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100">Void</button>
@@ -19,6 +22,7 @@
                     </form>
                 </div>
             @endif
+            </div>
         </div>
 
         <div class="mb-4 grid gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:grid-cols-4">

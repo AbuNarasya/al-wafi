@@ -78,6 +78,18 @@ class CashInController extends Controller
         return view('cash-in.show', ['rec' => $cash_in]);
     }
 
+    /** Bukti Kas Masuk siap tanda tangan (view cetaknya dipakai bersama Kas Keluar). */
+    public function print(CashIn $cash_in): View
+    {
+        $cash_in->load(['details', 'customer', 'unit', 'rekening', 'user']);
+
+        return view('cash.print', [
+            'rec' => $cash_in,
+            'jenis' => 'masuk',
+            'company' => \App\Models\CompanySettings::find(1),
+        ]);
+    }
+
     public function void(Request $request, CashIn $cash_in): RedirectResponse
     {
         $request->validate(['alasan' => ['required', 'string', 'max:255']]);
