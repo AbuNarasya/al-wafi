@@ -14,8 +14,8 @@ class CashOut extends Model
     protected $primaryKey = 'kode_transaksi';
 
     protected $fillable = [
-        'nomor_transaksi', 'tanggal', 'kode_unit', 'kode_rekening', 'kode_vendor',
-        'referensi', 'keterangan', 'nominal', 'id_bank_loan', 'status',
+        'nomor_transaksi', 'tanggal', 'kode_unit', 'kode_rekening', 'metode', 'kode_vendor',
+        'referensi', 'keterangan', 'nominal', 'id_bank_loan', 'id_perintah', 'status',
         'void_reason', 'void_by', 'void_at', 'id_pengguna',
     ];
 

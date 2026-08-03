@@ -29,7 +29,10 @@ class CashOutRequest extends FormRequest
             'referensi' => ['nullable', 'string', 'max:255'],
             'keterangan' => ['required', 'string'],
             'id_bank_loan' => ['nullable', 'integer', 'exists:bank_loans,id'],
+            'id_perintah' => ['nullable', 'integer', 'exists:perintah_pembayaran,kode_transaksi'],
+            'metode' => ['nullable', 'string', 'max:20'],
             'details' => ['required', 'array', 'min:1'],
+            'details.*.id_perintah_detail' => ['nullable', 'integer', 'exists:perintah_pembayaran_detail,id'],
             'details.*.tipe' => ['required', Rule::in(['lainnya', 'invoice', 'pengajuan', 'uang_muka', 'inventory'])],
             'details.*.kode_coa' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
             'details.*.id_invoice' => ['nullable', 'integer', 'exists:invoices,id_invoice'],
@@ -54,7 +57,13 @@ class CashOutRequest extends FormRequest
             // uang_muka dikirim ke server sebagai tipe 'pengajuan' (server bedakan via jenis).
             $tipeServer = $tipe === 'uang_muka' ? 'pengajuan' : $tipe;
 
-            $row = ['tipe' => $tipeServer, 'keterangan' => $d['keterangan'] ?? null];
+            $row = [
+                'tipe' => $tipeServer,
+                'keterangan' => $d['keterangan'] ?? null,
+                // Penaut ke baris Perintah Pembayaran — dibawa untuk SEMUA tipe,
+                // termasuk `lainnya` (angsuran pembiayaan memakai tipe itu).
+                'id_perintah_detail' => ($d['id_perintah_detail'] ?? '') ?: null,
+            ];
 
             if ($tipe === 'invoice') {
                 if (empty($d['id_invoice'])) {

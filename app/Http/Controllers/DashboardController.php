@@ -69,6 +69,10 @@ class DashboardController extends Controller
             'perusahaan' => CompanySettings::find(1),
             'summary' => $this->svc->summary(),
             'kas' => $this->svc->kasRekening(),
+            // Perhitungan yang SAMA dengan yang membatasi Perintah Pembayaran —
+            // satu tempat, satu angka. Kalau dihitung ulang di sini, suatu hari
+            // keduanya akan berbeda dan tak ada yang tahu mana yang benar.
+            'danaBebas' => (new \App\Services\Modules\DanaBebasService)->hitung(),
             'hutang' => [
                 'pendek' => $this->svc->hutang('pendek'),
                 'panjang' => $this->svc->hutang('panjang'),

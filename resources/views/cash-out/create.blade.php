@@ -4,7 +4,10 @@
 
 @php
     $baris = ['tipe' => 'lainnya', 'kode_coa' => '', 'id_invoice' => '', 'id_pengajuan' => '', 'kode_persediaan' => '', 'kuantiti' => '', 'harga_satuan' => '', 'nominal' => '', 'keterangan' => '', 'kode_bagian' => '', 'aset_pilih' => ''];
-    $initRows = array_values(old('details', [$baris]));
+    // Datang dari Perintah Pembayaran → barisnya terisi dari kewajiban yang
+    // masih bersisa di sana. old() tetap menang bila formnya baru saja gagal.
+    $bawaan = ($prefill ?? []) ?: [$baris];
+    $initRows = array_values(old('details', $bawaan));
     $vendorList = collect($vendorOptions)->map(fn ($l, $v) => ['v' => (string) $v, 'l' => (string) $l])->values()->all();
     $opts = [
         'coa' => $coaOptions, 'bagian' => $bagianOptions, 'vendor' => $vendorList,
@@ -22,12 +25,36 @@
               class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             @csrf
 
+            @if (! empty($perintah))
+                <input type="hidden" name="id_perintah" value="{{ $perintah->kode_transaksi }}">
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-900">
+                    Terisi dari <a href="{{ route('perintah_pembayaran.show', $perintah->kode_transaksi) }}" class="font-semibold underline">{{ $perintah->nomor }}</a>
+                    — diotorisasi {{ $perintah->pengotorisasi?->nama }}@if ($perintah->diotorisasi_pada), {{ $perintah->diotorisasi_pada->format('d M Y H:i') }}@endif.
+                    Metode {{ \App\Models\PerintahPembayaran::METODE[$perintah->metode] ?? '—' }}.
+                    <div class="mt-0.5 text-xs">Hanya baris yang <b>diotorisasi dan masih bersisa</b> yang muncul. Yang tak jadi dibayar sekarang tetap bersisa di perintahnya dan boleh dibayar menyusul dari rekening berbeda.</div>
+                </div>
+            @endif
+
             <div class="grid gap-4 sm:grid-cols-3">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">No. PV (otomatis)</label>
                     <div class="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-700">{{ $nomorPreview }}</div>
                 </div>
                 <x-field name="tanggal" label="Tanggal" type="date" :value="old('tanggal', now()->toDateString())" required />
+                <div>
+                    {{-- Metode yang BENAR-BENAR dipakai. Perintah Pembayaran mencatat
+                         yang direncanakan; selisih keduanya muncul di laporan kepatuhan. --}}
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Metode Pembayaran</label>
+                    <select name="metode" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:ring-1 focus:ring-brand">
+                        <option value="">— tidak dicatat —</option>
+                        @foreach (\App\Models\PerintahPembayaran::METODE as $k => $v)
+                            <option value="{{ $k }}" @selected(old('metode', $perintah->metode ?? '') === $k)>{{ $v }}</option>
+                        @endforeach
+                    </select>
+                    @if (! empty($perintah))
+                        <p class="mt-1 text-xs text-gray-500">Rencana pada {{ $perintah->nomor }}: <b>{{ \App\Models\PerintahPembayaran::METODE[$perintah->metode] ?? '—' }}</b></p>
+                    @endif
+                </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Unit Bisnis <span x-show="perluUnitHeader" class="text-red-500">*</span></label>
                     <x-search-select name="kode_unit" :options="$unitOptions" :value="old('kode_unit')" placeholder="— pilih unit —" />
@@ -60,7 +87,17 @@
             <div class="text-sm font-medium text-gray-700">Rincian Baris</div>
             <div class="space-y-2">
                 <template x-for="(row, i) in rows" :key="i">
-                    <div class="rounded-lg border border-gray-200 bg-gray-50/40 p-3">
+                    <div class="rounded-lg border border-gray-200 bg-gray-50/40 p-3"
+                         :class="row.id_perintah_detail ? 'border-emerald-300 bg-emerald-50/40' : ''">
+                        {{-- Penaut ke baris Perintah Pembayaran. Inilah yang menurunkan
+                             terbayar & sisa di sana saat voucher ini diposting. --}}
+                        <template x-if="row.id_perintah_detail">
+                            <div class="mb-2 flex items-center gap-2 text-xs text-emerald-800">
+                                <input type="hidden" :name="`details[${i}][id_perintah_detail]`" :value="row.id_perintah_detail">
+                                <span class="rounded bg-emerald-100 px-1.5 py-0.5 font-medium">dari perintah</span>
+                                <span x-text="row.label_perintah"></span>
+                            </div>
+                        </template>
                         <div class="grid grid-cols-12 items-start gap-2">
                             {{-- Jenis --}}
                             <div class="col-span-12 sm:col-span-3">
@@ -178,7 +215,10 @@
                 kodeVendor: headerInit.vendor || '', idBankLoan: '',
                 tambah() { this.rows.push(kosong()); },
                 hapus(i) { if (this.rows.length > 1) this.rows.splice(i, 1); },
-                gantiTipe(i) { const r = this.rows[i]; Object.assign(r, { kode_coa: '', id_invoice: '', id_pengajuan: '', kode_persediaan: '', kuantiti: '', harga_satuan: '', nominal: '', aset_pilih: '' }); },
+                // Mengganti jenis baris berarti membayar kewajiban yang lain, jadi
+                // penautnya ke Perintah Pembayaran ikut dilepas — kalau tidak,
+                // realisasi tercatat pada baris perintah yang keliru.
+                gantiTipe(i) { const r = this.rows[i]; Object.assign(r, { kode_coa: '', id_invoice: '', id_pengajuan: '', kode_persediaan: '', kuantiti: '', harga_satuan: '', nominal: '', aset_pilih: '', id_perintah_detail: '', label_perintah: '' }); },
                 invoiceFor() { return this.kodeVendor ? this.invoiceData.filter((x) => x.vendor === this.kodeVendor) : this.invoiceData; },
                 pengajuanBayar() { return this.pengajuanData.filter((p) => p.jenis !== 'uang_muka'); },
                 pengajuanUM() { return this.pengajuanData.filter((p) => p.jenis === 'uang_muka'); },

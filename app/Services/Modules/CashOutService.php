@@ -75,6 +75,16 @@ class CashOutService
             $bankLoan = ['id' => $loan->id, 'kode_coa_hutang' => $loan->kode_coa_hutang];
         }
 
+        // PERINTAH PEMBAYARAN. Dua hal sekaligus: baris yang mengaku berasal
+        // dari PP diperiksa keabsahannya, dan kewajiban yang sedang terkunci di
+        // PP hidup ditolak bila dibayar dari jalur lain.
+        $perintahSvc = new PerintahPembayaranService;
+        $perintahSvc->assertRealisasiSah(
+            $input['details'],
+            $input['id_perintah'] ?? null,
+            $input['id_bank_loan'] ?? null,
+        );
+
         $total = '0';
         $details = [];
         $jLines = [];
@@ -89,6 +99,7 @@ class CashOutService
 
         foreach ($input['details'] as $l) {
             $tipe = $l['tipe'] ?? 'lainnya';
+            $sebelum = count($details);
 
             if ($tipe === 'invoice') {
                 if (empty($l['id_invoice'])) {
@@ -218,6 +229,12 @@ class CashOutService
                     $assetBuys[] = ['nama' => $l['keterangan'] ?? $coa->nama_coa, 'nominal' => $nominal, 'kode_coa' => $l['kode_coa']];
                 }
             }
+
+            // Tautkan ke baris Perintah Pembayaran-nya. Ditempel di SINI, sekali
+            // untuk semua cabang, supaya cabang baru tak bisa terlewat.
+            for ($i = $sebelum; $i < count($details); $i++) {
+                $details[$i]['id_perintah_detail'] = $l['id_perintah_detail'] ?? null;
+            }
         }
 
         // Baris non-pengajuan memakai unit dokumen (dihitung dari selisih).
@@ -244,7 +261,8 @@ class CashOutService
             $rec = CashOut::create([
                 'nomor_transaksi' => $nomor, 'tanggal' => $input['tanggal'], 'kode_unit' => $input['kode_unit'] ?? null,
                 'kode_rekening' => $input['kode_rekening'], 'kode_vendor' => $input['kode_vendor'] ?? null,
-                'id_bank_loan' => $bankLoan['id'] ?? null, 'referensi' => $input['referensi'] ?? null,
+                'id_bank_loan' => $bankLoan['id'] ?? null, 'id_perintah' => $input['id_perintah'] ?? null,
+                'metode' => $input['metode'] ?? null, 'referensi' => $input['referensi'] ?? null,
                 'keterangan' => $input['keterangan'], 'nominal' => $total, 'status' => 'aktif', 'id_pengguna' => $idPengguna ?? 0,
             ]);
             foreach ($details as $d) {
@@ -271,6 +289,9 @@ class CashOutService
                 $sisa = Money::sub($inv->sisa_hutang, $p['nominal']);
                 $inv->update(['sisa_hutang' => $sisa, 'status' => Money::lte($sisa, '0') ? 'lunas' : 'sebagian']);
             }
+
+            // Baris PP: terbayar & sisanya diperbarui, status PP menyesuaikan.
+            (new PerintahPembayaranService)->terapkanRealisasi($details);
 
             $pengajuanSvc = new PengajuanPembayaranService;
             foreach ($pengajuanPayments as $p) {
@@ -321,6 +342,17 @@ class CashOutService
 
         return DB::transaction(function () use ($rec, $kodeTransaksi, $input, $idPengguna, $nama) {
             Authorization::authorizeByUser($idPengguna, $rec->nominal);
+
+            // Perintah Pembayaran ikut dikembalikan. TANPA INI, membatalkan Kas
+            // Keluar membuat kewajiban tampak lunas di PP padahal uangnya sudah
+            // ditarik kembali — rusak tanpa gejala, dan baru ketahuan saat
+            // vendornya menagih lagi.
+            (new PerintahPembayaranService)->batalkanRealisasi(
+                $rec->details->map(fn ($d) => [
+                    'id_perintah_detail' => $d->id_perintah_detail,
+                    'nominal' => (string) $d->nominal,
+                ])->all(),
+            );
 
             $pengajuanSvc = new PengajuanPembayaranService;
             foreach ($rec->details as $d) {

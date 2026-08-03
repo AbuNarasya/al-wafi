@@ -73,6 +73,7 @@ final class Navigation
         ['url' => '/assets', 'label' => 'Aset Tetap', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'assets'],
 
         ['url' => '/purchase-orders', 'label' => 'Purchase Order', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'purchase-orders'],
+        ['url' => '/perintah-pembayaran', 'label' => 'Perintah Pembayaran', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'perintah-pembayaran'],
         ['url' => '/cash-in', 'label' => 'Kas Masuk', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'cash-in'],
         ['url' => '/cash-out', 'label' => 'Kas Keluar', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'cash-out'],
         ['url' => '/invoices', 'label' => 'Invoice Vendor', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'invoices'],

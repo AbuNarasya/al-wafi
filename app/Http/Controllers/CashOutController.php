@@ -47,9 +47,73 @@ class CashOutController extends Controller
         ]);
     }
 
-    public function create(): View
+    /**
+     * Formulir Kas Keluar. Bila datang dari Perintah Pembayaran (`?perintah=`),
+     * barisnya TERISI OTOMATIS dari kewajiban yang masih bersisa di sana.
+     *
+     * Tanpa pengisian otomatis ini, modul Perintah Pembayaran justru MENAMBAH
+     * pekerjaan admin — mengetik hal yang sama dua kali — dan itu keluhan yang
+     * akan muncul di minggu pertama.
+     */
+    public function create(Request $request): View
     {
-        return view('cash-out.create', $this->opsi());
+        $data = $this->opsi();
+        $data['perintah'] = null;
+        $data['prefill'] = [];
+
+        $idPerintah = (int) $request->query('perintah', 0);
+        if ($idPerintah > 0) {
+            $pp = \App\Models\PerintahPembayaran::with('detail')->find($idPerintah);
+            if ($pp && $pp->bolehDibayar()) {
+                $data['perintah'] = $pp;
+                $data['prefill'] = $this->barisDariPerintah($pp);
+            }
+        }
+
+        return view('cash-out.create', $data);
+    }
+
+    /**
+     * Baris formulir dari kewajiban PP yang masih bersisa.
+     *
+     * Pembiayaan bank dipetakan ke baris `lainnya` beratasnamakan akun hutang
+     * pinjamannya — begitulah Kas Keluar mencatat angsuran; penanda pinjamannya
+     * sendiri ada di kepala voucher.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function barisDariPerintah(\App\Models\PerintahPembayaran $pp): array
+    {
+        $baris = [];
+        foreach ($pp->detail as $d) {
+            if ($d->status_baris !== 'disetujui' || ! \App\Support\Money::gtZero($d->sisa)) {
+                continue;
+            }
+            $row = [
+                'tipe' => 'lainnya', 'kode_coa' => '', 'id_invoice' => '', 'id_pengajuan' => '',
+                'kode_persediaan' => '', 'kuantiti' => '', 'harga_satuan' => '',
+                'nominal' => (string) \App\Support\Money::of($d->sisa),
+                'keterangan' => $d->keterangan ?: $d->nomor_dokumen,
+                'kode_bagian' => '', 'aset_pilih' => '',
+                'id_perintah_detail' => $d->id,
+                'label_perintah' => $d->nomor_dokumen.($d->pihak ? ' · '.$d->pihak : ''),
+            ];
+
+            if ($d->sumber === 'invoice') {
+                $row['tipe'] = 'invoice';
+                $row['id_invoice'] = (string) $d->id_dokumen;
+            } elseif ($d->sumber === 'pengajuan') {
+                $row['tipe'] = 'pengajuan';
+                $row['id_pengajuan'] = (string) $d->id_dokumen;
+            } elseif ($d->sumber === 'bank_loan') {
+                $loan = \App\Models\BankLoan::find($d->id_dokumen);
+                $row['kode_coa'] = $loan?->kode_coa_hutang ?? '';
+            }
+
+            $baris[] = $row;
+        }
+
+        return $baris;
     }
 
     public function store(CashOutRequest $request): RedirectResponse
@@ -63,6 +127,8 @@ class CashOutController extends Controller
                 'referensi' => $request->input('referensi'),
                 'keterangan' => $request->input('keterangan'),
                 'id_bank_loan' => $request->input('id_bank_loan') ?: null,
+                'id_perintah' => $request->input('id_perintah') ?: null,
+                'metode' => $request->input('metode') ?: null,
                 'details' => $request->details(),
             ], $request->user()->id_pengguna);
         } catch (AppException $e) {

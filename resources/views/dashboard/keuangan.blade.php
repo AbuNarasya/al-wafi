@@ -24,6 +24,27 @@
             <div class="mt-2 text-2xl font-bold text-brand">@rp($summary['saldo_kas'])</div>
             <button type="button" @click="modal = 'kas'" class="mt-2 self-start text-xs text-brand hover:underline">Lihat rincian →</button>
         </div>
+
+        {{-- Dana bebas dipakai — saldo di atas DIKURANGI uang milik orang lain
+             (titipan) dan uang yang sudah diperintahkan bayar. Ditaruh persis di
+             samping saldo kotor, karena selisih keduanyalah yang perlu terbaca. --}}
+        <div class="flex flex-col justify-between rounded-xl border border-emerald-200 bg-white p-4 shadow-sm"
+             x-data="{ rinci: false }">
+            <div class="text-xs uppercase tracking-wide text-gray-500">Dana Bisa Dipakai</div>
+            <div class="mt-2 text-2xl font-bold {{ (float) $danaBebas['dana_bebas'] < 0 ? 'text-red-600' : 'text-emerald-700' }}">
+                @rp($danaBebas['dana_bebas'])
+            </div>
+            <button type="button" @click="rinci = !rinci" class="mt-2 self-start text-xs text-brand hover:underline"
+                    x-text="rinci ? 'Sembunyikan ←' : 'Lihat rincian →'"></button>
+            <div x-show="rinci" x-cloak class="mt-2 border-t border-gray-100 pt-2 text-xs">
+                <div class="flex justify-between"><span class="text-gray-500">Saldo kas &amp; bank</span><span class="tabular-nums">@rp($danaBebas['saldo_kas'])</span></div>
+                <div class="flex justify-between text-red-700"><span>&minus; Titipan ({{ count($danaBebas['rincian_pengurang']) }})</span><span class="tabular-nums">@rp($danaBebas['pengurang'])</span></div>
+                <div class="flex justify-between text-red-700"><span>&minus; Perintah bayar ({{ count($danaBebas['rincian_komitmen']) }})</span><span class="tabular-nums">@rp($danaBebas['komitmen'])</span></div>
+                @if (empty($danaBebas['rincian_pengurang']))
+                    <p class="mt-1 text-[11px] text-amber-700">Belum ada akun titipan yang ditetapkan sebagai pengurang.</p>
+                @endif
+            </div>
+        </div>
         @foreach (['pendek' => 'Hutang Jangka Pendek', 'panjang' => 'Hutang Jangka Panjang', 'pajak' => 'Hutang Pajak'] as $j => $label)
             <div class="flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <div class="text-xs uppercase tracking-wide text-gray-500">{{ $label }}</div>

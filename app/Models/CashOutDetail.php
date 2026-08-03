@@ -14,7 +14,7 @@ class CashOutDetail extends Model
 
     protected $fillable = [
         'kode_transaksi', 'tipe', 'kode_coa', 'nama_coa', 'nominal', 'keterangan',
-        'id_invoice', 'id_pengajuan', 'kode_persediaan', 'kuantiti', 'harga_satuan',
+        'id_invoice', 'id_pengajuan', 'id_perintah_detail', 'kode_persediaan', 'kuantiti', 'harga_satuan',
     ];
 
     protected function casts(): array

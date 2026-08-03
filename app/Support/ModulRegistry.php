@@ -62,6 +62,9 @@ final class ModulRegistry
         ['kode' => 'assets', 'nama' => 'Aset Tetap', 'grup' => 'KEUANGAN', 'sub' => 'Aset & Persediaan'],
 
         ['kode' => 'purchase-orders', 'nama' => 'Purchase Order', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
+        // Perintah Pembayaran mendahului Kas Keluar dalam urutan kerja: rencana
+        // dulu, realisasi kemudian. Urutan menu mengikuti urutan itu.
+        ['kode' => 'perintah-pembayaran', 'nama' => 'Perintah Pembayaran', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         ['kode' => 'cash-in', 'nama' => 'Kas Masuk', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         ['kode' => 'cash-out', 'nama' => 'Kas Keluar', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         ['kode' => 'invoices', 'nama' => 'Invoice Vendor', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
@@ -131,6 +134,14 @@ final class ModulRegistry
         ['kode' => 'coa-groups', 'nama' => 'Grup COA', 'grup' => 'TANPA MENU'],
         ['kode' => 'edit-approvals', 'nama' => 'Persetujuan Edit', 'grup' => 'TANPA MENU'],
         ['kode' => 'posting-approvals', 'nama' => 'Persetujuan Posting', 'grup' => 'TANPA MENU'],
+        // Kewenangan OTORISASI & PENUTUPAN perintah pembayaran. Diwakili modul
+        // tersendiri karena sistem hak di sini hanya mengenal empat aksi
+        // (lihat/buat/ubah/hapus) — tak ada aksi "otorisasi". Hak `ubah` di sini
+        // berarti boleh mengotorisasi dan menutup; berikan hanya ke pejabatnya.
+        ['kode' => 'otorisasi-pembayaran', 'nama' => 'Otorisasi Perintah Pembayaran', 'grup' => 'TANPA MENU'],
+        // Akun mana yang mengurangi dana bebas dipakai. Mengubahnya mengubah
+        // batas seluruh pembayaran — bukan pengaturan untuk semua orang.
+        ['kode' => 'pengaturan-dana-bebas', 'nama' => 'Akun Pengurang Dana Bebas', 'grup' => 'TANPA MENU'],
     ];
 
     /** Urutan tampil grup — sama dengan urutan sidebar. */

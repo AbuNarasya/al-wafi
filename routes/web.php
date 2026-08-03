@@ -301,6 +301,34 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{cash_out}', [$c, 'void'])->name('void')->middleware('hakakses:cash-out,hapus');
     });
 
+    // Perintah Pembayaran — dokumen KAS (tidak menjurnal). Menyusun memakai hak
+    // `perintah-pembayaran`; OTORISASI & PENUTUPAN memakai modul terpisah
+    // `otorisasi-pembayaran`, supaya empat mata bisa ditegakkan lewat pemberian
+    // hak, bukan sekadar kesepakatan lisan.
+    Route::prefix('perintah-pembayaran')->name('perintah_pembayaran.')->group(function () {
+        $p = \App\Http\Controllers\PerintahPembayaranController::class;
+        Route::get('/', [$p, 'index'])->name('index')->middleware('hakakses:perintah-pembayaran,lihat');
+        Route::get('/create', [$p, 'create'])->name('create')->middleware('hakakses:perintah-pembayaran,buat');
+        // Didaftarkan SEBELUM /{id} — kalau tidak, "kepatuhan" akan ditelan
+        // parameter id (yang whereNumber-nya justru menolaknya → 404).
+        Route::get('/kepatuhan', [$p, 'kepatuhan'])->name('kepatuhan')->middleware('hakakses:perintah-pembayaran,lihat');
+        Route::post('/', [$p, 'store'])->name('store')->middleware('hakakses:perintah-pembayaran,buat');
+        Route::get('/{id}', [$p, 'show'])->name('show')->middleware('hakakses:perintah-pembayaran,lihat')->whereNumber('id');
+        Route::get('/{id}/print', [$p, 'print'])->name('print')->middleware('hakakses:perintah-pembayaran,lihat')->whereNumber('id');
+        Route::post('/{id}/ajukan', [$p, 'ajukan'])->name('ajukan')->middleware('hakakses:perintah-pembayaran,ubah')->whereNumber('id');
+        Route::post('/{id}/otorisasi', [$p, 'otorisasi'])->name('otorisasi')->middleware('hakakses:otorisasi-pembayaran,ubah')->whereNumber('id');
+        Route::post('/{id}/tolak', [$p, 'tolak'])->name('tolak')->middleware('hakakses:otorisasi-pembayaran,ubah')->whereNumber('id');
+        // Penutupan membatalkan pembayaran yang sudah DIOTORISASI pejabat, jadi
+        // haknya sama dengan otorisasi — bukan hak admin biasa.
+        Route::post('/{id}/tutup', [$p, 'tutup'])->name('tutup')->middleware('hakakses:otorisasi-pembayaran,ubah')->whereNumber('id');
+    });
+
+    Route::prefix('pengaturan/dana-bebas')->name('pengaturan_dana_bebas.')->group(function () {
+        $d = \App\Http\Controllers\PengaturanDanaBebasController::class;
+        Route::get('/', [$d, 'index'])->name('index')->middleware('hakakses:pengaturan-dana-bebas,lihat');
+        Route::put('/', [$d, 'update'])->name('update')->middleware('hakakses:pengaturan-dana-bebas,ubah');
+    });
+
     // Kas Masuk (Debit Kas/Bank; Kredit rincian).
     Route::prefix('cash-in')->name('cash_in.')->group(function () {
         $c = \App\Http\Controllers\CashInController::class;
