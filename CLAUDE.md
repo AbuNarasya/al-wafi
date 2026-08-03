@@ -3,6 +3,14 @@
 Aplikasi keuangan & kesantrian pesantren. Laravel 12 + Blade + Alpine + Tailwind, PostgreSQL.
 Bahasa kode & antarmuka: **Indonesia** (nama kelas/method/variabel ikut bahasa Indonesia — teruskan gaya itu).
 
+**Sebelum coding, sampaikan dulu konfirmasi pemahaman** atas permintaannya — selalu, tanpa kecuali.
+
+- **Perubahan kecil** (label, menyembunyikan isian, salah ketik, satu-dua berkas tanpa akibat
+  ke data): cukup pemahamannya saja, lalu kerjakan.
+- **Perubahan berdampak** (skema database, jurnal & akuntansi, hak akses, alur uang, hal yang
+  menyentuh banyak berkas, atau yang sulit dibalik): tambahkan pro & kontra berikut kelebihan
+  & kekurangannya, dan tunggu persetujuan sebelum menulis kode.
+
 Riwayat panjang & keputusan bisnis ada di memori sesi (`handoff-resume.md`). Berkas ini hanya
 rujukan cepat: perintah, konvensi, dan jebakan yang sudah pernah termakan.
 
