@@ -154,6 +154,36 @@ class PerintahPembayaranLayarTest extends TestCase
             ->assertSee('Keterangan', false);
     }
 
+    /** Nomor yang akan dipakai terlihat sejak awal, seperti di form Kas Keluar. */
+    public function test_layar_susun_menampilkan_nomor_pp(): void
+    {
+        $this->invoice('INV-0001', '5000000');
+
+        $this->actingAs($this->penyusun)->get(route('perintah_pembayaran.create'))
+            ->assertOk()
+            ->assertSee('No. PP (otomatis)')
+            ->assertSee('PP-'.now()->format('ym').'-0001')
+            ->assertSee('Nomor final ditetapkan saat disimpan');
+    }
+
+    /** Penomorannya berlanjut, bukan mengulang dari 0001. */
+    public function test_nomor_pp_berlanjut_setelah_ada_perintah(): void
+    {
+        $inv = $this->invoice('INV-0001', '5000000');
+        // Sengaja bertanggal HARI INI: nomor diturunkan dari tanggal dokumen,
+        // sedangkan pratinjau dari now(). Fixture bertanggal tetap akan membuat
+        // test ini pecah begitu bulannya berganti.
+        $this->actingAs($this->penyusun)->post(route('perintah_pembayaran.store'), [
+            'tanggal' => now()->toDateString(), 'keterangan' => 'Perintah pertama',
+            'detail' => [['sumber' => 'invoice', 'id_dokumen' => $inv->id_invoice, 'nominal' => '5000000']],
+        ])->assertRedirect();
+        $this->invoice('INV-0002', '3000000');
+
+        $this->actingAs($this->penyusun)->get(route('perintah_pembayaran.create'))
+            ->assertOk()
+            ->assertSee('PP-'.now()->format('ym').'-0002');
+    }
+
     public function test_menyimpan_draf_lewat_layar(): void
     {
         $pp = $this->buatLewatLayar($this->invoice('INV-0001', '12500000'), '12500000');

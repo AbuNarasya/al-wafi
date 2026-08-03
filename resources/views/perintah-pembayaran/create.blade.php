@@ -27,7 +27,12 @@
 
         <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <a href="{{ route('perintah_pembayaran.index') }}" class="mb-3 inline-block text-sm text-gray-500 hover:text-gray-700">&larr; Kembali</a>
-            <div class="grid gap-4 sm:grid-cols-3">
+            <div class="grid gap-4 sm:grid-cols-4">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">No. PP (otomatis)</label>
+                    <div class="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-700">{{ $nomorPreview }}</div>
+                    <p class="mt-1 text-xs text-gray-400">Nomor final ditetapkan saat disimpan.</p>
+                </div>
                 <x-field name="tanggal" label="Tanggal" type="date" :value="old('tanggal', now()->toDateString())" required />
                 <x-field name="tanggal_usulan" label="Usulan Tanggal Bayar" type="date" :value="old('tanggal_usulan')" />
                 <x-field name="keterangan" label="Keterangan" :value="old('keterangan')" required placeholder="mis. Pembayaran termin I Agustus" />

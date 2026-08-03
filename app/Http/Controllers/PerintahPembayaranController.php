@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\AppException;
 use App\Models\BankAccount;
 use App\Models\PerintahPembayaran;
+use App\Services\Ledger\DocNumber;
 use App\Services\Modules\DanaBebasService;
 use App\Services\Modules\PerintahPembayaranService;
 use Illuminate\Http\RedirectResponse;
@@ -49,7 +50,15 @@ class PerintahPembayaranController extends Controller
 
     public function create(): View
     {
+        // Nomor yang AKAN dipakai — indikatif. Nomor final ditetapkan saat
+        // disimpan, dan bisa berbeda bila tanggalnya digeser ke bulan lain atau
+        // ada perintah lain yang tersimpan lebih dulu.
+        $base = DocNumber::docBase('PP', now());
+        $terakhir = PerintahPembayaran::where('nomor', 'like', $base.'%')
+            ->orderByDesc('nomor')->value('nomor');
+
         return view('perintah-pembayaran.create', [
+            'nomorPreview' => DocNumber::nextDocNumber($base, $terakhir),
             'kewajiban' => $this->service->kewajibanTersedia(),
             'dana' => (new DanaBebasService)->hitung(),
         ]);
