@@ -17,6 +17,7 @@ class PengajuanPembayaran extends Model
     protected $fillable = [
         'nomor', 'tanggal', 'jenis', 'kode_bagian', 'kode_coa_hutang',
         'nominal', 'sisa_hutang', 'keterangan', 'referensi', 'status',
+        'bank_tujuan', 'no_rekening_tujuan', 'atas_nama_tujuan',
         'id_uang_muka', 'kode_rekening', 'void_reason', 'void_by', 'void_at',
         'journal_entry_id', 'id_pengguna',
     ];
@@ -44,5 +45,16 @@ class PengajuanPembayaran extends Model
     public function pemohon(): BelongsTo
     {
         return $this->belongsTo(User::class, 'id_pengguna', 'id_pengguna');
+    }
+
+    public function riwayatRekening(): HasMany
+    {
+        return $this->hasMany(PengajuanRekeningRiwayat::class, 'id_pengajuan', 'id');
+    }
+
+    /** Rekening tujuan terisi hanya bila ketiganya ada (setengah data = tak terpakai). */
+    public function punyaRekeningTujuan(): bool
+    {
+        return (bool) ($this->bank_tujuan && $this->no_rekening_tujuan && $this->atas_nama_tujuan);
     }
 }

@@ -50,7 +50,40 @@
                 <div class="text-xs text-gray-400">Akun Hutang</div>
                 <div>@if ($rec->kode_coa_hutang)<span class="text-gray-700">{{ $rec->kode_coa_hutang }}</span>@else<span class="text-amber-600">belum ditentukan keuangan</span>@endif</div>
             </div>
+            <div class="sm:col-span-2">
+                <div class="text-xs text-gray-400">Rekening Tujuan Pembayaran</div>
+                @if ($rec->punyaRekeningTujuan())
+                    <div class="text-gray-700">
+                        <span class="font-medium">{{ $rec->bank_tujuan }}</span>
+                        <span class="font-mono">{{ $rec->no_rekening_tujuan }}</span>
+                        <span class="text-gray-500">a.n. {{ $rec->atas_nama_tujuan }}</span>
+                    </div>
+                @else
+                    <div class="text-gray-400">tidak dicantumkan (mis. dibayar tunai)</div>
+                @endif
+            </div>
         </div>
+
+        {{-- Jejak penyuntingan rekening oleh keuangan. Sengaja tampil menonjol
+             dan tak pernah bisa dihapus: pemohon harus bisa melihat bila nomor
+             rekening tujuannya diganti orang lain. --}}
+        @if ($rec->riwayatRekening->isNotEmpty())
+            <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+                <h3 class="mb-2 text-sm font-semibold text-amber-900">Rekening tujuan pernah diubah</h3>
+                <ul class="space-y-2 text-sm text-amber-900">
+                    @foreach ($rec->riwayatRekening as $h)
+                        <li>
+                            <span class="font-mono text-xs">{{ $h->created_at?->format('d M Y H:i') }}</span> —
+                            oleh <b>{{ $h->pengubah?->nama ?? $h->id_pengguna }}</b>:
+                            <span class="line-through decoration-amber-400">{{ $h->bank_lama ? "{$h->bank_lama} {$h->no_rekening_lama} a.n. {$h->atas_nama_lama}" : '(kosong)' }}</span>
+                            &rarr;
+                            <b>{{ $h->bank_baru ? "{$h->bank_baru} {$h->no_rekening_baru} a.n. {$h->atas_nama_baru}" : '(kosong)' }}</b>
+                            <div class="text-xs text-amber-700">Alasan: {{ $h->alasan }}</div>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
 
         {{-- Rincian --}}
         <div class="mb-4 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -76,6 +109,52 @@
             <div class="mb-4">@include('pengajuan._timeline', ['t' => $timeline])</div>
         @else
             <div class="mb-4 rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-400 shadow-sm">Belum ada rantai persetujuan untuk dokumen ini.</div>
+        @endif
+
+        {{-- Keputusan persetujuan, langsung dari halaman dokumen. Hanya muncul
+             untuk penyetuju tahap yang SEDANG berjalan — kewenangannya dinilai
+             ApprovalService, aturan yang sama dengan yang menjaga rutenya. --}}
+        @if ($bolehMemutuskan && $instance)
+            <div class="mb-4 rounded-xl border border-brand/30 bg-brand-soft/40 p-5 shadow-sm">
+                <h3 class="text-sm font-semibold text-gray-900">Keputusan Anda</h3>
+                <p class="mb-3 mt-0.5 text-xs text-gray-500">
+                    Anda penyetuju tahap yang sedang berjalan. Menyetujui meneruskan pengajuan ke tahap berikutnya;
+                    menolak mengembalikannya ke pemohon untuk diperbaiki.
+                </p>
+
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <form method="POST" action="{{ route('approvals.approve', $instance->id) }}"
+                          {{-- Angkanya dirakit di sini, BUKAN dengan @rp: direktif itu
+                               mengeluarkan <span class="rp">, dan kutipnya menutup
+                               atribut ini lebih awal sehingga markupnya bocor ke layar. --}}
+                          data-confirm="Setujui pengajuan {{ $rec->nomor }} sebesar Rp {{ number_format((float) $rec->nominal, 0, ',', '.') }}?"
+                          class="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
+                        @csrf
+                        <input type="hidden" name="kembali" value="dokumen">
+                        {{-- Isian polos, bukan x-field: halaman ini sudah punya
+                             isian bernama "catatan" di blok Verifikasi Keuangan,
+                             dan dua id yang sama membuat labelnya salah tunjuk. --}}
+                        <label for="catatan_persetujuan" class="mb-1 block text-sm font-medium text-gray-700">Catatan (opsional)</label>
+                        <input id="catatan_persetujuan" name="catatan" type="text"
+                               class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:ring-brand">
+                        <button class="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+                            Setujui
+                        </button>
+                    </form>
+
+                    <form method="POST" action="{{ route('approvals.reject', $instance->id) }}"
+                          data-confirm="Tolak pengajuan {{ $rec->nomor }} dan kembalikan ke pemohon?"
+                          class="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
+                        @csrf
+                        <input type="hidden" name="kembali" value="dokumen">
+                        <x-field name="alasan" label="Alasan penolakan" :value="old('alasan')" required
+                                 hint="Wajib — pemohon menerima alasan ini beserta pemberitahuannya." />
+                        <button class="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
+                            Tolak
+                        </button>
+                    </form>
+                </div>
+            </div>
         @endif
 
         <div>
@@ -126,6 +205,23 @@
                         @else
                             <p class="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">Uang muka <b>cash basis</b> — tidak memakai akun hutang. Tekan <b>Verifikasi</b> untuk menandai <i>siap dibayar</i>; jurnal terbit saat Kas Keluar.</p>
                         @endif
+                        {{-- Rekening tujuan (opsional) — perubahannya berjejak. --}}
+                        <div class="rounded-lg border border-gray-200 p-3">
+                            <div class="text-sm font-medium text-gray-700">Rekening Tujuan Pembayaran</div>
+                            <p class="mb-2 mt-0.5 text-xs text-gray-400">
+                                Biarkan apa adanya bila sudah benar. Setiap perubahan <b>dicatat permanen</b> (nilai lama, nilai baru, alasan, dan nama Anda) serta <b>diberitahukan kepada pemohon</b>.
+                            </p>
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <x-field name="bank_tujuan" label="Nama Bank" :value="old('bank_tujuan', $rec->bank_tujuan)" />
+                                <x-field name="no_rekening_tujuan" label="Nomor Rekening" :value="old('no_rekening_tujuan', $rec->no_rekening_tujuan)" />
+                                <x-field name="atas_nama_tujuan" label="Atas Nama" :value="old('atas_nama_tujuan', $rec->atas_nama_tujuan)" />
+                            </div>
+                            <div class="mt-3">
+                                <x-field name="alasan_rekening" label="Alasan perubahan rekening" :value="old('alasan_rekening')"
+                                         hint="Wajib diisi HANYA bila Anda mengubah salah satu isian di atas." />
+                            </div>
+                        </div>
+
                         <x-field name="catatan" label="Catatan" :value="old('catatan')" />
                         <div class="flex justify-end">
                             <button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">{!! $btnLabel !!}</button>

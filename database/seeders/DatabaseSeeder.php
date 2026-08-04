@@ -208,7 +208,9 @@ class DatabaseSeeder extends Seeder
                 'jenis_dokumen' => 'Budget',
                 'steps' => [
                     ['urutan' => 1, 'nama_tahap' => 'Mudir Bagian', 'peringkat' => 3, 'fungsi' => null, 'scope' => 'bagian', 'syarat' => null],
-                    ['urutan' => 2, 'nama_tahap' => 'Mudir Umum', 'peringkat' => 2, 'fungsi' => null, 'scope' => 'yayasan', 'syarat' => null],
+                    // scope `induk`: mudir direktorat yang MEMBAWAHI bagian pemohon,
+                    // bukan semua pemegang peringkat 2 di yayasan.
+                    ['urutan' => 2, 'nama_tahap' => 'Mudir Umum', 'peringkat' => 2, 'fungsi' => null, 'scope' => 'induk', 'syarat' => null],
                     ['urutan' => 3, 'nama_tahap' => 'Ketua Yayasan', 'peringkat' => 1, 'fungsi' => null, 'scope' => 'yayasan', 'syarat' => null],
                 ],
             ],
@@ -218,7 +220,9 @@ class DatabaseSeeder extends Seeder
                 'jenis_dokumen' => 'PengajuanPembayaran',
                 'steps' => [
                     ['urutan' => 1, 'nama_tahap' => 'Mudir Bagian', 'peringkat' => 3, 'fungsi' => null, 'scope' => 'bagian', 'syarat' => null],
-                    ['urutan' => 2, 'nama_tahap' => 'Mudir Umum', 'peringkat' => 2, 'fungsi' => null, 'scope' => 'yayasan', 'syarat' => null],
+                    // scope `induk`: mudir direktorat yang MEMBAWAHI bagian pemohon,
+                    // bukan semua pemegang peringkat 2 di yayasan.
+                    ['urutan' => 2, 'nama_tahap' => 'Mudir Umum', 'peringkat' => 2, 'fungsi' => null, 'scope' => 'induk', 'syarat' => null],
                     // §4.c — tahap khusus: hanya aktif bila menembus anggaran.
                     ['urutan' => 3, 'nama_tahap' => 'Ketua Yayasan (eskalasi overbudget)', 'peringkat' => 1, 'fungsi' => null, 'scope' => 'yayasan', 'syarat' => 'overbudget'],
                 ],

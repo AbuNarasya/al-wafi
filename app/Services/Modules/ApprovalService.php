@@ -7,6 +7,7 @@ use App\Models\ApprovalFlow;
 use App\Models\ApprovalInstance;
 use App\Models\ApprovalLog;
 use App\Models\ApprovalStep;
+use App\Models\Bagian;
 use App\Models\CoaDetail;
 use App\Models\LevelPengajuan;
 use App\Models\User;
@@ -97,15 +98,57 @@ class ApprovalService
 
     private function penyetujuTahap(ApprovalStep $step, object $inst)
     {
-        return User::query()
+        $calon = fn () => User::query()
             ->where('status', 'aktif')
             ->when(
                 $step->fungsi === PeringkatPengajuan::FUNGSI_KEUANGAN,
                 fn ($q) => $q->where('tim_keuangan', true),
                 fn ($q) => $q->where('peringkat_pengajuan', $step->peringkat),
-            )
-            ->when($step->scope === 'bagian' && $inst->kode_bagian, fn ($q) => $q->where('kode_bagian', $inst->kode_bagian))
-            ->get(['id_pengguna', 'nama']);
+            );
+
+        if ($step->scope === 'bagian' && $inst->kode_bagian) {
+            return $calon()->where('kode_bagian', $inst->kode_bagian)->get(['id_pengguna', 'nama']);
+        }
+
+        // `induk`: atasan yang MEMBAWAHI bagian pemohon, ditelusuri lewat
+        // bagian.kode_induk. Tanpa ini, tahap ber-scope yayasan menawarkan
+        // SELURUH pemegang peringkat itu — termasuk mudir direktorat lain yang
+        // sama sekali tak membawahi pemohonnya.
+        if ($step->scope === 'induk' && $inst->kode_bagian) {
+            foreach ($this->rantaiInduk($inst->kode_bagian) as $kodeInduk) {
+                $ketemu = $calon()->where('kode_bagian', $kodeInduk)->get(['id_pengguna', 'nama']);
+                if ($ketemu->isNotEmpty()) {
+                    return $ketemu;
+                }
+            }
+            // Nihil sampai akar → jatuh ke daftar penuh. Dokumen yang tak punya
+            // seorang pun penyetuju jauh lebih buruk daripada daftar kelebaran:
+            // ia diam di tempat tanpa siapa pun merasa ditagih.
+        }
+
+        return $calon()->get(['id_pengguna', 'nama']);
+    }
+
+    /**
+     * Kode bagian dari INDUK TERDEKAT sampai akar (bagian pemohon sendiri tidak
+     * ikut). Berhenti bila induknya melingkar — data master yang salah tak boleh
+     * menggantung permintaan sampai kehabisan waktu.
+     *
+     * @return list<string>
+     */
+    private function rantaiInduk(string $kodeBagian): array
+    {
+        $rantai = [];
+        $dilewati = [$kodeBagian => true];
+        $sekarang = Bagian::find($kodeBagian)?->kode_induk;
+
+        while ($sekarang && ! isset($dilewati[$sekarang])) {
+            $rantai[] = $sekarang;
+            $dilewati[$sekarang] = true;
+            $sekarang = Bagian::find($sekarang)?->kode_induk;
+        }
+
+        return $rantai;
     }
 
     private function sebutanTahap(ApprovalStep $step): string
@@ -180,6 +223,41 @@ class ApprovalService
             ->where('kode_flow', $inst->kode_flow)->first();
 
         return $this->posisiSekarang($inst, $flow ? $flow->steps : collect());
+    }
+
+    /**
+     * Bolehkah pengguna ini memutuskan (setuju/tolak) tahap yang sedang
+     * berjalan? Dipakai layar dokumen untuk memunculkan tombolnya.
+     *
+     * Aturannya SENGAJA dibaca dari sumber yang sama dengan approve(): kalau
+     * layar memakai aturannya sendiri, tombol bisa muncul untuk orang yang
+     * nanti ditolak rutenya — atau lebih buruk, tak muncul untuk orang yang
+     * sebenarnya berwenang.
+     */
+    public function bolehMemutuskan(string $jenisDokumen, string $idDokumen, int $idPengguna): bool
+    {
+        $inst = ApprovalInstance::where('jenis_dokumen', $jenisDokumen)
+            ->where('id_dokumen', $idDokumen)->first();
+        if (! $inst || $inst->status !== 'berjalan') {
+            return false;
+        }
+
+        $flow = ApprovalFlow::with(['steps' => fn ($q) => $q->orderBy('urutan')])
+            ->where('kode_flow', $inst->kode_flow)->first();
+        $step = $flow?->steps->firstWhere('urutan', $inst->tahap_sekarang);
+        $user = User::find($idPengguna);
+        if (! $step || ! $user || $user->status !== 'aktif' || ! $this->berwenangAtas($user, $step)) {
+            return false;
+        }
+
+        if ($step->scope === 'bagian') {
+            return $user->kode_bagian === $inst->kode_bagian;
+        }
+        if ($step->scope === 'induk') {
+            return $this->penyetujuTahap($step, $inst)->contains('id_pengguna', $idPengguna);
+        }
+
+        return true;
     }
 
     /** "Sekarang menunggu di siapa" — tahap berjalan + kandidat penyetuju. */
@@ -375,6 +453,13 @@ class ApprovalService
             if ($step->scope === 'bagian' && $user->kode_bagian !== $inst->kode_bagian) {
                 throw new AppException(403, 'Anda bukan penyetuju dari bagian pemohon.');
             }
+            // Scope `induk` ditegakkan lewat daftar kandidat yang sama dengan
+            // yang ditampilkan — kalau hanya disaring di layar, mudir direktorat
+            // lain tetap bisa menyetujui dengan menebak alamat rutenya.
+            if ($step->scope === 'induk'
+                && ! $this->penyetujuTahap($step, $inst)->contains('id_pengguna', $idPengguna)) {
+                throw new AppException(403, 'Tahap ini hanya bisa disetujui oleh atasan yang membawahi bagian pemohon.');
+            }
 
             ApprovalLog::create([
                 'id_instance' => $inst->id, 'urutan' => $step->urutan, 'id_pengguna' => $idPengguna,
@@ -442,6 +527,13 @@ class ApprovalService
             }
             if ($step && ! $this->berwenangAtas($user, $step)) {
                 throw new AppException(403, "Tahap \"{$step->nama_tahap}\" hanya bisa ditolak oleh {$this->sebutanTahap($step)}.");
+            }
+            // Menolak sama menentukannya dengan menyetujui — dokumennya dikembalikan
+            // ke pemohon. Scope-nya karena itu dijaga sama; sebelumnya tahap
+            // ber-scope `bagian` pun bisa ditolak penyetuju dari bagian lain.
+            if ($step && in_array($step->scope, ['bagian', 'induk'], true)
+                && ! $this->penyetujuTahap($step, $inst)->contains('id_pengguna', $idPengguna)) {
+                throw new AppException(403, 'Anda bukan penyetuju yang berwenang atas bagian pemohon.');
             }
 
             ApprovalLog::create([

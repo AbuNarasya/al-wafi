@@ -81,15 +81,15 @@ class PengajuanController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
-        return view('pengajuan.create', $this->opsi('pembayaran'));
+        return view('pengajuan.create', $this->opsi('pembayaran', $request->user()->id_pengguna));
     }
 
     /** #5: Buat Pengajuan Uang Muka — rincian akun Aset (kelompok 1). */
-    public function createUangMuka(): View
+    public function createUangMuka(Request $request): View
     {
-        return view('pengajuan.create', $this->opsi('uang_muka'));
+        return view('pengajuan.create', $this->opsi('uang_muka', $request->user()->id_pengguna));
     }
 
     /** #6: Buat Penyelesaian Uang Muka — pilih UM outstanding milik sendiri. */
@@ -120,10 +120,13 @@ class PengajuanController extends Controller
                 'referensi' => $request->input('referensi'),
                 'id_uang_muka' => $jenis === 'penyelesaian_uang_muka' ? (int) $request->input('id_uang_muka') : null,
                 'details' => $request->details(),
+                ...$request->rekeningTujuan(),
             ], $request->user()->id_pengguna);
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
+
+        $this->simpanKeBukuRekening($request);
 
         return redirect()->route('pengajuan.show', $rec->id)->with('status', "Pengajuan {$rec->nomor} berhasil diajukan.");
     }
@@ -148,10 +151,13 @@ class PengajuanController extends Controller
                 'keterangan' => $request->input('keterangan'),
                 'referensi' => $request->input('referensi'),
                 'details' => $request->details(),
+                ...$request->rekeningTujuan(),
             ], $request->user()->id_pengguna);
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
+
+        $this->simpanKeBukuRekening($request);
 
         return redirect()->route('pengajuan.index')
             ->with('status', "Perbaikan pengajuan {$rec->nomor} disimpan. Tekan \"Ajukan Ulang\" untuk memulai rantai persetujuan.");
@@ -167,6 +173,26 @@ class PengajuanController extends Controller
         }
 
         return redirect()->route('pengajuan.index')->with('status', "Pengajuan {$rec->nomor} berhasil diajukan ulang.");
+    }
+
+    /**
+     * Simpan rekening tujuan ke buku pemohon bila ia mencentangnya. Gagal
+     * menyimpan buku TIDAK boleh menggagalkan pengajuannya — dokumennya sudah
+     * terbit, sedangkan buku rekening hanya kenyamanan.
+     */
+    private function simpanKeBukuRekening(PengajuanRequest $request): void
+    {
+        $rek = $request->rekeningTujuan();
+        if (! $request->boolean('simpan_rekening') || ! $rek['bank_tujuan']) {
+            return;
+        }
+
+        \App\Models\RekeningTersimpan::simpanUntuk(
+            $request->user()->id_pengguna,
+            $rek['bank_tujuan'],
+            $rek['no_rekening_tujuan'],
+            $rek['atas_nama_tujuan'],
+        );
     }
 
     /** Opsi form untuk sebuah jenis pengajuan. */
@@ -186,12 +212,18 @@ class PengajuanController extends Controller
             'uangMukaList' => $jenis === 'penyelesaian_uang_muka' && $idPengguna
                 ? collect($this->service->uangMukaSaya($idPengguna))
                 : collect(),
+            // Buku rekening MILIK pemohon sendiri — tak pernah memuat rekening
+            // yang disimpan orang lain.
+            'rekeningTersimpan' => $idPengguna ? \App\Models\RekeningTersimpan::untukPemohon($idPengguna) : [],
         ];
     }
 
-    public function show(int $id): View
+    public function show(Request $request, int $id): View
     {
-        $rec = PengajuanPembayaran::with(['details', 'bagian', 'pemohon'])->findOrFail($id);
+        $rec = PengajuanPembayaran::with([
+            'details', 'bagian', 'pemohon',
+            'riwayatRekening' => fn ($q) => $q->with('pengubah')->orderBy('created_at'),
+        ])->findOrFail($id);
         $instance = ApprovalInstance::with(['logs' => fn ($q) => $q->orderBy('waktu')])
             ->where('jenis_dokumen', PengajuanPembayaranService::SUMBER)
             ->where('id_dokumen', (string) $id)->first();
@@ -211,7 +243,14 @@ class PengajuanController extends Controller
         // Data tampilan rantai persetujuan (Sekarang Menunggu + Tahap + Riwayat).
         $timeline = $this->approval->timeline(PengajuanPembayaranService::SUMBER, (string) $id);
 
-        return view('pengajuan.show', compact('rec', 'instance', 'hutangOptions', 'rekeningOptions', 'coaOptions', 'timeline'));
+        // Tombol setuju/tolak muncul di halaman ini bila pembacanya memang
+        // penyetuju tahap yang sedang berjalan — supaya ia tak perlu kembali
+        // ke "Persetujuan Saya" setelah membaca rinciannya.
+        $bolehMemutuskan = $this->approval->bolehMemutuskan(
+            PengajuanPembayaranService::SUMBER, (string) $id, $request->user()->id_pengguna,
+        );
+
+        return view('pengajuan.show', compact('rec', 'instance', 'hutangOptions', 'rekeningOptions', 'coaOptions', 'timeline', 'bolehMemutuskan'));
     }
 
     /** Lembar cetak — HANYA untuk pengajuan yang sudah disetujui SELURUH approver. */
@@ -245,6 +284,12 @@ class PengajuanController extends Controller
             'catatan' => ['nullable', 'string'],
             'koreksi' => ['nullable', 'array'],
             'koreksi.*' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
+            // Rekening tujuan boleh dibetulkan keuangan di sini — berjejak,
+            // lihat PengajuanPembayaranService::ubahRekeningTujuan().
+            'bank_tujuan' => ['nullable', 'string', 'max:100'],
+            'no_rekening_tujuan' => ['nullable', 'string', 'max:50', 'regex:/^[0-9][0-9 .\-]*$/'],
+            'atas_nama_tujuan' => ['nullable', 'string', 'max:150'],
+            'alasan_rekening' => ['nullable', 'string', 'max:255'],
         ];
         if ($rec->jenis === 'pembayaran') {
             $rules['kode_coa_hutang'] = ['required', 'string', 'exists:coa_detail,kode_coa'];
@@ -265,7 +310,26 @@ class PengajuanController extends Controller
             }
         }
 
+        // Rekening tujuan: hanya diproses bila benar-benar berbeda, supaya form
+        // yang dikirim apa adanya tidak melahirkan jejak perubahan palsu.
+        $rekBaru = [
+            'bank_tujuan' => $this->kosongJadiNull($data['bank_tujuan'] ?? null),
+            'no_rekening_tujuan' => $this->kosongJadiNull($data['no_rekening_tujuan'] ?? null),
+            'atas_nama_tujuan' => $this->kosongJadiNull($data['atas_nama_tujuan'] ?? null),
+        ];
+        $rekBerubah = $rekBaru != [
+            'bank_tujuan' => $rec->bank_tujuan,
+            'no_rekening_tujuan' => $rec->no_rekening_tujuan,
+            'atas_nama_tujuan' => $rec->atas_nama_tujuan,
+        ];
+        if ($rekBerubah && trim((string) ($data['alasan_rekening'] ?? '')) === '') {
+            return back()->withInput()->with('error', 'Alasan wajib diisi bila rekening tujuan pembayaran diubah.');
+        }
+
         try {
+            if ($rekBerubah) {
+                $this->service->ubahRekeningTujuan($id, $rekBaru, $request->user()->id_pengguna, $data['alasan_rekening']);
+            }
             if ($koreksi !== []) {
                 $this->service->koreksiAkun($id, $koreksi, $request->user()->id_pengguna, $data['catatan'] ?? null);
             }
@@ -285,6 +349,13 @@ class PengajuanController extends Controller
             : 'Pengajuan diverifikasi & diposting.';
 
         return redirect()->route('pengajuan.show', $id)->with('status', $pesan);
+    }
+
+    private function kosongJadiNull(?string $nilai): ?string
+    {
+        $nilai = trim((string) $nilai);
+
+        return $nilai === '' ? null : $nilai;
     }
 
     public function void(Request $request, int $id): RedirectResponse

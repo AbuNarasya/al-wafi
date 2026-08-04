@@ -203,6 +203,9 @@ class PengajuanPembayaranService
                 'sisa_hutang' => '0',
                 'keterangan' => $input['keterangan'],
                 'referensi' => $input['referensi'] ?? null,
+                'bank_tujuan' => $input['bank_tujuan'] ?? null,
+                'no_rekening_tujuan' => $input['no_rekening_tujuan'] ?? null,
+                'atas_nama_tujuan' => $input['atas_nama_tujuan'] ?? null,
                 'status' => 'diajukan',
                 'id_pengguna' => $idPengguna,
             ]);
@@ -255,6 +258,9 @@ class PengajuanPembayaranService
                 'jenis' => $jenis,
                 'keterangan' => $input['keterangan'],
                 'referensi' => $input['referensi'] ?? null,
+                'bank_tujuan' => $input['bank_tujuan'] ?? null,
+                'no_rekening_tujuan' => $input['no_rekening_tujuan'] ?? null,
+                'atas_nama_tujuan' => $input['atas_nama_tujuan'] ?? null,
                 'nominal' => $prep['total'],
             ]);
             foreach ($prep['baris'] as $b) {
@@ -524,6 +530,104 @@ class PengajuanPembayaranService
             ])->all());
 
             return $rec->refresh()->load('details');
+        });
+    }
+
+    /**
+     * Keuangan menyunting REKENING TUJUAN saat verifikasi (§ rekening penerima).
+     *
+     * Mengganti rekening penerima setelah dokumen disetujui adalah modus
+     * penipuan pembayaran yang paling umum, jadi perubahannya tidak pernah
+     * senyap: alasannya WAJIB, nilai lama & barunya disimpan di
+     * pengajuan_rekening_riwayat, ikut masuk riwayat persetujuan, dan pemohon
+     * diberi tahu — dialah satu-satunya orang yang tahu rekening mana yang
+     * seharusnya.
+     *
+     * $baru = [bank_tujuan, no_rekening_tujuan, atas_nama_tujuan]; ketiganya
+     * kosong berarti rekening tujuan dihapus.
+     */
+    public function ubahRekeningTujuan(int $id, array $baru, int $idPengguna, string $alasan): PengajuanPembayaran
+    {
+        $user = User::find($idPengguna);
+        if (! $user) {
+            throw new AppException(400, 'Pengguna tidak ditemukan.');
+        }
+        if (! $user->tim_keuangan) {
+            throw new AppException(403, 'Hanya tim keuangan yang boleh mengubah rekening tujuan pembayaran.');
+        }
+        if (trim($alasan) === '') {
+            throw new AppException(422, 'Alasan perubahan rekening tujuan wajib diisi.');
+        }
+
+        $rec = PengajuanPembayaran::find($id);
+        if (! $rec) {
+            throw new AppException(404, 'Pengajuan tidak ditemukan.');
+        }
+        // Sesudah diposting/dibayar, dokumen sudah jadi dasar transfer — kalau
+        // rekeningnya keliru, jalurnya membatalkan dokumen, bukan menyuntingnya.
+        if ($rec->status !== 'diajukan') {
+            throw new AppException(409, "Rekening tujuan hanya bisa disunting selama pengajuan belum diposting; pengajuan ini berstatus {$rec->status}.");
+        }
+
+        $kolom = ['bank_tujuan', 'no_rekening_tujuan', 'atas_nama_tujuan'];
+        $nilaiBaru = [];
+        foreach ($kolom as $k) {
+            $v = trim((string) ($baru[$k] ?? ''));
+            $nilaiBaru[$k] = $v === '' ? null : $v;
+        }
+
+        // Setengah terisi ditolak di sini juga — service tak boleh bergantung
+        // pada satu-satunya layar yang kebetulan memvalidasinya.
+        $terisi = array_filter($nilaiBaru, fn ($v) => $v !== null);
+        if ($terisi !== [] && count($terisi) !== 3) {
+            throw new AppException(422, 'Rekening tujuan harus lengkap: nama bank, nomor rekening, dan atas nama pemilik rekening.');
+        }
+
+        $lama = ['bank_tujuan' => $rec->bank_tujuan, 'no_rekening_tujuan' => $rec->no_rekening_tujuan, 'atas_nama_tujuan' => $rec->atas_nama_tujuan];
+        if ($lama == $nilaiBaru) {
+            throw new AppException(422, 'Rekening tujuan tidak berubah.');
+        }
+
+        return DB::transaction(function () use ($rec, $lama, $nilaiBaru, $idPengguna, $user, $alasan, $id) {
+            $rec->update($nilaiBaru);
+
+            \App\Models\PengajuanRekeningRiwayat::create([
+                'id_pengajuan' => $rec->id,
+                'bank_lama' => $lama['bank_tujuan'],
+                'no_rekening_lama' => $lama['no_rekening_tujuan'],
+                'atas_nama_lama' => $lama['atas_nama_tujuan'],
+                'bank_baru' => $nilaiBaru['bank_tujuan'],
+                'no_rekening_baru' => $nilaiBaru['no_rekening_tujuan'],
+                'atas_nama_baru' => $nilaiBaru['atas_nama_tujuan'],
+                'alasan' => $alasan,
+                'id_pengguna' => $idPengguna,
+            ]);
+
+            $sebut = fn (array $v) => $v['bank_tujuan']
+                ? "{$v['bank_tujuan']} {$v['no_rekening_tujuan']} a.n. {$v['atas_nama_tujuan']}"
+                : '(kosong)';
+            $ringkas = $sebut($lama).' → '.$sebut($nilaiBaru);
+
+            $inst = \App\Models\ApprovalInstance::where('jenis_dokumen', self::SUMBER)->where('id_dokumen', (string) $id)->first();
+            if ($inst) {
+                \App\Models\ApprovalLog::create([
+                    'id_instance' => $inst->id, 'urutan' => $inst->tahap_sekarang, 'id_pengguna' => $idPengguna,
+                    'nama_pengguna' => $user->nama, 'aksi' => 'edit',
+                    'catatan' => "Rekening tujuan diubah keuangan: {$ringkas}. Alasan: {$alasan}",
+                    'waktu' => now(),
+                ]);
+            }
+
+            app(\App\Services\Modules\NotificationService::class)->kirim([[
+                'id_pengguna' => $rec->id_pengguna,
+                'judul' => 'Rekening tujuan pengajuan diubah keuangan',
+                'pesan' => "{$rec->nomor}: {$ringkas}. Alasan: {$alasan}. Periksa — bila Anda tidak tahu perubahan ini, laporkan sebelum uang dikirim.",
+                'jenis' => 'approval_edit',
+                'ref_jenis' => self::SUMBER,
+                'ref_id' => (string) $id,
+            ]]);
+
+            return $rec->refresh();
         });
     }
 

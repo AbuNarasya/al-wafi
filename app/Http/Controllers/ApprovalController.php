@@ -34,6 +34,7 @@ class ApprovalController extends Controller
     public function approve(Request $request, int $id): RedirectResponse
     {
         $data = $request->validate(['catatan' => ['nullable', 'string']]);
+        $asal = $this->asalDokumen($request, $id);
 
         try {
             $this->service->approve($id, $request->user()->id_pengguna, $data['catatan'] ?? null);
@@ -41,12 +42,13 @@ class ApprovalController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('approvals.inbox')->with('status', 'Pengajuan disetujui.');
+        return ($asal ?? redirect()->route('approvals.inbox'))->with('status', 'Pengajuan disetujui.');
     }
 
     public function reject(Request $request, int $id): RedirectResponse
     {
         $data = $request->validate(['alasan' => ['required', 'string', 'max:255']]);
+        $asal = $this->asalDokumen($request, $id);
 
         try {
             $this->service->reject($id, $request->user()->id_pengguna, $data['alasan']);
@@ -54,6 +56,30 @@ class ApprovalController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('approvals.inbox')->with('status', 'Pengajuan ditolak & dikembalikan ke pemohon.');
+        return ($asal ?? redirect()->route('approvals.inbox'))
+            ->with('status', 'Pengajuan ditolak & dikembalikan ke pemohon.');
+    }
+
+    /**
+     * Kembali ke halaman dokumen bila keputusannya diambil dari sana — approver
+     * yang sedang membaca rinciannya tak perlu dilempar ke kotak masuk.
+     *
+     * Tujuannya DIBANGUN dari instance-nya sendiri, bukan dari URL yang dikirim
+     * form: menerima alamat dari isian berarti membuka pengalihan ke mana saja.
+     * Alamat dicatat SEBELUM keputusan diambil, karena sesudahnya instance bisa
+     * saja sudah selesai.
+     */
+    private function asalDokumen(Request $request, int $idInstance): ?RedirectResponse
+    {
+        if ($request->input('kembali') !== 'dokumen') {
+            return null;
+        }
+
+        $inst = \App\Models\ApprovalInstance::find($idInstance);
+        if (! $inst || $inst->jenis_dokumen !== PengajuanPembayaranService::SUMBER) {
+            return null;
+        }
+
+        return redirect()->route('pengajuan.show', (int) $inst->id_dokumen);
     }
 }

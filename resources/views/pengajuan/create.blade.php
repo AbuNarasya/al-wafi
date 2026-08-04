@@ -87,6 +87,49 @@
                 <x-field name="keterangan" label="Keterangan" :value="old('keterangan')" required />
             </div>
 
+            {{-- Rekening tujuan pembayaran — OPSIONAL (pembayaran tunai tak
+                 memerlukannya), tapi bila diisi ketiganya wajib. --}}
+            <div x-data="bukuRekening(@js($rekeningTersimpan), @js([
+                    'bank' => old('bank_tujuan', $pengajuan->bank_tujuan ?? ''),
+                    'no_rekening' => old('no_rekening_tujuan', $pengajuan->no_rekening_tujuan ?? ''),
+                    'atas_nama' => old('atas_nama_tujuan', $pengajuan->atas_nama_tujuan ?? ''),
+                ]))" class="rounded-lg border border-gray-200 p-4">
+                <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
+                    <div class="text-sm font-medium text-gray-700">Rekening Tujuan Pembayaran <span class="text-xs font-normal text-gray-400">(opsional)</span></div>
+                    @if ($rekeningTersimpan)
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs text-gray-500">Rekening tersimpan</label>
+                            <select @change="pakai($event.target.value); $event.target.value = ''"
+                                    class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-brand focus:ring-brand">
+                                <option value="">— pilih untuk mengisi —</option>
+                                @foreach ($rekeningTersimpan as $r)
+                                    <option value="{{ $r['id'] }}">{{ $r['label'] }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                </div>
+                <p class="mb-3 text-xs text-gray-400">
+                    Kosongkan bila dibayar tunai. Bila diisi, ketiganya wajib — nomor rekening tanpa nama bank atau tanpa atas nama tidak bisa dipakai mentransfer.
+                </p>
+
+                <div class="grid gap-4 sm:grid-cols-3">
+                    <x-field name="bank_tujuan" label="Nama Bank" x-model="rek.bank"
+                             :value="old('bank_tujuan', $pengajuan->bank_tujuan ?? '')" />
+                    <x-field name="no_rekening_tujuan" label="Nomor Rekening" x-model="rek.no_rekening"
+                             :value="old('no_rekening_tujuan', $pengajuan->no_rekening_tujuan ?? '')" />
+                    <x-field name="atas_nama_tujuan" label="Atas Nama Pemilik Rekening" x-model="rek.atas_nama"
+                             :value="old('atas_nama_tujuan', $pengajuan->atas_nama_tujuan ?? '')" />
+                </div>
+
+                <label class="mt-3 flex items-center gap-2 text-sm text-gray-700" x-show="rek.bank || rek.no_rekening || rek.atas_nama" x-cloak>
+                    <input type="hidden" name="simpan_rekening" value="0">
+                    <input type="checkbox" name="simpan_rekening" value="1" @checked(old('simpan_rekening'))
+                           class="rounded border-gray-300 text-brand focus:ring-brand">
+                    Simpan ke daftar rekening saya (bisa dipanggil lagi di pengajuan berikutnya)
+                </label>
+            </div>
+
             <div class="text-sm font-medium text-gray-700">{{ $labelRincian }}</div>
             <div class="overflow-x-auto rounded-lg border border-gray-200">
                 <table class="w-full min-w-[48rem] text-sm">
@@ -131,6 +174,21 @@
     </div>
 
     <script>
+        // Buku rekening pemohon: memilih satu baris hanya MENGISI ketiga isian —
+        // nilainya tetap boleh disunting, dan yang tersimpan di dokumen adalah
+        // salinannya, bukan rujukan ke daftar ini.
+        function bukuRekening(daftar, awal) {
+            return {
+                daftar: daftar || [],
+                rek: { bank: awal.bank || '', no_rekening: awal.no_rekening || '', atas_nama: awal.atas_nama || '' },
+                pakai(id) {
+                    const r = this.daftar.find((x) => String(x.id) === String(id));
+                    if (!r) return;
+                    this.rek = { bank: r.bank, no_rekening: r.no_rekening, atas_nama: r.atas_nama };
+                },
+            };
+        }
+
         function pengajuan(initRows, opts) {
             return {
                 rows: initRows.length ? initRows : [{}],

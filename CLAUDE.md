@@ -56,6 +56,10 @@ proyek baru di sana alih-alih memasang ke sini.
   terkompilasi (regex Blade memakai `\B@`, dan posisi sesudah huruf `f` bukan non-word boundary),
   sehingga `@endif` pasangannya jadi yatim → "syntax error, unexpected token endif". Beri spasi,
   komentar `{{-- --}}`, atau baris baru di antaranya. `}}@if(...)` aman (didahului non-huruf).
+- **JANGAN memakai `@rp()` di dalam ATRIBUT HTML** (`data-confirm`, `title`, `placeholder`, …). Ia
+  mengeluarkan `<span class="rp">Rp&nbsp;…</span>`, dan kutip pada `class="rp"` menutup atributnya
+  lebih awal → sisa markupnya tercetak sebagai kalimat di layar. Di dalam atribut pakai
+  `Rp {{ number_format((float) $nilai, 0, ',', '.') }}`.
 - **Nama kelas Tailwind harus muncul di Blade**, bukan dirakit di controller/service. Tailwind
   memindai `resources/views` + `storage/framework/views`, TIDAK memindai `app/**`.
 - `artisan tinker --execute` dengan kutip bersarang sering gagal escaping. Untuk pemeriksaan lebih

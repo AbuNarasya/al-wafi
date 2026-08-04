@@ -74,6 +74,10 @@
                 ['Bagian', $rec->bagian?->nama_bagian ?? $rec->kode_bagian],
                 ['No. Bukti', $rec->referensi ?: '—'],
                 ['Keterangan', $rec->keterangan],
+                // Rekening tujuan ikut tercetak supaya lembar ini bisa dipakai
+                // mencocokkan bukti transfer; tanpa rekening → bertanda jelas.
+                ['Rekening Tujuan', $rec->punyaRekeningTujuan() ? "{$rec->bank_tujuan} {$rec->no_rekening_tujuan}" : 'tidak dicantumkan'],
+                ['Atas Nama', $rec->punyaRekeningTujuan() ? $rec->atas_nama_tujuan : '—'],
                 ['Total', "Rp " . number_format((float) $rec->nominal, 0, ',', '.')],
             ] as [$label, $val])
                 <div class="flex justify-between gap-3 border-b border-dashed border-gray-100 py-0.5">
