@@ -45,7 +45,10 @@ class HakAksesController extends Controller
             ];
         });
 
-        return view('hak-akses.edit', ['user' => $user, 'modul' => $modul]);
+        // Nol baris = pengguna yang belum pernah diatur (mis. baru dibuat).
+        // Dibedakan dari "sudah diatur tapi semuanya dimatikan" hanya untuk
+        // pesan di layar; keduanya sama-sama tak berhak apa pun.
+        return view('hak-akses.edit', ['user' => $user, 'modul' => $modul, 'belumPernahDiatur' => $rows->isEmpty()]);
     }
 
     public function update(Request $request, User $user): RedirectResponse

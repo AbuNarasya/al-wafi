@@ -27,6 +27,13 @@
         </div>
     @endif
 
+    @if (($belumPernahDiatur ?? false) && ! $user->is_admin)
+        <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Hak akses <strong>{{ $user->username }}</strong> belum pernah diatur, jadi saat ini ia <b>tidak bisa membuka apa pun</b> —
+            bahkan sidebar-nya kosong. Centang modul yang ia perlukan lalu tekan <b>Simpan Hak Akses</b>.
+        </div>
+    @endif
+
     <div class="mb-3 space-y-2 text-xs text-gray-500">
         <p class="text-sm text-gray-600">Tentukan modul apa saja yang boleh diakses <strong>{{ $user->username }}</strong>, beserta aksinya. <b>Tidak dicentang = tidak punya akses.</b></p>
         <p class="rounded bg-gray-50 px-3 py-2"><b>Lihat</b> dan <b>Menu</b> sengaja dipisah. <b>Lihat</b> = boleh membaca datanya. <b>Menu</b> = tampil di sidebar. Bila sebuah modul hanya dipakai sebagai sumber dropdown di modul lain, centang <b>Lihat</b> saja dan matikan <b>Menu</b>-nya.</p>

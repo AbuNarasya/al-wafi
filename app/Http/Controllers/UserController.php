@@ -49,9 +49,20 @@ class UserController extends Controller
         $data['password_hash'] = Hash::make($request->input('password'));
         $data['tim_keuangan'] = $request->boolean('tim_keuangan');
 
-        User::create($data);
+        $user = User::create($data);
 
-        return redirect()->route('users.index')->with('status', 'Pengguna berhasil ditambahkan.');
+        // Akun baru belum punya satu baris pun di matriks — artinya ia belum
+        // bisa membuka apa pun. Admin langsung dibawa ke matriksnya supaya
+        // langkah kedua tak tertinggal; yang bukan admin tak boleh ke sana
+        // (memberi wewenang membuat akun ≠ memberi wewenang membagikan kunci),
+        // jadi ia diberi tahu untuk memintakannya.
+        if (Auth::user()?->is_admin) {
+            return redirect()->route('hak_akses.edit', $user)->with('status',
+                "Pengguna {$user->username} dibuat. Sekarang tentukan hak aksesnya — tanpa satu pun centang, ia belum bisa membuka apa pun.");
+        }
+
+        return redirect()->route('users.index')->with('status',
+            "Pengguna {$user->username} berhasil ditambahkan. Hak akses modulnya belum diatur — mintakan kepada administrator, karena tanpa itu ia belum bisa membuka apa pun.");
     }
 
     public function edit(User $user): View
