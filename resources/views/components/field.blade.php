@@ -22,6 +22,20 @@
              agar semua dropdown bisa dicari; nilai dikirim via input hidden. --}}
         <x-search-select :name="$name" :options="$options" :value="$val" :required="$required"
                          @class(['border-red-400' => $errors->has($name)]) />
+    @elseif ($type === 'password')
+        {{-- Isian sandi selalu dengan tombol mata: salah ketik yang tak terlihat
+             adalah sebab tersering "sandi baru saya tidak bisa dipakai". --}}
+        <div x-data="{ lihat: false }" class="relative">
+            <input id="{{ $name }}" name="{{ $name }}" type="password" :type="lihat ? 'text' : 'password'"
+                   autocomplete="off"
+                   {{ $attributes->class(['w-full rounded-lg border px-3 py-2 pr-10 text-sm focus:ring-brand focus:border-brand', 'border-red-400' => $errors->has($name), 'border-gray-300' => ! $errors->has($name)]) }}>
+            <button type="button" @click="lihat = ! lihat" tabindex="-1"
+                    :title="lihat ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'"
+                    :aria-label="lihat ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'"
+                    class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600">
+                <x-ikon-mata />
+            </button>
+        </div>
     @elseif ($textarea)
         <textarea id="{{ $name }}" name="{{ $name }}" rows="3"
                   {{ $attributes->class(['w-full rounded-lg border px-3 py-2 text-sm focus:ring-brand focus:border-brand', 'border-red-400' => $errors->has($name), 'border-gray-300' => ! $errors->has($name)]) }}>{{ $val }}</textarea>

@@ -124,6 +124,9 @@
                             <span class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">ADMIN</span>
                         @endif
                     </div>
+                    <a href="{{ route('profil.index') }}" class="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        Profil &amp; Kata Sandi
+                    </a>
                     <form method="POST" action="{{ route('logout') }}" data-no-confirm>
                         @csrf
                         <button type="submit" class="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-gray-50">Keluar</button>

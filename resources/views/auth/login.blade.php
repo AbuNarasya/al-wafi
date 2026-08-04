@@ -31,8 +31,16 @@
 
             <div>
                 <label for="password" class="mb-1 block text-sm font-medium text-gray-700">Kata Sandi</label>
-                <input id="password" name="password" type="password" required
-                       class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand focus:ring-brand">
+                <div x-data="{ lihat: false }" class="relative">
+                    <input id="password" name="password" type="password" :type="lihat ? 'text' : 'password'" required
+                           class="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm focus:border-brand focus:ring-brand">
+                    <button type="button" @click="lihat = ! lihat" tabindex="-1"
+                            :title="lihat ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'"
+                            :aria-label="lihat ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'"
+                            class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600">
+                        <x-ikon-mata />
+                    </button>
+                </div>
             </div>
 
             <label class="flex items-center gap-2 text-sm text-gray-600">

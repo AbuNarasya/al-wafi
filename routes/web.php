@@ -94,6 +94,14 @@ Route::middleware('auth')->group(function () {
 
     crudModul('users', UserController::class, 'user');
 
+    // Profil sendiri — tanpa gerbang hak akses, tiap pengguna berhak mengganti
+    // kata sandinya sendiri. Penggantian dibatasi agar tak bisa dijadikan
+    // sarana menebak kata sandi lama.
+    Route::get('/profil', [\App\Http\Controllers\ProfilController::class, 'index'])->name('profil.index');
+    Route::put('/profil/kata-sandi', [\App\Http\Controllers\ProfilController::class, 'ubahKataSandi'])
+        ->middleware('throttle:10,1')
+        ->name('profil.kata_sandi');
+
     // Matriks hak akses per pengguna — KHUSUS ADMIN (di luar matriks modul).
     Route::middleware(\App\Http\Middleware\RequireAdmin::class)->group(function () {
         Route::get('/hak-akses', [HakAksesController::class, 'index'])->name('hak_akses.index');
