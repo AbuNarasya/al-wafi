@@ -23,6 +23,34 @@
                          hint="Harus lebih kecil dari uang pangkalnya, kalau tidak penagihan ditolak." />
                 <x-field name="masa_berlaku_hari" label="Masa Berlaku (hari)" type="number" :value="old('masa_berlaku_hari', $row->masa_berlaku_hari)" required />
             </div>
+            {{-- Periode berlaku GELOMBANGNYA — beda dari "Masa Berlaku (hari)"
+                 di atas, yang tenggat bayar tiap santri. --}}
+            <div class="rounded-lg border border-gray-200 p-3">
+                <div class="text-sm font-medium text-gray-700">Periode Berlaku Gelombang <span class="text-xs font-normal text-gray-400">(opsional)</span></div>
+                <p class="mb-3 mt-0.5 text-xs text-gray-400">
+                    Di luar rentang ini potongan tidak dipakai lagi walau statusnya Aktif — tanpa perlu dimatikan manual.
+                    Kosongkan salah satu ujungnya bila memang tak dibatasi. <b>Memperpanjang tanggal selesai langsung menghidupkannya kembali.</b>
+                </p>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <x-field name="berlaku_mulai" label="Mulai" type="date"
+                             :value="old('berlaku_mulai', $row->berlaku_mulai?->toDateString())" />
+                    <x-field name="berlaku_sampai" label="Sampai" type="date"
+                             :value="old('berlaku_sampai', $row->berlaku_sampai?->toDateString())" />
+                </div>
+                @unless ($baru)
+                    @php $keadaan = $row->keadaan(); @endphp
+                    @if ($keadaan === 'kedaluwarsa')
+                        <p class="mt-2 rounded bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                            Periode potongan ini sudah lewat, jadi saat ini <b>tidak dipakai</b>. Majukan tanggal selesainya untuk memberlakukannya lagi.
+                        </p>
+                    @elseif ($keadaan === 'belum_mulai')
+                        <p class="mt-2 rounded bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                            Periodenya belum mulai, jadi potongan ini <b>belum dipakai</b> sampai tanggal mulainya tiba.
+                        </p>
+                    @endif
+                @endunless
+            </div>
+
             <label class="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50/60 p-3 text-sm text-gray-700">
                 <input type="hidden" name="aktif" value="0">
                 <input type="checkbox" name="aktif" value="1" @checked(old('aktif', $row->aktif))

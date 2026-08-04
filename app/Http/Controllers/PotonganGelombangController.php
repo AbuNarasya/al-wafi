@@ -88,11 +88,21 @@ class PotonganGelombangController extends Controller
             'kode_jenjang' => ['nullable', 'string', 'max:255'],
             'potongan' => ['required', 'numeric', 'min:0'],
             'masa_berlaku_hari' => ['required', 'integer', 'min:1'],
+            // Periode berlaku gelombangnya sendiri — opsional, kosong = tak
+            // dibatasi pada ujung itu.
+            'berlaku_mulai' => ['nullable', 'date'],
+            'berlaku_sampai' => ['nullable', 'date', 'after_or_equal:berlaku_mulai'],
             'aktif' => ['nullable', 'boolean'],
             'keterangan' => ['nullable', 'string'],
+        ], [
+            'berlaku_sampai.after_or_equal' => 'Tanggal selesai periode tidak boleh mendahului tanggal mulai.',
         ]);
         $data['kode_jenjang'] = $data['kode_jenjang'] ?: null;
         $data['aktif'] = $request->boolean('aktif');
+        // `??` bukan hanya `?:` — isian nullable yang tak dikirim sama sekali
+        // tidak muncul sebagai kunci di hasil validate().
+        $data['berlaku_mulai'] = ($data['berlaku_mulai'] ?? null) ?: null;
+        $data['berlaku_sampai'] = ($data['berlaku_sampai'] ?? null) ?: null;
 
         return $data;
     }

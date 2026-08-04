@@ -6,6 +6,7 @@ use App\Exceptions\AppException;
 use App\Models\Jenjang;
 use App\Models\PotonganGelombang;
 use App\Support\Money;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -38,6 +39,7 @@ class PotonganGelombangService
         $kodeJenjang = $data['kode_jenjang'] ?? null;
         $this->assertNominalSah($data['potongan']);
         $this->assertBelumAda($data['tahun_ajaran'], (int) $data['gelombang'], $kodeJenjang, null);
+        $this->assertPeriodeSah($this->tanggalSaja($data['berlaku_mulai'] ?? null), $this->tanggalSaja($data['berlaku_sampai'] ?? null));
         $aktif = $data['aktif'] ?? true;
 
         return DB::transaction(function () use ($data, $kodeJenjang, $aktif) {
@@ -49,6 +51,8 @@ class PotonganGelombangService
                 'tahun_ajaran' => $data['tahun_ajaran'], 'gelombang' => $data['gelombang'],
                 'kode_jenjang' => $kodeJenjang, 'potongan' => Money::of($data['potongan']),
                 'masa_berlaku_hari' => $data['masa_berlaku_hari'] ?? 7, 'aktif' => $aktif,
+                'berlaku_mulai' => $data['berlaku_mulai'] ?? null,
+                'berlaku_sampai' => $data['berlaku_sampai'] ?? null,
                 'keterangan' => $data['keterangan'] ?? null,
             ]);
         });
@@ -72,9 +76,14 @@ class PotonganGelombangService
 
         $this->assertNominalSah($gabungan['potongan']);
         $this->assertBelumAda($gabungan['tahun_ajaran'], (int) $gabungan['gelombang'], $kodeJenjang, $id);
+        // Tanggal dari toArray() ikut membawa jam & zona; dipangkas supaya
+        // perbandingannya sama persis dengan yang dipakai penyaringan.
+        $mulai = $this->tanggalSaja($gabungan['berlaku_mulai'] ?? null);
+        $sampai = $this->tanggalSaja($gabungan['berlaku_sampai'] ?? null);
+        $this->assertPeriodeSah($mulai, $sampai);
         $aktif = (bool) ($gabungan['aktif'] ?? false);
 
-        return DB::transaction(function () use ($lama, $gabungan, $kodeJenjang, $aktif, $id) {
+        return DB::transaction(function () use ($lama, $gabungan, $kodeJenjang, $aktif, $id, $mulai, $sampai) {
             if ($aktif) {
                 $this->nonaktifkanLain((int) $gabungan['gelombang'], $kodeJenjang, $id);
             }
@@ -82,6 +91,7 @@ class PotonganGelombangService
                 'tahun_ajaran' => $gabungan['tahun_ajaran'], 'gelombang' => (int) $gabungan['gelombang'],
                 'kode_jenjang' => $kodeJenjang, 'potongan' => Money::of($gabungan['potongan']),
                 'masa_berlaku_hari' => $gabungan['masa_berlaku_hari'] ?? 7, 'aktif' => $aktif,
+                'berlaku_mulai' => $mulai, 'berlaku_sampai' => $sampai,
                 'keterangan' => $gabungan['keterangan'] ?? null,
             ]);
 
@@ -124,6 +134,27 @@ class PotonganGelombangService
         }
     }
 
+    /**
+     * Periode terbalik akan membuat potongannya TIDAK PERNAH berlaku — dan
+     * diam-diam, karena penyaringannya cuma tak menemukan baris. Ditolak di
+     * sini, bukan hanya di layar.
+     */
+    private function assertPeriodeSah(?string $mulai, ?string $sampai): void
+    {
+        if ($mulai && $sampai && $sampai < $mulai) {
+            throw new AppException(422, 'Tanggal selesai periode tidak boleh mendahului tanggal mulai.');
+        }
+    }
+
+    private function tanggalSaja(mixed $nilai): ?string
+    {
+        if (! $nilai) {
+            return null;
+        }
+
+        return Carbon::parse($nilai)->toDateString();
+    }
+
     /** Satu baris per (T.A, gelombang, jenjang) — termasuk yang sudah diarsipkan. */
     private function assertBelumAda(string $tahunAjaran, int $gelombang, ?string $kodeJenjang, ?int $kecualiId): void
     {
@@ -146,16 +177,19 @@ class PotonganGelombangService
      * TIDAK PERNAH dapat potongan; pencocokan dilewati sejak awal agar tak ada
      * potongan gelombang lain yang menempel keliru.
      */
-    public function potonganAktif(?int $gelombang, ?string $kodeJenjang, ?string $tahunAjaran = null): ?PotonganGelombang
+    public function potonganAktif(?int $gelombang, ?string $kodeJenjang, ?string $tahunAjaran = null, ?string $tanggal = null): ?PotonganGelombang
     {
         if ($gelombang === null) {
             return null;
         }
 
+        $tanggal = $tanggal ?: Carbon::now()->toDateString();
+
         if ($kodeJenjang) {
             $khusus = PotonganGelombang::where('gelombang', $gelombang)->where('kode_jenjang', $kodeJenjang)
                 ->when($tahunAjaran, fn ($q) => $q->where('tahun_ajaran', $tahunAjaran))
-                ->where('aktif', true)->orderByDesc('tahun_ajaran')->first();
+                ->where('aktif', true)->tap(fn ($q) => $this->batasiPeriode($q, $tanggal))
+                ->orderByDesc('tahun_ajaran')->first();
             if ($khusus) {
                 return $khusus;
             }
@@ -163,7 +197,23 @@ class PotonganGelombangService
 
         return PotonganGelombang::where('gelombang', $gelombang)->whereNull('kode_jenjang')
             ->when($tahunAjaran, fn ($q) => $q->where('tahun_ajaran', $tahunAjaran))
-            ->where('aktif', true)->orderByDesc('tahun_ajaran')->first();
+            ->where('aktif', true)->tap(fn ($q) => $this->batasiPeriode($q, $tanggal))
+            ->orderByDesc('tahun_ajaran')->first();
+    }
+
+    /**
+     * Periode berlaku gelombang, dinilai SAAT DIPAKAI — bukan ditulis ke kolom
+     * `aktif` oleh penjadwal. Produksi tak punya cron, jadi penonaktifan
+     * berjadwal tak akan pernah jalan di sana dan potongan kedaluwarsa akan
+     * tetap terpakai; dinilai di sini, ia berhenti tepat pada pergantian
+     * tanggal di mana pun aplikasinya berjalan.
+     *
+     * Tanggal kosong = tak dibatasi pada ujung itu (baris lama tetap berlaku).
+     */
+    private function batasiPeriode($query, string $tanggal): void
+    {
+        $query->where(fn ($w) => $w->whereNull('berlaku_mulai')->orWhere('berlaku_mulai', '<=', $tanggal))
+            ->where(fn ($w) => $w->whereNull('berlaku_sampai')->orWhere('berlaku_sampai', '>=', $tanggal));
     }
 
     /**
