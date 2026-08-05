@@ -35,11 +35,11 @@ class PengajuanController extends Controller
 
         $rows = PengajuanPembayaran::query()
             ->with('bagian')
-            // Visibilitas: admin & tim keuangan lihat semua; selain itu pengajuan
-            // milik sendiri atau dari bagiannya (approver bagian).
-            ->when(! ($user->is_admin || $user->tim_keuangan), fn ($query) => $query->where(
-                fn ($w) => $w->where('id_pengguna', $user->id_pengguna)->orWhere('kode_bagian', $user->kode_bagian),
-            ))
+            // Visibilitas mengikuti STRUKTUR (bagian sendiri + bawahannya) —
+            // lihat PengajuanPembayaran::scopeTerlihatOleh. Dulu "bagian sama
+            // persis", sehingga Ketua Yayasan tak pernah melihat satu pun
+            // pengajuan padahal ia penyetuju puncaknya.
+            ->terlihatOleh($user)
             ->when($q !== '', fn ($query) => $query->where(
                 fn ($w) => $w->where('nomor', 'ilike', "%{$q}%")->orWhere('keterangan', 'ilike', "%{$q}%"),
             ))

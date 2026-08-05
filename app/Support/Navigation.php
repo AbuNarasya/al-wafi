@@ -23,7 +23,7 @@ final class Navigation
      */
     public const ITEMS = [
         // Cukup berhak atas SALAH SATU tab untuk melihat menunya.
-        ['url' => '/dashboard', 'label' => 'Dashboard', 'group' => '', 'modulAny' => ['dashboard', 'dashboard-ppsb']],
+        ['url' => '/dashboard', 'label' => 'Dashboard', 'group' => '', 'modulAny' => ['dashboard', 'dashboard-ppsb', 'dashboard-anggaran']],
 
         // ---- 1. Setting Awal ----
         // Dipecah dua sub: yang menyetel LEMBAGA & ORANGNYA (Setting Umum) vs yang
@@ -118,7 +118,8 @@ final class Navigation
         // harus sudah ada sebelum jenis biaya diisi.
         ['url' => '/ppsb/jalur-pendaftaran', 'label' => 'Jalur Pendaftaran', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'jalur-pendaftaran'],
         ['url' => '/ppsb/sumber-informasi', 'label' => 'Sumber Informasi', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'sumber-informasi'],
-        ['url' => '/ppsb/potongan-gelombang', 'label' => 'Potongan Gelombang', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'potongan-gelombang'],
+        ['url' => '/ppsb/gelombang', 'label' => 'Gelombang', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'potongan-gelombang'],
+        ['url' => '/ppsb/gelombang/potongan', 'label' => 'Potongan Gelombang', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'potongan-gelombang'],
         ['url' => '/ppsb/target-santri', 'label' => 'Target Santri', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'target-santri'],
         ['url' => '/ppsb/termin-filter', 'label' => 'Setting Filter Termin Jatuh Tempo', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'termin-filter'],
         ['url' => '/wali', 'label' => 'Wali / Keluarga', 'group' => 'PPSB', 'sub' => 'Data Master', 'modul' => 'wali'],

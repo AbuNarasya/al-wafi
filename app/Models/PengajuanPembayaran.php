@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\LingkupBagian;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -30,6 +32,25 @@ class PengajuanPembayaran extends Model
             'sisa_hutang' => 'decimal:2',
             'void_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Dokumen yang boleh dilihat seorang pengguna: miliknya sendiri, atau milik
+     * bagiannya BESERTA seluruh bawahannya. Admin & tim keuangan tanpa batas.
+     *
+     * Dipakai daftar Status Pengajuan maupun ringkasan dashboard — satu aturan,
+     * supaya dua layar tak pernah bercerita berbeda tentang dokumen yang sama.
+     */
+    public function scopeTerlihatOleh(Builder $query, User $user): Builder
+    {
+        $lingkup = LingkupBagian::untukPengguna($user);
+        if ($lingkup === null) {
+            return $query;
+        }
+
+        return $query->where(fn ($w) => $w
+            ->where('id_pengguna', $user->id_pengguna)
+            ->when($lingkup !== [], fn ($q) => $q->orWhereIn('kode_bagian', $lingkup)));
     }
 
     public function bagian(): BelongsTo

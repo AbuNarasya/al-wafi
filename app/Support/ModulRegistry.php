@@ -19,6 +19,9 @@ final class ModulRegistry
         // diberi 'dashboard-ppsb' saja tanpa melihat angka keuangan.
         ['kode' => 'dashboard', 'nama' => 'Dashboard — tab Keuangan', 'grup' => 'UMUM'],
         ['kode' => 'dashboard-ppsb', 'nama' => 'Dashboard — tab PPSB', 'grup' => 'UMUM'],
+        // Dipisah dari tab Keuangan supaya mudir/kepala bagian bisa memantau
+        // anggaran & pengajuannya tanpa ikut melihat kas dan laba rugi.
+        ['kode' => 'dashboard-anggaran', 'nama' => 'Dashboard — tab Anggaran & Pengajuan', 'grup' => 'UMUM'],
 
         // ---- Setting Awal ----
         // Sub-nya mengikuti sidebar (lihat Navigation::SUB_ORDER): Setting Umum =
@@ -95,7 +98,10 @@ final class ModulRegistry
         // dibedakan per jalur.
         ['kode' => 'jalur-pendaftaran', 'nama' => 'Jalur Pendaftaran', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
         ['kode' => 'sumber-informasi', 'nama' => 'Sumber Informasi PPSB', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
-        ['kode' => 'potongan-gelombang', 'nama' => 'Potongan Uang Pangkal per Gelombang', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
+        // Satu modul untuk master gelombang DAN matriks potongannya: memisahkan
+        // haknya hanya melahirkan keadaan aneh — boleh mengisi potongan tapi tak
+        // boleh melihat gelombang yang dipotongnya.
+        ['kode' => 'potongan-gelombang', 'nama' => 'Gelombang & Potongan Uang Pangkal', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
         ['kode' => 'target-santri', 'nama' => 'Target Santri per Tahun Ajaran & Jenjang', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
         ['kode' => 'termin-filter', 'nama' => 'Setting Filter Termin Jatuh Tempo', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
         ['kode' => 'dokumen-santri', 'nama' => 'Berkas Santri (KTP, akta, KK, med check)', 'grup' => 'PPSB', 'sub' => 'Data Master'],

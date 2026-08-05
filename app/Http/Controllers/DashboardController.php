@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AppException;
 use App\Models\CompanySettings;
 use App\Services\Modules\DashboardService;
 use App\Services\Modules\PpsbDashboardService;
+use App\Services\Modules\StatusAnggaranPengajuanService;
 use App\Support\Akses;
 use App\Support\Export\Exporter;
 use Illuminate\Http\Request;
@@ -40,6 +42,7 @@ class DashboardController extends Controller
     {
         $tabs = array_filter([
             'keuangan' => Akses::boleh('dashboard', 'lihat') ? 'Keuangan' : null,
+            'anggaran' => Akses::boleh('dashboard-anggaran', 'lihat') ? 'Anggaran & Pengajuan' : null,
             'ppsb' => Akses::boleh('dashboard-ppsb', 'lihat') ? 'PPSB' : null,
         ]);
         abort_if($tabs === [], 403, 'Anda belum diberi akses ke dashboard mana pun.');
@@ -54,8 +57,50 @@ class DashboardController extends Controller
         return view('dashboard.index', [
             'tab' => $tab,
             'tabs' => $tabs,
-            ...($tab === 'ppsb' ? $this->dataPpsb($request) : $this->dataKeuangan()),
+            ...match ($tab) {
+                'ppsb' => $this->dataPpsb($request),
+                'anggaran' => $this->dataAnggaran($request),
+                default => $this->dataKeuangan(),
+            },
         ]);
+    }
+
+    /**
+     * Tab Anggaran & Pengajuan. Hitungannya hanya jalan saat tab ini dibuka —
+     * dashboard adalah halaman yang paling sering dibuka, dan di produksi tiap
+     * query menyeberang ke Neon.
+     *
+     * @return array<string,mixed>
+     */
+    private function dataAnggaran(Request $request): array
+    {
+        $svc = new StatusAnggaranPengajuanService;
+        $user = $request->user();
+        $tahun = (int) ($request->query('tahun') ?: $svc->tahunBerjalan());
+        $bagian = trim((string) $request->query('bagian', '')) ?: null;
+
+        // Yang tak berhak atas realisasi anggaran (mis. staf tanpa bagian) tetap
+        // boleh melihat status pengajuannya — panelnya saja yang absen, bukan
+        // seluruh tabnya, supaya ia tak kehilangan satu-satunya ringkasan yang
+        // memang jadi haknya.
+        try {
+            $anggaran = $svc->anggaran($user->id_pengguna, $tahun, $bagian);
+            $anggaranDitolak = null;
+        } catch (AppException $e) {
+            $anggaran = null;
+            $anggaranDitolak = $e->getMessage();
+        }
+
+        return [
+            'tahun' => $tahun,
+            'tahunOpsi' => range($svc->tahunBerjalan() + 1, $svc->tahunBerjalan() - 3),
+            'bagian' => $bagian,
+            'anggaran' => $anggaran,
+            'anggaranDitolak' => $anggaranDitolak,
+            'pengajuan' => $svc->pengajuan($user),
+            'jenisLabel' => StatusAnggaranPengajuanService::JENIS,
+            'statusLabel' => StatusAnggaranPengajuanService::STATUS_LABEL,
+        ];
     }
 
     /** @return array<string,mixed> */
