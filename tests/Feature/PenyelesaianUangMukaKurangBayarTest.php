@@ -180,6 +180,27 @@ class PenyelesaianUangMukaKurangBayarTest extends TestCase
         $this->svc->verifikasi($rec->id, self::HUTANG, $this->keuangan->id_pengguna);
     }
 
+    /**
+     * Daftar pengajuan menampilkan KEWAJIBAN yang tersisa, bukan isi mentah
+     * `sisa_hutang` — yang pada dokumen ini bernilai nominal uang mukanya.
+     * Ditemukan pengguna: kolomnya menyebut 10 juta padahal yang harus dibayar
+     * 2 juta, dan angka itu dibaca sebagai tagihan.
+     */
+    public function test_daftar_menampilkan_kekurangan_bukan_nominal_uang_muka(): void
+    {
+        $adv = $this->uangMuka('10000000');
+        $rec = $this->penyelesaian($adv, '12000000');
+        $this->svc->verifikasi($rec->id, self::HUTANG, $this->keuangan->id_pengguna);
+
+        $rec->refresh();
+        $this->assertSame('10000000.00', $rec->sisa_hutang, 'Nilai mentahnya memang nominal uang muka.');
+        $this->assertSame('2000000.00', $rec->sisaTagihan(), 'Yang ditampilkan harus kekurangannya.');
+
+        $isi = preg_replace('/\s+/', ' ', $this->actingAs($this->keuangan)->get(route('pengajuan.index'))->assertOk()->content());
+        $this->assertStringContainsString('2.000.000', $isi);
+        $this->assertStringNotContainsString('Sisa Hutang', $isi, 'Judul kolom melayani dua jenis dokumen.');
+    }
+
     /** Kekurangannya dibayar lewat Kas Keluar — barulah kas berkurang. */
     public function test_kekurangan_dibayar_lewat_kas_keluar(): void
     {

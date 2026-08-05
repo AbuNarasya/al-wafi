@@ -24,6 +24,22 @@ class PengajuanPembayaran extends Model
         'journal_entry_id', 'id_pengguna',
     ];
 
+    /**
+     * Yang benar-benar masih harus DIBAYAR atas dokumen ini.
+     *
+     * `sisa_hutang` tak bisa dipakai apa adanya: pada dokumen PENYELESAIAN uang
+     * muka kolom itu menyimpan nominal uang muka yang diselesaikan — dibaca saat
+     * pembatalan untuk mengembalikan angka ke pool uang muka — sehingga
+     * menampilkannya sebagai "sisa hutang" memberi angka yang jauh lebih besar
+     * daripada kewajiban yang sebenarnya (10 juta uang muka vs 2 juta kekurangan).
+     */
+    public function sisaTagihan(): string
+    {
+        return \App\Support\Money::of(
+            $this->jenis === 'penyelesaian_uang_muka' ? $this->sisa_kurang_bayar : $this->sisa_hutang
+        );
+    }
+
     protected function casts(): array
     {
         return [

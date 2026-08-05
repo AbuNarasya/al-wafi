@@ -31,7 +31,9 @@
                 <tr>
                     <th class="px-4 py-3">No. PB</th><th class="px-4 py-3">Tanggal</th><th class="px-4 py-3">Jenis</th>
                     <th class="px-4 py-3">Bagian</th><th class="px-4 py-3">Keterangan</th>
-                    <th class="px-4 py-3 text-right">Nominal</th><th class="px-4 py-3 text-right">Sisa Hutang</th>
+                    {{-- "Sisa Dibayar", bukan "Sisa Hutang": kolom ini melayani dua
+                         jenis dokumen — hutang pengajuan dan kekurangan penyelesaian. --}}
+                    <th class="px-4 py-3 text-right">Nominal</th><th class="px-4 py-3 text-right">Sisa Dibayar</th>
                     <th class="px-4 py-3">Status</th><th class="px-4 py-3">Menunggu Di</th><th class="px-4 py-3 text-right">Aksi</th>
                 </tr>
                 <tr class="bg-white">
@@ -51,7 +53,10 @@
                         <td class="px-4 py-3 text-gray-600">{{ $r->bagian?->nama_bagian ?? $r->kode_bagian }}</td>
                         <td class="px-4 py-3 text-gray-500"><div class="max-w-[14rem] truncate" title="{{ $r->keterangan }}">{{ $r->keterangan }}</div></td>
                         <td class="px-4 py-3 text-right tabular-nums">@rp($r->nominal)</td>
-                        <td class="px-4 py-3 text-right tabular-nums">@if ((float) $r->sisa_hutang > 0)@rp($r->sisa_hutang)@else<span class="text-gray-300">—</span>@endif</td>
+                        {{-- sisaTagihan(), bukan sisa_hutang: pada penyelesaian uang muka
+                             kolom itu menyimpan nominal uang mukanya, bukan kewajiban. --}}
+                        @php $sisaTagih = $r->sisaTagihan(); @endphp
+                        <td class="px-4 py-3 text-right tabular-nums">@if ((float) $sisaTagih > 0)@rp($sisaTagih)@else<span class="text-gray-300">—</span>@endif</td>
                         <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $labelStatus[$r->status] ?? 'bg-gray-100 text-gray-500' }}">{{ ucfirst(str_replace('_', ' ', $r->status)) }}</span></td>
                         <td class="px-4 py-3">
                             @php $m = $menunggu[$r->id] ?? null; @endphp
