@@ -18,7 +18,12 @@
     </div>
 
     {{-- ===== Kartu headline ===== --}}
-    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    {{-- Satu kolom di ponsel. Dua kolom memberi tiap kartu ±165px, dan nominal
+         sebesar "Rp 1.128.000.000" terpotong tepi kartunya — kelas `.rp` sengaja
+         `white-space: nowrap` supaya "Rp" tak pernah terpisah dari angkanya,
+         jadi ia tak bisa membungkus untuk menyelamatkan diri. Angka headline
+         justru yang paling perlu terbaca utuh. --}}
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div class="flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <div class="text-xs uppercase tracking-wide text-gray-500">Saldo Kas &amp; Rekening</div>
             <div class="mt-2 text-2xl font-bold text-brand">@rp($summary['saldo_kas'])</div>

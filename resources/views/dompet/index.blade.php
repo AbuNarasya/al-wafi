@@ -185,7 +185,9 @@
                              dropdown polos tak lagi enak dipindai — pakai yang bisa dicari. --}}
                         <x-search-select name="id_santri" :options="$santriOptions" placeholder="— pilih santri —" required />
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    {{-- Satu kolom di ponsel: isian nominal berpemisah ribuan
+                         tak terbaca utuh dalam lebar separuh layar 375px. --}}
+                    <div class="grid gap-3 sm:grid-cols-2">
                         <div><label class="mb-1 block text-xs font-medium text-gray-600">Nominal</label><x-input-rupiah name="nominal" required class="px-3 py-2" /></div>
                         <div><label class="mb-1 block text-xs font-medium text-gray-600">Kas/Rekening</label>
                             <select name="kode_rekening" required class="w-full rounded border-gray-300 px-3 py-2 text-sm">@foreach ($rekeningOptions as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select></div>
