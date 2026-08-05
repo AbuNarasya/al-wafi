@@ -243,8 +243,15 @@ class PengajuanController extends Controller
         $coaOptions = CoaDetail::where('status', 'aktif')->orderBy('kode_coa')->get()
             ->mapWithKeys(fn ($c) => [$c->kode_coa => "{$c->kode_coa} — {$c->nama_coa}"])->all();
 
-        // Data tampilan rantai persetujuan (Sekarang Menunggu + Tahap + Riwayat).
+        // Data tampilan rantai persetujuan — satu daftar tahap + penyetujunya.
         $timeline = $this->approval->timeline(PengajuanPembayaranService::SUMBER, (string) $id);
+
+        // Verifikasi keuangan bukan tahap rantai (ApprovalService sengaja tak
+        // mengenalnya — ia dipakai juga oleh usulan anggaran yang tak punya
+        // verifikasi). Nama penyetujunya karena itu disiapkan di sini, supaya
+        // baris "menunggu di …" menyebut orang, bukan sekadar "tim keuangan".
+        $timKeuangan = \App\Models\User::where('tim_keuangan', true)
+            ->where('status', 'aktif')->orderBy('nama')->pluck('nama')->all();
 
         // Tombol setuju/tolak muncul di halaman ini bila pembacanya memang
         // penyetuju tahap yang sedang berjalan — supaya ia tak perlu kembali
@@ -253,7 +260,7 @@ class PengajuanController extends Controller
             PengajuanPembayaranService::SUMBER, (string) $id, $request->user()->id_pengguna,
         );
 
-        return view('pengajuan.show', compact('rec', 'instance', 'hutangOptions', 'rekeningOptions', 'coaOptions', 'timeline', 'bolehMemutuskan'));
+        return view('pengajuan.show', compact('rec', 'instance', 'hutangOptions', 'rekeningOptions', 'coaOptions', 'timeline', 'bolehMemutuskan', 'timKeuangan'));
     }
 
     /** Lembar cetak — HANYA untuk pengajuan yang sudah disetujui SELURUH approver. */

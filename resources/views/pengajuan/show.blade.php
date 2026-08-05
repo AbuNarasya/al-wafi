@@ -104,9 +104,10 @@
             </table>
         </div>
 
-        {{-- Rantai persetujuan (Sekarang Menunggu + Tahap Persetujuan + Riwayat) --}}
+        {{-- Rantai persetujuan — satu daftar: pengajuan, tiap tahap berikut
+             penyetujunya, lalu verifikasi keuangan. --}}
         @if ($timeline)
-            <div class="mb-4">@include('pengajuan._timeline', ['t' => $timeline])</div>
+            <div class="mb-4">@include('pengajuan._timeline', ['t' => $timeline, 'verifikasi' => true, 'timKeuangan' => $timKeuangan])</div>
         @else
             <div class="mb-4 rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-400 shadow-sm">Belum ada rantai persetujuan untuk dokumen ini.</div>
         @endif
