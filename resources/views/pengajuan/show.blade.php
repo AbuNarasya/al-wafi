@@ -166,7 +166,17 @@
                     $catatanJenis = [
                         'pembayaran' => 'Verifikasi memicu pengakuan biaya (Beban ke Hutang Pengajuan); pembayarannya menyusul lewat Kas Keluar.',
                         'uang_muka' => 'Uang muka cash basis: verifikasi hanya menandai siap dibayar — belum ada jurnal. Jurnal (Uang Muka/Kas) terjadi saat Kas Keluar melunasinya.',
-                        'penyelesaian_uang_muka' => 'Penyelesaian: verifikasi langsung memposting (Uang Muka dibersihkan, beban diakui, selisih via kas) & mengurangi outstanding. Tanpa Kas Keluar.',
+                        // Keterangannya mengikuti ARAH selisih: kekurangan tak
+                        // menyentuh kas dan harus lewat Kas Keluar, kelebihan
+                        // langsung kembali. Kalimat lama menyebut "selisih via
+                        // kas · Tanpa Kas Keluar" — kini justru sebaliknya untuk
+                        // kekurangan, dan salah kalimat di sini berarti keuangan
+                        // menyangka kas sudah berkurang padahal belum.
+                        'penyelesaian_uang_muka' => \App\Support\Money::gtZero($selisihPenyelesaian)
+                            ? 'Penyelesaian: verifikasi memposting beban & membersihkan uang muka. Kekurangannya DITAHAN sebagai kewajiban — kas belum berkurang, dan pelunasannya lewat Kas Keluar.'
+                            : (\App\Support\Money::isNegative($selisihPenyelesaian)
+                                ? 'Penyelesaian: verifikasi langsung memposting (uang muka dibersihkan, beban diakui) & kelebihannya kembali sebagai kas masuk saat itu juga. Tanpa Kas Keluar.'
+                                : 'Penyelesaian: realisasi persis sebesar uang mukanya — verifikasi langsung memposting, tak ada kas yang berpindah.'),
                     ][$rec->jenis] ?? '';
                     $btnLabel = $rec->jenis === 'uang_muka' ? 'Verifikasi' : ($rec->jenis === 'penyelesaian_uang_muka' ? 'Verifikasi & Posting Penyelesaian' : 'Verifikasi &amp; Posting');
                 @endphp
