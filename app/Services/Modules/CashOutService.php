@@ -92,6 +92,7 @@ class CashOutService
         $invoicePayments = [];
         $usedPengajuan = [];
         $pengajuanPayments = [];
+        $penyelesaianPayments = [];
         $uangMukaPayments = [];
         $kasPerUnit = []; // per unit, urutan sisip
         $inventoryBuys = [];
@@ -139,7 +140,34 @@ class CashOutService
                     throw new AppException(400, 'Pengajuan tidak ditemukan.');
                 }
                 if ($pb->jenis === 'penyelesaian_uang_muka') {
-                    throw new AppException(422, "Penyelesaian uang muka {$pb->nomor} tidak dibayar lewat Kas Keluar.");
+                    // KEKURANGAN penyelesaian: bebannya sudah diakui saat posting,
+                    // dan selisihnya ditahan di akun hutang. Di sini akun itu
+                    // DIDEBIT — kas baru berkurang sekarang, saat uangnya memang
+                    // benar-benar keluar.
+                    $sisaKurang = Money::of($pb->sisa_kurang_bayar);
+                    if (! Money::gtZero($sisaKurang)) {
+                        throw new AppException(422, "Penyelesaian {$pb->nomor} tak punya kekurangan yang harus dibayar.");
+                    }
+                    if ($pb->status !== 'diposting') {
+                        throw new AppException(422, "Penyelesaian {$pb->nomor} berstatus {$pb->status}; hanya yang sudah diposting yang bisa dibayar.");
+                    }
+                    if (! $pb->kode_coa_hutang) {
+                        throw new AppException(422, "Penyelesaian {$pb->nomor} belum punya akun hutang penampung kekurangan.");
+                    }
+                    $nominal = Money::of($l['nominal'] ?? 0);
+                    if (! Money::eq($nominal, $sisaKurang)) {
+                        throw new AppException(422, "Kekurangan penyelesaian {$pb->nomor} harus dilunasi PENUH sebesar {$sisaKurang}.");
+                    }
+                    $hutangCoa = CoaDetail::find($pb->kode_coa_hutang);
+                    $total = Money::add($total, $nominal);
+                    $ket = $l['keterangan'] ?? "Pembayaran kekurangan penyelesaian {$pb->nomor}";
+                    $unitBaris = $pb->details->first()?->kode_unit ?: ($input['kode_unit'] ?? null);
+                    $details[] = ['tipe' => 'pengajuan', 'id_pengajuan' => $pb->id, 'kode_coa' => $pb->kode_coa_hutang, 'nama_coa' => $hutangCoa?->nama_coa ?? $pb->kode_coa_hutang, 'nominal' => $nominal, 'keterangan' => $ket];
+                    $jLines[] = ['kode_coa' => $pb->kode_coa_hutang, 'nama_coa' => $hutangCoa?->nama_coa, 'debet' => $nominal, 'kredit' => '0', 'keterangan' => $ket, 'kode_unit' => $unitBaris, 'kode_bagian' => $pb->kode_bagian];
+                    $kasPerUnit[$unitBaris] = Money::add($kasPerUnit[$unitBaris] ?? '0', $nominal);
+                    $penyelesaianPayments[] = ['id' => $pb->id, 'nominal' => $nominal];
+
+                    continue;
                 }
                 if ($pb->jenis === 'uang_muka') {
                     // CASH BASIS: jurnal Uang Muka(D)/Kas(K) dibuat sekarang; tiap baris
@@ -253,7 +281,7 @@ class CashOutService
             $jLines[] = ['kode_coa' => $input['kode_rekening'], 'nama_coa' => $rek->coa->nama_coa, 'debet' => '0', 'kredit' => $nominal, 'keterangan' => $input['keterangan'], 'kode_unit' => $kodeUnit];
         }
 
-        return DB::transaction(function () use ($input, $idPengguna, $total, $details, $jLines, $bankLoan, $invoicePayments, $pengajuanPayments, $uangMukaPayments, $inventoryBuys, $assetBuys) {
+        return DB::transaction(function () use ($input, $idPengguna, $total, $details, $jLines, $bankLoan, $invoicePayments, $pengajuanPayments, $penyelesaianPayments, $uangMukaPayments, $inventoryBuys, $assetBuys) {
             $base = DocNumber::docBase('KK', $input['tanggal']);
             $last = CashOut::where('nomor_transaksi', 'like', $base.'%')->orderByDesc('nomor_transaksi')->value('nomor_transaksi');
             $nomor = DocNumber::nextDocNumber($base, $last);
@@ -296,6 +324,10 @@ class CashOutService
             $pengajuanSvc = new PengajuanPembayaranService;
             foreach ($pengajuanPayments as $p) {
                 $pengajuanSvc->applyPayment($p['id'], $p['nominal']);
+            }
+            // Kekurangan penyelesaian uang muka — lunas begitu kasnya keluar.
+            foreach ($penyelesaianPayments as $p) {
+                $pengajuanSvc->applyKurangBayar($p['id'], $p['nominal']);
             }
             // Uang muka (cash basis): tandai lunas + daftarkan tiap baris ke pool.
             foreach ($uangMukaPayments as $pbId) {
@@ -371,6 +403,9 @@ class CashOutService
                     if ($pb && $pb->jenis === 'uang_muka') {
                         // Cash basis: batalkan advance-nya & kembalikan status "diverifikasi".
                         $pengajuanSvc->reverseUangMukaPayment($d->id_pengajuan);
+                    } elseif ($pb && $pb->jenis === 'penyelesaian_uang_muka') {
+                        // Kekurangan penyelesaian: kewajibannya hidup lagi.
+                        $pengajuanSvc->reverseKurangBayar($d->id_pengajuan, (string) $d->nominal);
                     } else {
                         $pengajuanSvc->reversePayment($d->id_pengajuan, (string) $d->nominal);
                     }

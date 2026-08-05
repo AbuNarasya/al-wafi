@@ -201,8 +201,30 @@
                             <x-field name="kode_coa_hutang" label="Akun Hutang Pengajuan (Liabilitas, kelompok 2)" :value="old('kode_coa_hutang')" :options="['' => '— pilih —'] + $hutangOptions" required
                                      hint="Menahan kewajiban sampai dibayar Kas Keluar (menghindari biaya tercatat dua kali)." />
                         @elseif ($rec->jenis === 'penyelesaian_uang_muka')
-                            <x-field name="kode_rekening" label="Kas/Rekening Penampung Selisih" :value="old('kode_rekening')" :options="['' => '— pilih —'] + $rekeningOptions" required
-                                     hint="Selisih realisasi − uang muka diposting ke sini (kurang bayar → kas keluar; kelebihan → pengembalian)." />
+                            {{-- Arah selisih menentukan isian yang diminta. Kurang bayar
+                                 TIDAK menyentuh kas: uangnya belum keluar, jadi yang
+                                 dicatat kewajiban, dan pelunasannya lewat Kas Keluar. --}}
+                            @php $kurang = \App\Support\Money::gtZero($selisihPenyelesaian); @endphp
+                            @if ($kurang)
+                                <div class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                    Realisasi melampaui uang muka sebesar <b>@rp($selisihPenyelesaian)</b>.
+                                    Kekurangan ini <b>tidak langsung mengurangi kas</b> — ia ditahan sebagai kewajiban,
+                                    lalu dibayar lewat <b>Kas Keluar</b> (dan muncul di Perintah Pembayaran).
+                                </div>
+                                <x-field name="kode_coa_hutang" label="Akun Hutang Penampung Kekurangan (Liabilitas, kelompok 2)" :value="old('kode_coa_hutang')" :options="['' => '— pilih —'] + $hutangOptions" required
+                                         hint="Menahan kekurangannya sampai dibayar Kas Keluar, supaya kas tak berkurang sebelum uangnya benar-benar keluar." />
+                            @elseif (\App\Support\Money::isNegative($selisihPenyelesaian))
+                                <div class="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                                    Uang muka melebihi realisasi sebesar <b>@rp(\App\Support\Money::sub('0', $selisihPenyelesaian))</b>.
+                                    Kelebihannya kembali sekarang, jadi kasnya diakui langsung saat posting.
+                                </div>
+                                <x-field name="kode_rekening" label="Kas/Rekening Penerima Pengembalian" :value="old('kode_rekening')" :options="['' => '— pilih —'] + $rekeningOptions" required
+                                         hint="Ke mana kelebihan uang muka dikembalikan." />
+                            @else
+                                <p class="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                                    Realisasi <b>persis sebesar</b> uang mukanya — tak ada selisih, tak ada kas yang berpindah.
+                                </p>
+                            @endif
                         @else
                             <p class="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">Uang muka <b>cash basis</b> — tidak memakai akun hutang. Tekan <b>Verifikasi</b> untuk menandai <i>siap dibayar</i>; jurnal terbit saat Kas Keluar.</p>
                         @endif

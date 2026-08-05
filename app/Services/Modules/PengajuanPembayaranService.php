@@ -669,14 +669,34 @@ class PengajuanPembayaranService
             $rec->update(['status' => 'diverifikasi']);
             $tandaiPosted = false;
         } elseif ($rec->jenis === 'penyelesaian_uang_muka') {
-            // Keuangan menentukan kas/rekening penampung selisih, lalu posting settlement.
-            if (! $kodeRekening) {
-                throw new AppException(422, 'Tentukan kas/rekening penampung selisih.');
+            // Isian yang diminta bergantung ARAH selisihnya, dan arah itu
+            // dihitung di sini — bukan disimpulkan dari isian mana yang terkirim.
+            //   realisasi > uang muka → kekurangan ditahan di akun HUTANG,
+            //                            kas tak tersentuh, dibayar Kas Keluar;
+            //   uang muka > realisasi → kelebihan kembali sekarang, kas diakui.
+            $adv = OperationalAdvance::find($rec->id_uang_muka);
+            if (! $adv) {
+                throw new AppException(400, 'Uang muka tidak valid / sudah dibatalkan.');
             }
-            if (! BankAccount::find($kodeRekening)) {
-                throw new AppException(400, 'Kas/Rekening tidak ditemukan.');
+            $selisih = Money::sub($rec->nominal, Money::sub($adv->nominal, $adv->nominal_diselesaikan));
+
+            if (Money::gtZero($selisih)) {
+                if (! $kodeCoaHutang) {
+                    throw new AppException(422, 'Realisasi melampaui uang muka — tentukan akun hutang penampung kekurangannya.');
+                }
+                if (! CoaDetail::find($kodeCoaHutang)) {
+                    throw new AppException(400, 'Akun hutang tidak ditemukan.');
+                }
+                $rec->update(['kode_coa_hutang' => $kodeCoaHutang]);
+            } elseif (Money::isNegative($selisih)) {
+                if (! $kodeRekening) {
+                    throw new AppException(422, 'Uang muka melebihi realisasi — tentukan kas/rekening penerima pengembaliannya.');
+                }
+                if (! BankAccount::find($kodeRekening)) {
+                    throw new AppException(400, 'Kas/Rekening tidak ditemukan.');
+                }
+                $rec->update(['kode_rekening' => $kodeRekening]);
             }
-            $rec->update(['kode_rekening' => $kodeRekening]);
             $this->applyPenyelesaian($id, $idPengguna);
         } else {
             if (! $kodeCoaHutang) {
@@ -713,6 +733,39 @@ class PengajuanPembayaranService
             throw new AppException(422, "Pengajuan {$rec->nomor} harus dilunasi PENUH sebesar {$sisa}; pembayaran sebagian tidak diizinkan.");
         }
         $rec->update(['sisa_hutang' => '0', 'status' => 'lunas']);
+    }
+
+    /**
+     * Dipanggil Kas Keluar saat KEKURANGAN penyelesaian uang muka dibayar.
+     *
+     * Jurnalnya (Hutang D / Kas K) milik Kas Keluar; di sini hanya kewajibannya
+     * yang ditutup. `sisa_hutang` sengaja TAK disentuh — pada dokumen ini ia
+     * memikul nominal uang muka yang diselesaikan, dan dibaca saat pembatalan.
+     */
+    public function applyKurangBayar(int $id, string $nominal): void
+    {
+        $rec = PengajuanPembayaran::find($id);
+        if (! $rec) {
+            throw new AppException(400, 'Pengajuan tidak ditemukan.');
+        }
+        $sisa = Money::of($rec->sisa_kurang_bayar);
+        if (! Money::eq($nominal, $sisa)) {
+            throw new AppException(422, "Kekurangan penyelesaian {$rec->nomor} harus dilunasi PENUH sebesar {$sisa}.");
+        }
+        $rec->update(['sisa_kurang_bayar' => '0', 'status' => 'selesai']);
+    }
+
+    /** Kebalikannya: vouchernya di-void, kekurangannya berutang lagi. */
+    public function reverseKurangBayar(int $id, string $nominal): void
+    {
+        $rec = PengajuanPembayaran::find($id);
+        if (! $rec) {
+            return;
+        }
+        $rec->update([
+            'sisa_kurang_bayar' => Money::add($rec->sisa_kurang_bayar, $nominal),
+            'status' => 'diposting',
+        ]);
     }
 
     /** Dipanggil Kas Keluar saat vouchernya di-void: kembalikan sisa hutang. */
@@ -760,8 +813,8 @@ class PengajuanPembayaranService
         if ($rec->status !== 'diajukan') {
             throw new AppException(409, "Pengajuan berstatus {$rec->status}; tidak dapat diproses.");
         }
-        if (! $rec->id_uang_muka || ! $rec->kode_rekening) {
-            throw new AppException(422, 'Data penyelesaian tidak lengkap (uang muka / rekening).');
+        if (! $rec->id_uang_muka) {
+            throw new AppException(422, 'Data penyelesaian tidak lengkap (uang muka belum ditunjuk).');
         }
         $adv = OperationalAdvance::find($rec->id_uang_muka);
         if (! $adv || $adv->status === 'void') {
@@ -771,15 +824,29 @@ class PengajuanPembayaranService
         if (Money::lte($sisaUM, '0')) {
             throw new AppException(409, 'Uang muka ini sudah selesai.');
         }
-        $rek = BankAccount::with('coa')->find($rec->kode_rekening);
-        if (! $rek) {
-            throw new AppException(400, 'Kas/Rekening tidak ditemukan.');
-        }
-
         $umN = $sisaUM;
         $realN = Money::of($rec->nominal);
         $diff = Money::sub($realN, $umN);
         $uUnit = $adv->kode_unit ?: null;
+        $kurang = Money::gtZero($diff);   // realisasi > uang muka → masih harus dibayar
+        $lebih = Money::isNegative($diff); // uang muka > realisasi → uang kembali
+
+        // KURANG BAYAR tidak menyentuh kas sama sekali. Uangnya belum keluar,
+        // jadi mengkreditkan kas di sini akan membuat saldo & "dana bisa
+        // dipakai" lebih rendah daripada kenyataan, sementara kewajiban kepada
+        // pemohon tak tercatat di mana pun. Selisihnya ditahan di akun hutang
+        // pilihan keuangan, lalu dilunasi lewat Kas Keluar.
+        if ($kurang && ! $rec->kode_coa_hutang) {
+            throw new AppException(422, 'Realisasi melampaui uang muka — akun hutang penampung kekurangan belum ditentukan keuangan.');
+        }
+        $rek = null;
+        if ($lebih) {
+            // KELEBIHAN: uang benar-benar kembali sekarang, jadi kas diakui langsung.
+            $rek = BankAccount::with('coa')->find($rec->kode_rekening);
+            if (! $rek) {
+                throw new AppException(422, 'Uang muka melebihi realisasi — kas/rekening penerima pengembalian belum ditentukan.');
+            }
+        }
 
         $lines = [
             ['kode_coa' => $adv->kode_coa_uang_muka, 'nama_coa' => $adv->nama_coa_uang_muka, 'debet' => '0', 'kredit' => $umN, 'keterangan' => "Penyelesaian uang muka {$adv->nomor_ref}", 'kode_unit' => $uUnit],
@@ -787,20 +854,32 @@ class PengajuanPembayaranService
         foreach ($rec->details as $d) {
             $lines[] = ['kode_coa' => $d->kode_coa, 'nama_coa' => $d->nama_coa, 'debet' => $d->nominal, 'kredit' => '0', 'keterangan' => $d->keterangan ?? $rec->keterangan, 'kode_bagian' => $rec->kode_bagian, 'kode_unit' => $d->kode_unit];
         }
-        if (Money::gtZero($diff)) {
-            $lines[] = ['kode_coa' => $rec->kode_rekening, 'nama_coa' => $rek->coa->nama_coa, 'debet' => '0', 'kredit' => $diff, 'keterangan' => "Pembayaran selisih penyelesaian {$rec->nomor}", 'kode_unit' => $uUnit];
-        } elseif (Money::isNegative($diff)) {
+        if ($kurang) {
+            $hutang = CoaDetail::find($rec->kode_coa_hutang);
+            $lines[] = ['kode_coa' => $rec->kode_coa_hutang, 'nama_coa' => $hutang?->nama_coa, 'debet' => '0', 'kredit' => $diff, 'keterangan' => "Kekurangan penyelesaian {$rec->nomor} — menunggu Kas Keluar", 'kode_bagian' => $rec->kode_bagian, 'kode_unit' => $uUnit];
+        } elseif ($lebih) {
             $lines[] = ['kode_coa' => $rec->kode_rekening, 'nama_coa' => $rek->coa->nama_coa, 'debet' => Money::sub('0', $diff), 'kredit' => '0', 'keterangan' => "Pengembalian sisa uang muka {$rec->nomor}", 'kode_unit' => $uUnit];
         }
 
-        DB::transaction(function () use ($rec, $id, $idPengguna, $lines, $umN) {
+        // Kurang bayar berhenti di `diposting` — kewajibannya belum lunas dan
+        // harus terlihat di Perintah Pembayaran maupun Kas Keluar. Selebihnya
+        // memang sudah tuntas saat ini juga.
+        $statusAkhir = $kurang ? 'diposting' : 'selesai';
+        $kurangN = $kurang ? $diff : '0';
+
+        DB::transaction(function () use ($rec, $id, $idPengguna, $lines, $umN, $statusAkhir, $kurangN) {
             $entry = PostingService::postJournal([
                 'referensi' => $rec->nomor, 'tanggal' => $rec->tanggal,
                 'keterangan' => "Penyelesaian uang muka — {$rec->keterangan}",
                 'sumber_modul' => self::SUMBER, 'id_sumber' => (string) $rec->id, 'id_pengguna' => $idPengguna, 'lines' => $lines,
             ]);
-            // sisa_hutang MENYIMPAN nominal uang muka yang diselesaikan (dipakai saat void).
-            $rec->update(['status' => 'selesai', 'journal_entry_id' => $entry->id, 'sisa_hutang' => $umN]);
+            // sisa_hutang MENYIMPAN nominal uang muka yang diselesaikan (dipakai saat void)
+            // — BUKAN hutang. Kekurangan yang benar-benar masih harus dibayar
+            // ada di `sisa_kurang_bayar`, kolomnya sendiri.
+            $rec->update([
+                'status' => $statusAkhir, 'journal_entry_id' => $entry->id,
+                'sisa_hutang' => $umN, 'sisa_kurang_bayar' => $kurangN,
+            ]);
             (new OperationalAdvanceService)->applySettlement($rec->id_uang_muka, $umN);
         });
     }

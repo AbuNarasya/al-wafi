@@ -67,13 +67,31 @@ class PerintahPembayaranService
 
         $rows = [];
 
+        // Penyelesaian uang muka DIKECUALIKAN dari saringan ini: pada dokumen itu
+        // `sisa_hutang` menyimpan nominal uang muka yang diselesaikan, bukan
+        // hutang — memakainya di sini akan menagih angka yang sama sekali lain.
+        // Kekurangannya diambil dari `sisa_kurang_bayar`, di blok berikutnya.
         foreach (PengajuanPembayaran::whereIn('status', ['diposting', 'diverifikasi'])
+            ->where('jenis', '!=', 'penyelesaian_uang_muka')
             ->where('sisa_hutang', '>', 0)->orderBy('id')->get() as $p) {
             $rows[] = [
                 'sumber' => 'pengajuan', 'id_dokumen' => (int) $p->id, 'nomor_dokumen' => $p->nomor,
                 'pihak' => $p->keterangan, 'keterangan' => $p->referensi ?: $p->keterangan,
                 'kode_unit' => null, 'nama_unit' => null, 'jatuh_tempo' => null,
                 'sisa' => Money::of($p->sisa_hutang), 'terkunci_di' => $kunci('pengajuan', $p->id),
+            ];
+        }
+
+        // Kekurangan penyelesaian uang muka: bebannya sudah diakui saat posting,
+        // yang tersisa tinggal membayarnya.
+        foreach (PengajuanPembayaran::where('jenis', 'penyelesaian_uang_muka')
+            ->where('status', 'diposting')
+            ->where('sisa_kurang_bayar', '>', 0)->orderBy('id')->get() as $p) {
+            $rows[] = [
+                'sumber' => 'pengajuan', 'id_dokumen' => (int) $p->id, 'nomor_dokumen' => $p->nomor,
+                'pihak' => $p->keterangan, 'keterangan' => 'Kekurangan penyelesaian uang muka',
+                'kode_unit' => null, 'nama_unit' => null, 'jatuh_tempo' => null,
+                'sisa' => Money::of($p->sisa_kurang_bayar), 'terkunci_di' => $kunci('pengajuan', $p->id),
             ];
         }
 
@@ -106,7 +124,13 @@ class PerintahPembayaranService
     public function sisaKewajiban(string $sumber, int $idDokumen): string
     {
         return match ($sumber) {
-            'pengajuan' => Money::of(PengajuanPembayaran::find($idDokumen)?->sisa_hutang ?? '0'),
+            // Penyelesaian uang muka menagih `sisa_kurang_bayar`; `sisa_hutang`
+            // di dokumen itu menyimpan nominal uang muka, bukan kewajiban.
+            'pengajuan' => (function () use ($idDokumen) {
+                $p = PengajuanPembayaran::find($idDokumen);
+
+                return Money::of(($p?->jenis === 'penyelesaian_uang_muka' ? $p?->sisa_kurang_bayar : $p?->sisa_hutang) ?? '0');
+            })(),
             'invoice' => Money::of(Invoice::find($idDokumen)?->sisa_hutang ?? '0'),
             'bank_loan' => Money::of(BankLoan::find($idDokumen)?->sisa_pokok ?? '0'),
             default => '0',

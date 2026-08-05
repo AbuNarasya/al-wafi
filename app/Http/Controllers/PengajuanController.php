@@ -253,6 +253,9 @@ class PengajuanController extends Controller
         $timKeuangan = \App\Models\User::where('tim_keuangan', true)
             ->where('status', 'aktif')->orderBy('nama')->pluck('nama')->all();
 
+        // Arah selisih penyelesaian menentukan isian mana yang diminta keuangan.
+        $selisihPenyelesaian = $rec->jenis === 'penyelesaian_uang_muka' ? $this->selisihPenyelesaian($rec) : '0';
+
         // Tombol setuju/tolak muncul di halaman ini bila pembacanya memang
         // penyetuju tahap yang sedang berjalan — supaya ia tak perlu kembali
         // ke "Persetujuan Saya" setelah membaca rinciannya.
@@ -260,7 +263,22 @@ class PengajuanController extends Controller
             PengajuanPembayaranService::SUMBER, (string) $id, $request->user()->id_pengguna,
         );
 
-        return view('pengajuan.show', compact('rec', 'instance', 'hutangOptions', 'rekeningOptions', 'coaOptions', 'timeline', 'bolehMemutuskan', 'timKeuangan'));
+        return view('pengajuan.show', compact('rec', 'instance', 'hutangOptions', 'rekeningOptions', 'coaOptions', 'timeline', 'bolehMemutuskan', 'timKeuangan', 'selisihPenyelesaian'));
+    }
+
+    /**
+     * Selisih penyelesaian = realisasi − sisa uang muka.
+     * Positif = kurang bayar (masih harus dibayar), negatif = uang kembali.
+     */
+    private function selisihPenyelesaian(PengajuanPembayaran $rec): string
+    {
+        $adv = $rec->id_uang_muka ? \App\Models\OperationalAdvance::find($rec->id_uang_muka) : null;
+        if (! $adv) {
+            return '0';
+        }
+        $sisaUM = \App\Support\Money::sub($adv->nominal, $adv->nominal_diselesaikan);
+
+        return \App\Support\Money::sub($rec->nominal, $sisaUM);
     }
 
     /** Lembar cetak — HANYA untuk pengajuan yang sudah disetujui SELURUH approver. */
@@ -304,7 +322,16 @@ class PengajuanController extends Controller
         if ($rec->jenis === 'pembayaran') {
             $rules['kode_coa_hutang'] = ['required', 'string', 'exists:coa_detail,kode_coa'];
         } elseif ($rec->jenis === 'penyelesaian_uang_muka') {
-            $rules['kode_rekening'] = ['required', 'string', 'exists:bank_accounts,kode_coa'];
+            // Isian yang dibutuhkan bergantung arah selisihnya, dan arah itu
+            // ditentukan ULANG di server — bukan dipercaya dari layar.
+            $selisih = $this->selisihPenyelesaian($rec);
+            if (\App\Support\Money::gtZero($selisih)) {
+                // Kurang bayar: kas tak tersentuh, kekurangannya ditahan di hutang.
+                $rules['kode_coa_hutang'] = ['required', 'string', 'exists:coa_detail,kode_coa'];
+            } elseif (\App\Support\Money::isNegative($selisih)) {
+                // Kelebihan: uang kembali sekarang, kasnya diakui langsung.
+                $rules['kode_rekening'] = ['required', 'string', 'exists:bank_accounts,kode_coa'];
+            }
         }
         $data = $request->validate($rules);
 

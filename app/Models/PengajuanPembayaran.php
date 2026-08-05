@@ -18,7 +18,7 @@ class PengajuanPembayaran extends Model
 
     protected $fillable = [
         'nomor', 'tanggal', 'jenis', 'kode_bagian', 'kode_coa_hutang',
-        'nominal', 'sisa_hutang', 'keterangan', 'referensi', 'status',
+        'nominal', 'sisa_hutang', 'sisa_kurang_bayar', 'keterangan', 'referensi', 'status',
         'bank_tujuan', 'no_rekening_tujuan', 'atas_nama_tujuan',
         'id_uang_muka', 'kode_rekening', 'void_reason', 'void_by', 'void_at',
         'journal_entry_id', 'id_pengguna',
@@ -30,6 +30,7 @@ class PengajuanPembayaran extends Model
             'tanggal' => 'date',
             'nominal' => 'decimal:2',
             'sisa_hutang' => 'decimal:2',
+            'sisa_kurang_bayar' => 'decimal:2',
             'void_at' => 'datetime',
         ];
     }
