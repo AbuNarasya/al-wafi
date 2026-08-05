@@ -5,7 +5,7 @@
 @section('content')
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <a href="{{ route('reports.index') }}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Semua Laporan</a>
-        <form method="GET" class="flex items-end gap-2">
+        <form method="GET" class="flex flex-wrap items-end gap-2">
             <div>
                 <label class="mb-1 block text-xs font-medium text-gray-500">Per Tanggal</label>
                 <input type="date" name="as_of" value="{{ $asOf }}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm">

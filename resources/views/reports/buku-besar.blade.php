@@ -5,7 +5,7 @@
 @section('content')
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <a href="{{ route('reports.index') }}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Semua Laporan</a>
-        <form method="GET" class="flex items-end gap-2">
+        <form method="GET" class="flex flex-wrap items-end gap-2">
             <div class="w-72"><label class="mb-1 block text-xs font-medium text-gray-500">Akun</label>
                 <x-search-select name="kode_coa" :options="$akunList" :value="$kodeCoa" placeholder="— Pilih akun —" />
             </div>

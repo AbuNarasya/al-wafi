@@ -18,7 +18,7 @@
 @section('content')
     <div class="mb-4 flex items-center justify-between">
         <p class="text-sm text-gray-500">Hutang vendor belum lunas, dikelompokkan menurut umur jatuh tempo.</p>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
             @include('kontrol._download', ['type' => 'aging-ap'])
             <a href="{{ route('kontrol.ringkasan') }}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Ringkasan</a>
         </div>

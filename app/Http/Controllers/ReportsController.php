@@ -97,7 +97,17 @@ class ReportsController extends Controller
     {
         [$from, $to] = $this->rentang($request);
 
-        return view('reports.jurnal', ['rows' => $this->reports->jurnalMentah($from, $to), 'from' => $from, 'to' => $to]);
+        // `jurnalMentah()` mengembalikan ['from','to','rows'] — yang dioper ke
+        // layar HANYA barisnya. Sebelum ini seluruh bungkusnya yang dioper,
+        // sehingga baris pertama yang ditemui view adalah string tanggal dan
+        // halamannya SELALU gagal 500, di ponsel maupun di desktop. Jalur
+        // unduhannya memakai ['rows'] dengan benar, jadi kesalahannya hanya di
+        // sini — dan tak ada test yang pernah membuka halaman ini.
+        return view('reports.jurnal', [
+            'rows' => $this->reports->jurnalMentah($from, $to)['rows'],
+            'from' => $from,
+            'to' => $to,
+        ]);
     }
 
     /** @return array{0:string,1:string} */

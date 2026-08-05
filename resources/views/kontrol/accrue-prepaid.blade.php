@@ -5,7 +5,7 @@
 @section('content')
     <div class="mb-4 flex items-center justify-between">
         <p class="text-sm text-gray-500">Jurnal akrual/prabayar yang masih aktif (belum di-reversal).</p>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
             @include('kontrol._download', ['type' => 'accrue-prepaid'])
             <a href="{{ route('kontrol.ringkasan') }}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Ringkasan</a>
         </div>

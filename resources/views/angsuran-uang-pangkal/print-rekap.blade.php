@@ -24,7 +24,11 @@
         tfoot td{border-top:2px solid #cbd5e1;font-weight:bold}
         .ttd{display:flex;justify-content:space-between;margin-top:60px;text-align:center;font-size:11px}
         .ttd .line{margin-top:50px;border-top:1px solid #666;padding-top:3px}
-        @media print{body{margin:0}.noprint{display:none}}
+        /* Di LAYAR ponsel, sepuluh kolom tak muat 375px dan halaman ikut
+           tergeser mendatar — dokumen ini biasa dibuka dulu sebelum dicetak.
+           Saat MENCETAK pembungkusnya dinetralkan supaya tabelnya tak terpotong. */
+        .geser{overflow-x:auto}
+        @media print{body{margin:0}.noprint{display:none}.geser{overflow:visible}}
     </style>
 </head>
 <body onload="window.print()">
@@ -41,6 +45,7 @@
         </div>
     </div>
 
+    <div class="geser">
     <table>
         <thead>
             <tr><th>#</th><th>No. Pendaftaran</th><th>Nama</th><th>Komponen</th><th>Wali</th><th class="r">Total</th><th class="r">Terbayar</th><th class="r">Sisa</th><th>Termin berikut</th><th>Status</th></tr>
@@ -72,6 +77,7 @@
             </tfoot>
         @endif
     </table>
+    </div>
 
     <div class="ttd">
         <div style="width:40%"><div>Mengetahui,</div><div class="line">( ................................ )</div></div>

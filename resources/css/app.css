@@ -33,6 +33,19 @@ input.border-gray-300, select.border-gray-300, textarea.border-gray-300 {
     font-variant-numeric: tabular-nums;
 }
 
+/* "KURANGI GERAK" dihormati. Sebagian orang memakai setelan ini bukan karena
+   selera: gerak di layar bisa memicu pusing & mual (vestibular). Aplikasi ini
+   memang tak banyak beranimasi, tetapi aturannya dipasang sekali di sini supaya
+   animasi yang ditambahkan kelak ikut tunduk tanpa perlu diingat lagi. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
 /* DAFTAR BERTABEL MENJADI KARTU di layar sempit (< 768px = ambang `md`).
    Pasangannya `tabelTumpuk` di app.js, yang menyalin judul kolom ke tiap sel
    sebagai `data-label`. Ditulis sebagai CSS biasa, BUKAN utilitas Tailwind:
