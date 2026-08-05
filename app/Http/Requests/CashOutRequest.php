@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Exceptions\AppException;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -48,12 +49,24 @@ class CashOutRequest extends FormRequest
         ];
     }
 
-    /** Baris untuk service, dipetakan per-tipe (baris kosong dibuang). */
+    /**
+     * Baris untuk service, dipetakan per-tipe. Baris yang belum menunjuk
+     * dokumennya DIBUANG — itu disengaja, supaya baris yang telanjur ditambah
+     * lalu ditinggalkan tak menghalangi penyimpanan.
+     *
+     * TETAPI bila SEMUA baris terbuang, dokumennya jadi tanpa rincian sama
+     * sekali, dan yang muncul di layar adalah "Jurnal harus memiliki minimal 2
+     * baris" — aturan pembukuan yang benar tetapi tak menjelaskan apa pun
+     * kepada petugas. Karena itu keadaan tersebut dihentikan di sini, dengan
+     * menyebut baris mana dan apa yang belum dipilih.
+     */
     public function details(): array
     {
         $out = [];
-        foreach ($this->input('details', []) as $d) {
+        $belum = [];
+        foreach ($this->input('details', []) as $i => $d) {
             $tipe = $d['tipe'] ?? 'lainnya';
+            $nomorBaris = (int) $i + 1;
             // uang_muka dikirim ke server sebagai tipe 'pengajuan' (server bedakan via jenis).
             $tipeServer = $tipe === 'uang_muka' ? 'pengajuan' : $tipe;
 
@@ -67,21 +80,30 @@ class CashOutRequest extends FormRequest
 
             if ($tipe === 'invoice') {
                 if (empty($d['id_invoice'])) {
+                    $belum[] = "Baris {$nomorBaris} (Pembayaran Invoice): invoice belum dipilih";
+
                     continue;
                 }
                 $row += ['id_invoice' => (int) $d['id_invoice'], 'nominal' => $d['nominal'] ?? 0, 'kode_bagian' => ($d['kode_bagian'] ?? '') ?: null];
             } elseif ($tipe === 'pengajuan' || $tipe === 'uang_muka') {
                 if (empty($d['id_pengajuan'])) {
+                    $label = $tipe === 'uang_muka' ? 'Pembayaran Pengajuan Uang Muka): uang muka' : 'Pelunasan Pengajuan Pembayaran): pengajuan';
+                    $belum[] = "Baris {$nomorBaris} ({$label} belum dipilih";
+
                     continue;
                 }
                 $row += ['id_pengajuan' => (int) $d['id_pengajuan'], 'nominal' => $d['nominal'] ?? 0];
             } elseif ($tipe === 'inventory') {
                 if (empty($d['kode_persediaan'])) {
+                    $belum[] = "Baris {$nomorBaris} (Pembelian Persediaan): item persediaan belum dipilih";
+
                     continue;
                 }
                 $row += ['kode_persediaan' => $d['kode_persediaan'], 'kuantiti' => $d['kuantiti'] ?? 0, 'harga_satuan' => $d['harga_satuan'] ?? 0, 'kode_bagian' => ($d['kode_bagian'] ?? '') ?: null];
             } else { // lainnya
                 if (empty($d['kode_coa'])) {
+                    $belum[] = "Baris {$nomorBaris} (Beban / Akun Lainnya): akun COA belum dipilih";
+
                     continue;
                 }
                 $aset = $d['aset_pilih'] ?? '';
@@ -95,6 +117,12 @@ class CashOutRequest extends FormRequest
                 ];
             }
             $out[] = $row;
+        }
+
+        // Sebagian baris terbuang sementara sisanya lengkap = perilaku lama,
+        // sengaja dibiarkan. Yang dihentikan hanya bila TAK ADA yang tersisa.
+        if ($out === [] && $belum !== []) {
+            throw new AppException(422, 'Rincian belum lengkap — '.implode('; ', $belum).'.');
         }
 
         return $out;

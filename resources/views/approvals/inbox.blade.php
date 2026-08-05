@@ -12,7 +12,9 @@
     @else
         <div class="space-y-4">
             @foreach ($items as $inst)
-                @php $doc = $docs->get((int) $inst->id_dokumen); @endphp
+                {{-- Kunci JENIS + id: dua jenis dokumen berbeda bisa punya id yang
+                     sama, dan kunci id saja membuat kartu menampilkan dokumen lain. --}}
+                @php $doc = $docs->get($inst->jenis_dokumen.'|'.(int) $inst->id_dokumen); @endphp
                 <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -27,7 +29,13 @@
                         </div>
                         <div class="text-right">
                             <div class="text-lg font-semibold tabular-nums text-gray-900">@rp($inst->nominal)</div>
-                            @if ($doc)<a href="{{ route('pengajuan.show', $doc->id) }}" class="text-xs text-brand hover:underline">Lihat detail</a>@endif
+                            {{-- Tombol, bukan tautan kecil: inilah satu-satunya jalan
+                                 memeriksa rinciannya sebelum memutuskan, jadi ia harus
+                                 sebesar tombol keputusan di sebelahnya. --}}
+                            @if ($doc)
+                                <a href="{{ route('pengajuan.show', $doc->id) }}"
+                                   class="mt-2 inline-block rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-brand hover:bg-gray-50">Lihat detail</a>
+                            @endif
                         </div>
                     </div>
 

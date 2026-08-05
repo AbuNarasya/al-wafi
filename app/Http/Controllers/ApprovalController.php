@@ -24,9 +24,18 @@ class ApprovalController extends Controller
         $items = $this->service->inbox($request->user()->id_pengguna);
 
         // Lampirkan info dokumen Pengajuan Pembayaran untuk ditampilkan.
+        //
+        // Kuncinya JENIS + id, bukan id saja. Kotak ini memuat sepuluh jenis
+        // dokumen (Budget, KasKeluar, PindahBuku, …) dan penomorannya berjalan
+        // sendiri-sendiri, sehingga Usulan Anggaran #5 dan Pengajuan Pembayaran
+        // #5 sama-sama ada. Dengan kunci id saja, kartu usulan anggaran
+        // menampilkan nomor, keterangan, bagian, dan tautan milik pengajuan
+        // pembayaran — keputusan persetujuan diambil di atas keterangan dokumen
+        // yang sama sekali lain.
         $pengajuanIds = $items->where('jenis_dokumen', PengajuanPembayaranService::SUMBER)
             ->pluck('id_dokumen')->map(fn ($v) => (int) $v)->all();
-        $docs = PengajuanPembayaran::with('bagian')->whereIn('id', $pengajuanIds)->get()->keyBy('id');
+        $docs = PengajuanPembayaran::with('bagian')->whereIn('id', $pengajuanIds)->get()
+            ->keyBy(fn ($d) => PengajuanPembayaranService::SUMBER.'|'.$d->id);
 
         return view('approvals.inbox', compact('items', 'docs'));
     }
