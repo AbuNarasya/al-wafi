@@ -213,6 +213,13 @@ class AkrualKenaikanJenjangTest extends TestCase
         JalurPendaftaran::create(['kode' => 'karyawan', 'nama' => 'Anak Karyawan']);
         JalurPendaftaran::where('kode', 'karyawan')->update(['kode_jalur_lanjutan' => 'karyawan']);
         $this->pasangTarif(self::TA_DEPAN, 'SMA', 'karyawan', 'uang_pangkal', null, bebas: true);
+        // Jalur ini lahir setelah tarif jenjang dipasang, jadi selnya sendiri
+        // harus diisi: biaya masuk tak lagi punya baris cadangan "semua jalur".
+        // Termasuk jenjang & T.A ASAL — registrasinya terbit saat santri dibuat.
+        foreach ([[self::TA, 'SMP'], [self::TA_DEPAN, 'SMA']] as [$ta, $jenjang]) {
+            $this->pasangTarif($ta, $jenjang, 'karyawan', 'registrasi', '500000');
+            $this->pasangTarif($ta, $jenjang, 'karyawan', 'perlengkapan', '2000000');
+        }
 
         // Jalur tujuan DITURUNKAN dari jalur santrinya (`kode_jalur_lanjutan`),
         // bukan dari apa yang dikirim ke buat() — jadi santrinya sendiri yang

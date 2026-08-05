@@ -45,7 +45,8 @@
             <span class="rounded bg-white px-1.5 py-0.5 font-medium text-gray-800">Bebas</span> sengaja tidak dipungut, tagihannya tidak terbit &middot;
             <span class="rounded bg-white px-1.5 py-0.5 font-medium text-gray-800">dikosongkan</span> belum diisi &mdash; penagihan akan berhenti dan meminta sel ini dilengkapi.
             <br>
-            Baris <b>Umum</b> berlaku untuk jalur yang tidak punya barisnya sendiri. Baris jalur menang atas baris Umum.
+            Tiap jalur pendaftaran disebut <b>sendiri-sendiri</b> — tidak ada baris "semua jalur", karena jalur selalu dipilih saat registrasi.
+            Jalur yang selnya dikosongkan <b>tidak</b> ikut jalur lain: penagihannya berhenti sampai sel itu diisi.
         </div>
 
         <form method="POST" action="{{ route('tarif.simpan') }}">

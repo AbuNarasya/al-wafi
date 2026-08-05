@@ -99,19 +99,22 @@ class TarifPerJalurTest extends TestCase
     {
         $this->buatJenis('UP-SMP', 'uang_pangkal', 'SMP');
         $this->pasangTarif(self::TA, 'SMP', 'OSS', 'uang_pangkal', '70000000');
-        $this->pasangTarif(self::TA, 'SMP', null, 'uang_pangkal', '50000000');
+        $this->pasangTarif(self::TA, 'SMP', 'REG', 'uang_pangkal', '50000000');
         $tarif = new TarifService;
 
         $this->assertSame('70000000.00', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'OSS')['nominal']);
         $this->assertSame('50000000.00', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'REG')['nominal']);
-        // Jalur yang tak punya selnya sendiri ikut baris Umum, bukan sel OSS.
-        $this->assertSame('50000000.00', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'YTM')['nominal']);
-        // Asal angkanya selalu bisa disebut — inilah yang dulu tak terlihat. Yang
-        // disebut adalah NAMA jalurnya, bukan kode `OSS`: kalimat ini dibaca
-        // petugas, dan kode jalur tak bercerita apa pun baginya.
+        // Jalur yang selnya belum diisi TIDAK meminjam dari jalur mana pun —
+        // penagihannya berhenti dan meminta selnya dilengkapi. Dulu ia diam-diam
+        // memakai baris Umum, dan tak ada yang tahu angka itu dari mana.
+        $ytm = $tarif->cari('uang_pangkal', self::TA, 'SMP', 'YTM');
+        $this->assertSame('kosong', $ytm['status']);
+        $this->assertStringContainsString('belum diisi', $ytm['label']);
+        // Asal angkanya selalu bisa disebut. Yang disebut adalah NAMA jalurnya,
+        // bukan kode `OSS`: kalimat ini dibaca petugas, dan kode jalur tak
+        // bercerita apa pun baginya.
         $asalOss = $tarif->cari('uang_pangkal', self::TA, 'SMP', 'OSS')['asal'];
         $this->assertStringContainsString('jalur SMP (OSS)', $asalOss);
-        $this->assertStringContainsString('baris Umum', $tarif->cari('uang_pangkal', self::TA, 'SMP', 'YTM')['asal']);
     }
 
     /** Jenjang harus COCOK PERSIS — sel SMP tak boleh melayani calon SDTQ. */
@@ -189,14 +192,16 @@ class TarifPerJalurTest extends TestCase
         $this->pasangTarif(self::TA, 'SMP', 'OSS', 'registrasi', '1500000');
         $this->pasangTarif(self::TA, 'SMP', null, 'registrasi', '500000');
         $this->pasangTarif(self::TA, 'SMP', null, 'spp', '4200000');
-        $this->pasangTarif(self::TA, 'SMP', 'OSS', 'spp', '6000000');
 
         // Registrasi terbit otomatis saat mendaftar → nominalnya ikut jalur.
         $this->assertSame(1500000.0, (float) $this->calonLulus('SMP', 'OSS')->tagihan()->first()->nominal);
         $this->assertSame(500000.0, (float) $this->calonLulus('SMP', 'REG')->tagihan()->first()->nominal);
 
+        // SPP justru KEBALIKANNYA: ia tak mengenal jalur sama sekali, jadi
+        // angkanya sama bagi semua jalur — bukan karena ada cadangan, melainkan
+        // karena dimensinya memang bukan jalur.
         $spp = new SppService;
-        $this->assertSame(6000000.0, (float) $spp->nominalSppSantri($this->santriAktif('SMP', 'OSS')->id)['nominal']);
+        $this->assertSame(4200000.0, (float) $spp->nominalSppSantri($this->santriAktif('SMP', 'OSS')->id)['nominal']);
         $this->assertSame(4200000.0, (float) $spp->nominalSppSantri($this->santriAktif('SMP', 'REG')->id)['nominal']);
     }
 
@@ -216,8 +221,9 @@ class TarifPerJalurTest extends TestCase
             ->assertSee('name="nominal" value="50000000"', false)
             ->assertDontSee('70.000.000', false)
             // Asal tarifnya ikut tampil di layar, dengan namanya DITEBALKAN —
-            // itulah yang membedakannya dari teks bantu di sekitarnya.
-            ->assertSee('baris <b>Umum</b>', false)
+            // itulah yang membedakannya dari teks bantu di sekitarnya. Kini
+            // selalu menyebut JALUR-nya; tak ada lagi "baris Umum".
+            ->assertSee('jalur <b>', false)
             ->assertSee('T.A <b>'.self::TA.'</b>', false);
 
         $this->actingAs(User::find($this->admin))

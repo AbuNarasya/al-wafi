@@ -111,19 +111,23 @@ class IsiDataDummyTest extends TestCase
                 ]);
             }
 
+            // Biaya masuk kini SELALU per jalur — tak ada lagi baris "Umum
+            // (semua jalur)" sebagai cadangan.
             foreach (['registrasi' => '500000', 'uang_pangkal' => '25000000', 'perlengkapan' => '8000000'] as $perilaku => $nominal) {
-                TarifBiaya::create([
-                    'tahun_ajaran' => self::TA, 'kode_jenjang' => $j, 'kode_jalur' => null,
-                    'perilaku' => $perilaku, 'nominal' => $nominal, 'bebas' => false,
-                ]);
+                foreach (\App\Models\JalurPendaftaran::pluck('kode') as $kodeJalur) {
+                    TarifBiaya::create([
+                        'tahun_ajaran' => self::TA, 'kode_jenjang' => $j, 'kode_jalur' => $kodeJalur,
+                        'perilaku' => $perilaku, 'nominal' => $nominal, 'bebas' => false,
+                    ]);
+                }
             }
 
             // Jalur Anak Karyawan: registrasinya BEBAS. Sengaja ditiru dari master
             // di lapangan — inilah jalur yang membuat calon tertahan di "Calon".
-            TarifBiaya::create([
+            TarifBiaya::updateOrCreate([
                 'tahun_ajaran' => self::TA, 'kode_jenjang' => $j, 'kode_jalur' => '005',
-                'perilaku' => 'registrasi', 'nominal' => null, 'bebas' => true,
-            ]);
+                'perilaku' => 'registrasi',
+            ], ['nominal' => null, 'bebas' => true]);
         }
     }
 

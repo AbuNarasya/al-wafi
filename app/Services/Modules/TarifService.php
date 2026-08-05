@@ -140,12 +140,17 @@ class TarifService
             // Tingkat juga cocok persis; perilaku yang tak bertingkat selalu
             // mencari baris bertingkat kosong.
             ->whereRaw('tingkat IS NOT DISTINCT FROM ?', [$perTingkat ? $tingkat : null])
-            ->when($kodeJalur,
-                fn ($q) => $q->where(fn ($w) => $w->where('kode_jalur', $kodeJalur)->orWhereNull('kode_jalur')),
-                fn ($q) => $q->whereNull('kode_jalur'))
-            // Baris berjalur menang atas baris Umum: ia memang dibuat sebagai
-            // pengecualian terhadapnya.
-            ->orderByRaw('kode_jalur IS NULL')
+            // Jalur COCOK PERSIS — biaya masuk tak lagi punya baris "Umum (semua
+            // jalur)" sebagai cadangan. Jalur wajib diisi saat registrasi, jadi
+            // cadangan itu tak pernah dibutuhkan untuk menemukan tarif; yang ia
+            // lakukan hanyalah menagih diam-diam dari sel yang tampak kosong.
+            //
+            // SPP & daftar ulang lain perkara: keduanya memang tak mengenal
+            // jalur, jadi jalur yang dikirim pemanggil DIABAIKAN dan barisnya
+            // dicari dengan jalur kosong.
+            ->whereRaw('kode_jalur IS NOT DISTINCT FROM ?', [
+                in_array($perilaku, static::TANPA_JALUR, true) ? null : $kodeJalur,
+            ])
             ->first();
 
         // Jenjang & jalur disebut lewat NAMA-nya. Kodenya (`J003`, `005`) tak
@@ -156,6 +161,21 @@ class TarifService
         $namaJenjang = $this->namaJenjang($kodeJenjang);
         $labelJenjang = $kodeJenjang ? "jenjang {$namaJenjang}" : 'tanpa jenjang';
         $labelTingkat = $perTingkat ? " tingkat {$tingkat}" : '';
+
+        // Penanda "bebas uang pangkal" di master Jalur MENANG atas isi selnya.
+        // Dulu penanda itu hanya mematikan sel di layar dan tak pernah diperiksa
+        // saat menagih, sehingga jalur bertanda bebas tetap menagih puluhan juta
+        // tanpa ada yang menyadarinya. Ditegakkan di sini — satu-satunya pintu
+        // yang dilewati semua pemanggil.
+        if ($perilaku === 'uang_pangkal' && JalurPendaftaran::bebasUangPangkal($kodeJalur)) {
+            $asal = 'Jalur '.$this->namaJalur($kodeJalur).' · bebas uang pangkal · T.A '.$tahunAjaran;
+
+            return ['status' => 'bebas', 'nominal' => null, 'asal' => $asal,
+                'label' => $asal.' — bebas (tidak dipungut)',
+                'bagian' => ['jenjang' => $namaJenjang, 'tingkat' => null,
+                    'jalur' => $this->namaJalur($kodeJalur), 'tahun_ajaran' => $tahunAjaran,
+                    'catatan' => 'Ditetapkan di master Jalur Pendaftaran, bukan di sel tarif.']];
+        }
         if (! $baris) {
             return ['status' => 'kosong', 'nominal' => null, 'asal' => null, 'bagian' => null,
                 'label' => "Tarif {$label} untuk {$labelJenjang}{$labelTingkat}"
@@ -252,8 +272,11 @@ class TarifService
         $semuaJalur = JalurPendaftaran::where('status', 'aktif')->orderBy('kode')->get();
 
         // ---- Matriks per jalur: hanya perilaku BIAYA MASUK ----
+        // Tanpa baris "Umum (semua jalur)": ia tak punya padanan di dropdown
+        // registrasi — petugas diminta mengisi sesuatu yang tak pernah bisa
+        // dipilihnya — dan tarifnya kini tersimpan lengkap di tiap jalur.
         $perJalur = array_values(array_diff(array_keys(static::PERILAKU), static::TANPA_JALUR));
-        $baris = [['kode' => null, 'nama' => 'Umum (semua jalur)', 'bebas_up' => false]];
+        $baris = [];
         foreach ($semuaJalur as $j) {
             if (in_array($j->kode, $nonaktif, true)) {
                 continue; // tak berlaku di jenjang & T.A ini
@@ -359,9 +382,15 @@ class TarifService
 
         return DB::transaction(function () use ($tahunAjaran, $kodeJenjang, $sel, $jalurSah) {
             $tersentuh = 0;
+            // Kunci "-" bukan lagi baris Umum melainkan ISI MASSAL: nilainya
+            // dituliskan ke SETIAP jalur sebagai baris sungguhan. Bedanya
+            // menentukan — yang tertulis di sel tetap sama dengan yang ditagih,
+            // tak ada lagi jalur yang menagih dari baris yang tak kelihatan.
+            $sel = $this->bentangkanKeSemuaJalur($sel, $jalurSah);
+
             foreach ($sel as $kunciJalur => $perilakuSel) {
-                $kodeJalur = ($kunciJalur === '-' || $kunciJalur === '') ? null : (string) $kunciJalur;
-                if ($kodeJalur !== null && ! isset($jalurSah[$kodeJalur])) {
+                $kodeJalur = (string) $kunciJalur;
+                if (! isset($jalurSah[$kodeJalur])) {
                     throw new AppException(422, "Jalur \"{$kodeJalur}\" tidak terdaftar.");
                 }
                 foreach ($perilakuSel as $perilaku => $isi) {
@@ -383,6 +412,36 @@ class TarifService
 
             return $tersentuh;
         });
+    }
+
+    /**
+     * Terjemahkan kunci isi-massal ("-" / "") menjadi kiriman per jalur.
+     *
+     * Nilai massal dipasang LEBIH DULU, sehingga sel yang juga disebut per jalur
+     * di kiriman yang sama tetap menang — persis urutan yang dulu berlaku antara
+     * baris jalur dan baris Umum, tapi kini hasilnya tertulis di tiap sel.
+     *
+     * @param  array<string,mixed>  $sel
+     * @param  \Illuminate\Support\Collection<string,int>  $jalurSah
+     * @return array<string,mixed>
+     */
+    private function bentangkanKeSemuaJalur(array $sel, $jalurSah): array
+    {
+        $massal = $sel['-'] ?? $sel[''] ?? null;
+        unset($sel['-'], $sel['']);
+        if ($massal === null) {
+            return $sel;
+        }
+
+        $hasil = [];
+        foreach ($jalurSah->keys() as $kode) {
+            $hasil[$kode] = $massal;
+        }
+        foreach ($sel as $kode => $isi) {
+            $hasil[$kode] = array_merge($hasil[$kode] ?? [], $isi);
+        }
+
+        return $hasil;
     }
 
     /**

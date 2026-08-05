@@ -242,6 +242,11 @@ class DashboardPpsbTest extends TestCase
     public function test_sebaran_jalur_per_jenis_kelamin_dan_jenjang(): void
     {
         JalurPendaftaran::create(['kode' => 'PDH', 'nama' => 'Pindahan', 'tahun_ajaran' => self::TA]);
+        // Jalur yang lahir setelah tarif dipasang harus punya selnya sendiri —
+        // biaya masuk tak lagi punya baris cadangan "semua jalur".
+        foreach (['registrasi' => '500000', 'uang_pangkal' => '25000000', 'perlengkapan' => '8000000'] as $perilaku => $nominal) {
+            $this->pasangTarif(self::TA, 'SMP', 'PDH', $perilaku, $nominal);
+        }
 
         $ikhwan = $this->calon('Ikhwan', 'L');
         $this->tagihkanUp($ikhwan);

@@ -15,6 +15,7 @@ use App\Models\TahunAjaran;
 use App\Models\User;
 use App\Services\Modules\JenisBiayaService;
 use App\Services\Modules\SantriService;
+use App\Services\Modules\TarifService;
 use App\Services\Modules\WaliService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -69,9 +70,10 @@ class JalurBebasUangPangkalTest extends TestCase
         $this->buatBiaya(['kode' => 'PLK', 'nama' => 'Perlengkapan', 'tipe' => 'perlengkapan', 'nominal' => '5000000',
             'kode_coa_pendapatan' => '4.ZZBB.1', 'kode_coa_piutang' => '1.ZZBB.1', 'kode_unit' => 'ZZUNIT', 'tahun_ajaran' => self::TA]);
 
-        // PEMBEBASAN kini ditegakkan lewat SEL TARIF bertanda Bebas, bukan lagi
-        // lewat penanda `bebas_uang_pangkal` di master jalur — penanda itu tinggal
-        // menjadi pengisi awal grid. Satu sumber kebenaran saat menagih.
+        // PEMBEBASAN ditegakkan DUA-DUANYA: sel tarif bertanda Bebas, DAN
+        // penanda `bebas_uang_pangkal` di master jalur — yang terakhir menang
+        // atas isi sel. Dulu penanda itu tak pernah diperiksa saat menagih,
+        // sehingga jalur bertanda bebas tetap menagih puluhan juta diam-diam.
         $this->pasangTarif(self::TA, 'SMP', 'karyawan', 'uang_pangkal', null, bebas: true);
     }
 
@@ -100,6 +102,29 @@ class JalurBebasUangPangkalTest extends TestCase
         // Perlengkapannya tetap terbit.
         $this->assertSame(5000000.0, (float) $hasil['perlengkapan']->nominal);
         $this->assertSame(0, JournalEntry::count());
+    }
+
+    /**
+     * Penanda di master MENANG atas sel tarif yang terlanjur bernominal.
+     *
+     * Inilah keadaan yang ditemukan di data sungguhan: jalur "Lanjutan (OSS)"
+     * bertanda bebas, tetapi selnya berisi 25–50 juta dan tetap ditagih, karena
+     * penandanya cuma mematikan sel di layar dan tak pernah diperiksa saat
+     * menagih. Kekeliruan yang tak bergejala — sampai wali menerima tagihannya.
+     */
+    public function test_penanda_master_menang_atas_sel_yang_terlanjur_bernominal(): void
+    {
+        // Sel sengaja diisi angka, meniru data lama yang menyimpang.
+        $this->pasangTarif(self::TA, 'SMP', 'karyawan', 'uang_pangkal', '25000000');
+
+        $tarif = (new TarifService)->cari('uang_pangkal', self::TA, 'SMP', 'karyawan');
+        $this->assertSame('bebas', $tarif['status']);
+        $this->assertNull($tarif['nominal']);
+
+        // Dan penagihannya pun tak menerbitkan apa-apa.
+        $santri = $this->calonLulus('karyawan');
+        $hasil = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal_perlengkapan' => '5000000']);
+        $this->assertNull($hasil['uang_pangkal']);
     }
 
     public function test_jalur_biasa_tetap_ditagih(): void

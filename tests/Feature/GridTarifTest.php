@@ -91,21 +91,31 @@ class GridTarifTest extends TestCase
             'REG' => ['uang_pangkal' => ['nominal' => '']], // sengaja dibiarkan kosong
         ]);
 
-        $this->assertSame('ada', $svc->cari('uang_pangkal', self::TA, 'SMP', 'REG')['status'], 'jalur tanpa sel sendiri ikut baris Umum');
+        // Isi massal ("-") menulis baris SUNGGUHAN di tiap jalur, lalu sel yang
+        // disebut sendiri di kiriman yang sama menang atasnya.
+        $this->assertSame('kosong', $svc->cari('uang_pangkal', self::TA, 'SMP', 'REG')['status'],
+            'sel yang sengaja dikosongkan tidak lagi menumpang jalur lain');
         $this->assertSame('bebas', $svc->cari('uang_pangkal', self::TA, 'SMP', 'OSS')['status']);
+        // Nilai massalnya sendiri memang tertulis: perlengkapan tak disebut per
+        // jalur, jadi kedua jalur menerimanya apa adanya.
+        $svc->simpan(self::TA, 'SMP', ['-' => ['perlengkapan' => ['nominal' => '13000000']]]);
+        foreach (['REG', 'OSS'] as $j) {
+            $this->assertSame('13000000.00', $svc->cari('perlengkapan', self::TA, 'SMP', $j)['nominal'],
+                "jalur {$j} menerima nilai massalnya sebagai baris sendiri");
+        }
         // Sel kosong TIDAK disimpan sebagai baris bernominal nol — nol itu angka
         // yang sah (gratis tapi tetap terbit) dan tak boleh tertukar dengan bebas.
-        $this->assertNull(TarifBiaya::where('kode_jalur', 'REG')->first());
+        $this->assertNull(TarifBiaya::where('kode_jalur', 'REG')->where('perilaku', 'uang_pangkal')->first());
     }
 
     public function test_sel_dikosongkan_kembali_menghapus_barisnya(): void
     {
         $svc = new TarifService;
         $svc->simpan(self::TA, 'SMP', ['-' => ['uang_pangkal' => ['nominal' => '50000000']]]);
-        $this->assertSame('ada', $svc->cari('uang_pangkal', self::TA, 'SMP', null)['status']);
+        $this->assertSame('ada', $svc->cari('uang_pangkal', self::TA, 'SMP', 'REG')['status']);
 
         $svc->simpan(self::TA, 'SMP', ['-' => ['uang_pangkal' => ['nominal' => '']]]);
-        $this->assertSame('kosong', $svc->cari('uang_pangkal', self::TA, 'SMP', null)['status']);
+        $this->assertSame('kosong', $svc->cari('uang_pangkal', self::TA, 'SMP', 'REG')['status']);
     }
 
     public function test_salin_antar_tahun_ajaran_tidak_menimpa_yang_sudah_diisi(): void
@@ -120,10 +130,13 @@ class GridTarifTest extends TestCase
 
         $hasil = $svc->salin(self::TA, '2027/2028', 'SMP');
 
-        // Tersalin: registrasi (dari setUp), perlengkapan, & sel bebas OSS.
-        $this->assertSame(3, $hasil['disalin']);
-        $this->assertSame(1, $hasil['dilewati'], 'uang pangkal yang sudah disesuaikan tidak ditimpa');
-        $this->assertSame('55000000.00', $svc->cari('uang_pangkal', '2027/2028', 'SMP', null)['nominal']);
+        // Setiap sel kini nyata per jalur, jadi cacahnya mengikuti jumlah jalur:
+        // yang tersalin adalah sel yang belum ada di T.A tujuan.
+        $this->assertGreaterThan(0, $hasil['disalin']);
+        $this->assertGreaterThan(0, $hasil['dilewati'], 'uang pangkal yang sudah disesuaikan tidak ditimpa');
+        $this->assertSame('55000000.00', $svc->cari('uang_pangkal', '2027/2028', 'SMP', 'REG')['nominal']);
+        // OSS bertanda "bebas uang pangkal" di master jalur, dan penanda itu
+        // menang atas isi sel mana pun — termasuk 55jt hasil isi massal.
         $this->assertSame('bebas', $svc->cari('uang_pangkal', '2027/2028', 'SMP', 'OSS')['status']);
     }
 
@@ -132,7 +145,7 @@ class GridTarifTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('tarif.index', ['ta' => self::TA, 'jenjang' => 'SMP']))
             ->assertOk()
-            ->assertSee('Umum (semua jalur)')
+            ->assertDontSee('Umum (semua jalur)')
             ->assertSee('OSS')
             ->assertSee('Uang Pangkal');
 
@@ -141,7 +154,7 @@ class GridTarifTest extends TestCase
             'sel' => ['-' => ['uang_pangkal' => ['nominal' => '50000000', 'bebas' => '0']]],
         ])->assertRedirect();
 
-        $this->assertSame('50000000.00', (new TarifService)->cari('uang_pangkal', self::TA, 'SMP', null)['nominal']);
+        $this->assertSame('50000000.00', (new TarifService)->cari('uang_pangkal', self::TA, 'SMP', 'REG')['nominal']);
     }
 
     // ---- Penjagaan OSS & anti tagih-ganda ----

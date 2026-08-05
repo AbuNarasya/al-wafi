@@ -22,6 +22,9 @@ trait MembuatTarif
     /** Jenjang bawaan fixture — tarif selalu melekat pada satu jenjang. */
     protected const JENJANG_UJI = 'XJ';
 
+    /** @var array<string,true> sel yang disebut per jalur; tak boleh tertimpa penyebaran */
+    private array $selJalurEksplisit = [];
+
     /** Dipakai bila fixture menyebut tahun ajaran tapi tidak menyebut nominal. */
     protected const NOMINAL_BAWAAN = '1000000';
 
@@ -70,8 +73,51 @@ trait MembuatTarif
         return $jenis;
     }
 
-    /** Pasang/ubah satu sel tarif tanpa menyentuh master jenis biaya. */
+    /**
+     * Pasang/ubah satu sel tarif tanpa menyentuh master jenis biaya.
+     *
+     * Biaya masuk tak lagi punya baris "Umum (semua jalur)". Fixture lama yang
+     * tak menyebut jalur karena itu dicerminkan ke SETIAP jalur terdaftar —
+     * maksudnya memang "tarif ini berlaku bagi semua pendaftar", dan dulu itu
+     * ditulis sebagai satu baris tanpa jalur. SPP & daftar ulang tetap ditulis
+     * tanpa jalur, karena keduanya memang tak mengenalnya.
+     */
     protected function pasangTarif(string $ta, ?string $jenjang, ?string $jalur, string $perilaku, string|int|float|null $nominal, bool $bebas = false, bool $timpa = true): TarifBiaya
+    {
+        $berjalur = ! in_array($perilaku, TarifService::TANPA_JALUR, true);
+
+        if ($berjalur && $jalur !== null) {
+            // Sel yang SENGAJA disebut per jalur — kelak tak boleh tertimpa
+            // penyebaran, persis seperti baris jalur dulu menang atas Umum.
+            $this->selJalurEksplisit[$this->kunciSel($ta, $jenjang, $jalur, $perilaku)] = true;
+        }
+
+        if ($berjalur && $jalur === null) {
+            $semua = \App\Models\JalurPendaftaran::pluck('kode')->all();
+            $terakhir = null;
+            foreach ($semua as $kode) {
+                // Melewati sel yang sudah dipasang khusus; sisanya boleh
+                // diperbarui, karena dulu mengubah baris Umum memang mengubah
+                // tarif semua jalur yang menumpang padanya.
+                if (isset($this->selJalurEksplisit[$this->kunciSel($ta, $jenjang, $kode, $perilaku)])) {
+                    continue;
+                }
+                $terakhir = $this->tulisSelTarif($ta, $jenjang, $kode, $perilaku, $nominal, $bebas, $timpa);
+            }
+            // Tanpa satu pun jalur terdaftar, selnya tetap ditulis tanpa jalur
+            // agar fixture yang belum membuat master jalur tak gagal senyap.
+            return $terakhir ?? $this->tulisSelTarif($ta, $jenjang, null, $perilaku, $nominal, $bebas, $timpa);
+        }
+
+        return $this->tulisSelTarif($ta, $jenjang, $berjalur ? $jalur : null, $perilaku, $nominal, $bebas, $timpa);
+    }
+
+    private function kunciSel(string $ta, ?string $jenjang, string $jalur, string $perilaku): string
+    {
+        return $ta.'|'.($jenjang ?: '-').'|'.$jalur.'|'.$perilaku;
+    }
+
+    private function tulisSelTarif(string $ta, ?string $jenjang, ?string $jalur, string $perilaku, string|int|float|null $nominal, bool $bebas, bool $timpa): TarifBiaya
     {
         $kunci = ['tahun_ajaran' => $ta, 'kode_jenjang' => $jenjang ?: null,
             'kode_jalur' => $jalur, 'perilaku' => $perilaku];
