@@ -59,6 +59,7 @@ class SantriAktifMundurTest extends TestCase
         JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler', 'tahun_ajaran' => self::TA]);
         $this->admin = User::create(['username' => 'adm', 'nama' => 'Admin', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => true, 'tim_keuangan' => true])->id_pengguna;
 
+        $this->jenjangUji();
         $this->buatBiaya(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND_REG, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
         $this->buatBiaya(['kode' => 'UP', 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'kode_coa_pendapatan' => self::PEND_UP, 'kode_coa_piutang' => self::PIUT_UP, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
     }
@@ -68,7 +69,7 @@ class SantriAktifMundurTest extends TestCase
     {
         $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '08'.random_int(100000, 999999)]);
         $svc = new SantriService;
-        $santri = $svc->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L', 'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'gelombang' => 1]);
+        $santri = $svc->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L', 'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'gelombang' => '1', 'kode_jenjang' => $this->jenjangUji()]);
         $santri->update(['status' => 'terbayar']);
         $svc->verifikasiBerkas($santri->id);
         $svc->seleksi($santri->id, []);
@@ -188,7 +189,7 @@ class SantriAktifMundurTest extends TestCase
     public function test_calon_belum_aktif_tetap_memakai_alur_lama(): void
     {
         $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '08123123']);
-        $santri = (new SantriService)->create(['id_wali' => $wali->id, 'nama' => 'Calon', 'jenis_kelamin' => 'L', 'tahun_ajaran' => self::TA, 'jalur' => 'reguler']);
+        $santri = (new SantriService)->create(['id_wali' => $wali->id, 'nama' => 'Calon', 'jenis_kelamin' => 'L', 'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'kode_jenjang' => $this->jenjangUji()]);
 
         (new SantriService)->mengundurkanDiri($santri->id, 'batal daftar', $this->admin);
 

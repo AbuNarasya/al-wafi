@@ -27,6 +27,8 @@ use Tests\TestCase;
 /** Koreksi nominal uang pangkal (salah input): hitung ulang + pagar keselamatan. */
 class KoreksiUangPangkalTest extends TestCase
 {
+    use \Tests\Concerns\MelunasiRegistrasi;
+    use \Tests\Concerns\MembuatGelombang;
     use \Tests\Concerns\MengaktifkanSantri;
     use RefreshDatabase;
     use \Tests\Concerns\MembuatTarif;
@@ -58,6 +60,7 @@ class KoreksiUangPangkalTest extends TestCase
         JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler', 'tahun_ajaran' => self::TA]);
         $this->admin = User::create(['username' => 'adm', 'nama' => 'Admin', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => true, 'tim_keuangan' => true])->id_pengguna;
 
+        $this->jenjangUji();
         $this->buatBiaya(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND_REG, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
         $this->buatBiaya(['kode' => 'UP', 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'kode_coa_pendapatan' => self::PEND_UP, 'kode_coa_piutang' => self::PIUT_UP, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
     }
@@ -67,8 +70,12 @@ class KoreksiUangPangkalTest extends TestCase
     {
         $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '08'.random_int(100000, 999999)]);
         $svc = new SantriService;
-        $santri = $svc->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L', 'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'gelombang' => 1]);
+        // Jenjang wajib: potongan kini matriks, tak ada sel "semua jenjang".
+        $santri = $svc->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L',
+            'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'gelombang' => '1', 'kode_jenjang' => $this->jenjangUji()]);
         $santri->update(['status' => 'terbayar']);
+        // Potongan gelombang kini DIPEROLEH dengan membayar registrasi.
+        $this->lunasiRegistrasi($santri->id);
         $svc->verifikasiBerkas($santri->id);
         $svc->seleksi($santri->id, []);
         $svc->pengumuman($santri->id, ['lulus' => true]);
@@ -107,7 +114,7 @@ class KoreksiUangPangkalTest extends TestCase
 
     public function test_koreksi_menghormati_potongan_gelombang(): void
     {
-        PotonganGelombang::create(['tahun_ajaran' => self::TA, 'gelombang' => 1, 'potongan' => '2000000', 'masa_berlaku_hari' => 7, 'aktif' => true]);
+        $this->buatPotonganGelombang(self::TA, '1', $this->jenjangUji(), '2000000');
         $santri = $this->calonDenganUangPangkal('20000000');
         $tagihan = $this->tagihanUp($santri);
         $this->assertSame(18000000.0, (float) $tagihan->nominal); // 20jt − 2jt
@@ -188,7 +195,7 @@ class KoreksiUangPangkalTest extends TestCase
     public function test_tolak_bila_uang_pangkal_belum_ditagihkan(): void
     {
         $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '0812999']);
-        $santri = (new SantriService)->create(['id_wali' => $wali->id, 'nama' => 'Belum', 'jenis_kelamin' => 'L', 'tahun_ajaran' => self::TA, 'jalur' => 'reguler']);
+        $santri = (new SantriService)->create(['id_wali' => $wali->id, 'nama' => 'Belum', 'jenis_kelamin' => 'L', 'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'kode_jenjang' => $this->jenjangUji()]);
 
         $this->expectException(AppException::class);
         $this->expectExceptionMessageMatches('/belum ditagihkan/i');

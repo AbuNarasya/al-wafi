@@ -15,7 +15,6 @@ class PotonganUangPangkal extends Model
     protected function casts(): array
     {
         return [
-            'gelombang' => 'integer',
             'nominal_normal' => 'decimal:2',
             'potongan' => 'decimal:2',
             'syarat_persen' => 'integer',

@@ -23,6 +23,8 @@ use Tests\TestCase;
 /** Uang pangkal: tagihkan (potongan), daftar ulang (akrual), angsuran, evaluasi hangus. */
 class UangPangkalTest extends TestCase
 {
+    use \Tests\Concerns\MelunasiRegistrasi;
+    use \Tests\Concerns\MembuatGelombang;
     use \Tests\Concerns\MengaktifkanSantri;
     use RefreshDatabase;
     use \Tests\Concerns\MembuatTarif;
@@ -48,6 +50,9 @@ class UangPangkalTest extends TestCase
         \App\Models\JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler', 'tahun_ajaran' => '2026/2027']);
         $this->admin = User::create(['username' => 'adm', 'nama' => 'Admin', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => true])->id_pengguna;
 
+        // Jenjang dibuat SEBELUM tarif: fixture tarif tanpa jenjang mencerminkan
+        // selnya ke tiap jenjang yang sudah ada saat itu.
+        $this->jenjangUji();
         $this->buatBiaya(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND_REG, 'kode_unit' => self::UNIT, 'tahun_ajaran' => '2026/2027']);
         $this->buatBiaya(['kode' => 'UP', 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'kode_coa_pendapatan' => self::PEND_UP, 'kode_coa_piutang' => self::PIUT_UP, 'kode_unit' => self::UNIT, 'tahun_ajaran' => '2026/2027']);
     }
@@ -55,15 +60,20 @@ class UangPangkalTest extends TestCase
     private function buatSantriDiterima(): Santri
     {
         $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '0812'.rand(1000, 9999)]);
-        $santri = (new SantriService)->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L', 'gelombang' => 1, 'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler']);
+        // Jenjang WAJIB sejak potongan jadi matriks: tak ada lagi sel "semua
+        // jenjang", jadi santri tanpa jenjang tak pernah punya sel yang cocok.
+        $santri = (new SantriService)->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L',
+            'gelombang' => '1', 'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler', 'kode_jenjang' => $this->jenjangUji()]);
         $santri->update(['status' => 'diterima']);
+        // Potongan gelombang kini DIPEROLEH dengan membayar registrasi.
+        $this->lunasiRegistrasi($santri->id);
 
         return $santri->refresh();
     }
 
     public function test_tagihkan_uang_pangkal_dengan_potongan(): void
     {
-        PotonganGelombang::create(['tahun_ajaran' => '2026/2027', 'gelombang' => 1, 'potongan' => '1000000', 'masa_berlaku_hari' => 7, 'aktif' => true]);
+        $this->buatPotonganGelombang('2026/2027', '1', $this->jenjangUji(), '1000000');
         $santri = $this->buatSantriDiterima();
 
         $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '5000000'])['uang_pangkal'];
@@ -98,7 +108,7 @@ class UangPangkalTest extends TestCase
 
     public function test_angsuran_dan_potongan_hangus(): void
     {
-        PotonganGelombang::create(['tahun_ajaran' => '2026/2027', 'gelombang' => 1, 'potongan' => '1000000', 'masa_berlaku_hari' => 7, 'aktif' => true]);
+        $this->buatPotonganGelombang('2026/2027', '1', $this->jenjangUji(), '1000000');
         $santri = $this->buatSantriDiterima();
         $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '5000000'])['uang_pangkal']; // efektif 4jt
 

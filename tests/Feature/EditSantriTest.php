@@ -120,7 +120,7 @@ class EditSantriTest extends TestCase
         $this->santri->refresh();
         $this->assertSame(self::TA, $this->santri->tahun_ajaran);
         $this->assertSame('reguler', $this->santri->jalur);
-        $this->assertSame(2, $this->santri->gelombang);
+        $this->assertSame('2', $this->santri->gelombang); // kode gelombang kini teks
         $this->assertSame('aktif', $this->santri->status);
         $this->assertStringStartsWith('PSB-', $this->santri->no_pendaftaran);
     }

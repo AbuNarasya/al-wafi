@@ -44,13 +44,14 @@ class ReminderTagihanTest extends TestCase
     private function buatTagihan(string $jatuhTempo): TagihanSantri
     {
         $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '08999']);
+        $this->jenjangUji();
         $this->buatBiaya([
             'kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000',
             'kode_coa_pendapatan' => '4.ZZRM.REG', 'kode_unit' => 'ZZRMU', 'tahun_ajaran' => '2026/2027',
         ]);
         $santri = (new SantriService)->create([
             'id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L', 'tanggal_lahir' => '2012-05-01',
-            'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler',
+            'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler', 'kode_jenjang' => $this->jenjangUji(),
         ]);
 
         // Tagihan registrasi otomatis dari registrasi tidak ber-jatuh-tempo; pakai tagihan manual.

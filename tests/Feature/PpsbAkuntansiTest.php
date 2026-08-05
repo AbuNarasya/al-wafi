@@ -62,7 +62,9 @@ class PpsbAkuntansiTest extends TestCase
     private function buatSantri(bool $aktif = false, ?string $jenjang = null): Santri
     {
         $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '0812'.rand(1000, 9999)]);
-        $santri = (new SantriService)->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L', 'kode_jenjang' => $jenjang, 'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler']);
+        // Santri WAJIB berjenjang; 'SD' dibuat di setUp sebagai bawaannya.
+        $santri = (new SantriService)->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L',
+            'kode_jenjang' => $jenjang ?: 'SD', 'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler']);
         if ($aktif) {
             $santri->update(['status' => 'aktif']);
         }

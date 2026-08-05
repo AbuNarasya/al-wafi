@@ -57,6 +57,7 @@ class StatusBayarDaftarTest extends TestCase
             'kode_level' => 'L1', 'is_admin' => true, 'tim_keuangan' => true, 'status' => 'aktif',
         ]);
 
+        $this->jenjangUji();
         $this->buatBiaya([
             'kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '1000000',
             'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
@@ -69,7 +70,7 @@ class StatusBayarDaftarTest extends TestCase
 
         return (new SantriService)->create([
             'id_wali' => $wali->id, 'nama' => $nama, 'jenis_kelamin' => 'L',
-            'tahun_ajaran' => self::TA, 'jalur' => 'reguler',
+            'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'kode_jenjang' => $this->jenjangUji(),
         ]);
     }
 

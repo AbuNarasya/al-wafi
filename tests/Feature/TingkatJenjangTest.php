@@ -70,7 +70,7 @@ class TingkatJenjangTest extends TestCase
             'id_wali' => $wali->id, 'nama' => 'Zaid', 'jenis_kelamin' => 'L',
             'tahun_ajaran' => self::TA, 'jalur' => 'reguler',
             'kode_jenjang' => 'SMP', 'tingkat' => 2,
-            'gelombang_mode' => 'tanpa',
+            'gelombang' => \App\Http\Controllers\SantriController::TANPA_GELOMBANG,
         ], $ganti));
     }
 

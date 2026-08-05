@@ -283,9 +283,16 @@ class SantriService
             $jenisPerlengkapan = $komponenPerlengkapan['jenis'];
         }
 
+        // Potongan gelombang DIPEROLEH dengan membayar registrasi, bukan sekadar
+        // melekat pada gelombangnya. Periodenya pun diukur pada TANGGAL
+        // PELUNASAN REGISTRASI, bukan hari tagihan uang pangkal dibuat: calon
+        // yang membayar tepat waktu tak boleh kehilangan potongannya hanya
+        // karena pengumuman kelulusan atau penagihannya tertunda.
+        //
         // Jalur bebas: tak ada nominal, jadi tak ada pula potongan yang dihitung.
-        $potonganRow = $bebas ? null
-            : (new PotonganGelombangService)->potonganAktif($santri->gelombang, $jenjangTagihan, $taTagihan);
+        $lunasRegistrasi = $this->tanggalLunasRegistrasi($id);
+        $potonganRow = ($bebas || $lunasRegistrasi === null) ? null
+            : (new PotonganGelombangService)->potonganAktif($santri->gelombang, $jenjangTagihan, $taTagihan, $lunasRegistrasi);
         $potongan = $potonganRow ? Money::of($potonganRow->potongan) : '0';
         if (Money::gte($potongan, $nominalNormal) && ! $bebas) {
             throw new AppException(422, "Potongan Gelombang {$santri->gelombang} ({$potongan}) tidak boleh ≥ nominal uang pangkal ({$nominalNormal}).");
@@ -300,7 +307,9 @@ class SantriService
                 'jatuh_tempo' => $data['jatuh_tempo'] ?? null, 'keterangan' => $data['keterangan'] ?? $jenis->nama,
             ]);
             if ($tagihan && Money::gtZero($potongan)) {
-                $masaBerlaku = $potonganRow?->masa_berlaku_hari ?? 7;
+                // Masa berlaku milik GELOMBANGNYA, bukan sel potongannya —
+                // satu tenggat untuk seluruh jenjang di gelombang yang sama.
+                $masaBerlaku = (new PotonganGelombangService)->masaBerlakuHari((string) $santri->gelombang, $taTagihan);
                 PotonganUangPangkal::create([
                     'id_tagihan' => $tagihan->id, 'gelombang' => $santri->gelombang,
                     'nominal_normal' => $nominalNormal, 'potongan' => $potongan, 'syarat_persen' => 50,
@@ -319,6 +328,31 @@ class SantriService
 
             return ['uang_pangkal' => $tagihan, 'perlengkapan' => $perlengkapan];
         });
+    }
+
+    /**
+     * Tanggal saat tagihan REGISTRASI calon ini menjadi LUNAS — penentu apakah
+     * ia berhak atas potongan gelombang, sekaligus tanggal yang dibandingkan
+     * dengan periode gelombangnya.
+     *
+     * NULL bila registrasinya belum lunas ATAU belum pernah ditagihkan sama
+     * sekali. Keduanya sengaja diperlakukan sama: potongan adalah imbalan atas
+     * pembayaran registrasi, jadi tanpa pembayaran itu tak ada yang diimbali.
+     */
+    private function tanggalLunasRegistrasi(int $idSantri): ?string
+    {
+        $tagihan = TagihanSantri::where('id_santri', $idSantri)
+            ->where('perilaku', 'registrasi')
+            ->orderByDesc('id')->first();
+        if (! $tagihan || ! Money::isZero($tagihan->sisa)) {
+            return null;
+        }
+
+        // Tanggal setoran TERAKHIR — itulah saat kewajibannya benar-benar tuntas.
+        $pelunas = PembayaranSantri::where('id_tagihan', $tagihan->id)
+            ->orderByDesc('tanggal')->orderByDesc('id')->first();
+
+        return $pelunas?->tanggal?->toDateString();
     }
 
     /** Santri ini sudah punya tagihan berperilaku tertentu untuk (jenjang, T.A) itu? */

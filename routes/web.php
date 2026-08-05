@@ -492,15 +492,21 @@ Route::middleware('auth')->group(function () {
         Route::post('/terbitkan', 'terbitkan')->name('terbitkan')->middleware('hakakses:tagihan-massal,buat');
     });
 
-    // Potongan Gelombang (list/create/edit/remove).
-    Route::prefix('ppsb/potongan-gelombang')->name('potongan_gelombang.')->group(function () {
-        $p = \App\Http\Controllers\PotonganGelombangController::class;
-        Route::get('/', [$p, 'index'])->name('index')->middleware('hakakses:potongan-gelombang,lihat');
-        Route::get('/create', [$p, 'create'])->name('create')->middleware('hakakses:potongan-gelombang,buat');
-        Route::post('/', [$p, 'store'])->name('store')->middleware('hakakses:potongan-gelombang,buat');
-        Route::get('/{id}/edit', [$p, 'edit'])->name('edit')->middleware('hakakses:potongan-gelombang,ubah')->whereNumber('id');
-        Route::put('/{id}', [$p, 'update'])->name('update')->middleware('hakakses:potongan-gelombang,ubah')->whereNumber('id');
-        Route::delete('/{id}', [$p, 'destroy'])->name('destroy')->middleware('hakakses:potongan-gelombang,hapus')->whereNumber('id');
+    // Gelombang: master (identitas & waktu) + MATRIKS potongannya. Keduanya
+    // digerbangi modul yang sama — memisahkan haknya hanya akan melahirkan
+    // keadaan aneh: boleh mengisi potongan tapi tak boleh melihat gelombangnya.
+    Route::prefix('ppsb/gelombang')->name('gelombang.')->group(function () {
+        $g = \App\Http\Controllers\GelombangController::class;
+        // Matriks didaftarkan SEBELUM /{id} — kalau tidak, "potongan" akan
+        // ditelan parameter id (yang whereNumber-nya justru menolaknya → 404).
+        Route::get('/potongan', [$g, 'potongan'])->name('potongan')->middleware('hakakses:potongan-gelombang,lihat');
+        Route::put('/potongan', [$g, 'simpanPotongan'])->name('potongan.simpan')->middleware('hakakses:potongan-gelombang,ubah');
+        Route::get('/', [$g, 'index'])->name('index')->middleware('hakakses:potongan-gelombang,lihat');
+        Route::get('/create', [$g, 'create'])->name('create')->middleware('hakakses:potongan-gelombang,buat');
+        Route::post('/', [$g, 'store'])->name('store')->middleware('hakakses:potongan-gelombang,buat');
+        Route::get('/{id}/edit', [$g, 'edit'])->name('edit')->middleware('hakakses:potongan-gelombang,ubah')->whereNumber('id');
+        Route::put('/{id}', [$g, 'update'])->name('update')->middleware('hakakses:potongan-gelombang,ubah')->whereNumber('id');
+        Route::delete('/{id}', [$g, 'destroy'])->name('destroy')->middleware('hakakses:potongan-gelombang,hapus')->whereNumber('id');
     });
 
     // Angsuran Uang Pangkal (rencana termin + reminder).

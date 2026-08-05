@@ -132,22 +132,34 @@
             </div>
 
             <div class="grid gap-4 sm:grid-cols-3" x-data="{ sumber: '{{ old('sumber_informasi') }}' }">
-                {{-- Gelombang dipilih SADAR: bernomor, atau "Tanpa Gelombang" untuk pindahan & kasus khusus. --}}
-                <div x-data="{ mode: @js(old('gelombang_mode', '')) }">
+                {{-- Gelombang dipilih dari master Potongan Gelombang (kodenya bebas:
+                     angka maupun nama), atau "Tanpa Gelombang" untuk pindahan &
+                     kasus khusus. Seluruh kode dirender di server lalu disaring per
+                     T.A oleh Alpine — supaya isinya tetap bisa diperiksa test dan
+                     tetap tampil saat JavaScript mati. --}}
+                @php $tanpaGelombang = \App\Http\Controllers\SantriController::TANPA_GELOMBANG; @endphp
+                <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Gelombang <span class="text-red-500">*</span></label>
-                    <select name="gelombang_mode" x-model="mode" required
+                    <select name="gelombang" required
                             class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm focus:border-brand focus:ring-1 focus:ring-brand">
-                        <option value="">— pilih —</option>
-                        <option value="nomor">Gelombang ke-…</option>
-                        <option value="tanpa">Tanpa Gelombang</option>
+                        <option value="">— pilih gelombang —</option>
+                        <option value="{{ $tanpaGelombang }}" @selected(old('gelombang') === $tanpaGelombang)>Tanpa Gelombang</option>
+                        @foreach ($gelombangOptions as $kodeTa => $daftar)
+                            @foreach ($daftar as $gel)
+                                <option value="{{ $gel['kode'] }}" @selected(old('gelombang') === (string) $gel['kode'])
+                                        x-bind:hidden="ta !== '{{ $kodeTa }}'" x-bind:disabled="ta !== '{{ $kodeTa }}'">{{ $gel['nama'] }}</option>
+                            @endforeach
+                        @endforeach
                     </select>
-                    <input type="number" name="gelombang" min="1" x-show="mode === 'nomor'" x-cloak
-                           :required="mode === 'nomor'" value="{{ old('gelombang') }}" placeholder="nomor gelombang"
-                           class="mt-2 w-full rounded-lg border border-gray-400 px-3 py-2 text-sm focus:border-brand focus:ring-1 focus:ring-brand">
-                    <p class="mt-1 text-xs text-gray-400" x-show="mode === 'tanpa'" x-cloak>
-                        Untuk santri pindahan &amp; kasus di luar skema gelombang — tidak mendapat potongan gelombang.
-                    </p>
-                    @error('gelombang_mode')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                    @if (empty($gelombangOptions))
+                        <p class="mt-1 text-xs text-gray-400">
+                            Belum ada gelombang yang sedang berjalan. Tambahkan di menu PPSB &rarr; Gelombang; sementara ini hanya "Tanpa Gelombang" yang bisa dipilih.
+                        </p>
+                    @else
+                        <p class="mt-1 text-xs text-gray-400">
+                            "Tanpa Gelombang" untuk pindahan &amp; kasus di luar skema — tidak mendapat potongan.
+                        </p>
+                    @endif
                     @error('gelombang')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div>

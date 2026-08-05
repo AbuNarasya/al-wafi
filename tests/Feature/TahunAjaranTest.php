@@ -81,8 +81,9 @@ class TahunAjaranTest extends TestCase
         // SATU baris registrasi (akunnya sama tiap tahun), DUA sel tarif: 500rb
         // untuk T.A 26/27 dan 750rb untuk 27/28. Dulu ini menuntut dua baris
         // master; sejak tarif dipisah, tahun ajaran tak lagi memecah masternya.
+        $this->jenjangUji();
         $this->buatBiaya(['kode' => 'REG27', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => '4.ZZTA.REG', 'kode_unit' => 'ZZTAU', 'tahun_ajaran' => '2026/2027']);
-        $this->pasangTarif('2027/2028', null, null, 'registrasi', '750000');
+        $this->pasangTarif('2027/2028', $this->jenjangUji(), null, 'registrasi', '750000');
         $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '08321']);
 
         $santriSvc = new SantriService;
@@ -98,13 +99,15 @@ class TahunAjaranTest extends TestCase
         // Jalur BERLAKU LINTAS T.A — jalur mana pun boleh dipakai di T.A mana pun.
         // (Dulu ada aturan "jalur harus milik T.A yang sama"; dicabut 2026-07-28
         // karena "Reguler" memang jalur yang sama tiap tahun.)
-        $lintas = $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'Lintas TA', 'jenis_kelamin' => 'L', 'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler28']);
+        $lintas = $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'Lintas TA', 'jenis_kelamin' => 'L',
+            'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler28', 'kode_jenjang' => $this->jenjangUji()]);
         $this->assertSame('reguler28', $lintas->jalur);
 
         // Jalur nonaktif tetap ditolak.
         JalurPendaftaran::whereKey('reguler28')->update(['status' => 'nonaktif']);
         try {
-            $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'B', 'jenis_kelamin' => 'L', 'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler28']);
+            $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'B', 'jenis_kelamin' => 'L',
+                'tahun_ajaran' => '2026/2027', 'jalur' => 'reguler28', 'kode_jenjang' => $this->jenjangUji()]);
             $this->fail('harus 422');
         } catch (AppException $e) {
             $this->assertStringContainsString('nonaktif', $e->getMessage());
@@ -113,7 +116,8 @@ class TahunAjaranTest extends TestCase
 
         // TA 27/28 → tagihan registrasi memakai SEL TARIF tahun itu (750rb),
         // tetapi baris master (akun) yang dipakai tetap satu-satunya yang ada.
-        $santri = $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'A', 'jenis_kelamin' => 'L', 'tahun_ajaran' => '2027/2028', 'jalur' => 'reguler28']);
+        $santri = $santriSvc->create(['id_wali' => $wali->id, 'nama' => 'A', 'jenis_kelamin' => 'L',
+            'tahun_ajaran' => '2027/2028', 'jalur' => 'reguler28', 'kode_jenjang' => $this->jenjangUji()]);
         $this->assertSame('2027/2028', $santri->tahun_ajaran);
         $this->assertSame(750000.0, (float) $santri->tagihan()->first()->nominal);
         $this->assertSame('REG27', $santri->tagihan()->first()->kode_jenis);

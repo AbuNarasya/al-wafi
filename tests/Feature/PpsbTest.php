@@ -53,6 +53,10 @@ class PpsbTest extends TestCase
 
     private function buatJenisRegistrasi(): JenisBiaya
     {
+        // Jenjang dibuat lebih dulu: fixture tarif tanpa jenjang mencerminkan
+        // selnya ke jenjang yang sudah ada, dan santri kini wajib berjenjang.
+        $this->jenjangUji();
+
         return $this->buatBiaya([
             'kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000',
             'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
@@ -88,7 +92,7 @@ class PpsbTest extends TestCase
 
         $santri = (new SantriService)->create([
             'id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L', 'tanggal_lahir' => '2012-05-01',
-            'tahun_ajaran' => self::TA, 'jalur' => 'reguler',
+            'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'kode_jenjang' => $this->jenjangUji(),
         ]);
 
         $this->assertSame('calon', $santri->status);
@@ -115,12 +119,13 @@ class PpsbTest extends TestCase
     {
         $wali = $this->buatWali();
         $this->buatJenisRegistrasi();
-        // Sel tanpa jenjang & tanpa jalur = yang dipakai santri fixture ini.
-        $this->pasangTarif(self::TA, null, null, 'registrasi', null, bebas: true);
+        // Sel JENJANG santri fixture ini: tarif dicocokkan persis, tak ada lagi
+        // sel "tanpa jenjang" yang bisa melayaninya.
+        $this->pasangTarif(self::TA, $this->jenjangUji(), null, 'registrasi', null, bebas: true);
 
         $santri = (new SantriService)->create([
             'id_wali' => $wali->id, 'nama' => 'Anak Karyawan', 'jenis_kelamin' => 'L',
-            'tahun_ajaran' => self::TA, 'jalur' => 'reguler',
+            'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'kode_jenjang' => $this->jenjangUji(),
         ]);
 
         $this->assertSame('terbayar', $santri->refresh()->status);
@@ -136,7 +141,7 @@ class PpsbTest extends TestCase
         $wali = $this->buatWali();
         $this->buatJenisRegistrasi();
         $svc = new SantriService;
-        $santri = $svc->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L', 'tahun_ajaran' => self::TA, 'jalur' => 'reguler']);
+        $santri = $svc->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L', 'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'kode_jenjang' => $this->jenjangUji()]);
 
         // calon tidak bisa langsung verifikasi berkas (harus terbayar dulu).
         try {
@@ -207,7 +212,7 @@ class PpsbTest extends TestCase
         $wali = $this->buatWali();
         $this->buatJenisRegistrasi();
         $svc = new SantriService;
-        $santri = $svc->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'P', 'tahun_ajaran' => self::TA, 'jalur' => 'reguler']);
+        $santri = $svc->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'P', 'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'kode_jenjang' => $this->jenjangUji()]);
 
         $svc->mengundurkanDiri($santri->id, 'pindah kota');
         $this->assertSame('mengundurkan_diri', $santri->refresh()->status);

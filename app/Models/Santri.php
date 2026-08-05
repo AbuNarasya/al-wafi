@@ -92,7 +92,6 @@ class Santri extends Model
         return [
             'tanggal_lahir' => 'date',
             'tanggal_lulus' => 'date',
-            'gelombang' => 'integer',
             'tingkat' => 'integer',
             'nominal_spp' => 'decimal:2',
         ];

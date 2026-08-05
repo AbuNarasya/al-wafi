@@ -136,7 +136,7 @@ class UnduhDaftarSantriTest extends TestCase
         $this->assertSame('081300001', $baris['CP Kepala Sekolah Asal']);
         $this->assertSame('Bu Aminah', $baris['Wali Kelas Asal']);
         $this->assertSame('081300002', $baris['CP Wali Kelas Asal']);
-        $this->assertSame(2, $baris['Gelombang']);
+        $this->assertSame('2', $baris['Gelombang']); // kode gelombang kini teks
         // Kode master di-resolve jadi NAMA — `MEDSOS` tak bercerita di luar aplikasi.
         $this->assertSame('Media Sosial', $baris['Sumber Informasi']);
         $this->assertSame('Instagram', $baris['Keterangan Sumber Informasi']);

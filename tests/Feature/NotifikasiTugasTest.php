@@ -62,6 +62,7 @@ class NotifikasiTugasTest extends TestCase
             'kode_level' => 'L1', 'is_admin' => true, 'tim_keuangan' => true, 'status' => 'aktif',
         ]);
 
+        $this->jenjangUji();
         $this->buatBiaya([
             'kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000',
             'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
@@ -73,7 +74,7 @@ class NotifikasiTugasTest extends TestCase
         $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '08'.random_int(100000, 999999)]);
         $santri = (new SantriService)->create([
             'id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L',
-            'tahun_ajaran' => self::TA, 'jalur' => 'reguler',
+            'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'kode_jenjang' => $this->jenjangUji(),
         ]);
 
         return (new PembayaranSantriService)->catat([

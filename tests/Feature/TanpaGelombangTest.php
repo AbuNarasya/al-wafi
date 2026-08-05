@@ -23,6 +23,8 @@ use Tests\TestCase;
 /** "Tanpa Gelombang" (santri pindahan & kasus khusus) tak pernah dapat potongan gelombang. */
 class TanpaGelombangTest extends TestCase
 {
+    use \Tests\Concerns\MelunasiRegistrasi;
+    use \Tests\Concerns\MembuatGelombang;
     use RefreshDatabase;
     use \Tests\Concerns\MembuatTarif;
 
@@ -52,10 +54,10 @@ class TanpaGelombangTest extends TestCase
         $this->buatBiaya(['kode' => 'UP', 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'kode_coa_pendapatan' => self::PEND, 'kode_coa_piutang' => self::PIUT, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
 
         // Potongan gelombang 1 yang menggiurkan — tak boleh menempel ke santri tanpa gelombang.
-        PotonganGelombang::create(['tahun_ajaran' => self::TA, 'gelombang' => 1, 'potongan' => '2000000', 'masa_berlaku_hari' => 7, 'aktif' => true]);
+        $this->buatPotonganGelombang(self::TA, '1', 'SD', '2000000');
     }
 
-    private function buatSantri(?int $gelombang): Santri
+    private function buatSantri(?string $gelombang): Santri
     {
         $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '08'.random_int(100000, 999999)]);
         $svc = new SantriService;
@@ -67,6 +69,8 @@ class TanpaGelombangTest extends TestCase
         $svc->verifikasiBerkas($santri->id);
         $svc->seleksi($santri->id, []);
         $svc->pengumuman($santri->id, ['lulus' => true]);
+        // Potongan gelombang kini DIPEROLEH dengan membayar registrasi.
+        $this->lunasiRegistrasi($santri->id);
 
         return $santri->refresh();
     }
@@ -85,7 +89,7 @@ class TanpaGelombangTest extends TestCase
 
     public function test_santri_bergelombang_tetap_dapat_potongan(): void
     {
-        $santri = $this->buatSantri(1);
+        $santri = $this->buatSantri('1');
 
         $tagihan = (new SantriService)->tagihkanUangPangkal($santri->id, ['nominal' => '20000000'])['uang_pangkal'];
 
@@ -97,9 +101,12 @@ class TanpaGelombangTest extends TestCase
     {
         $svc = new PotonganGelombangService;
 
-        $this->assertNull($svc->potonganAktif(null, 'SD', self::TA));
+        $this->assertNull($svc->potonganAktif(null, 'SD', self::TA), 'tanpa gelombang → tak pernah dapat potongan');
         $this->assertNull($svc->potonganAktif(null, null, self::TA));
-        $this->assertNotNull($svc->potonganAktif(1, null, self::TA));
+        // Tanpa JENJANG pun tak ada potongan: selnya matriks (gelombang ×
+        // jenjang), dan tak ada lagi sel "semua jenjang" sebagai cadangan.
+        $this->assertNull($svc->potonganAktif('1', null, self::TA));
+        $this->assertNotNull($svc->potonganAktif('1', 'SD', self::TA));
     }
 
     public function test_form_menolak_bila_gelombang_tidak_dipilih_sadar(): void
@@ -113,14 +120,11 @@ class TanpaGelombangTest extends TestCase
             'kode_jenjang' => 'SD', 'tingkat' => 1,
         ];
 
-        // Tanpa memilih mode → ditolak.
-        $this->post(route('santri.store'), $dasar)->assertSessionHasErrors('gelombang_mode');
+        // Tanpa memilih apa pun → ditolak; gelombang tak boleh punya nilai bawaan.
+        $this->post(route('santri.store'), $dasar)->assertSessionHasErrors('gelombang');
 
-        // Mode "nomor" tapi angkanya kosong → ditolak.
-        $this->post(route('santri.store'), $dasar + ['gelombang_mode' => 'nomor'])->assertSessionHasErrors('gelombang');
-
-        // Mode "tanpa" → lolos & tersimpan NULL.
-        $this->post(route('santri.store'), $dasar + ['gelombang_mode' => 'tanpa', 'gelombang' => '9'])
+        // "Tanpa Gelombang" → lolos & tersimpan NULL, bukan kode sentinelnya.
+        $this->post(route('santri.store'), $dasar + ['gelombang' => \App\Http\Controllers\SantriController::TANPA_GELOMBANG])
             ->assertSessionHasNoErrors();
         $this->assertNull(Santri::where('nama', 'Zaid')->first()->gelombang);
     }

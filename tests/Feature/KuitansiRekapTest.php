@@ -49,6 +49,9 @@ class KuitansiRekapTest extends TestCase
         JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler', 'tahun_ajaran' => self::TA]);
         $this->admin = User::create(['username' => 'adm', 'nama' => 'Admin', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => true, 'tim_keuangan' => true])->id_pengguna;
 
+        // Jenjang dibuat SEBELUM tarif — fixture tarif tanpa jenjang mencerminkan
+        // selnya ke jenjang yang sudah ada saat itu, dan santri kini wajib berjenjang.
+        $this->jenjangUji();
         $this->buatBiaya([
             'kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000',
             'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA,
@@ -61,7 +64,7 @@ class KuitansiRekapTest extends TestCase
 
         return (new SantriService)->create([
             'id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L',
-            'tahun_ajaran' => self::TA, 'jalur' => 'reguler',
+            'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'kode_jenjang' => $this->jenjangUji(),
         ]);
     }
 

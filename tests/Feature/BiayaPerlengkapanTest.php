@@ -35,6 +35,8 @@ use Tests\TestCase;
  */
 class BiayaPerlengkapanTest extends TestCase
 {
+    use \Tests\Concerns\MelunasiRegistrasi;
+    use \Tests\Concerns\MembuatGelombang;
     use \Tests\Concerns\MengaktifkanSantri;
     use RefreshDatabase;
     use \Tests\Concerns\MembuatTarif;
@@ -83,6 +85,7 @@ class BiayaPerlengkapanTest extends TestCase
             'kode_level' => 'L1', 'is_admin' => true, 'tim_keuangan' => true,
         ])->id_pengguna;
 
+        $this->jenjangUji();
         $this->buatBiaya(['kode' => 'REG', 'nama' => 'Registrasi', 'tipe' => 'registrasi', 'nominal' => '500000', 'kode_coa_pendapatan' => self::PEND_REG, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
         $this->buatBiaya(['kode' => 'UP', 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'kode_coa_pendapatan' => self::PEND_UP, 'kode_coa_piutang' => self::PIUT_UP, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
     }
@@ -100,8 +103,12 @@ class BiayaPerlengkapanTest extends TestCase
     private function buatSantriDiterima(): Santri
     {
         $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '0812'.rand(100000, 999999)]);
-        $santri = (new SantriService)->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L', 'gelombang' => 1, 'tahun_ajaran' => self::TA, 'jalur' => 'reguler']);
+        // Jenjang wajib: potongan kini matriks, tak ada sel "semua jenjang".
+        $santri = (new SantriService)->create(['id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L',
+            'gelombang' => '1', 'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'kode_jenjang' => $this->jenjangUji()]);
         $santri->update(['status' => 'diterima']);
+        // Potongan gelombang kini DIPEROLEH dengan membayar registrasi.
+        $this->lunasiRegistrasi($santri->id);
 
         return $santri->refresh();
     }
@@ -118,7 +125,7 @@ class BiayaPerlengkapanTest extends TestCase
 
     public function test_terbit_dua_tagihan_dan_potongan_hanya_memotong_uang_pangkal(): void
     {
-        PotonganGelombang::create(['tahun_ajaran' => self::TA, 'gelombang' => 1, 'potongan' => '1000000', 'masa_berlaku_hari' => 7, 'aktif' => true]);
+        $this->buatPotonganGelombang(self::TA, '1', $this->jenjangUji(), '1000000');
         $this->masterPerlengkapan();
         $santri = $this->buatSantriDiterima();
 
@@ -141,7 +148,7 @@ class BiayaPerlengkapanTest extends TestCase
 
     public function test_ambang_50_persen_tetap_dihitung_dari_uang_pangkal_saja(): void
     {
-        PotonganGelombang::create(['tahun_ajaran' => self::TA, 'gelombang' => 1, 'potongan' => '1000000', 'masa_berlaku_hari' => 7, 'aktif' => true]);
+        $this->buatPotonganGelombang(self::TA, '1', $this->jenjangUji(), '1000000');
         $this->masterPerlengkapan();
         $santri = $this->buatSantriDiterima();
         $hasil = (new SantriService)->tagihkanUangPangkal($santri->id, [
@@ -370,7 +377,7 @@ class BiayaPerlengkapanTest extends TestCase
      */
     public function test_satu_form_menjadwalkan_kedua_komponen(): void
     {
-        PotonganGelombang::create(['tahun_ajaran' => self::TA, 'gelombang' => 1, 'potongan' => '1000000', 'masa_berlaku_hari' => 7, 'aktif' => true]);
+        $this->buatPotonganGelombang(self::TA, '1', $this->jenjangUji(), '1000000');
         $this->masterPerlengkapan();
         $santri = $this->buatSantriDiterima();
         (new SantriService)->tagihkanUangPangkal($santri->id, [
@@ -476,8 +483,10 @@ class BiayaPerlengkapanTest extends TestCase
 
         $this->assertSame(1000000.0, (float) $penerimaan['uang_pangkal']);
         $this->assertSame(750000.0, (float) $penerimaan['perlengkapan']);
-        // Registrasi 500rb terbit otomatis saat mendaftar & belum dibayar.
-        $this->assertSame(1750000.0, (float) $penerimaan['total'], 'total menjumlahkan ketiga komponen');
+        // Registrasi 500rb: terbit otomatis saat mendaftar dan kini memang
+        // sudah dibayar — syarat memperoleh potongan gelombang.
+        $this->assertSame(500000.0, (float) $penerimaan['registrasi']);
+        $this->assertSame(2250000.0, (float) $penerimaan['total'], 'total menjumlahkan ketiga komponen');
     }
 
     public function test_koreksi_nominal_perlengkapan_menonaktifkan_jadwalnya(): void

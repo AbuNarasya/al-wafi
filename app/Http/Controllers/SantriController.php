@@ -43,6 +43,14 @@ use Illuminate\View\View;
  */
 class SantriController extends Controller
 {
+    /**
+     * Penanda "Tanpa Gelombang" di dropdown registrasi. Sengaja memakai tanda
+     * hubung: kode gelombang di master dilarang bernilai ini (lihat
+     * PotonganGelombangController), jadi ia tak mungkin bentrok dengan kode
+     * gelombang sungguhan.
+     */
+    public const TANPA_GELOMBANG = '-';
+
     /** Judul halaman & nama rute per lingkup — dipakai judul, tombol Reset, & tautan Kembali. */
     private const JUDUL = [
         'calon' => 'Calon Santri',
@@ -365,6 +373,17 @@ class SantriController extends Controller
             'jalurNonaktif' => JalurNonaktif::all(['tahun_ajaran', 'kode_jenjang', 'kode_jalur'])
                 ->groupBy(fn ($n) => $n->tahun_ajaran.'|'.$n->kode_jenjang)
                 ->map(fn ($g) => $g->pluck('kode_jalur')->values()->all())->all(),
+            // Gelombang diambil dari MASTER-nya, bukan dari baris potongan:
+            // gelombang ada karena dibuka panitia, bukan karena kebetulan punya
+            // potongan. Hanya yang periodenya sedang berjalan yang ditawarkan.
+            // Seluruh T.A dirender server lalu disaring Alpine, agar isinya bisa
+            // diperiksa test & tetap tampil saat JavaScript mati.
+            'gelombangOptions' => \App\Models\Gelombang::where('status', 'aktif')
+                ->orderBy('kode')->get()
+                ->filter(fn ($g) => $g->keadaan() === 'berlaku')
+                ->groupBy('tahun_ajaran')
+                ->map(fn ($g) => $g->map(fn ($x) => ['kode' => $x->kode, 'nama' => $x->nama])->values()->all())
+                ->all(),
         ]);
     }
 
@@ -387,20 +406,21 @@ class SantriController extends Controller
             'tingkat' => ['required', 'integer', 'min:1'],
             'tahun_ajaran' => ['required', 'string', 'exists:tahun_ajaran,kode'],
             'jalur' => ['required', 'string', 'exists:jalur_pendaftaran,kode'],
-            // Gelombang dipilih SADAR: "nomor" (isi angkanya) atau "tanpa"
-            // (pindahan & kasus khusus → tak pernah dapat potongan gelombang).
-            'gelombang_mode' => ['required', 'in:nomor,tanpa'],
-            'gelombang' => ['nullable', 'required_if:gelombang_mode,nomor', 'integer', 'min:1'],
+            // Gelombang = KODE dari master Potongan Gelombang, atau penanda
+            // "tanpa gelombang" untuk pindahan & kasus khusus (tak pernah dapat
+            // potongan). Wajib dipilih sadar — tak ada nilai bawaan.
+            'gelombang' => ['required', 'string', 'max:50'],
             // Pilihannya kini master (PPSB → Sumber Informasi), bukan daftar tetap.
             'sumber_informasi' => ['nullable', Rule::exists('sumber_informasi', 'kode')->where('status', 'aktif')],
             'sumber_informasi_lain' => ['nullable', 'string', 'max:255'],
         ]);
 
-        // "Tanpa Gelombang" disimpan sebagai NULL, bukan angka sentinel.
-        if ($data['gelombang_mode'] === 'tanpa') {
+        // "Tanpa Gelombang" disimpan sebagai NULL, bukan kode sentinel — supaya
+        // pencarian potongan berhenti sejak awal, bukan mencari kode yang tak
+        // pernah ada di master.
+        if ($data['gelombang'] === self::TANPA_GELOMBANG) {
             $data['gelombang'] = null;
         }
-        unset($data['gelombang_mode']);
 
         try {
             $santri = $this->service->create($data);
