@@ -206,9 +206,15 @@ class CashOutController extends Controller
                 ->map(fn ($it) => ['v' => $it->kode_persediaan, 'l' => "{$it->nama_persediaan} ({$it->kode_persediaan})"])->all(),
 
             // Pengajuan siap bayar (diposting=accrual, diverifikasi=uang muka).
+            //
+            // `sisa` diambil dari sisaTagihan(), BUKAN `sisa_hutang` mentah: pada
+            // penyelesaian uang muka kolom itu menyimpan nominal uang mukanya.
+            // Salah di sini bukan sekadar salah tulis — angkanya ikut mengisi
+            // isian Nominal, dan servicenya menolak karena menuntut pelunasan
+            // penuh sebesar kekurangan yang sebenarnya.
             'pengajuanData' => \App\Models\PengajuanPembayaran::whereIn('status', ['diposting', 'diverifikasi'])
-                ->orderByDesc('id')->get(['id', 'nomor', 'jenis', 'nominal', 'sisa_hutang'])
-                ->map(fn ($p) => ['id' => $p->id, 'nomor' => $p->nomor, 'jenis' => $p->jenis, 'nominal' => \App\Support\Money::of($p->nominal), 'sisa' => \App\Support\Money::of($p->sisa_hutang)])->all(),
+                ->orderByDesc('id')->get(['id', 'nomor', 'jenis', 'nominal', 'sisa_hutang', 'sisa_kurang_bayar'])
+                ->map(fn ($p) => ['id' => $p->id, 'nomor' => $p->nomor, 'jenis' => $p->jenis, 'nominal' => \App\Support\Money::of($p->nominal), 'sisa' => $p->sisaTagihan()])->all(),
 
             // Pembiayaan aktif (Angsuran) + data prefill baris.
             'loanOptions' => ['' => '— bukan angsuran pembiayaan —'] + \App\Models\BankLoan::where('status', 'aktif')

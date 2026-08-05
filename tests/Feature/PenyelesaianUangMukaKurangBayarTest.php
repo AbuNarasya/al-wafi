@@ -201,6 +201,27 @@ class PenyelesaianUangMukaKurangBayarTest extends TestCase
         $this->assertStringNotContainsString('Sisa Hutang', $isi, 'Judul kolom melayani dua jenis dokumen.');
     }
 
+    /**
+     * Dropdown "Pelunasan Pengajuan Pembayaran" di Kas Keluar menawarkan
+     * KEKURANGANNYA. Salah di sini bukan sekadar salah tulis: angka itu ikut
+     * mengisi isian Nominal, lalu service menolaknya karena menuntut pelunasan
+     * penuh sebesar kekurangan yang sebenarnya — pembayarannya jadi buntu.
+     */
+    public function test_dropdown_kas_keluar_menawarkan_kekurangan_bukan_nominal_uang_muka(): void
+    {
+        $adv = $this->uangMuka('10000000');
+        $rec = $this->penyelesaian($adv, '12000000');
+        $this->svc->verifikasi($rec->id, self::HUTANG, $this->keuangan->id_pengguna);
+
+        // Blade menulis JSON-nya dengan kutip ter-escape (") — dinormalkan
+        // dulu supaya yang diperiksa isinya, bukan cara menulisnya.
+        $isi = str_replace(['\\u0022', '&quot;'], '"',
+            $this->actingAs($this->keuangan)->get(route('cash_out.create'))->assertOk()->content());
+
+        $this->assertStringContainsString('"sisa":"2000000.00"', $isi);
+        $this->assertStringNotContainsString('"sisa":"10000000.00"', $isi);
+    }
+
     /** Kekurangannya dibayar lewat Kas Keluar — barulah kas berkurang. */
     public function test_kekurangan_dibayar_lewat_kas_keluar(): void
     {
