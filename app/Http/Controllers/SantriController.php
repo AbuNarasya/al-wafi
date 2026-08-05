@@ -111,11 +111,12 @@ class SantriController extends Controller
         //     abjad kode, menambah satu jalur akan MENGGESER warna semua jalur
         //     setelahnya — orang yang sudah hafal "biru = pindahan" jadi salah baca.
         //     created_at NULL (baris hasil impor SQL langsung) dianggap paling tua.
-        //   $opsiJalur — urut kode, untuk dropdown filter (yang dicari orang abjad).
+        //   $opsiJalur — urut `urutan` master, susunan yang diatur petugas dengan
+        //     menyeret baris di halaman Jalur Pendaftaran. Sengaja query sendiri:
+        //     mengurutkan ulang $jalur akan ikut menggeser jatah warnanya.
         $jalur = JalurPendaftaran::orderByRaw('created_at ASC NULLS FIRST')
             ->orderBy('kode')->pluck('nama', 'kode')->all();
-        $opsiJalur = $jalur;
-        ksort($opsiJalur);
+        $opsiJalur = JalurPendaftaran::orderBy('urutan')->orderBy('kode')->pluck('nama', 'kode')->all();
 
         return view('santri.index', [
             'rows' => $rows,

@@ -46,9 +46,9 @@
                          hint="Jenjang berikutnya saat santri tamat di sini (SDTQ→SMP, SMP→SMA). Dikosongkan berarti jenjang terakhir: santrinya menjadi alumni, bukan naik." />
             </div>
 
+            {{-- Urutan tampil TIDAK di sini: diatur dengan menyeret baris di
+                 halaman daftar, agar susunannya terlihat sambil disusun. --}}
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-field name="urutan" label="Urutan Tampil" type="number" :value="old('urutan', $row->urutan ?? 0)"
-                         hint="Angka kecil tampil lebih dulu (mis. SD 1, SMP 2, SMA 3)." />
                 <x-field name="status" label="Status" :value="old('status', $row->status ?? 'aktif')" :options="['aktif' => 'Aktif', 'nonaktif' => 'Nonaktif']"
                          hint="Nonaktif = tidak muncul di dropdown, data lama tetap utuh." />
             </div>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\AppException;
 use App\Http\Requests\JalurPendaftaranRequest;
 use App\Models\JalurPendaftaran;
+use App\Http\Controllers\Concerns\MengaturUrutanTampil;
 use App\Services\Modules\JalurPendaftaranService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -15,7 +16,14 @@ use Illuminate\View\View;
  */
 class JalurPendaftaranController extends Controller
 {
+    use MengaturUrutanTampil;
+
     public function __construct(private readonly JalurPendaftaranService $service) {}
+
+    protected function kelasUrutan(): string
+    {
+        return JalurPendaftaran::class;
+    }
 
     public function index(): View
     {

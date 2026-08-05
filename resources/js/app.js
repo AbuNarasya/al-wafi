@@ -110,6 +110,133 @@ document.addEventListener('alpine:init', () => {
 });
 
 /**
+ * urutTabel — mengatur URUTAN TAMPIL baris master dengan menyeret barisnya
+ * (lihat komponen <x-urut-tabel>, <x-urut-kepala>, <x-urut-sel>).
+ *
+ * Dipakai master ber-kolom `urutan`: jenjang, tipe biaya, sumber informasi,
+ * jalur pendaftaran. Susunan baru langsung dikirim ke server (`fetch`) tanpa
+ * memuat ulang halaman, lalu server merapikan nomornya menjadi 1..n.
+ *
+ * DUA cara memindahkan, sengaja:
+ *   • seret pegangan ⠿ — cepat di desktop;
+ *   • tombol ▲▼ — satu-satunya yang jalan di layar sentuh, karena drag & drop
+ *     bawaan HTML5 tidak mengenal sentuhan sama sekali.
+ *
+ * DIKUNCI SELAMA FILTER AKTIF: baris yang tersembunyi tak ikut terkirim, jadi
+ * menyimpan susunan "yang terlihat saja" akan melemparkan baris tersembunyi ke
+ * bawah tanpa disadari siapa pun.
+ */
+document.addEventListener('alpine:init', () => {
+    Alpine.data('urutTabel', (alamat) => ({
+        seret: null,      // <tr> yang sedang dipindahkan
+        terkunci: false,  // ada baris tersembunyi filter
+        status: '',       // '' | 'menyimpan' | 'tersimpan' | 'gagal'
+        pesan: '',
+
+        init() {
+            // rowFilter (komponen induk) menyembunyikan baris saat init; tunggu
+            // giliran berikutnya supaya keadaannya sudah final saat diperiksa.
+            this.$nextTick(() => this.periksa());
+        },
+
+        baris() {
+            return [...this.$root.querySelectorAll('tbody tr[data-row]')];
+        },
+
+        periksa() {
+            this.terkunci = this.baris().some((tr) => tr.style.display === 'none');
+            if (!this.terkunci && this.status === 'gagal' && this.pesan.startsWith('Kosongkan')) {
+                this.status = '';
+                this.pesan = '';
+            }
+        },
+
+        tolakBilaTerkunci() {
+            this.periksa();
+            if (this.terkunci) {
+                this.status = 'gagal';
+                this.pesan = 'Kosongkan filter dulu — baris yang tersembunyi ikut menentukan urutan.';
+            }
+
+            return this.terkunci;
+        },
+
+        mulai(ev) {
+            const pegangan = ev.target.closest?.('[data-seret]');
+            if (!pegangan) return;
+            if (this.tolakBilaTerkunci()) { ev.preventDefault(); return; }
+
+            this.seret = pegangan.closest('tr');
+            ev.dataTransfer.effectAllowed = 'move';
+            // Firefox tak memulai drag sama sekali tanpa data yang di-set.
+            ev.dataTransfer.setData('text/plain', this.seret.dataset.kode || '');
+            ev.dataTransfer.setDragImage(this.seret, 20, 12);
+            this.seret.classList.add('opacity-40');
+        },
+
+        lewati(ev) {
+            if (!this.seret) return;
+            const atas = ev.target.closest?.('tr[data-row]');
+            if (!atas || atas === this.seret) return;
+
+            // Separuh atas baris = jatuhkan sebelum, separuh bawah = sesudah.
+            const kotak = atas.getBoundingClientRect();
+            const sesudah = (ev.clientY - kotak.top) / kotak.height > 0.5;
+            atas.parentNode.insertBefore(this.seret, sesudah ? atas.nextSibling : atas);
+        },
+
+        selesai() {
+            if (!this.seret) return;
+            this.seret.classList.remove('opacity-40');
+            this.seret = null;
+            this.simpan();
+        },
+
+        geser(el, arah) {
+            if (this.tolakBilaTerkunci()) return;
+            const tr = el.closest('tr');
+            const semua = this.baris();
+            const i = semua.indexOf(tr) + arah;
+            if (i < 0 || i >= semua.length) return; // sudah di ujung
+
+            const lawan = semua[i];
+            tr.parentNode.insertBefore(arah < 0 ? tr : lawan, arah < 0 ? lawan : tr);
+            this.simpan();
+        },
+
+        async simpan() {
+            const kode = this.baris().map((tr) => tr.dataset.kode);
+            this.status = 'menyimpan';
+            this.pesan = 'Menyimpan urutan…';
+            try {
+                const r = await fetch(alamat, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    },
+                    body: JSON.stringify({ kode }),
+                });
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(data.message || 'Urutan gagal disimpan.');
+
+                this.status = 'tersimpan';
+                this.pesan = data.pesan || 'Urutan tersimpan.';
+                setTimeout(() => {
+                    if (this.status === 'tersimpan') { this.status = ''; this.pesan = ''; }
+                }, 2500);
+            } catch (e) {
+                // Layar TIDAK dikembalikan ke susunan lama: yang terlihat sekarang
+                // bukan lagi yang tersimpan, dan itu harus dikatakan terang-terangan.
+                this.status = 'gagal';
+                this.pesan = e.message + ' Muat ulang halaman untuk melihat urutan yang tersimpan.';
+            }
+        },
+    }));
+});
+
+/**
  * unduhKolom — panel "Kolom" pada setiap tombol unduh (lihat komponen <x-unduh>).
  *
  * Daftar kolomnya TIDAK ditulis di layar: ia diminta ke alamat unduhan yang sama

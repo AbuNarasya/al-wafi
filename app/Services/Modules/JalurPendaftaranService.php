@@ -15,7 +15,7 @@ class JalurPendaftaranService
 {
     public function list()
     {
-        return JalurPendaftaran::orderBy('nama')->get();
+        return JalurPendaftaran::orderBy('urutan')->orderBy('kode')->get();
     }
 
     public function create(array $data): JalurPendaftaran
@@ -33,6 +33,9 @@ class JalurPendaftaranService
             'bebas_uang_pangkal' => (bool) ($data['bebas_uang_pangkal'] ?? false),
             'keterangan' => $data['keterangan'] ?? null,
             'status' => $data['status'] ?? 'aktif',
+            // Jalur baru masuk paling bawah, bukan menyelinap ke tengah susunan
+            // yang sudah diatur petugas.
+            'urutan' => UrutanTampilService::berikutnya(JalurPendaftaran::class),
         ]);
     }
 

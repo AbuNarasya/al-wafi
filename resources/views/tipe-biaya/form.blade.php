@@ -12,7 +12,7 @@
 
             @if ($row->bawaan)
                 <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                    Ini tipe <b>bawaan</b>. Nama, urutan, dan keterangannya bebas diubah, tetapi kode, perilaku, dan statusnya
+                    Ini tipe <b>bawaan</b>. Nama dan keterangannya bebas diubah, tetapi kode, perilaku, dan statusnya
                     dikunci — alur registrasi, uang pangkal, SPP, dan tagihan lain-lain bersandar padanya.
                 </div>
             @endif
@@ -42,8 +42,8 @@
                 @error('perilaku')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
             </div>
 
+            {{-- Urutan tampil diatur dengan menyeret baris di halaman daftar. --}}
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-field name="urutan" label="Urutan Tampil" type="number" :value="$row->urutan ?? 0" />
                 @if ($row->bawaan)
                     <div><label class="mb-1 block text-sm font-medium text-gray-700">Status</label><div class="rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600">Aktif (dikunci)</div><input type="hidden" name="status" value="aktif"></div>
                 @else

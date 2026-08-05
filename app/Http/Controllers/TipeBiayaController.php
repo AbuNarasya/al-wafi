@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
+use App\Http\Controllers\Concerns\MengaturUrutanTampil;
 use App\Models\TipeBiaya;
 use App\Services\Modules\TipeBiayaService;
 use Illuminate\Http\RedirectResponse;
@@ -13,7 +14,14 @@ use Illuminate\View\View;
 /** Master Tipe Biaya (Setting Awal). Controller tipis → TipeBiayaService. */
 class TipeBiayaController extends Controller
 {
+    use MengaturUrutanTampil;
+
     public function __construct(private readonly TipeBiayaService $service) {}
+
+    protected function kelasUrutan(): string
+    {
+        return TipeBiaya::class;
+    }
 
     public function index(): View
     {
@@ -69,7 +77,7 @@ class TipeBiayaController extends Controller
             'kode' => $baru ? ['required', 'string', 'max:50', Rule::unique('tipe_biaya', 'kode')] : ['prohibited'],
             'nama' => ['required', 'string', 'max:255'],
             'perilaku' => ['required', Rule::in(array_keys(TipeBiaya::PERILAKU))],
-            'urutan' => ['nullable', 'integer', 'min:0'],
+            // `urutan` diatur dengan menyeret baris di halaman daftar, bukan di sini.
             'keterangan' => ['nullable', 'string'],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
         ]);

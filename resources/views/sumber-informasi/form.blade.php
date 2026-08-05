@@ -19,8 +19,8 @@
                 <x-field name="nama" label="Nama" :value="$row->nama" required placeholder="mis. Brosur / Spanduk" />
             </div>
 
+            {{-- Urutan tampil diatur dengan menyeret baris di halaman daftar. --}}
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-field name="urutan" label="Urutan Tampil" type="number" :value="$row->urutan ?? 0" />
                 <x-field name="status" label="Status" :value="$row->status ?? 'aktif'" :options="['aktif' => 'Aktif', 'nonaktif' => 'Nonaktif']" required />
             </div>
 

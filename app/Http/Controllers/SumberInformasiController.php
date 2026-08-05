@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
+use App\Http\Controllers\Concerns\MengaturUrutanTampil;
 use App\Models\SumberInformasi;
 use App\Services\Modules\SumberInformasiService;
 use Illuminate\Http\RedirectResponse;
@@ -13,7 +14,14 @@ use Illuminate\View\View;
 /** Master Sumber Informasi PPSB. Controller tipis → SumberInformasiService. */
 class SumberInformasiController extends Controller
 {
+    use MengaturUrutanTampil;
+
     public function __construct(private readonly SumberInformasiService $service) {}
+
+    protected function kelasUrutan(): string
+    {
+        return SumberInformasi::class;
+    }
 
     public function index(): View
     {
@@ -68,7 +76,7 @@ class SumberInformasiController extends Controller
         $data = $request->validate([
             'kode' => $baru ? ['required', 'string', 'max:50', Rule::unique('sumber_informasi', 'kode')] : ['prohibited'],
             'nama' => ['required', 'string', 'max:255'],
-            'urutan' => ['nullable', 'integer', 'min:0'],
+            // `urutan` diatur dengan menyeret baris di halaman daftar, bukan di sini.
             'butuh_keterangan' => ['nullable', 'boolean'],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
         ]);

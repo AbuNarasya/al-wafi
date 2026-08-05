@@ -82,6 +82,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [$j, 'store'])->name('store')->middleware('hakakses:jenjang,buat');
         Route::get('/{kode}/edit', [$j, 'edit'])->name('edit')->middleware('hakakses:jenjang,ubah');
         Route::put('/{kode}', [$j, 'update'])->name('update')->middleware('hakakses:jenjang,ubah');
+        // Urutan tampil (seret baris / tombol naik-turun) — sebelum /{kode}
+        // tak perlu, karena polanya POST sedangkan /{kode} memakai PUT & DELETE.
+        Route::post('/urutan', [$j, 'urutan'])->name('urutan')->middleware('hakakses:jenjang,ubah');
         Route::delete('/{kode}', [$j, 'destroy'])->name('destroy')->middleware('hakakses:jenjang,hapus');
     });
 
@@ -272,6 +275,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [$t, 'store'])->name('store')->middleware('hakakses:tipe-biaya,buat');
         Route::get('/{kode}/edit', [$t, 'edit'])->name('edit')->middleware('hakakses:tipe-biaya,ubah');
         Route::put('/{kode}', [$t, 'update'])->name('update')->middleware('hakakses:tipe-biaya,ubah');
+        Route::post('/urutan', [$t, 'urutan'])->name('urutan')->middleware('hakakses:tipe-biaya,ubah');
         Route::delete('/{kode}', [$t, 'destroy'])->name('destroy')->middleware('hakakses:tipe-biaya,hapus');
     });
 
@@ -283,6 +287,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [$s, 'store'])->name('store')->middleware('hakakses:sumber-informasi,buat');
         Route::get('/{kode}/edit', [$s, 'edit'])->name('edit')->middleware('hakakses:sumber-informasi,ubah');
         Route::put('/{kode}', [$s, 'update'])->name('update')->middleware('hakakses:sumber-informasi,ubah');
+        Route::post('/urutan', [$s, 'urutan'])->name('urutan')->middleware('hakakses:sumber-informasi,ubah');
         Route::delete('/{kode}', [$s, 'destroy'])->name('destroy')->middleware('hakakses:sumber-informasi,hapus');
     });
 
@@ -538,6 +543,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [$j, 'store'])->name('store')->middleware('hakakses:jalur-pendaftaran,buat');
         Route::get('/{kode}/edit', [$j, 'edit'])->name('edit')->middleware('hakakses:jalur-pendaftaran,ubah');
         Route::put('/{kode}', [$j, 'update'])->name('update')->middleware('hakakses:jalur-pendaftaran,ubah');
+        Route::post('/urutan', [$j, 'urutan'])->name('urutan')->middleware('hakakses:jalur-pendaftaran,ubah');
         Route::delete('/{kode}', [$j, 'destroy'])->name('destroy')->middleware('hakakses:jalur-pendaftaran,hapus');
     });
 

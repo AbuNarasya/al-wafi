@@ -24,12 +24,18 @@ class SumberInformasiService
             throw new AppException(409, "Kode sumber \"{$data['kode']}\" sudah dipakai.");
         }
 
-        return SumberInformasi::create($this->bersih($data) + ['bawaan' => false]);
+        return SumberInformasi::create($this->bersih($data) + [
+            'bawaan' => false,
+            'urutan' => UrutanTampilService::berikutnya(SumberInformasi::class),
+        ]);
     }
 
     public function update(string $kode, array $data): SumberInformasi
     {
         $lama = $this->cari($kode);
+        // `urutan` sengaja TIDAK ikut: ia hanya berubah lewat seret/naik-turun di
+        // halaman daftar. Kalau ikut disimpan dari form, menyunting nama saja
+        // akan mengembalikan barisnya ke nomor 0.
         $lama->update($this->bersih($data));
 
         return $lama;
@@ -61,7 +67,6 @@ class SumberInformasiService
         return [
             'kode' => $data['kode'],
             'nama' => $data['nama'],
-            'urutan' => (int) ($data['urutan'] ?? 0),
             'butuh_keterangan' => (bool) ($data['butuh_keterangan'] ?? false),
             'status' => $data['status'] ?? 'aktif',
         ];

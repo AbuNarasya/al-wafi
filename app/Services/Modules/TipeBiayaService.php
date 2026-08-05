@@ -27,7 +27,10 @@ class TipeBiayaService
             throw new AppException(409, "Kode tipe \"{$data['kode']}\" sudah dipakai.");
         }
 
-        return TipeBiaya::create($this->bersih($data) + ['bawaan' => false]);
+        return TipeBiaya::create($this->bersih($data) + [
+            'bawaan' => false,
+            'urutan' => UrutanTampilService::berikutnya(TipeBiaya::class),
+        ]);
     }
 
     public function update(string $kode, array $data): TipeBiaya
@@ -78,11 +81,12 @@ class TipeBiayaService
             throw new AppException(422, 'Perilaku tipe biaya tidak dikenal.');
         }
 
+        // `urutan` tidak ada di sini: ia hanya berubah lewat seret/naik-turun di
+        // halaman daftar, bukan dari form sunting.
         return [
             'kode' => $data['kode'],
             'nama' => $data['nama'],
             'perilaku' => $data['perilaku'],
-            'urutan' => (int) ($data['urutan'] ?? 0),
             'keterangan' => $data['keterangan'] ?? null,
             'status' => $data['status'] ?? 'aktif',
         ];

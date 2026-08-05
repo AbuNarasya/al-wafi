@@ -269,7 +269,9 @@ class TarifService
         };
 
         $nonaktif = JalurNonaktif::kodeUntuk($tahunAjaran, $kodeJenjang);
-        $semuaJalur = JalurPendaftaran::where('status', 'aktif')->orderBy('kode')->get();
+        // Urutan baris mengikuti `urutan` master jalur — satu susunan yang sama
+        // dengan halaman master & dropdown pendaftaran.
+        $semuaJalur = JalurPendaftaran::where('status', 'aktif')->orderBy('urutan')->orderBy('kode')->get();
 
         // ---- Matriks per jalur: hanya perilaku BIAYA MASUK ----
         // Tanpa baris "Umum (semua jalur)": ia tak punya padanan di dropdown
@@ -329,7 +331,7 @@ class TarifService
 
         return JalurPendaftaran::where('status', 'aktif')
             ->when($nonaktif !== [], fn ($q) => $q->whereNotIn('kode', $nonaktif))
-            ->orderBy('kode')->pluck('nama', 'kode')->all();
+            ->orderBy('urutan')->orderBy('kode')->pluck('nama', 'kode')->all();
     }
 
     /** Tandai satu jalur tidak berlaku di (T.A, jenjang). Sudah ditandai = diam saja. */

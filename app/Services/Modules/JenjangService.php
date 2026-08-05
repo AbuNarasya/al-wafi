@@ -46,7 +46,7 @@ class JenjangService
             'jumlah_tingkat' => $data['jumlah_tingkat'] ?? null,
             'tingkat_mulai' => $data['tingkat_mulai'] ?? null,
             'kode_jenjang_lanjutan' => $data['kode_jenjang_lanjutan'] ?? null,
-            'urutan' => $data['urutan'] ?? 0,
+            'urutan' => $data['urutan'] ?? UrutanTampilService::berikutnya(Jenjang::class),
             'status' => $data['status'] ?? 'aktif',
             'keterangan' => $data['keterangan'] ?? null,
         ]);

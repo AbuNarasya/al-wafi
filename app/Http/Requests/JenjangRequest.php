@@ -36,7 +36,8 @@ class JenjangRequest extends FormRequest
                 'nullable', 'string', Rule::exists('jenjang', 'kode'),
                 Rule::notIn([$this->route('kode') ?? $this->input('kode')]),
             ],
-            'urutan' => ['nullable', 'integer', 'between:0,999'],
+            // `urutan` TIDAK ada di form: ia diatur dengan menyeret baris di
+            // halaman daftar (lihat UrutanTampilService).
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
             'keterangan' => ['nullable', 'string'],
         ];
@@ -53,7 +54,6 @@ class JenjangRequest extends FormRequest
         if ($this->isMethod('post')) {
             $data['kode'] = $this->input('kode');
         }
-        $data['urutan'] = (int) ($data['urutan'] ?? 0);
         // Kosong = belum ditentukan; jangan dijadikan 0 karena "0 tingkat"
         // membuat dropdown Tingkat kosong tanpa penjelasan.
         $data['jumlah_tingkat'] = ($data['jumlah_tingkat'] ?? '') !== '' ? (int) $data['jumlah_tingkat'] : null;

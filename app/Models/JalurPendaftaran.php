@@ -21,11 +21,11 @@ class JalurPendaftaran extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['kode', 'nama', 'kode_jalur_lanjutan', 'bebas_uang_pangkal', 'keterangan', 'status'];
+    protected $fillable = ['kode', 'nama', 'kode_jalur_lanjutan', 'bebas_uang_pangkal', 'keterangan', 'status', 'urutan'];
 
     protected function casts(): array
     {
-        return ['bebas_uang_pangkal' => 'boolean'];
+        return ['bebas_uang_pangkal' => 'boolean', 'urutan' => 'integer'];
     }
 
     /** Jalur yang berlaku setelah santri naik jenjang; null = jalurnya tak berubah. */

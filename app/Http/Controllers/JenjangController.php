@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
+use App\Http\Controllers\Concerns\MengaturUrutanTampil;
 use App\Http\Requests\JenjangRequest;
 use App\Models\Jenjang;
 use App\Services\Modules\JenjangService;
@@ -15,7 +16,14 @@ use Illuminate\View\View;
  */
 class JenjangController extends Controller
 {
+    use MengaturUrutanTampil;
+
     public function __construct(private readonly JenjangService $service) {}
+
+    protected function kelasUrutan(): string
+    {
+        return Jenjang::class;
+    }
 
     public function index(): View
     {
@@ -24,7 +32,7 @@ class JenjangController extends Controller
 
     public function create(): View
     {
-        return view('jenjang.form', ['row' => new Jenjang(['status' => 'aktif', 'urutan' => 0]), 'baru' => true]);
+        return view('jenjang.form', ['row' => new Jenjang(['status' => 'aktif']), 'baru' => true]);
     }
 
     public function store(JenjangRequest $request): RedirectResponse

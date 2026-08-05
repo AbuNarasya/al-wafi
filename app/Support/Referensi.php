@@ -33,6 +33,7 @@ class Referensi
     public static function jalur(): array
     {
         return JalurPendaftaran::where('status', 'aktif')
+            ->orderBy('urutan')
             ->orderBy('kode')
             ->pluck('nama', 'kode')
             ->all();
