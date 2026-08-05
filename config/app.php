@@ -17,6 +17,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | PWA (pasang ke layar utama)
+    |--------------------------------------------------------------------------
+    |
+    | Tombol darurat dari sisi server. Bila diisi false, halaman tak hanya
+    | berhenti mendaftarkan pekerja layanan — ia MENCABUT yang sudah terpasang
+    | di ponsel saat halaman berikutnya dibuka. Jadi satu deploy cukup untuk
+    | mematikannya di semua perangkat, tanpa menyentuh ponsel siapa pun.
+    |
+    */
+
+    'pwa_aktif' => (bool) env('PWA_AKTIF', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

@@ -213,7 +213,9 @@
                 <span class="ml-1 font-normal text-gray-400">— {{ $ket }}</span>
             </div>
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                {{-- data-matriks: jenjang × dua belas bulan. Kolom jenjangnya sudah
+                     dilekatkan, jadi di ponsel ia digeser mendatar, bukan ditumpuk. --}}
+                <table data-matriks class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                         <tr>
                             <th class="sticky left-0 bg-gray-50 px-4 py-2 text-left">Jenjang</th>

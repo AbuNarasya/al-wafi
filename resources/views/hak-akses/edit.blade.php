@@ -47,7 +47,7 @@
         </div>
 
         <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-            <table class="min-w-full text-sm">
+            <table data-matriks class="min-w-full text-sm">
                 <thead class="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                     <tr>
                         <th class="px-4 py-3 text-left">Modul</th>

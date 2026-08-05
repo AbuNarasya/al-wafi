@@ -53,7 +53,7 @@
                     <span class="text-xs text-gray-400">nilai dalam rupiah</span>
                 </div>
 
-                <table class="min-w-full text-sm">
+                <table data-matriks class="min-w-full text-sm">
                     <thead class="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                         <tr>
                             <th class="px-4 py-3 text-left">Gelombang</th>

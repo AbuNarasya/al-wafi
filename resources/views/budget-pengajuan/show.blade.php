@@ -75,7 +75,7 @@
 
             {{-- Rincian per akun × 12 slot TA --}}
             <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-                <table class="w-full text-xs">
+                <table data-matriks class="w-full text-xs">
                     <thead class="bg-gray-50 text-left uppercase text-gray-500">
                         <tr>
                             <th class="sticky left-0 z-10 bg-gray-50 px-3 py-2 min-w-[13rem]">Akun</th>

@@ -112,7 +112,9 @@
 
             <div class="mb-1 text-sm font-semibold text-gray-700">Biaya masuk &mdash; dibedakan per jalur pendaftaran</div>
             <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                {{-- data-matriks: barisnya JALUR dan kolomnya komponen biaya —
+                     ditumpuk jadi kartu, hubungan jalur×komponennya hilang. --}}
+                <table data-matriks class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                         <tr>
                             <th class="px-4 py-3">Jalur</th>

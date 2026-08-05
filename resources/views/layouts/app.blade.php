@@ -5,19 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Dashboard') — AL Wafi</title>
+
+    {{-- PWA: aplikasi bisa dipasang ke layar utama & terbuka tanpa bilah alamat.
+         `pwa` dibaca app.js — bila "mati", pekerja layanan yang sudah terpasang
+         justru DICABUT saat halaman dimuat. Itu tombol darurat dari sisi server
+         (env PWA_AKTIF=false lalu deploy), bukan sesuatu yang perlu disentuh
+         satu per satu di ponsel staf. --}}
+    <meta name="pwa" content="{{ config('app.pwa_aktif') ? 'aktif' : 'mati' }}">
+    <meta name="theme-color" content="#164a9e">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/ikon/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="AL Wafi">
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="h-full bg-gray-100 text-gray-800 antialiased">
-<div x-data="{ sidebar: true }" class="min-h-full">
+{{--
+  Menu samping: TETAP seperti dulu di layar ≥1024px (terbuka tiap halaman dimuat,
+  tombol tiga garis tetap bekerja). Di bawah itu ia menjadi LACI yang tertutup.
+
+  Nilai awalnya dibaca dari lebar layar, bukan dipaku `true`: halaman ini dirender
+  server, jadi keadaan Alpine kembali ke nilai awal setiap kali pindah halaman —
+  dan di ponsel itu berarti menu menutupi dua pertiga layar, berulang kali.
+
+  Tak ada yang disimpan di penyimpanan peramban: di layar sempit "diingat" selalu
+  berarti "tetap tertutup", dan laci yang membuka sendiri di atas konten justru
+  keadaan yang hendak dihilangkan.
+
+  Ambangnya 1024px = breakpoint `lg` Tailwind, sama dengan `lg:pl-64` di bawah.
+--}}
+<div x-data="{
+        sidebar: window.matchMedia('(min-width: 1024px)').matches,
+        get lebar() { return window.matchMedia('(min-width: 1024px)').matches; },
+     }"
+     @keydown.escape.window="if (! lebar) sidebar = false"
+     class="min-h-full">
+    {{-- Tirai laci — hanya di layar sempit; di ≥lg disembunyikan CSS, jadi
+         perilaku desktop tak bergantung pada JavaScript sama sekali. --}}
+    <div x-show="sidebar" x-cloak @click="sidebar = false"
+         class="fixed inset-0 z-30 bg-slate-900/50 lg:hidden" aria-hidden="true"></div>
+
     {{-- Sidebar --}}
     <aside x-show="sidebar" x-cloak
-           class="fixed inset-y-0 left-0 z-30 w-64 overflow-y-auto bg-brand-dark text-slate-200 [scrollbar-gutter:stable]">
+           class="fixed inset-y-0 left-0 z-40 w-64 overflow-y-auto bg-brand-dark text-slate-200 [scrollbar-gutter:stable] pb-[env(safe-area-inset-bottom)]">
         <div class="flex h-14 items-center gap-2 border-b border-white/10 px-4">
             <div class="flex h-8 w-8 items-center justify-center rounded bg-accent font-bold text-brand-dark">A</div>
             <span class="font-semibold tracking-tight text-white">AL Wafi</span>
         </div>
         @php $aktifUrl = \App\Support\Navigation::activeUrl(); @endphp
-        <nav class="p-2 text-sm" x-data="{ open: @js(\App\Support\Navigation::activeGroup()), openSub: @js(\App\Support\Navigation::activeSub()) }">
+        {{-- Menutup laci begitu sebuah menu dipilih — hanya menu (<a>), bukan
+             tombol pembuka grup. Di ≥lg dilewati supaya desktop tak berubah. --}}
+        <nav class="p-2 text-sm" x-data="{ open: @js(\App\Support\Navigation::activeGroup()), openSub: @js(\App\Support\Navigation::activeSub()) }"
+             @click="if (! lebar && $event.target.closest('a')) sidebar = false">
             @foreach (\App\Support\Navigation::tree() as $grup)
                 @if ($grup['group'] === '')
                     {{-- Grup tanpa header (Dashboard): tampil langsung. --}}
@@ -127,6 +168,19 @@
                     <a href="{{ route('profil.index') }}" class="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                         Profil &amp; Kata Sandi
                     </a>
+                    {{-- "Pasang aplikasi" hanya muncul bila peramban memang
+                         menawarkannya (peristiwa beforeinstallprompt). Di iPhone
+                         peristiwa itu tak ada, jadi yang muncul petunjuk singkat —
+                         hampir tak ada staf yang menemukan sendiri menu
+                         "Tambahkan ke Layar Utama". Keduanya diatur app.js. --}}
+                    <button type="button" data-pasang-pwa hidden
+                            class="block w-full px-3 py-2 text-left text-sm text-brand hover:bg-gray-50">
+                        Pasang aplikasi
+                    </button>
+                    <div data-petunjuk-pwa hidden class="border-t border-gray-100 px-3 py-2 text-xs leading-relaxed text-gray-500">
+                        Pasang ke layar utama: tekan <b>Bagikan</b>, lalu
+                        <b>Tambahkan ke Layar Utama</b>.
+                    </div>
                     <form method="POST" action="{{ route('logout') }}" data-no-confirm>
                         @csrf
                         <button type="submit" class="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-gray-50">Keluar</button>

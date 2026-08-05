@@ -1,0 +1,27 @@
+{
+    "name": "AL Wafi",
+    "short_name": "AL Wafi",
+    "description": "Keuangan & kesantrian Pesantren AL Wafi",
+    "lang": "id",
+    "dir": "ltr",
+    "start_url": "/dashboard",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "theme_color": "#164a9e",
+    "background_color": "#0e3168",
+    "icons": [
+        {
+            "src": "/ikon/ikon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/ikon/ikon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}

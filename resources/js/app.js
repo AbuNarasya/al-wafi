@@ -32,8 +32,19 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('rowFilter', () => ({
         count: 0,
         hasFilter: false,
+        // Baris filter per kolom mustahil dipakai di layar ponsel — ia dilipat
+        // dan dibuka lewat tombol "Filter" (lihat <x-filter-bar>). `adaKolom`
+        // menahan tombolnya muncul di daftar yang memang tak punya baris filter.
+        adaKolom: false,
+        filterTampak: false,
+
+        bukaFilter() {
+            this.filterTampak = ! this.filterTampak;
+            this.$root.toggleAttribute('data-filter-tampak', this.filterTampak);
+        },
 
         init() {
+            this.adaKolom = !! this.$root.querySelector('thead tr:nth-child(2) [data-col]');
             // Isi opsi dropdown tiap kolom select dari nilai sel unik.
             this.$root.querySelectorAll('select[data-col]').forEach((sel) => {
                 const idx = Number(sel.dataset.col);
@@ -108,6 +119,160 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 });
+
+/**
+ * aksiForm — PAPAN SIMPAN yang melekat di kaki layar pada formulir panjang.
+ *
+ * Di ponsel, tombol Simpan formulir kas keluar/jurnal/pengajuan berada jauh di
+ * bawah beberapa layar gulungan; petugas harus menggulir turun untuk menyimpan,
+ * lalu menggulir naik lagi untuk memeriksa. Baris tombolnya dibuat melekat
+ * sehingga selalu terjangkau.
+ *
+ * Barisnya dikenali dari markup yang memang sudah seragam di 50 formulir:
+ * pembungkus terakhir di dalam <form> yang berisi tombol kirim. Syarat tambahan
+ * menjaga formulir SATU TOMBOL (mis. tombol Hapus di dalam baris tabel) tak ikut
+ * dilekatkan — itu akan menempelkan tombol hapus di kaki layar, persis yang tak
+ * boleh terjadi.
+ *
+ * Seperti tabelTumpuk: hanya berjalan di bawah 768px, tak menyentuh DOM desktop.
+ */
+(function () {
+    const SEMPIT = window.matchMedia('(max-width: 767px)');
+
+    function tandai(form) {
+        if (form.hasAttribute('data-aksi-siap')) return;
+        form.setAttribute('data-aksi-siap', '');
+
+        // Formulir pendek & formulir satu tombol dilewati: melekatkan baris
+        // tombolnya justru memakan layar tanpa menolong siapa pun.
+        const isian = form.querySelectorAll('input:not([type="hidden"]), select, textarea');
+        if (isian.length < 4) return;
+        if (form.closest('td, th')) return; // formulir di dalam baris tabel
+
+        const kirim = [...form.querySelectorAll('button')]
+            .filter((b) => ! b.type || b.type === 'submit').pop();
+        if (! kirim) return;
+
+        const baris = kirim.parentElement;
+        // Harus benar-benar BARIS TOMBOL, bukan sel isian yang kebetulan memuatnya.
+        if (! baris || baris.querySelector('input:not([type="hidden"]), select, textarea')) return;
+
+        baris.setAttribute('data-aksi-form', '');
+    }
+
+    function sapu() {
+        if (! SEMPIT.matches) return;
+        document.querySelectorAll('form').forEach(tandai);
+    }
+
+    document.addEventListener('DOMContentLoaded', sapu);
+    SEMPIT.addEventListener('change', sapu);
+})();
+
+/**
+ * tabelTumpuk — DAFTAR bertabel menjadi KARTU di layar sempit.
+ *
+ * Aplikasi ini punya 138 tabel di 184 tampilan; menyunting satu per satu tak
+ * akan pernah selesai dan hasilnya tak akan seragam. Karena itu judul kolom
+ * DISALIN dari <thead> ke tiap sel sebagai `data-label`, lalu CSS di app.css
+ * yang menumpuknya. Satu tempat untuk seluruh daftar.
+ *
+ * Hanya berjalan di bawah 768px, dan tak melakukan apa pun di atas itu — DOM
+ * desktop tidak disentuh sama sekali. Kalau jendela dipersempit kemudian
+ * (atau ponsel diputar), ia dijalankan sekali saat ambangnya terlewati.
+ *
+ * Tabel MATRIKS dikecualikan lewat `data-matriks`: barisnya bukan satu benda
+ * melainkan sumbu (jalur × komponen biaya, akun × dua belas bulan), dan
+ * menumpuknya justru menghancurkan artinya — ia tetap digeser mendatar.
+ *
+ * Kelasnya SENGAJA bukan utilitas Tailwind: Tailwind hanya memindai Blade,
+ * jadi kelas yang dirakit di sini akan hilang saat build tanpa pesan apa pun.
+ */
+(function () {
+    const SEMPIT = window.matchMedia('(max-width: 767px)');
+
+    /**
+     * Teks tiap <th> pada baris judul, menurut posisi kolomnya.
+     *
+     * `null` bila kepalanya memakai colspan/rowspan: pemetaan judul ke sel di
+     * sini murni menurut POSISI, dan kepala bertingkat (mis. Ikhwan/Akhwat di
+     * dashboard PPSB) akan menghasilkan label yang salah — lebih baik tabelnya
+     * dibiarkan digeser mendatar daripada diberi keterangan keliru.
+     */
+    function judulKolom(tabel) {
+        const baris = tabel.querySelector('thead tr');
+        if (! baris) return null;
+
+        const bertingkat = [...baris.children].some((th) => th.colSpan > 1 || th.rowSpan > 1);
+
+        return bertingkat ? null : [...baris.children].map((th) => (th.textContent || '').replace(/\s+/g, ' ').trim());
+    }
+
+    function siapkan(tabel) {
+        if (tabel.hasAttribute('data-tumpuk') || tabel.hasAttribute('data-matriks')) return;
+
+        const judul = judulKolom(tabel);
+        if (! judul || judul.length < 2) return; // tabel satu kolom tak perlu ditumpuk
+
+        tabel.querySelectorAll('tbody tr').forEach((baris) => {
+            let sudahAdaJudul = false;
+            [...baris.children].forEach((sel, i) => {
+                // Sel bergabung (baris total, "tidak ada data") jadi satu blok penuh.
+                if (sel.colSpan > 1) {
+                    sel.setAttribute('data-tumpuk-penuh', '');
+
+                    return;
+                }
+                const teks = (sel.textContent || '').replace(/\s+/g, ' ').trim();
+                // Kosong DAN tanpa elemen apa pun — kolom centang & ikon tak ikut
+                // disembunyikan meski teksnya kosong.
+                if (teks === '' && sel.children.length === 0) {
+                    sel.setAttribute('data-tumpuk-kosong', '');
+
+                    return;
+                }
+
+                const label = judul[i] ?? '';
+                // Kolom aksi & pegangan urutan tak diberi label: isinya tombol,
+                // dan "Aksi: Ubah Hapus" hanya menambah kata tanpa menambah arti.
+                if (label === '' || /^(aksi|urutan)$/i.test(label)) {
+                    sel.setAttribute('data-tumpuk-aksi', '');
+                } else {
+                    sel.setAttribute('data-label', label);
+                    // Sel berlabel PERTAMA menjadi judul kartu — labelnya
+                    // disembunyikan dan tulisannya ditebalkan.
+                    if (! sudahAdaJudul) {
+                        sel.setAttribute('data-tumpuk-judul', '');
+                        sudahAdaJudul = true;
+                    }
+                }
+            });
+        });
+
+        // Baris filter per kolom ikut diberi label dari baris judul, supaya saat
+        // dibuka di ponsel setiap isian jelas menyaring kolom yang mana.
+        const barisFilter = tabel.querySelector('thead tr:nth-child(2)');
+        if (barisFilter) {
+            [...barisFilter.children].forEach((th, i) => {
+                if (th.querySelector('[data-col]')) {
+                    th.setAttribute('data-label', judul[i] ?? '');
+                } else {
+                    th.setAttribute('data-tumpuk-kosong', '');
+                }
+            });
+        }
+
+        tabel.setAttribute('data-tumpuk', '');
+    }
+
+    function sapu() {
+        if (! SEMPIT.matches) return;
+        document.querySelectorAll('table').forEach(siapkan);
+    }
+
+    document.addEventListener('DOMContentLoaded', sapu);
+    SEMPIT.addEventListener('change', sapu);
+})();
 
 /**
  * urutTabel — mengatur URUTAN TAMPIL baris master dengan menyeret barisnya
@@ -389,12 +554,18 @@ window.searchSelect = function ({ options = [], value = '' } = {}) {
         },
         posisikan() {
             const r = this.$refs.btn.getBoundingClientRect();
-            const lebar = Math.max(r.width, 224);
+            // Lebar minimal 224px agar daftar panjang tetap terbaca — TETAPI di
+            // layar 375px sebuah tombol sempit di sisi kanan akan mendorong
+            // panelnya keluar layar. Karena itu lebarnya dibatasi lebar layar,
+            // dan posisi kirinya digeser masuk kembali bila tepi kanannya lewat.
+            const tepi = 8;
+            const lebar = Math.min(Math.max(r.width, 224), window.innerWidth - tepi * 2);
+            const kiri = Math.max(tepi, Math.min(r.left, window.innerWidth - lebar - tepi));
             // Buka ke atas bila ruang bawah sempit.
             const ruangBawah = window.innerHeight - r.bottom;
             const top = ruangBawah < 240 && r.top > ruangBawah ? '' : `${r.bottom + 2}px`;
             const bottom = top === '' ? `${window.innerHeight - r.top + 2}px` : '';
-            this.gaya = `left:${r.left}px; width:${lebar}px;` + (top ? `top:${top};` : `bottom:${bottom};`);
+            this.gaya = `left:${kiri}px; width:${lebar}px;` + (top ? `top:${top};` : `bottom:${bottom};`);
         },
         buka() {
             this.open = !this.open;
@@ -601,14 +772,72 @@ Alpine.start();
     }, true); // fase capture
 })();
 
-// Bersihkan Service Worker sisa aplikasi React lama (PWA) yang mungkin masih
-// terdaftar di origin dev (localhost) dan mengintersepsi request — menyebabkan
-// respons/redirect yang keliru. App Laravel ini bukan PWA.
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations()
-        .then((regs) => regs.forEach((r) => r.unregister()))
-        .catch(() => {});
-}
+/**
+ * PWA — pemasangan ke layar utama.
+ *
+ * CATATAN PENTING: sebelum ini blok di sini MENCABUT semua service worker tanpa
+ * syarat (sisa aplikasi React lama). Kalau pencabutan itu dibiarkan sementara
+ * pekerja layanan baru didaftarkan, ia akan dimatikan sendiri setiap halaman
+ * dimuat — dan gejalanya menyesatkan: PWA-nya "kadang jalan, kadang tidak".
+ * Karena itu keduanya kini SATU keputusan, dibaca dari <meta name="pwa">:
+ *
+ *   aktif → daftarkan /sw.js (pendaftaran lama di lingkup yang sama tergantikan)
+ *   mati  → cabut semua pendaftaran, persis perilaku lama
+ *
+ * Nilainya berasal dari server (env PWA_AKTIF), jadi mematikan PWA di seluruh
+ * ponsel staf cukup dengan satu deploy — tak perlu menyentuh perangkatnya.
+ */
+(function () {
+    if (! ('serviceWorker' in navigator)) return;
+
+    const aktif = document.querySelector('meta[name="pwa"]')?.content === 'aktif';
+
+    if (! aktif) {
+        navigator.serviceWorker.getRegistrations()
+            .then((daftar) => daftar.forEach((r) => r.unregister()))
+            .catch(() => {});
+
+        return;
+    }
+
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+
+    // Ajakan memasang. Peramban menahan tawarannya sampai syaratnya terpenuhi,
+    // dan menyembunyikan tombol yang belum tentu bisa dipakai lebih baik
+    // daripada tombol yang tak melakukan apa-apa saat ditekan.
+    let tawaran = null;
+    const tombol = document.querySelector('[data-pasang-pwa]');
+    const petunjuk = document.querySelector('[data-petunjuk-pwa]');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        tawaran = e;
+        if (tombol) tombol.hidden = false;
+        if (petunjuk) petunjuk.hidden = true;
+    });
+
+    tombol?.addEventListener('click', async () => {
+        if (! tawaran) return;
+        tombol.hidden = true;
+        tawaran.prompt();
+        await tawaran.userChoice;
+        tawaran = null;
+    });
+
+    window.addEventListener('appinstalled', () => {
+        if (tombol) tombol.hidden = true;
+        if (petunjuk) petunjuk.hidden = true;
+    });
+
+    // iOS tak mengenal beforeinstallprompt sama sekali — di sana yang bisa
+    // diberikan hanya petunjuk, dan hanya bila aplikasinya belum terpasang.
+    const iosSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) && ! window.MSStream;
+    const sudahTerpasang = window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone === true;
+    if (petunjuk && iosSafari && ! sudahTerpasang) petunjuk.hidden = false;
+})();
 
 /**
  * SEPARATOR RIBUAN untuk SEMUA isian uang (mis. 750000 → 750.000).

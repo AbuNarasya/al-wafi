@@ -9,7 +9,23 @@
     'hint' => null,
 ])
 
-@php $val = old($name, $value); @endphp
+@php
+    $val = old($name, $value);
+
+    // PAPAN KETIK PONSEL. Nomor telepon, NIS, NISN, dan NIK disimpan sebagai
+    // TEKS — nol di depan dan tanda "+" harus utuh — sehingga `type="number"`
+    // tak bisa dipakai. Tanpa `inputmode`, ponsel memunculkan papan ketik huruf
+    // dan petugas menekan tombol angka satu per satu lewat tombol "?123".
+    //
+    // Ditentukan dari NAMA isian di satu tempat ini, bukan ditambahkan satu per
+    // satu di tiap formulir — isian baru yang bernama sama ikut tertangani.
+    // Bisa ditimpa dari pemakainya: `inputmode` yang dioper eksplisit menang.
+    $modeKetik = match (true) {
+        (bool) preg_match('/(telepon|no_hp|hp|wa|whatsapp)/i', $name) => 'tel',
+        (bool) preg_match('/(nis|nisn|nik|kode_pos|tahun)/i', $name) => 'numeric',
+        default => null,
+    };
+@endphp
 
 <div>
     <label for="{{ $name }}" class="mb-1 block text-sm font-medium text-gray-700">
@@ -41,6 +57,7 @@
                   {{ $attributes->class(['w-full rounded-lg border px-3 py-2 text-sm focus:ring-brand focus:border-brand', 'border-red-400' => $errors->has($name), 'border-gray-300' => ! $errors->has($name)]) }}>{{ $val }}</textarea>
     @else
         <input id="{{ $name }}" name="{{ $name }}" type="{{ $type }}" value="{{ $val }}"
+               @if ($modeKetik && ! $attributes->has('inputmode')) inputmode="{{ $modeKetik }}" @endif
                {{ $attributes->class(['w-full rounded-lg border px-3 py-2 text-sm focus:ring-brand focus:border-brand', 'border-red-400' => $errors->has($name), 'border-gray-300' => ! $errors->has($name)]) }}>
     @endif
 

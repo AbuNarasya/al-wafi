@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tidak ada koneksi — AL Wafi</title>
+<!-- Gayanya ditulis di dalam berkas ini, tanpa memanggil aset apa pun: halaman
+     ini justru dipakai ketika jaringan sedang tak bisa dihubungi. -->
+<style>
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+           background: #0e3168; color: #e2e8f0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; padding: 24px; }
+    .kotak { max-width: 22rem; text-align: center; }
+    .lambang { width: 56px; height: 56px; border-radius: 14px; background: #f8c400; color: #0e3168;
+               display: grid; place-items: center; font-size: 28px; font-weight: 700; margin: 0 auto 20px; }
+    h1 { font-size: 19px; font-weight: 600; margin: 0 0 10px; color: #fff; }
+    p { font-size: 14.5px; line-height: 1.6; margin: 0 0 22px; color: #b8c4d9; }
+    button { background: #f8c400; color: #0e3168; border: 0; border-radius: 9px; padding: 12px 22px;
+             font-size: 14.5px; font-weight: 600; cursor: pointer; min-height: 46px; }
+</style>
+</head>
+<body>
+    <div class="kotak">
+        <div class="lambang">A</div>
+        <h1>Tidak ada koneksi</h1>
+        <p>
+            AL Wafi membutuhkan sambungan untuk menampilkan data terbaru. Angka kas &amp;
+            tagihan sengaja tidak disimpan di ponsel agar tak ada yang membaca data lama
+            sebagai data hari ini.
+        </p>
+        <button type="button" onclick="location.reload()">Coba lagi</button>
+    </div>
+</body>
+</html>
