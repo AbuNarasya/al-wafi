@@ -162,7 +162,8 @@
                  HTML, dan satu tombol per baris jalur akan memaksa itu. Tiap
                  tombol mengirim kode jalurnya lewat atribut value. --}}
             <div class="mt-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                <div class="mb-1 text-sm font-semibold text-gray-700">Jalur yang berlaku di {{ $jenjang ?: 'jenjang ini' }}</div>
+                {{-- Nama jenjang, bukan kodenya: $opsiJenjang berisi [kode => nama]. --}}
+                <div class="mb-1 text-sm font-semibold text-gray-700">Jalur yang berlaku di {{ $jenjang ? ($opsiJenjang[$jenjang] ?? $jenjang) : 'jenjang ini' }}</div>
                 <p class="mb-3 text-xs text-gray-500">
                     Jalur yang tak pernah ada di jenjang ini sebaiknya dinonaktifkan supaya barisnya tidak
                     ikut memenuhi grid &mdash; mis. SDTQ tidak punya jalur OSS maupun jalur lanjutan.
@@ -235,7 +236,7 @@
                         <input type="hidden" name="semua_jenjang" value="0">
                         <input type="checkbox" name="semua_jenjang" value="1" checked
                                class="rounded border-gray-300 text-brand focus:ring-brand">
-                        Semua jenjang (lepas centang untuk {{ $jenjang }} saja)
+                        Semua jenjang (lepas centang untuk {{ $opsiJenjang[$jenjang] ?? $jenjang }} saja)
                     </label>
                     <button class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50">Salin</button>
                 </div>

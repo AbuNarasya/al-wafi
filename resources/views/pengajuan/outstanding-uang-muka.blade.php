@@ -18,7 +18,7 @@
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3 font-mono">{{ $r['nomor_ref'] }}</td>
                         <td class="px-4 py-3 text-gray-500">{{ $r['nama_coa_uang_muka'] ?? $r['kode_coa_uang_muka'] }}</td>
-                        <td class="px-4 py-3 text-gray-500">{{ $r['kode_unit'] ?? '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500">{{ $r['nama_unit'] ?? $r['kode_unit'] ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ $r['keterangan'] ?? '—' }}</td>
                         <td class="px-4 py-3 text-right tabular-nums font-medium">@rp($r['sisa'])</td>
                         <td class="px-4 py-3 text-right"><a href="{{ route('pengajuan.create_penyelesaian') }}" class="text-brand hover:underline">Selesaikan</a></td>

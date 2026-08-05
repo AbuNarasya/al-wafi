@@ -85,7 +85,8 @@ class JournalController extends Controller
     {
         // Semua entri jurnal boleh dilihat (general journal); hanya JurnalUmum
         // yang bisa di-void dari sini (yang lain via modul asalnya).
-        $journal->load(['lines', 'user']);
+        // Bagian & unit ikut dimuat: kolomnya menyebut NAMA, bukan kodenya.
+        $journal->load(['lines', 'lines.bagian', 'lines.unit', 'user']);
 
         return view('journal.show', ['entry' => $journal]);
     }

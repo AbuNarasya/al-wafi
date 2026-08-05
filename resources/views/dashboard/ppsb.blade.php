@@ -184,7 +184,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @foreach ($outstanding['per_jenjang'] as $r)
-                        <tr><td class="px-4 py-2">{{ $r['kode'] }}</td>
+                        <tr><td class="px-4 py-2">{{ $r['nama'] ?? $r['kode'] }}</td>
                             <td class="px-4 py-2 text-right tabular-nums">{{ $r['santri'] }}</td>
                             <td class="px-4 py-2 text-right tabular-nums">@rp($r['nominal'])</td></tr>
                     @endforeach
@@ -229,7 +229,7 @@
                     <tbody class="divide-y divide-gray-100">
                         @forelse ($tabel['baris'] as $baris)
                             <tr class="hover:bg-gray-50">
-                                <td class="sticky left-0 bg-white px-4 py-2 font-medium text-gray-900">{{ $baris['kode'] }}</td>
+                                <td class="sticky left-0 bg-white px-4 py-2 font-medium text-gray-900">{{ $baris['nama'] ?: $baris['kode'] }}</td>
                                 @foreach ($tabel['bulan'] as $b)
                                     <td class="px-2 py-2 text-right tabular-nums {{ $baris['sel'][$b['kunci']] === 0 ? 'text-gray-300' : '' }}">
                                         {{ $baris['sel'][$b['kunci']] }}
@@ -292,7 +292,7 @@
                     @forelse ($plan['baris'] as $r)
                         <tr class="hover:bg-gray-50">
                             <td class="border-r border-gray-100 px-4 py-2 font-medium text-gray-900">
-                                {{ $r['kode'] }}<div class="text-xs font-normal text-gray-400">{{ $r['nama'] }}</div>
+                                {{ $r['nama'] ?: $r['kode'] }}
                             </td>
                             <td class="px-3 py-2 text-right tabular-nums">{{ $sel($r['target_l']) }}</td>
                             <td class="px-3 py-2 text-right tabular-nums">{{ $r['aktual_l'] }}</td>
@@ -359,7 +359,7 @@
                     <tr>
                         @foreach (['L', 'P'] as $jk)
                             @foreach ($jalur['jenjang'] as $kode => $nama)
-                                <th class="px-3 py-2 text-right font-medium">{{ $kode }}</th>
+                                <th class="px-3 py-2 text-right font-medium">{{ $nama ?: $kode }}</th>
                             @endforeach
                             <th class="border-r border-gray-200 px-3 py-2 text-right font-medium">Jml</th>
                         @endforeach
@@ -369,7 +369,7 @@
                     @forelse ($jalur['baris'] as $r)
                         <tr class="hover:bg-gray-50">
                             <td class="border-r border-gray-100 px-4 py-2 font-medium text-gray-900">
-                                {{ $r['nama'] }}<div class="text-xs font-normal text-gray-400">{{ $r['kode'] }}</div>
+                                {{ $r['nama'] ?: $r['kode'] }}
                             </td>
                             @foreach (['L', 'P'] as $jk)
                                 @foreach ($jalur['jenjang'] as $kode => $nama)

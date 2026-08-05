@@ -43,8 +43,8 @@
                         <tr>
                             <td class="px-4 py-2">{{ $l->kode_coa }} — {{ $l->nama_coa }}</td>
                             <td class="px-4 py-2 text-gray-600">{{ $l->keterangan }}</td>
-                            <td class="px-4 py-2 text-gray-500">{{ $l->kode_bagian ?? '—' }}</td>
-                            <td class="px-4 py-2 text-gray-500">{{ $l->kode_unit ?? '—' }}</td>
+                            <td class="px-4 py-2 text-gray-500">{{ $l->bagian?->nama_bagian ?? $l->kode_bagian ?? '—' }}</td>
+                            <td class="px-4 py-2 text-gray-500">{{ $l->unit?->nama_unit ?? $l->kode_unit ?? '—' }}</td>
                             <td class="px-4 py-2 text-right tabular-nums">@rp($l->debet)</td>
                             <td class="px-4 py-2 text-right tabular-nums">@rp($l->kredit)</td>
                         </tr>

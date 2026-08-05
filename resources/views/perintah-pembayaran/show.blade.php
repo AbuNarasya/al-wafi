@@ -132,7 +132,7 @@
                         <tr>
                             <td class="px-3 py-2">
                                 <div class="font-mono text-xs">{{ $d->nomor_dokumen }}</div>
-                                <div class="text-xs text-gray-400">{{ $labelSumber[$d->sumber] ?? $d->sumber }}{{ $d->kode_unit ? ' · '.$d->kode_unit : '' }}</div>
+                                <div class="text-xs text-gray-400">{{ $labelSumber[$d->sumber] ?? $d->sumber }}{{ $d->kode_unit ? ' · '.($d->unit?->nama_unit ?? $d->kode_unit) : '' }}</div>
                                 @if ($d->ditambahkan_pengotorisasi)
                                     <span class="mt-0.5 inline-block rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-amber-800">ditambahkan pengotorisasi</span>
                                 @endif

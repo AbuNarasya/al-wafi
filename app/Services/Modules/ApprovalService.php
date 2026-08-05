@@ -200,6 +200,11 @@ class ApprovalService
             'belum_dianggarkan' => (bool) $inst->belum_dianggarkan,
             'nominal' => $inst->nominal,
             'kode_bagian' => $inst->kode_bagian,
+            // Namanya ikut dibawa: layar menyebut NAMA bagian, dan Blade bukan
+            // tempat menanyakannya sendiri ke database.
+            'nama_bagian' => $inst->kode_bagian
+                ? (Bagian::where('kode_bagian', $inst->kode_bagian)->value('nama_bagian') ?: $inst->kode_bagian)
+                : null,
             'tahap' => $tahap,
             'menunggu' => $this->posisiSekarang($inst, $steps),
             'logs' => $inst->logs,

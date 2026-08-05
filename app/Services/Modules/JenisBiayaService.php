@@ -30,7 +30,8 @@ class JenisBiayaService
     public function list()
     {
         // `jenjang` dimuat karena daftarnya menyebut NAMA jenjang, bukan kode `J001`.
-        return JenisBiaya::with('jenjang')->orderBy('tipe')->orderBy('kode')->get();
+        // `unit` ikut: kolom Unit di layar menyebut NAMA unit, bukan kodenya.
+        return JenisBiaya::with(['jenjang', 'unit'])->orderBy('tipe')->orderBy('kode')->get();
     }
 
     public function get(string $kode): JenisBiaya

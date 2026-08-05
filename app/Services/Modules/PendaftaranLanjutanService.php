@@ -46,7 +46,7 @@ class PendaftaranLanjutanService
      * `alasan` terisi = sasarannya ada tapi BELUM boleh dijalankan; layar
      * menampilkan kalimatnya alih-alih formulir, dan `buat()` menolaknya.
      *
-     * @return array{kode_jenjang:string,nama_jenjang:string,kode_jalur:?string,alasan:?string}|null
+     * @return array{kode_jenjang:string,nama_jenjang:string,kode_jalur:?string,nama_jalur:?string,alasan:?string}|null
      */
     public function sasaran(Santri $santri): ?array
     {
@@ -73,6 +73,8 @@ class PendaftaranLanjutanService
             'kode_jenjang' => $tujuan->kode,
             'nama_jenjang' => $tujuan->nama,
             'kode_jalur' => $jalurTujuan,
+            // Namanya ikut: layar menyebut NAMA jalur ("Lanjutan Reguler"), bukan "003".
+            'nama_jalur' => $jalurTujuan ? (JalurPendaftaran::find($jalurTujuan)?->nama ?: $jalurTujuan) : null,
             // Tingkat diperiksa LEBIH DULU: ia penghalang yang datang lebih awal,
             // dan menyebut urusan jalur pada santri yang belum kelas akhir hanya
             // menyesatkan.

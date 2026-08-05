@@ -37,7 +37,7 @@
                         @php $perilaku = \App\Models\TipeBiaya::perilakuDari($r->tipe) ?? 'lain'; @endphp
                         <td class="px-4 py-3"><span class="rounded px-1.5 py-0.5 text-xs font-medium {{ $labelTipe[$perilaku] ?? '' }}">{{ str_replace('_', ' ', ucfirst($perilaku)) }}</span></td>
                         <td class="px-4 py-3 text-gray-600">{{ $r->kode_jenjang ? ($r->jenjang?->nama ?? $r->kode_jenjang) : 'Semua jenjang' }}</td>
-                        <td class="px-4 py-3 text-gray-500">{{ $r->kode_unit }}</td>
+                        <td class="px-4 py-3 text-gray-500">{{ $r->unit?->nama_unit ?? $r->kode_unit }}</td>
                         <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $r->status === 'aktif' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500' }}">{{ ucfirst($r->status) }}</span></td>
                         <td class="px-4 py-3 text-right">
                             <div class="flex items-center justify-end gap-2">

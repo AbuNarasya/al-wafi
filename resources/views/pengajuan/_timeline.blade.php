@@ -77,6 +77,6 @@
     </div>
 
     <div class="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-        Nominal: <b>@rp($t['nominal'])</b>@if ($t['kode_bagian']) · Bagian: <b>{{ $t['kode_bagian'] }}</b>@endif
+        Nominal: <b>@rp($t['nominal'])</b>@if ($t['kode_bagian']) · Bagian: <b>{{ $t['nama_bagian'] ?? $t['kode_bagian'] }}</b>@endif
     </div>
 </div>

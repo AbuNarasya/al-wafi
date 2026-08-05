@@ -12,7 +12,8 @@
         'nomor' => $k['nomor_dokumen'],
         'pihak' => $k['pihak'] ?? '',
         'ket' => $k['keterangan'] ?? '',
-        'unit' => $k['kode_unit'] ?? '',
+        // NAMA unit, bukan kodenya — kolom Unit di tabel ini dibaca petugas.
+        'unit' => $k['nama_unit'] ?? $k['kode_unit'] ?? '',
         'tempo' => $k['jatuh_tempo'] ? \Illuminate\Support\Carbon::parse($k['jatuh_tempo'])->format('d/m/Y') : '',
         'sisa' => (float) $k['sisa'],
         'kunci' => $k['terkunci_di'],

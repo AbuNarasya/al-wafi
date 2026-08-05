@@ -99,7 +99,9 @@ class KenaikanTingkatController extends Controller
             'opsiKeputusan' => KenaikanTingkatService::KEPUTUSAN,
             // Daftar kerja: apa yang sudah ditetapkan tapi belum menyala.
             'terjadwal' => JadwalPerubahanSantri::hidup()
-                ->with(['santri:id,nama,nis,no_pendaftaran,kode_jenjang,tingkat', 'jenjangTujuan:kode,nama', 'pendaftaran:id,nomor,status'])
+                // `santri.jenjang` ikut: kolomnya menyebut NAMA jenjang, bukan kodenya.
+                ->with(['santri:id,nama,nis,no_pendaftaran,kode_jenjang,tingkat', 'santri.jenjang:kode,nama',
+                    'jenjangTujuan:kode,nama', 'pendaftaran:id,nomor,status'])
                 ->orderBy('tahun_ajaran')->orderBy('status')->get(),
         ];
     }

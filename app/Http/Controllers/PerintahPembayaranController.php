@@ -89,7 +89,8 @@ class PerintahPembayaranController extends Controller
 
     public function show(int $id): View
     {
-        $pp = PerintahPembayaran::with(['detail', 'penyusun', 'pengotorisasi', 'rekeningRencana'])->findOrFail($id);
+        // `detail.unit` ikut: baris kewajiban menyebut NAMA unit, bukan kodenya.
+        $pp = PerintahPembayaran::with(['detail', 'detail.unit', 'penyusun', 'pengotorisasi', 'rekeningRencana'])->findOrFail($id);
 
         // Riwayat pengajuan tiap kewajiban di PP LAIN — inilah yang mencegah
         // satu kewajiban ditunda berkali-kali tanpa ada yang menyadarinya.

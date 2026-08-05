@@ -732,12 +732,17 @@ class PengajuanPembayaranService
     /** Uang muka outstanding MILIK pemohon (untuk dropdown penyelesaian). */
     public function uangMukaSaya(int $idPengguna)
     {
+        // Nama unit dibawa dari sini, bukan dicari di Blade: layar & dropdown
+        // menyebut NAMA unit, sedangkan barisnya hanya menyimpan kodenya.
+        $namaUnit = \App\Models\BusinessUnit::pluck('nama_unit', 'kode_unit');
+
         return OperationalAdvance::where('id_pengguna', $idPengguna)->where('status', 'outstanding')->orderByDesc('id')->get()
             ->filter(fn ($r) => Money::gtZero($r->sisa))
             ->map(fn ($r) => [
                 'id' => $r->id, 'nomor_ref' => $r->nomor_ref, 'keterangan' => $r->keterangan,
                 'kode_coa_uang_muka' => $r->kode_coa_uang_muka, 'nama_coa_uang_muka' => $r->nama_coa_uang_muka,
-                'kode_unit' => $r->kode_unit, 'sisa' => $r->sisa,
+                'kode_unit' => $r->kode_unit, 'nama_unit' => $namaUnit[$r->kode_unit] ?? $r->kode_unit,
+                'sisa' => $r->sisa,
             ])->values();
     }
 

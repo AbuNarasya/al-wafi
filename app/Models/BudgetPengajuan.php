@@ -34,4 +34,10 @@ class BudgetPengajuan extends Model
     {
         return $this->hasMany(BudgetPengajuanDetail::class, 'id_pengajuan', 'id');
     }
+
+    /** Unit bisnis usulan — kosong berarti berlaku untuk semua unit. */
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(BusinessUnit::class, 'kode_unit', 'kode_unit');
+    }
 }

@@ -66,7 +66,7 @@
                                     <span class="block text-xs text-gray-400">{{ $j->santri?->nis ?: $j->santri?->no_pendaftaran }}</span>
                                 </td>
                                 <td class="px-4 py-2 text-gray-500">
-                                    {{ $j->santri?->kode_jenjang }}{{ $j->santri?->tingkat ? ' · Tingkat '.$j->santri->tingkat : '' }}
+                                    {{ $j->santri?->jenjang?->nama ?? $j->santri?->kode_jenjang }}{{ $j->santri?->tingkat ? ' · Tingkat '.$j->santri->tingkat : '' }}
                                 </td>
                                 <td class="px-4 py-2">
                                     <span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $warna[$j->keputusan] ?? 'bg-gray-100 text-gray-600' }}">

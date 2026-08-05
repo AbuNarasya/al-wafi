@@ -48,7 +48,7 @@
             <div class="sm:col-span-2"><div class="text-xs text-gray-400">Keterangan</div><div class="text-gray-700">{{ $rec->keterangan }}</div></div>
             <div class="sm:col-span-2">
                 <div class="text-xs text-gray-400">Akun Hutang</div>
-                <div>@if ($rec->kode_coa_hutang)<span class="text-gray-700">{{ $rec->kode_coa_hutang }}</span>@else<span class="text-amber-600">belum ditentukan keuangan</span>@endif</div>
+                <div>@if ($rec->kode_coa_hutang)<span class="text-gray-700">{{ $rec->kode_coa_hutang }}{{ $rec->coaHutang?->nama_coa ? ' — '.$rec->coaHutang->nama_coa : '' }}</span>@else<span class="text-amber-600">belum ditentukan keuangan</span>@endif</div>
             </div>
             <div class="sm:col-span-2">
                 <div class="text-xs text-gray-400">Rekening Tujuan Pembayaran</div>
@@ -95,7 +95,7 @@
                     @foreach ($rec->details as $d)
                         <tr>
                             <td class="px-4 py-2">{{ $d->kode_coa }} — {{ $d->nama_coa }}</td>
-                            <td class="px-4 py-2 text-gray-500">{{ $d->kode_unit }}</td>
+                            <td class="px-4 py-2 text-gray-500">{{ $d->unit?->nama_unit ?? $d->kode_unit }}</td>
                             <td class="px-4 py-2 text-gray-600">{{ $d->keterangan }}</td>
                             <td class="px-4 py-2 text-right tabular-nums">@rp($d->nominal)</td>
                         </tr>
@@ -186,7 +186,7 @@
                                 @foreach ($rec->details as $d)
                                     <div class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1.3fr_auto] sm:items-center">
                                         <div class="text-xs">
-                                            <div class="text-gray-500">{{ $d->kode_unit }}</div>
+                                            <div class="text-gray-500">{{ $d->unit?->nama_unit ?? $d->kode_unit }}</div>
                                             <div class="font-medium text-gray-800">{{ $d->kode_coa }} — {{ $d->nama_coa }}</div>
                                         </div>
                                         <x-search-select name="koreksi[{{ $d->id }}]" :options="['' => '— biarkan —'] + $coaOptions" :value="''" placeholder="— biarkan —" />

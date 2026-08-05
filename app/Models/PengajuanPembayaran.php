@@ -68,6 +68,12 @@ class PengajuanPembayaran extends Model
         return $this->belongsTo(User::class, 'id_pengguna', 'id_pengguna');
     }
 
+    /** Akun hutang yang ditentukan keuangan — dipakai agar layar menyebut namanya, bukan kodenya saja. */
+    public function coaHutang(): BelongsTo
+    {
+        return $this->belongsTo(CoaDetail::class, 'kode_coa_hutang', 'kode_coa');
+    }
+
     public function riwayatRekening(): HasMany
     {
         return $this->hasMany(PengajuanRekeningRiwayat::class, 'id_pengajuan', 'id');

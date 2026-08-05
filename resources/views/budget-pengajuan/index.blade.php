@@ -57,7 +57,7 @@
                         <td class="px-4 py-3 font-medium text-gray-900">{{ $r->nomor }}</td>
                         <td class="px-4 py-3 whitespace-nowrap text-gray-600">{{ \App\Services\Ledger\AnggaranPeriode::labelTahunAnggaran($r->tahun, $r->bulan_awal) }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ $r->bagian?->nama_bagian ?? $r->kode_bagian }}</td>
-                        <td class="px-4 py-3 text-gray-500">{{ $r->kode_unit ?: 'Semua Unit' }}</td>
+                        <td class="px-4 py-3 text-gray-500">{{ $r->kode_unit ? ($r->unit?->nama_unit ?? $r->kode_unit) : 'Semua Unit' }}</td>
                         <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ $r->details_count }}</td>
                         <td class="px-4 py-3 text-right tabular-nums">@rp($r->nominal)</td>
                         <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $labelStatus[$r->status] ?? 'bg-gray-100 text-gray-500' }}">{{ ucfirst($r->status) }}</span></td>

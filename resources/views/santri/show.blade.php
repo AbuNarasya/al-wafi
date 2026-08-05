@@ -500,7 +500,7 @@
                     @if ($lanjutan['sasaran'] && ! $lanjutan['sasaran']['alasan'])
                         <p class="mt-1 text-xs text-gray-500">
                             Naik ke <b>{{ $lanjutan['sasaran']['nama_jenjang'] ?: $lanjutan['sasaran']['kode_jenjang'] }}</b>,
-                            jalur <b>{{ $lanjutan['sasaran']['kode_jalur'] }}</b>. Prosesnya melewati PPSB (seleksi &amp; med check);
+                            jalur <b>{{ $lanjutan['sasaran']['nama_jalur'] ?? $lanjutan['sasaran']['kode_jalur'] }}</b>. Prosesnya melewati PPSB (seleksi &amp; med check);
                             <b>tahap berkas dilewati</b> karena dokumennya sudah ada.
                         </p>
                         <form method="POST" action="{{ route('pendaftaran_lanjutan.store', $santri->id) }}"

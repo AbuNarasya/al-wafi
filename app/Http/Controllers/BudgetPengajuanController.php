@@ -46,7 +46,7 @@ class BudgetPengajuanController extends Controller
         $fStatus = trim((string) $request->query('status', ''));
 
         $rows = $this->service->kueriTerlihat($user)
-            ->with('bagian')->withCount('details')
+            ->with(['bagian', 'unit'])->withCount('details')
             ->when($q !== '', fn ($query) => $query->where(
                 fn ($w) => $w->where('nomor', 'ilike', "%{$q}%")->orWhere('keterangan', 'ilike', "%{$q}%"),
             ))

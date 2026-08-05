@@ -220,8 +220,11 @@ class PengajuanController extends Controller
 
     public function show(Request $request, int $id): View
     {
+        // `details.unit` & `coaHutang` ikut dimuat: layar menyebut NAMA unit dan
+        // nama akun, bukan kodenya — tanpa eager load, tiap baris rincian jadi
+        // satu query sendiri.
         $rec = PengajuanPembayaran::with([
-            'details', 'bagian', 'pemohon',
+            'details', 'details.unit', 'bagian', 'pemohon', 'coaHutang',
             'riwayatRekening' => fn ($q) => $q->with('pengubah')->orderBy('created_at'),
         ])->findOrFail($id);
         $instance = ApprovalInstance::with(['logs' => fn ($q) => $q->orderBy('waktu')])
@@ -256,7 +259,7 @@ class PengajuanController extends Controller
     /** Lembar cetak — HANYA untuk pengajuan yang sudah disetujui SELURUH approver. */
     public function cetak(int $id): View
     {
-        $rec = PengajuanPembayaran::with(['details', 'bagian', 'pemohon'])->findOrFail($id);
+        $rec = PengajuanPembayaran::with(['details', 'details.unit', 'bagian', 'pemohon'])->findOrFail($id);
         $instance = ApprovalInstance::where('jenis_dokumen', PengajuanPembayaranService::SUMBER)
             ->where('id_dokumen', (string) $id)->first();
 

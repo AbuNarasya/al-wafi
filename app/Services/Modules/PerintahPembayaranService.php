@@ -61,6 +61,9 @@ class PerintahPembayaranService
     {
         $terkunci = $this->kewajibanTerkunci($kecualiPp);
         $kunci = fn (string $sumber, $id) => $terkunci["{$sumber}:{$id}"] ?? null;
+        // Nama unit dibawa sekalian — layar penyusunan PP menyebut NAMA unit.
+        $namaUnit = \App\Models\BusinessUnit::pluck('nama_unit', 'kode_unit');
+        $unit = fn (?string $kode) => $kode ? ($namaUnit[$kode] ?? $kode) : null;
 
         $rows = [];
 
@@ -69,7 +72,7 @@ class PerintahPembayaranService
             $rows[] = [
                 'sumber' => 'pengajuan', 'id_dokumen' => (int) $p->id, 'nomor_dokumen' => $p->nomor,
                 'pihak' => $p->keterangan, 'keterangan' => $p->referensi ?: $p->keterangan,
-                'kode_unit' => null, 'jatuh_tempo' => null,
+                'kode_unit' => null, 'nama_unit' => null, 'jatuh_tempo' => null,
                 'sisa' => Money::of($p->sisa_hutang), 'terkunci_di' => $kunci('pengajuan', $p->id),
             ];
         }
@@ -79,7 +82,7 @@ class PerintahPembayaranService
             $rows[] = [
                 'sumber' => 'invoice', 'id_dokumen' => (int) $i->id_invoice, 'nomor_dokumen' => $i->nomor_invoice,
                 'pihak' => $i->vendor?->nama_vendor ?? $i->kode_vendor, 'keterangan' => $i->keterangan,
-                'kode_unit' => $i->kode_unit, 'jatuh_tempo' => $i->tanggal_jatuh_tempo,
+                'kode_unit' => $i->kode_unit, 'nama_unit' => $unit($i->kode_unit), 'jatuh_tempo' => $i->tanggal_jatuh_tempo,
                 'sisa' => Money::of($i->sisa_hutang), 'terkunci_di' => $kunci('invoice', $i->id_invoice),
             ];
         }
@@ -91,7 +94,7 @@ class PerintahPembayaranService
             $rows[] = [
                 'sumber' => 'bank_loan', 'id_dokumen' => (int) $l->id, 'nomor_dokumen' => $l->nomor_kontrak ?: "Pembiayaan #{$l->id}",
                 'pihak' => $l->nama_bank, 'keterangan' => $l->keterangan,
-                'kode_unit' => null, 'jatuh_tempo' => $l->tanggal_jatuh_tempo,
+                'kode_unit' => null, 'nama_unit' => null, 'jatuh_tempo' => $l->tanggal_jatuh_tempo,
                 'sisa' => Money::of($l->sisa_pokok), 'terkunci_di' => $kunci('bank_loan', $l->id),
             ];
         }

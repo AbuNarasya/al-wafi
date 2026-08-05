@@ -286,9 +286,11 @@ class DashboardPpsbTest extends TestCase
 
         $this->assertSame('Juli', $tren['bulan'][0]);
         $this->assertSame('Juni', $tren['bulan'][11]);
-        $this->assertSame(1, $seri['SDTQ']['nilai'][1], 'SDTQ memuncak di Agustus.');
+        // Legenda memakai NAMA jenjang, bukan kodenya: "SD Tahfizh", bukan "SDTQ".
+        $this->assertSame(1, $seri['SD Tahfizh']['nilai'][1], 'SDTQ memuncak di Agustus.');
         $this->assertSame(1, $seri['SMP']['nilai'][2], 'SMP memuncak di September.');
         $this->assertSame(0, $seri['SMP']['nilai'][1]);
+        $this->assertArrayNotHasKey('SDTQ', $seri->all(), 'Kode jenjang tak boleh jadi label grafik.');
         // Angka grafik harus sama persis dengan tabel bulanan di bawahnya.
         $tabel = (new PpsbDashboardService)->tabelBulanan(self::TA, 'pendaftar');
         $this->assertSame(

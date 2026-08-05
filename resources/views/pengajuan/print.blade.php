@@ -100,7 +100,7 @@
                     <tr class="border-b border-gray-100">
                         <td class="px-2 py-1.5 text-gray-400">{{ $i + 1 }}</td>
                         <td class="px-2 py-1.5">{{ $d->kode_coa }} — {{ $d->nama_coa }}</td>
-                        <td class="px-2 py-1.5">{{ $d->kode_unit }}</td>
+                        <td class="px-2 py-1.5">{{ $d->unit?->nama_unit ?? $d->kode_unit }}</td>
                         <td class="px-2 py-1.5">{{ $d->keterangan ?: '—' }}</td>
                         <td class="px-2 py-1.5 text-right font-mono">Rp {{ number_format((float) $d->nominal, 0, ',', '.') }}</td>
                     </tr>

@@ -147,7 +147,8 @@ class PpsbDashboardService
             }
             // Jenjang tanpa pendaftar tetap digambar sebagai garis datar di nol —
             // itu jawaban yang benar, bukan alasan menyembunyikan serinya.
-            $seri[] = ['label' => $baris['kode'], 'nilai' => $nilai, 'total' => array_sum($nilai)];
+            // Legenda menyebut NAMA jenjang; kodenya tak berarti apa-apa bagi pembaca.
+            $seri[] = ['label' => $baris['nama'] ?: $baris['kode'], 'nilai' => $nilai, 'total' => array_sum($nilai)];
         }
 
         return ['bulan' => $label, 'seri' => $seri];
@@ -212,7 +213,12 @@ class PpsbDashboardService
                 continue;
             }
             $kode = $t->santri?->kode_jenjang ?? '—';
-            $perJenjang[$kode] ??= ['kode' => $kode, 'nominal' => '0', 'santri' => 0];
+            // `nama` ikut disiapkan: tabelnya menyebut NAMA jenjang.
+            $perJenjang[$kode] ??= [
+                'kode' => $kode,
+                'nama' => Referensi::jenjang()[$kode] ?? $kode,
+                'nominal' => '0', 'santri' => 0,
+            ];
             $perJenjang[$kode]['nominal'] = Money::add($perJenjang[$kode]['nominal'], $t->sisa);
             $perJenjang[$kode]['santri']++;
             $santriBersisa[$t->id_santri] = true;
@@ -458,7 +464,7 @@ class PpsbDashboardService
         // Baris = SELURUH jalur master (aktif) + jalur yang benar-benar dipakai,
         // supaya jalur yang belum ada pendaftarnya tetap terlihat sebagai 0
         // — itu informasi, bukan baris kosong yang layak disembunyikan.
-        $jalur = \App\Models\JalurPendaftaran::where('status', 'aktif')->orderBy('kode')
+        $jalur = \App\Models\JalurPendaftaran::where('status', 'aktif')->orderBy('urutan')->orderBy('kode')
             ->pluck('nama', 'kode')->all();
         foreach ($santri->pluck('jalur')->filter()->unique() as $kode) {
             $jalur[$kode] ??= $kode;
