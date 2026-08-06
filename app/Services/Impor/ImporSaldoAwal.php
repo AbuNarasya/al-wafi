@@ -63,6 +63,34 @@ class ImporSaldoAwal
     }
 
     /**
+     * Seragamkan isi berkas ke UTF-8 SEBELUM apa pun dibaca darinya.
+     *
+     * Excel di Windows menyimpan "CSV (Comma delimited)" sebagai ANSI, bukan
+     * UTF-8. Satu nama seperti "AL AUZA’I" sudah cukup: tanda kutip melengkungnya
+     * tersimpan sebagai bita 0x92 yang BUKAN UTF-8 sah, lolos melewati seluruh
+     * pemetaan, lalu ditolak PostgreSQL — dan karena impornya satu transaksi,
+     * DUA RATUS baris lain ikut batal. Galat yang muncul pun tak menyebut baris
+     * mana pun, jadi petugas tak punya petunjuk berkasnya harus diapakan.
+     *
+     * CP1252 yang dipakai, BUKAN ISO-8859-1: keduanya sama persis di 0xA0–0xFF,
+     * tapi hanya CP1252 yang mengisi 0x80–0x9F — dan justru di sanalah tanda
+     * kutip melengkung serta tanda hubung panjang buatan Excel berada.
+     */
+    private function keUtf8(string $isi): string
+    {
+        $hasil = match (true) {
+            // "Unicode Text" dari Excel = UTF-16 ber-BOM.
+            str_starts_with($isi, "\xFF\xFE") => mb_convert_encoding(substr($isi, 2), 'UTF-8', 'UTF-16LE'),
+            str_starts_with($isi, "\xFE\xFF") => mb_convert_encoding(substr($isi, 2), 'UTF-8', 'UTF-16BE'),
+            mb_check_encoding($isi, 'UTF-8') => $isi,
+            default => mb_convert_encoding($isi, 'UTF-8', 'Windows-1252'),
+        };
+
+        // PostgreSQL menolak NUL di kolom teks walau UTF-8-nya sah.
+        return str_replace("\0", '', (string) $hasil);
+    }
+
+    /**
      * Baca CSV jadi baris berkunci nama kolom.
      *
      * Menerima pemisah koma maupun titik koma — Excel berbahasa Indonesia
@@ -77,6 +105,7 @@ class ImporSaldoAwal
         if ($isi === false || trim($isi) === '') {
             throw new AppException(422, 'Berkas kosong atau tidak terbaca.');
         }
+        $isi = $this->keUtf8($isi);
         // Buang BOM UTF-8 — kalau tidak, nama kolom pertama tak pernah cocok.
         $isi = preg_replace('/^\xEF\xBB\xBF/', '', $isi);
 

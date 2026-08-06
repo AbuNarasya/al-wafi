@@ -369,6 +369,46 @@ class ImporDataAwalTest extends TestCase
         $this->assertStringContainsString('belum dipilih', $hasil['baris_masalah'][0]['alasan']);
     }
 
+    /**
+     * Berkas ANSI dari Excel Windows — bukan hal langka, itu bawaan menu "CSV
+     * (Comma delimited)" di Windows berbahasa Indonesia.
+     *
+     * Satu nama ber-tanda kutip melengkung sudah cukup menggagalkan SELURUH
+     * impor: bita 0x92 bukan UTF-8 sah, PostgreSQL menolaknya, dan karena
+     * impornya satu transaksi, ratusan baris lain ikut batal. Galatnya pun tak
+     * menyebut baris mana pun.
+     */
+    public function test_berkas_ansi_windows_terbaca_dan_tersimpan_sebagai_utf8(): void
+    {
+        // 0x92 = tanda kutip melengkung pada Windows-1252.
+        $namaAnsi = "AL AUZA\x92I AZ ZUHRI HITIMALA";
+        $this->assertFalse(mb_check_encoding($namaAnsi, 'UTF-8'), 'contohnya harus benar-benar bukan UTF-8');
+
+        $path = sys_get_temp_dir().'/impor-uji-'.uniqid().'.csv';
+        file_put_contents($path, "nis,nama,jenis_kelamin,kode_jenjang,tingkat,tahun_ajaran,jalur,wali_nama,wali_telepon\n"
+            ."230022,{$namaAnsi},L,SMP,2,".self::TA.",LAMA,Wali Ansi,08999\n");
+
+        $hasil = app(ImporSaldoAwal::class)->jalankan('santri-lama', $path, $this->param());
+
+        $this->assertSame(1, $hasil['tersimpan']['santri']);
+        $this->assertSame('AL AUZA’I AZ ZUHRI HITIMALA', Santri::where('nis', '230022')->value('nama'));
+    }
+
+    /** Excel "Unicode Text" menyimpan UTF-16 ber-BOM — juga bukan UTF-8. */
+    public function test_berkas_utf16_dari_excel_ikut_terbaca(): void
+    {
+        $baris = "nis,nama,jenis_kelamin,kode_jenjang,tingkat,tahun_ajaran,jalur,wali_nama,wali_telepon\n"
+            .'230023,Süleyman Çelebi,L,SMP,2,'.self::TA.",LAMA,Wali Unicode,08998\n";
+
+        $path = sys_get_temp_dir().'/impor-uji-'.uniqid().'.csv';
+        file_put_contents($path, "\xFF\xFE".mb_convert_encoding($baris, 'UTF-16LE', 'UTF-8'));
+
+        $hasil = app(ImporSaldoAwal::class)->jalankan('santri-lama', $path, $this->param());
+
+        $this->assertSame(1, $hasil['tersimpan']['santri']);
+        $this->assertSame('Süleyman Çelebi', Santri::where('nis', '230023')->value('nama'));
+    }
+
     public function test_pemisah_titik_koma_ikut_terbaca(): void
     {
         $path = sys_get_temp_dir().'/impor-uji-'.uniqid().'.csv';
