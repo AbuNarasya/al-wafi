@@ -37,10 +37,24 @@ class UrutanTampilMasterTest extends TestCase
         ]);
     }
 
+    /**
+     * `urutan` DIISI 1..3, persis seperti JalurPendaftaranService::create() yang
+     * selalu memanggil UrutanTampilService::berikutnya(). Lewat aplikasi, tiga
+     * jalur tak pernah bisa ber-`urutan` sama.
+     *
+     * Membiarkannya memakai bawaan kolom (0) membuat ketiganya SERI, dan
+     * `ORDER BY urutan` yang seri tidak menjanjikan susunan apa pun di
+     * PostgreSQL — yang keluar adalah letak fisik baris di heap. Selama heap-nya
+     * masih rapi, susunannya kebetulan sama dengan urutan penyisipan; begitu
+     * database pekerja paratest terisi tuple mati dari test sebelumnya, baris
+     * baru menempati ruang bekas dan susunannya bergeser. Itu yang dulu membuat
+     * test hak akses di bawah gagal sesekali dengan susunan 002, 003, 001 —
+     * hanya pada lari suite penuh, tak pernah saat dijalankan sendirian.
+     */
     private function buatJalur(): void
     {
-        foreach ([['001', 'Reguler'], ['002', 'Pindahan'], ['003', 'Anak Karyawan']] as [$kode, $nama]) {
-            JalurPendaftaran::create(['kode' => $kode, 'nama' => $nama, 'status' => 'aktif']);
+        foreach ([['001', 'Reguler'], ['002', 'Pindahan'], ['003', 'Anak Karyawan']] as $i => [$kode, $nama]) {
+            JalurPendaftaran::create(['kode' => $kode, 'nama' => $nama, 'status' => 'aktif', 'urutan' => $i + 1]);
         }
     }
 

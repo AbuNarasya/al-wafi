@@ -132,7 +132,7 @@ class GelombangService
      */
     public function grid(string $tahunAjaran): array
     {
-        $jenjang = Jenjang::where('status', 'aktif')->orderBy('urutan')->get(['kode', 'nama']);
+        $jenjang = Jenjang::where('status', 'aktif')->orderBy('urutan')->orderBy('kode')->get(['kode', 'nama']);
         $semua = $this->daftar($tahunAjaran);
 
         $sel = PotonganGelombang::where('tahun_ajaran', $tahunAjaran)->get()

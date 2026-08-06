@@ -97,7 +97,7 @@ class PemetaSantriLama implements Pemeta
             'jenis_kelamin' => ['wajib' => true, 'contoh' => 'L', 'ket' => 'L atau P.'],
             'kode_jenjang' => [
                 'wajib' => true,
-                'contoh' => Jenjang::orderBy('urutan')->value('nama') ?? 'SMP',
+                'contoh' => Jenjang::orderBy('urutan')->orderBy('kode')->value('nama') ?? 'SMP',
                 'ket' => 'Boleh diisi KODE (mis. J002) atau NAMA jenjangnya (mis. SMP) — keduanya diterima.',
             ],
             // Tingkat WAJIB: tanpa itu proses kenaikan tahun depan tak tahu harus
