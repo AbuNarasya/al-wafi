@@ -32,13 +32,46 @@ class PwaTest extends TestCase
         ]);
     }
 
-    public function test_penanda_pwa_ada_di_setiap_halaman(): void
+    /** @return list<string> */
+    private function penandaPwa(): array
     {
-        $this->actingAs($this->pengguna)->get(route('dashboard'))->assertOk()
-            ->assertSee('<link rel="manifest" href="/manifest.json">', false)
-            ->assertSee('<meta name="theme-color" content="#164a9e">', false)
-            ->assertSee('<link rel="apple-touch-icon" href="/ikon/apple-touch-icon.png">', false)
-            ->assertSee('<meta name="apple-mobile-web-app-title" content="Al Wafi ERP">', false);
+        return [
+            '<meta name="pwa" content="aktif">',
+            '<link rel="manifest" href="/manifest.json">',
+            '<meta name="theme-color" content="#164a9e">',
+            '<link rel="apple-touch-icon" href="/ikon/apple-touch-icon.png">',
+            '<meta name="apple-mobile-web-app-title" content="Al Wafi ERP">',
+        ];
+    }
+
+    public function test_penanda_pwa_ada_di_halaman_ber_sesi(): void
+    {
+        config()->set('app.pwa_aktif', true);
+        $halaman = $this->actingAs($this->pengguna)->get(route('dashboard'))->assertOk();
+
+        foreach ($this->penandaPwa() as $penanda) {
+            $halaman->assertSee($penanda, false);
+        }
+    }
+
+    /**
+     * HALAMAN MASUK JUGA — dan taruhannya lebih besar daripada sekadar tombol
+     * "Pasang" yang tak muncul.
+     *
+     * `meta[name="pwa"]` yang TIDAK ADA terbaca app.js sebagai "mati", dan
+     * cabang itu MENCABUT pendaftaran pekerja layanan. Selama penanda ini cuma
+     * hidup di layout ber-sesi, setiap kali staf keluar akun atau sesinya
+     * kedaluwarsa, pemasangan di layar utamanya dibongkar sendiri oleh halaman
+     * masuk — tanpa ada yang menyadarinya.
+     */
+    public function test_penanda_pwa_ada_di_halaman_masuk(): void
+    {
+        config()->set('app.pwa_aktif', true);
+        $halaman = $this->get(route('login'))->assertOk();
+
+        foreach ($this->penandaPwa() as $penanda) {
+            $halaman->assertSee($penanda, false);
+        }
     }
 
     public function test_saklar_mati_dari_server(): void

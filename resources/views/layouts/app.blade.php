@@ -6,18 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Dashboard') — Al Wafi ERP</title>
 
-    {{-- PWA: aplikasi bisa dipasang ke layar utama & terbuka tanpa bilah alamat.
-         `pwa` dibaca app.js — bila "mati", pekerja layanan yang sudah terpasang
-         justru DICABUT saat halaman dimuat. Itu tombol darurat dari sisi server
-         (env PWA_AKTIF=false lalu deploy), bukan sesuatu yang perlu disentuh
-         satu per satu di ponsel staf. --}}
-    <meta name="pwa" content="{{ config('app.pwa_aktif') ? 'aktif' : 'mati' }}">
-    <meta name="theme-color" content="#164a9e">
-    <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/ikon/apple-touch-icon.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Al Wafi ERP">
+    <x-kepala-pwa />
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
