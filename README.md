@@ -1,5 +1,5 @@
 ---
-title: AL Wafi — Akuntansi & Kesantrian
+title: Al Wafi ERP — Akuntansi & Kesantrian
 emoji: 🏫
 colorFrom: indigo
 colorTo: green
@@ -8,7 +8,7 @@ app_port: 7860
 pinned: false
 ---
 
-# AL Wafi — Sistem Akuntansi & Kesantrian
+# Al Wafi ERP — Sistem Akuntansi & Kesantrian
 
 Aplikasi internal pesantren: akuntansi (COA, jurnal, kas, hutang, anggaran,
 pengajuan pembayaran) dan kesantrian/PPSB (calon santri, registrasi, uang

@@ -3,15 +3,15 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Masuk — AL Wafi</title>
+    <title>Masuk — Al Wafi ERP</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="flex h-full items-center justify-center bg-brand-dark p-4">
     <div class="w-full max-w-sm">
         <div class="mb-6 text-center">
-            <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-xl font-bold text-brand-dark">A</div>
-            <h1 class="text-lg font-semibold text-white">AL Wafi Islamic Boarding School</h1>
-            <p class="text-sm text-slate-400">Sistem Akuntansi &amp; Kesantrian</p>
+            <x-logo class="mx-auto mb-3 h-20 w-20 rounded-2xl text-3xl" />
+            <h1 class="text-xl font-semibold text-white">Al Wafi ERP</h1>
+            <p class="text-sm text-slate-300">AL Wafi Islamic Boarding School</p>
         </div>
 
         <form method="POST" action="{{ url('/login') }}" data-no-confirm class="space-y-4 rounded-xl bg-white p-6 shadow-xl">

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Dashboard') — AL Wafi</title>
+    <title>@yield('title', 'Dashboard') — Al Wafi ERP</title>
 
     {{-- PWA: aplikasi bisa dipasang ke layar utama & terbuka tanpa bilah alamat.
          `pwa` dibaca app.js — bila "mati", pekerja layanan yang sudah terpasang
@@ -17,7 +17,7 @@
     <link rel="apple-touch-icon" href="/ikon/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="AL Wafi">
+    <meta name="apple-mobile-web-app-title" content="Al Wafi ERP">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -51,8 +51,8 @@
     <aside x-show="sidebar" x-cloak
            class="fixed inset-y-0 left-0 z-40 w-64 overflow-y-auto bg-brand-dark text-slate-200 [scrollbar-gutter:stable] pb-[env(safe-area-inset-bottom)]">
         <div class="flex h-14 items-center gap-2 border-b border-white/10 px-4">
-            <div class="flex h-8 w-8 items-center justify-center rounded bg-accent font-bold text-brand-dark">A</div>
-            <span class="font-semibold tracking-tight text-white">AL Wafi</span>
+            <x-logo class="h-8 w-8 shrink-0 rounded" />
+            <span class="font-semibold tracking-tight text-white">Al Wafi ERP</span>
         </div>
         @php $aktifUrl = \App\Support\Navigation::activeUrl(); @endphp
         {{-- Menutup laci begitu sebuah menu dipilih — hanya menu (<a>), bukan

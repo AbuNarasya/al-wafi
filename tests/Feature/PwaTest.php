@@ -38,7 +38,7 @@ class PwaTest extends TestCase
             ->assertSee('<link rel="manifest" href="/manifest.json">', false)
             ->assertSee('<meta name="theme-color" content="#164a9e">', false)
             ->assertSee('<link rel="apple-touch-icon" href="/ikon/apple-touch-icon.png">', false)
-            ->assertSee('<meta name="apple-mobile-web-app-title" content="AL Wafi">', false);
+            ->assertSee('<meta name="apple-mobile-web-app-title" content="Al Wafi ERP">', false);
     }
 
     public function test_saklar_mati_dari_server(): void
