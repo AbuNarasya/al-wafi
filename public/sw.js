@@ -17,7 +17,10 @@
  * Mematikannya: setel env PWA_AKTIF=false lalu deploy. Halaman akan mencabut
  * pendaftaran pekerja layanan ini sendiri saat dimuat (lihat app.js).
  */
-const VERSI = 'alwafi-v1';
+// Naikkan nomornya setiap kali isi `/ikon/` diganti: `activate` membuang semua
+// simpanan bernama lain, dan itu satu-satunya cara memaksa perangkat yang sudah
+// terlanjur menyimpan lambang lama untuk mengambilnya lagi SEKETIKA.
+const VERSI = 'alwafi-v2';
 const LURING = '/luring.html';
 
 self.addEventListener('install', (e) => {
@@ -44,7 +47,7 @@ self.addEventListener('fetch', (e) => {
 
     // Aset build: isi tetap selamanya (nama berkas ber-hash) → ambil dari
     // simpanan lebih dulu, unduh sekali lalu simpan.
-    if (url.pathname.startsWith('/build/') || url.pathname.startsWith('/ikon/')) {
+    if (url.pathname.startsWith('/build/')) {
         e.respondWith(
             caches.match(req).then((tersimpan) => tersimpan || fetch(req).then((res) => {
                 if (res.ok) {
@@ -53,6 +56,31 @@ self.addEventListener('fetch', (e) => {
                 }
 
                 return res;
+            })),
+        );
+
+        return;
+    }
+
+    // IKON — sengaja TIDAK disamakan dengan aset build. Namanya tetap
+    // (`/ikon/ikon-192.png`) walau gambarnya diganti, jadi menyimpannya
+    // selamanya berarti lambang lama menempel di dialog "tambahkan ke layar
+    // utama" sampai pemakainya mencopot aplikasinya sendiri.
+    //
+    // Sajikan yang tersimpan supaya tetap cepat dan tetap ada saat luring, TAPI
+    // selalu unduh ulang di latar untuk pemakaian berikutnya.
+    if (url.pathname.startsWith('/ikon/')) {
+        e.respondWith(
+            caches.open(VERSI).then((c) => c.match(req).then((tersimpan) => {
+                const segar = fetch(req).then((res) => {
+                    if (res.ok) {
+                        c.put(req, res.clone());
+                    }
+
+                    return res;
+                }).catch(() => tersimpan);
+
+                return tersimpan || segar;
             })),
         );
 

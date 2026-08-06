@@ -85,4 +85,32 @@ class PwaTest extends TestCase
         // Tak ada penyimpanan menyeluruh atas seluruh permintaan.
         $this->assertStringNotContainsString('caches.put(req)', str_replace(' ', '', $sw));
     }
+
+    /**
+     * IKON TIDAK BOLEH ikut aturan "simpan selamanya" milik aset build.
+     *
+     * Nama berkas build mengandung hash, jadi isinya memang tak pernah berubah.
+     * Nama ikon TETAP (`/ikon/ikon-192.png`) walau gambarnya diganti — dan
+     * keduanya pernah disatukan dalam satu cabang cache-first. Akibatnya ponsel
+     * yang sudah menyimpannya menampilkan lambang lama di dialog "tambahkan ke
+     * layar utama" tanpa batas waktu, meski servernya sudah menyajikan yang
+     * baru. Yang dijaga di sini: ikon punya cabangnya sendiri, dan cabang itu
+     * selalu mengunduh ulang lalu menimpa simpanannya.
+     */
+    public function test_ikon_tidak_disimpan_selamanya(): void
+    {
+        $sw = file_get_contents(public_path('sw.js'));
+        $rapat = str_replace(' ', '', $sw);
+
+        $this->assertStringContainsString("url.pathname.startsWith('/ikon/')", $sw);
+
+        // Bukan lagi satu cabang bersama aset build.
+        $this->assertStringNotContainsString(
+            "startsWith('/build/')||url.pathname.startsWith('/ikon/')",
+            $rapat,
+        );
+
+        // Cabang ikon menimpa simpanannya dengan hasil unduhan baru.
+        $this->assertMatchesRegularExpression("#startsWith\('/ikon/'\).*?c\.put\(req,res\.clone\(\)\)#s", $rapat);
+    }
 }
