@@ -10,6 +10,11 @@ namespace App\Services\Impor;
  * dan menahan berkas antara pratinjau dan impor. Pemeta hanya menjawab tiga
  * hal: kolom apa yang diminta, apakah sebuah baris sah, dan bagaimana
  * menyimpannya. Menambah jenis data baru = menambah satu berkas pemeta.
+ *
+ * Satu-satunya pemeriksaan yang tak muat di ketiganya adalah KEKEMBARAN DI
+ * DALAM BERKAS: sebuah baris tak bisa menilainya sendirian, karena baris kedua
+ * yang ber-NIS sama selalu tampak sah bila dilihat terpisah. Karena itu pemeta
+ * cukup menyebut kolomnya lewat kolomUnik(), dan kerangkanya yang memeriksa.
  */
 interface Pemeta
 {
@@ -48,6 +53,16 @@ interface Pemeta
      * @param  array<string,string>  $param
      */
     public function periksaParameter(array $param): ?string;
+
+    /**
+     * Kolom yang nilainya TAK BOLEH kembar di dalam satu berkas — biasanya
+     * kolom yang di database berindeks unik. Sel kosong tak dihitung kembar.
+     *
+     * Kembalikan `[]` bila jenis impor ini memang tak punya kunci semacam itu.
+     *
+     * @return list<string>
+     */
+    public function kolomUnik(): array;
 
     /**
      * Periksa satu baris. Kembalikan:

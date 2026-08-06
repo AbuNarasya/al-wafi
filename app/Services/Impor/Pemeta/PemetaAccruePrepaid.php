@@ -76,6 +76,12 @@ class PemetaAccruePrepaid implements Pemeta
         return null;
     }
 
+    /** Tak ada kolom yang harus tunggal dalam satu berkas. */
+    public function kolomUnik(): array
+    {
+        return [];
+    }
+
     public function periksa(array $baris, array $param): array
     {
         $bukti = trim($baris['nomor_bukti'] ?? '');

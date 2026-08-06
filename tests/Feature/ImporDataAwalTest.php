@@ -409,6 +409,75 @@ class ImporDataAwalTest extends TestCase
         $this->assertSame('Süleyman Çelebi', Santri::where('nis', '230023')->value('nama'));
     }
 
+    /**
+     * NIS kembar DI DALAM satu berkas — tak mungkin terlihat dari periksa(),
+     * yang cuma memegang satu baris. Dulu impor berjalan sampai baris kembarnya
+     * lalu batal seluruhnya dengan SQLSTATE[23505] tanpa menyebut baris mana
+     * pun; pernah terjadi pada berkas SDTQ berisi kakak-beradik yang NIS-nya
+     * salah ketik jadi sama.
+     */
+    public function test_nis_kembar_dalam_satu_berkas_ketahuan_di_pratinjau(): void
+    {
+        $path = $this->berkas([
+            $this->barisSah(['nis' => '242501054', 'nama' => 'GHALEILA PRICELA SAPUTRA']),
+            $this->barisSah(['nis' => '230099', 'nama' => 'Anak Lain']),
+            $this->barisSah(['nis' => '242501054', 'nama' => 'GIBRALTAR STAVEL SAPUTRA']),
+        ]);
+
+        $hasil = app(ImporSaldoAwal::class)->pratinjau('santri-lama', $path, $this->param());
+
+        $this->assertSame(2, $hasil['siap']);
+        $this->assertSame(1, $hasil['masalah']);
+
+        // Yang ditandai kemunculan KEDUA (baris 4), bukan yang pertama.
+        $this->assertSame(4, $hasil['baris_masalah'][0]['nomor']);
+        $this->assertStringContainsString('242501054', $hasil['baris_masalah'][0]['alasan']);
+        // Nomor baris pertamanya ikut disebut, supaya ada yang bisa dibandingkan.
+        $this->assertStringContainsString('baris 2', $hasil['baris_masalah'][0]['alasan']);
+    }
+
+    /** Yang kembar dilewati; sisanya tetap masuk, tak ikut dibatalkan. */
+    public function test_baris_kembar_dilewati_dan_sisanya_tetap_terimpor(): void
+    {
+        $path = $this->berkas([
+            $this->barisSah(['nis' => '242501054', 'nama' => 'GHALEILA PRICELA SAPUTRA']),
+            $this->barisSah(['nis' => '230099', 'nama' => 'Anak Lain']),
+            $this->barisSah(['nis' => '242501054', 'nama' => 'GIBRALTAR STAVEL SAPUTRA']),
+        ]);
+
+        $hasil = app(ImporSaldoAwal::class)->jalankan('santri-lama', $path, $this->param());
+
+        $this->assertSame(2, $hasil['siap']);
+        $this->assertSame(1, $hasil['masalah']);
+        $this->assertSame(2, Santri::count());
+        $this->assertSame('GHALEILA PRICELA SAPUTRA', Santri::where('nis', '242501054')->value('nama'));
+    }
+
+    /**
+     * Sel KOSONG tak pernah dihitung kembar.
+     *
+     * Di sini kedua barisnya memang tetap bermasalah — PemetaSantriLama
+     * mewajibkan NIS — tapi alasannya harus "NIS kosong", BUKAN tuduhan kembar.
+     * Aturannya hidup di kerangka dan berlaku juga bagi pemeta yang kolom
+     * uniknya boleh dikosongkan; di database pun dua NULL dianggap berbeda oleh
+     * indeks uniknya.
+     */
+    public function test_sel_kosong_berulang_tidak_dianggap_kembar(): void
+    {
+        $path = $this->berkas([
+            $this->barisSah(['nis' => '', 'nama' => 'Tanpa NIS Satu']),
+            $this->barisSah(['nis' => '', 'nama' => 'Tanpa NIS Dua']),
+        ]);
+
+        $hasil = app(ImporSaldoAwal::class)->pratinjau('santri-lama', $path, $this->param());
+
+        $this->assertSame(2, $hasil['masalah']);
+        foreach ($hasil['baris_masalah'] as $b) {
+            $this->assertStringContainsString('NIS kosong', $b['alasan']);
+            $this->assertStringNotContainsString('sudah dipakai baris', $b['alasan']);
+        }
+    }
+
     public function test_pemisah_titik_koma_ikut_terbaca(): void
     {
         $path = sys_get_temp_dir().'/impor-uji-'.uniqid().'.csv';

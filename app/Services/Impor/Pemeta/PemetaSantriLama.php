@@ -232,6 +232,20 @@ class PemetaSantriLama implements Pemeta
         return null;
     }
 
+    /**
+     * NIS berindeks unik di tabel santri. Dua baris ber-NIS sama membuat
+     * seluruh impor batal di tengah jalan dengan galat SQL yang tak menyebut
+     * baris mana pun — pernah terjadi pada berkas SDTQ berisi kakak-beradik
+     * yang NIS-nya salah ketik jadi sama.
+     *
+     * NISN TIDAK ikut: kolomnya memang tak berindeks unik, dan berkas pindahan
+     * kerap membiarkannya kosong atau sementara diisi seadanya.
+     */
+    public function kolomUnik(): array
+    {
+        return ['nis'];
+    }
+
     public function periksa(array $baris, array $param): array
     {
         $nis = trim($baris['nis'] ?? '');

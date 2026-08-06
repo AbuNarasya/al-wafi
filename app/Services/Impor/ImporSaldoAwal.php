@@ -172,10 +172,17 @@ class ImporSaldoAwal
             ];
         }
 
+        $kembar = $this->kembarDalamBerkas($pemeta, $rows);
+
         $siap = $lewati = 0;
         $masalah = [];
         foreach ($rows as $i => $baris) {
-            $p = $pemeta->periksa($baris, $param);
+            // Kekembaran didahulukan: baris ini boleh saja lolos periksa() —
+            // yang membuatnya tak bisa masuk adalah baris lain di berkas ini.
+            $p = isset($kembar[$i])
+                ? ['status' => 'masalah', 'alasan' => $kembar[$i]]
+                : $pemeta->periksa($baris, $param);
+
             match ($p['status']) {
                 'siap' => $siap++,
                 'lewati' => $lewati++,
@@ -210,10 +217,15 @@ class ImporSaldoAwal
         }
         $rows = $this->baca($path);
 
+        $kembar = $this->kembarDalamBerkas($pemeta, $rows);
+
         $siap = [];
         $lewati = $masalah = 0;
-        foreach ($rows as $baris) {
-            $p = $pemeta->periksa($baris, $param);
+        foreach ($rows as $i => $baris) {
+            $p = isset($kembar[$i])
+                ? ['status' => 'masalah']
+                : $pemeta->periksa($baris, $param);
+
             match ($p['status']) {
                 'siap' => $siap[] = $baris,
                 'lewati' => $lewati++,
@@ -243,6 +255,53 @@ class ImporSaldoAwal
         fclose($f);
 
         return "\xEF\xBB\xBF".$isi; // BOM supaya Excel membaca UTF-8 dengan benar
+    }
+
+    /**
+     * Kekembaran DI DALAM satu berkas — yang tak mungkin terlihat dari
+     * Pemeta::periksa(), karena ia hanya memegang satu baris pada satu waktu:
+     * baris kedua yang ber-NIS sama selalu tampak sah bila dilihat sendirian.
+     *
+     * Yang ditandai bermasalah hanya kemunculan KEDUA dan seterusnya; yang
+     * pertama tetap masuk. Membatalkan keduanya berarti menghukum baris yang
+     * belum tentu keliru, padahal yang salah ketik biasanya cuma satu.
+     *
+     * Sel KOSONG tak pernah dihitung kembar: kolom seperti `nis` boleh kosong,
+     * dan di database pun dua NULL dianggap berbeda oleh indeks uniknya.
+     *
+     * @param  list<array<string,string>>  $rows
+     * @return array<int,string>  indeks baris => alasannya
+     */
+    private function kembarDalamBerkas(Pemeta $pemeta, array $rows): array
+    {
+        $masalah = [];
+
+        foreach ($pemeta->kolomUnik() as $kolom) {
+            $pertama = [];
+            foreach ($rows as $i => $baris) {
+                $nilai = trim((string) ($baris[$kolom] ?? ''));
+                if ($nilai === '') {
+                    continue;
+                }
+
+                if (isset($pertama[$nilai])) {
+                    // Nomor baris pertamanya ikut disebut — tanpa itu petugas
+                    // tahu ada yang kembar tapi tak tahu harus membandingkan
+                    // dengan baris yang mana di antara ratusan baris.
+                    $awal = $pertama[$nilai];
+                    $masalah[$i] ??= sprintf(
+                        'Kolom %s bernilai "%s" sudah dipakai baris %d (%s).',
+                        $kolom, $nilai, $awal + 2, $this->ringkas($rows[$awal]),
+                    );
+
+                    continue;
+                }
+
+                $pertama[$nilai] = $i;
+            }
+        }
+
+        return $masalah;
     }
 
     /** Cuplikan baris untuk ditampilkan di daftar masalah. */

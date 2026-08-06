@@ -105,6 +105,12 @@ class PemetaPinjamanBank implements Pemeta
         return null;
     }
 
+    /** Tak ada kolom yang harus tunggal dalam satu berkas. */
+    public function kolomUnik(): array
+    {
+        return [];
+    }
+
     public function periksa(array $baris, array $param): array
     {
         $kontrak = trim($baris['nomor_kontrak'] ?? '');
