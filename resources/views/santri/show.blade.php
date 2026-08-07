@@ -142,7 +142,12 @@
         <div class="mb-4 rounded-xl border border-gray-200 bg-white shadow-sm">
             <div class="border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-700">Tagihan</div>
             <table class="min-w-full text-sm">
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="px-4 py-2">Jenis</th><th class="px-4 py-2">Keterangan</th><th class="px-4 py-2 text-right">Nominal</th><th class="px-4 py-2 text-right">Sisa</th><th class="px-4 py-2">Status</th></tr></thead>
+                {{-- Koreksi nominal hanya untuk pemegang hak `koreksi-tagihan`
+                     (kepala keuangan). Ia mengubah piutang yang sudah dibukukan
+                     dan menerbitkan jurnal penyesuaian, jadi kolomnya pun tak
+                     ditampilkan bagi yang tak berwenang. --}}
+                @php $bolehKoreksi = \App\Support\Akses::boleh('koreksi-tagihan', 'ubah'); @endphp
+                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="px-4 py-2">Jenis</th><th class="px-4 py-2">Keterangan</th><th class="px-4 py-2 text-right">Nominal</th><th class="px-4 py-2 text-right">Sisa</th><th class="px-4 py-2">Status</th>@if ($bolehKoreksi)<th class="px-4 py-2"></th>@endif</tr></thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse ($santri->tagihan as $t)
                         {{-- Setoran yang sudah dicatat tapi belum diverifikasi keuangan tidak
@@ -162,9 +167,50 @@
                                     <div class="mt-0.5 text-[11px] text-gray-500">sudah disetor, menunggu keuangan</div>
                                 @endif
                             </td>
+                            @if ($bolehKoreksi)
+                                <td class="px-4 py-2 text-right">
+                                    @if ($t->status !== 'batal')
+                                        <div x-data="{ buka: false }" class="relative inline-block">
+                                            <button type="button" @click="buka = ! buka"
+                                                    class="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50">Koreksi</button>
+                                            <form x-show="buka" x-cloak @click.outside="buka = false" method="POST"
+                                                  action="{{ route('tagihan.koreksi', $t->id) }}"
+                                                  class="absolute right-0 z-20 mt-1 w-80 space-y-2 rounded-lg border border-gray-200 bg-white p-3 text-left shadow-lg">
+                                                @csrf
+                                                <p class="text-xs text-gray-600">
+                                                    Nominal sekarang <b>@rp($t->nominal)</b>, sudah dibayar
+                                                    <b>Rp {{ number_format((float) $t->nominal - (float) $t->sisa, 0, ',', '.') }}</b>.
+                                                </p>
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-gray-600">Nominal baru</label>
+                                                    {{-- `nominal_baru`, bukan `nominal`: di halaman ini
+                                                         `name="nominal"` sudah berarti isian uang pangkal,
+                                                         dan ketiadaannya dipakai sebagai bukti bahwa jalur
+                                                         bebas uang pangkal memang tak menawarkannya. --}}
+                                                    <x-input-rupiah name="nominal_baru" :value="$t->nominal" required />
+                                                </div>
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-gray-600">Alasan koreksi</label>
+                                                    <input type="text" name="alasan" required maxlength="255"
+                                                           placeholder="mis. salah baca berkas impor"
+                                                           class="w-full rounded border-gray-300 text-xs">
+                                                </div>
+                                                {{-- Dua akibat yang tak diminta petugas secara langsung, dan
+                                                     justru paling mudah luput — disebutkan SEBELUM ditekan. --}}
+                                                <p class="text-[11px] leading-relaxed text-gray-500">
+                                                    Menurunkan di bawah yang sudah dibayar boleh — kelebihannya masuk
+                                                    <b>Dompet Wali</b> sebagai titipan. Bila tagihan ini punya jadwal
+                                                    angsuran, jadwalnya digugurkan dan harus disusun ulang bersama walinya.
+                                                </p>
+                                                <button class="w-full rounded bg-brand px-2 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark">Simpan Koreksi</button>
+                                            </form>
+                                        </div>
+                                    @endif
+                                </td>
+                            @endif
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">Belum ada tagihan.</td></tr>
+                        <tr><td colspan="{{ $bolehKoreksi ? 6 : 5 }}" class="px-4 py-6 text-center text-gray-400">Belum ada tagihan.</td></tr>
                     @endforelse
                 </tbody>
             </table>

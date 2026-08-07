@@ -18,6 +18,18 @@ final class Akses
     private static array $cache = [];
 
     /**
+     * Buang cache hak. Satu permintaan HTTP = satu proses, jadi di lapangan
+     * cache ini tak pernah basi. Yang butuh justru TEST: seluruh test berbagi
+     * satu proses PHP, sehingga hak yang diberikan di tengah test tak terlihat
+     * karena yang dibaca masih hasil permintaan sebelumnya — dan gejalanya
+     * menyesatkan, tampak seperti tombolnya yang tak muncul.
+     */
+    public static function lupakan(): void
+    {
+        self::$cache = [];
+    }
+
+    /**
      * @return array<string,array{lihat:bool,buat:bool,ubah:bool,hapus:bool,menu:bool}>
      */
     private static function hakUser(User $user): array

@@ -3,6 +3,7 @@
 namespace Tests;
 
 use App\Services\Ledger\PostingService;
+use App\Support\Akses;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
@@ -18,5 +19,6 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
         PostingService::lupakanKonteksNeraca();
+        Akses::lupakan();
     }
 }

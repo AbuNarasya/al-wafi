@@ -279,7 +279,7 @@ class KoreksiTagihanTest extends TestCase
         ]);
 
         $this->actingAs($petugas)
-            ->post(route('tagihan.koreksi', $t->id), ['nominal' => '500000', 'alasan' => 'Coba'])
+            ->post(route('tagihan.koreksi', $t->id), ['nominal_baru' => '500000', 'alasan' => 'Coba'])
             ->assertForbidden();
         $this->assertSame(1000000.0, (float) $t->refresh()->nominal);
 
@@ -290,9 +290,48 @@ class KoreksiTagihanTest extends TestCase
         ]);
 
         $this->actingAs($petugas)
-            ->post(route('tagihan.koreksi', $t->id), ['nominal' => '500000', 'alasan' => 'Salah tarif'])
+            ->post(route('tagihan.koreksi', $t->id), ['nominal_baru' => '500000', 'alasan' => 'Salah tarif'])
             ->assertRedirect();
         $this->assertSame(500000.0, (float) $t->refresh()->nominal);
+    }
+
+    /**
+     * Tombolnya di halaman santri — dan yang lebih penting, KETIADAANNYA bagi
+     * yang tak berwenang.
+     *
+     * Menyembunyikan tombol bukan pengganti penjagaan di rute (itu sudah diuji
+     * terpisah), melainkan supaya petugas tak menemukan pintu yang selalu
+     * tertutup untuknya dan mengira ada yang rusak.
+     */
+    public function test_tombol_koreksi_hanya_tampak_bagi_yang_berwenang(): void
+    {
+        $t = $this->tagihan('1000000');
+
+        $petugas = User::create([
+            'username' => 'zzkt_lihat', 'nama' => 'Petugas Santri', 'password_hash' => 'x',
+            'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif',
+        ]);
+        \App\Models\HakAksesModul::create([
+            'id_pengguna' => $petugas->id_pengguna, 'kode_modul' => 'santri',
+            'lihat' => true, 'buat' => true, 'ubah' => true, 'hapus' => true, 'menu' => true,
+        ]);
+
+        $this->actingAs($petugas)->get(route('santri.show', $this->santri->id))
+            ->assertOk()
+            ->assertDontSee(route('tagihan.koreksi', $t->id));
+
+        \App\Models\HakAksesModul::create([
+            'id_pengguna' => $petugas->id_pengguna, 'kode_modul' => 'koreksi-tagihan',
+            'lihat' => true, 'buat' => false, 'ubah' => true, 'hapus' => false, 'menu' => false,
+        ]);
+        // Hak dibaca sekali per proses; di lapangan tiap permintaan HTTP adalah
+        // proses baru, tapi di test keduanya berbagi satu proses.
+        \App\Support\Akses::lupakan();
+
+        $this->actingAs($petugas)->get(route('santri.show', $this->santri->id))
+            ->assertOk()
+            ->assertSee(route('tagihan.koreksi', $t->id))
+            ->assertSee('Dompet Wali');
     }
 
     /** Pembayaran yang belum diputuskan membuat sisa masih bergerak. */

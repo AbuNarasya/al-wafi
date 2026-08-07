@@ -22,15 +22,18 @@ class KoreksiTagihanController extends Controller
 
     public function koreksi(Request $request, int $id): RedirectResponse
     {
+        // `nominal_baru`, bukan `nominal`: di halaman santri `name="nominal"`
+        // sudah berarti isian uang pangkal, dan ketiadaannya dipakai sebagai
+        // bukti bahwa jalur bebas uang pangkal memang tak menawarkannya.
         $data = $request->validate([
-            'nominal' => ['required', 'numeric', 'gt:0'],
+            'nominal_baru' => ['required', 'numeric', 'gt:0'],
             'alasan' => ['required', 'string', 'max:255'],
         ]);
 
         try {
             $hasil = $this->service->koreksi(
                 $id,
-                (string) $data['nominal'],
+                (string) $data['nominal_baru'],
                 $data['alasan'],
                 $request->user()->id_pengguna,
             );
