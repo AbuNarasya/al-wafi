@@ -1,0 +1,853 @@
+<title>Rancangan Tagihan Lain-lain v2 — Al Wafi</title>
+
+<style>
+  :root {
+    --ground: #f5f6f8;
+    --surface: #ffffff;
+    --surface-sunk: #fbfbfd;
+    --ink: #1a2130;
+    --ink-soft: #4e5a6e;
+    --ink-faint: #7b8699;
+    --rule: #dfe3ea;
+    --rule-soft: #eceff4;
+    --brand: #164a9e;
+    --brand-dark: #0e3168;
+    --brand-soft: #e8edf6;
+    --accent: #9a6b00;
+    --accent-bright: #f8c400;
+    --accent-soft: #fdf4dc;
+    --ok: #047857;
+    --ok-soft: #e7f5ef;
+    --warn: #a16207;
+    --warn-soft: #fdf5e3;
+    --bad: #b42318;
+    --bad-soft: #fdecea;
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #12151b;
+      --surface: #191d25;
+      --surface-sunk: #151920;
+      --ink: #e7eaf0;
+      --ink-soft: #aab4c4;
+      --ink-faint: #7d8798;
+      --rule: #2b3240;
+      --rule-soft: #232936;
+      --brand: #7ba4e8;
+      --brand-dark: #a8c4f0;
+      --brand-soft: #1c2740;
+      --accent: #e0b34d;
+      --accent-bright: #f8c400;
+      --accent-soft: #2a2314;
+      --ok: #5cc59a;
+      --ok-soft: #16281f;
+      --warn: #e0b34d;
+      --warn-soft: #2a2314;
+      --bad: #ef8579;
+      --bad-soft: #2b1918;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #12151b;
+    --surface: #191d25;
+    --surface-sunk: #151920;
+    --ink: #e7eaf0;
+    --ink-soft: #aab4c4;
+    --ink-faint: #7d8798;
+    --rule: #2b3240;
+    --rule-soft: #232936;
+    --brand: #7ba4e8;
+    --brand-dark: #a8c4f0;
+    --brand-soft: #1c2740;
+    --accent: #e0b34d;
+    --accent-bright: #f8c400;
+    --accent-soft: #2a2314;
+    --ok: #5cc59a;
+    --ok-soft: #16281f;
+    --warn: #e0b34d;
+    --warn-soft: #2a2314;
+    --bad: #ef8579;
+    --bad-soft: #2b1918;
+  }
+  :root[data-theme="light"] {
+    --ground: #f5f6f8;
+    --surface: #ffffff;
+    --surface-sunk: #fbfbfd;
+    --ink: #1a2130;
+    --ink-soft: #4e5a6e;
+    --ink-faint: #7b8699;
+    --rule: #dfe3ea;
+    --rule-soft: #eceff4;
+    --brand: #164a9e;
+    --brand-dark: #0e3168;
+    --brand-soft: #e8edf6;
+    --accent: #9a6b00;
+    --accent-bright: #f8c400;
+    --accent-soft: #fdf4dc;
+    --ok: #047857;
+    --ok-soft: #e7f5ef;
+    --warn: #a16207;
+    --warn-soft: #fdf5e3;
+    --bad: #b42318;
+    --bad-soft: #fdecea;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.25rem;
+  }
+
+  .prose { display: flex; flex-direction: column; gap: .85rem; max-width: 42rem; }
+  .prose p { margin: 0; }
+
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(2rem, 5vw, 2.9rem);
+    line-height: 1.12;
+    font-weight: 600;
+    letter-spacing: -.015em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-size: clamp(1.35rem, 3vw, 1.7rem);
+    line-height: 1.2;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-size: .95rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -.005em;
+  }
+
+  .lede {
+    font-size: 1.12rem;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    max-width: 40rem;
+  }
+  .meta { font-size: 12.5px; color: var(--ink-faint); }
+
+  header.head {
+    display: flex;
+    flex-direction: column;
+    gap: .9rem;
+    padding-bottom: 2rem;
+    border-bottom: 3px solid var(--brand);
+  }
+
+  section { display: flex; flex-direction: column; gap: 1.35rem; }
+
+  .sec-head { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; }
+  .sec-head .num {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    padding-top: .2rem;
+  }
+
+  /* Penanda keluarga: A = navy, B = emas. Dipakai konsisten di seluruh dokumen. */
+  .fam {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    padding: .18rem .5rem;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .fam.a { background: var(--brand-soft); color: var(--brand-dark); }
+  .fam.b { background: var(--accent-soft); color: var(--accent); }
+
+  .keyed { border-left: 3px solid var(--rule); padding-left: 1.25rem; }
+  .keyed.a { border-left-color: var(--brand); }
+  .keyed.b { border-left-color: var(--accent-bright); }
+
+  .tablebox {
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--surface);
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  table th {
+    text-align: left;
+    font-size: 11px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 700;
+    padding: .7rem .85rem;
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface-sunk);
+    white-space: nowrap;
+  }
+  table td {
+    padding: .7rem .85rem;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  table tr:last-child td { border-bottom: 0; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+  td.ctr, th.ctr { text-align: center; }
+
+  code {
+    font-family: var(--mono);
+    font-size: .87em;
+    background: var(--rule-soft);
+    padding: .1rem .3rem;
+    border-radius: 3px;
+  }
+
+  .callout {
+    border-radius: 6px;
+    padding: 1rem 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: .45rem;
+    font-size: 13.5px;
+    line-height: 1.55;
+    background: var(--brand-soft);
+    border: 1px solid transparent;
+  }
+  .callout .k {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--brand-dark);
+  }
+  .callout p { margin: 0; }
+  .callout.warn { background: var(--warn-soft); }
+  .callout.warn .k { color: var(--warn); }
+  .callout.bad { background: var(--bad-soft); }
+  .callout.bad .k { color: var(--bad); }
+  .callout.ok { background: var(--ok-soft); }
+  .callout.ok .k { color: var(--ok); }
+
+  /* Panel mockup — ringan, bukan jendela palsu berlapis. */
+  .panel {
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .panel > .path {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-faint);
+    padding: .5rem .85rem;
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface-sunk);
+  }
+  .panel > .body { padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: .9rem; }
+  .panel .cap {
+    font-size: 12px;
+    color: var(--ink-faint);
+    padding: .6rem .85rem;
+    border-top: 1px solid var(--rule-soft);
+    background: var(--surface-sunk);
+    line-height: 1.5;
+  }
+  .panel table { font-size: 13px; }
+
+  .fields { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
+  .fld { display: flex; flex-direction: column; gap: .28rem; }
+  .fld label { font-size: 11px; font-weight: 600; color: var(--ink-soft); }
+  .fld .inp {
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: .38rem .55rem;
+    font-size: 13px;
+    background: var(--surface-sunk);
+    min-height: 1.9rem;
+  }
+  .fld .hint { font-size: 11px; color: var(--ink-faint); line-height: 1.45; }
+  .req { color: var(--bad); }
+
+  .pill {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    padding: .12rem .45rem;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); }
+  .pill.wait { background: var(--warn-soft); color: var(--warn); }
+  .pill.off { background: var(--rule-soft); color: var(--ink-faint); }
+  .pill.acc { background: var(--brand-soft); color: var(--brand-dark); }
+  .pill.kas { background: var(--accent-soft); color: var(--accent); }
+
+  .flow { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); }
+  .flowcard {
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--surface);
+    padding: 1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .7rem;
+  }
+  .flowcard h3 { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+  .step { display: grid; grid-template-columns: 5.2rem 1fr; gap: .6rem; font-size: 13px; align-items: baseline; }
+  .step em {
+    font-style: normal;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .step span { color: var(--ink-soft); }
+  .step.none span { color: var(--ink-faint); }
+
+  ul.list { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: .55rem; font-size: 14px; }
+  ul.list li { line-height: 1.55; }
+
+  .calc {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--surface-sunk);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: .9rem 1rem;
+    overflow-x: auto;
+    line-height: 1.8;
+  }
+  .calc b { color: var(--brand); }
+
+  footer.foot { border-top: 1px solid var(--rule); padding-top: 1.5rem; }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 2.25rem 1rem 3.5rem; gap: 2.5rem; }
+    .keyed { padding-left: .9rem; }
+    .step { grid-template-columns: 1fr; gap: .1rem; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="head">
+    <div class="eyebrow">Rancangan v2 · menggantikan versi 1 Agustus</div>
+    <h1>Tagihan Lain-lain</h1>
+    <p class="lede">Bukan satu jenis tagihan, melainkan dua watak yang bekerja dari akar yang berbeda: yang ditagih menurut <b>pemakaian</b>, dan yang ditagih menurut <b>kepesertaan</b>.</p>
+    <p class="meta">Al Wafi · disusun ulang 7 Agustus 2026 · belum ada baris kode yang diubah</p>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">01</span>
+      <h2>Kenapa versi lama diganti, bukan ditambal</h2>
+    </div>
+    <div class="prose">
+      <p>Rancangan 1 Agustus bertumpu pada satu kalimat yang ternyata keliru: <em>“nominal tiap santri berbeda dan jarang berubah, jadi disimpan sebagai daftar peserta — sekali disusun, tiap periode terbit sendiri.”</em></p>
+      <p>Laundry tidak begitu. Tarifnya <b>Rp 7.000 per kilogram</b>, dan kilogramnya berubah tiap bulan. Tak ada nominal yang bisa disimpan, dan tak ada jadwal yang bisa menerbitkannya sendiri — tidak ada angka untuk diterbitkan sebelum ada yang menimbang.</p>
+      <p>Sementara ekskul, kegiatan khusus, dan program umroh justru sebaliknya: nominalnya tetap, tapi hanya ditagihkan kepada santri yang ikut, dan tarifnya bisa berbeda antar jenjang.</p>
+      <p>Satu rancangan yang memaksa keduanya ke bentuk yang sama akan salah untuk dua-duanya. Karena itu dokumen ini memisahkan keduanya sejak awal.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">02</span>
+      <h2>Dua keluarga</h2>
+    </div>
+    <div class="prose">
+      <p>Penanda warna di dokumen ini konsisten: <span class="fam a">A · pemakaian</span> dan <span class="fam b">B · kepesertaan</span>. Setiap layar, tabel, dan jalur jurnal di bawah selalu menyebut ia milik yang mana.</p>
+    </div>
+    <div class="tablebox">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 11rem;"></th>
+            <th>A · Berbasis pemakaian</th>
+            <th>B · Berbasis kepesertaan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Contohnya</b></td>
+            <td>Laundry</td>
+            <td>Ekskul, kegiatan khusus, program umroh</td>
+          </tr>
+          <tr>
+            <td><b>Siapa yang ditagih</b></td>
+            <td>Otomatis — seluruh santri SMP &amp; SMA dianggap berlangganan</td>
+            <td>Hanya yang mengikuti; pesertanya didaftarkan</td>
+          </tr>
+          <tr>
+            <td><b>Besarannya</b></td>
+            <td>Tarif satuan × kuantitas, dikurangi kuota gratis</td>
+            <td>Tarif tetap, <b>bisa berbeda antar jenjang</b></td>
+          </tr>
+          <tr>
+            <td><b>Yang diisi petugas</b></td>
+            <td>Kilogram tiap kali santri menyetor</td>
+            <td>Daftar peserta kegiatan</td>
+          </tr>
+          <tr>
+            <td><b>Kapan terbit</b></td>
+            <td>Tiap bulan, setelah kilogramnya lengkap</td>
+            <td>Sekali per kegiatan</td>
+          </tr>
+          <tr>
+            <td><b>Pengakuan</b></td>
+            <td><span class="pill acc">Akrual</span> piutang diakui saat ditagihkan</td>
+            <td><span class="pill kas">Kas</span> pendapatan diakui saat dibayar</td>
+          </tr>
+          <tr>
+            <td><b>Kalau keliru</b></td>
+            <td>Koreksi — jurnalnya sudah terbit, harus disesuaikan</td>
+            <td>Batalkan — belum ada jurnal yang perlu dibalik</td>
+          </tr>
+          <tr>
+            <td><b>Tak ada tagihan bila</b></td>
+            <td>Tak mencuci, atau masih di bawah kuota</td>
+            <td>Tidak ikut kegiatannya</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <span class="k">Yang tetap sama untuk keduanya</span>
+      <p>Dua-duanya bermuara ke <code>tagihan_santri</code> yang sama, dengan <code>jenis_biaya</code> sebagai identitas akuntansinya. Pembayaran, dompet santri, rekap, reminder, dan koreksi tagihan tidak perlu tahu apa pun soal laundry maupun umroh — perbedaannya berhenti pada <b>cara sebuah tagihan lahir</b>.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">03</span>
+      <h2>Aturan yang dikunci</h2>
+    </div>
+    <div class="prose">
+      <p>Semua yang menyusul turun dari sini. Kalau ada satu yang salah tangkap, hentikan di bagian ini — sesudahnya semuanya menempel ke sana.</p>
+    </div>
+    <div class="tablebox">
+      <table>
+        <thead>
+          <tr><th style="width: 13rem;">Aturan</th><th>Wujudnya</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Pengakuan dipilih sadar</b></td>
+            <td>Kolom baru <code>jenis_biaya.pengakuan</code> — <code>akrual</code> atau <code>kas</code>. Sekarang sifat itu cuma <em>disimpulkan</em> dari kebetulan terisinya akun piutang.</td>
+          </tr>
+          <tr>
+            <td><b>Jenis <code>lain</code> tidak berjenjang</b></td>
+            <td>Satu jenis boleh ditagihkan ke santri jenjang mana pun. Jenjang berpindah tempat: ke <em>tarif</em> (keluarga B) atau ke <em>daftar jenjang peserta</em> (keluarga A).</td>
+          </tr>
+          <tr>
+            <td><b>Kuota gratis</b></td>
+            <td>Berlaku per santri per bulan, hangus di akhir bulan. Tagihan terbit <b>hanya untuk kelebihannya</b>. Pemakaian di bawah kuota tidak menerbitkan tagihan sama sekali — bukan tagihan bernilai nol.</td>
+          </tr>
+          <tr>
+            <td><b>Nominal dibekukan saat terbit</b></td>
+            <td>Tagihan menyimpan kuantitas &amp; tarif yang berlaku saat itu. Tarif naik 7.000 → 8.000 tidak menyentuh tagihan lama.</td>
+          </tr>
+          <tr>
+            <td><b>Lunas sekaligus</b></td>
+            <td>Tagihan lain-lain tak bisa dicicil, termasuk lewat potong dompet. Dompet yang saldonya kurang tidak memotong sebagian.</td>
+          </tr>
+          <tr>
+            <td><b>Setoran susulan tidak mengoreksi</b></td>
+            <td>Kilogram yang telat dicatat setelah tagihan bulan itu terbit ikut dihitung ke bulan berikutnya. Koreksi tagihan menerbitkan jurnal penyesuaian — terlalu berat untuk kelalaian pencatatan sehari.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">04</span>
+      <span class="fam a">A · pemakaian</span>
+      <h2>Laundry</h2>
+    </div>
+
+    <div class="keyed a" style="display:flex; flex-direction:column; gap:1.35rem;">
+      <div class="prose">
+        <p>Tiga layar: masternya sekali disetel, pencatatan setoran dipakai <b>tiap hari</b>, penerbitan sekali sebulan.</p>
+      </div>
+
+      <div class="panel">
+        <div class="path">/ jenis-biaya / LDR / edit</div>
+        <div class="body">
+          <div class="fields">
+            <div class="fld"><label>Nama <span class="req">*</span></label><div class="inp">Laundry</div></div>
+            <div class="fld"><label>Perilaku</label><div class="inp">Lain-lain</div></div>
+            <div class="fld">
+              <label>Cara menagih <span class="req">*</span></label>
+              <div class="inp">Menurut pemakaian</div>
+              <div class="hint">Pilihan lain: “Menurut kepesertaan”.</div>
+            </div>
+          </div>
+          <div class="fields">
+            <div class="fld"><label>Tarif per satuan <span class="req">*</span></label><div class="inp">7.000</div></div>
+            <div class="fld"><label>Nama satuan <span class="req">*</span></label><div class="inp">kg</div><div class="hint">Dipakai di seluruh layar: “12,5 kg”.</div></div>
+            <div class="fld"><label>Kuota gratis / bulan</label><div class="inp">20</div><div class="hint">Kosongkan bila tak ada kuota.</div></div>
+            <div class="fld"><label>Jenjang pemakai <span class="req">*</span></label><div class="inp">SMP, SMA</div></div>
+          </div>
+          <div class="fields">
+            <div class="fld">
+              <label>Pengakuan <span class="req">*</span></label>
+              <div class="inp">Akrual — piutang diakui saat ditagihkan</div>
+              <div class="hint">Tagihannya tidak bisa dibatalkan; kekeliruan lewat Koreksi.</div>
+            </div>
+            <div class="fld"><label>Akun Piutang <span class="req">*</span></label><div class="inp">1.1.03.003 — Piutang Santri Lainnya</div></div>
+            <div class="fld"><label>Akun Pendapatan <span class="req">*</span></label><div class="inp">4.1.02.001 — Pendapatan Laundry</div></div>
+          </div>
+        </div>
+        <div class="cap"><b>Perubahan:</b> “Cara menagih”, tarif satuan, nama satuan, kuota, jenjang pemakai, dan blok Pengakuan — seluruhnya baru. Kolom jenjang yang lama tidak dipakai lagi untuk perilaku <code>lain</code>.</div>
+      </div>
+
+      <div class="panel">
+        <div class="path">/ laundry / setoran</div>
+        <div class="body">
+          <div class="fields" style="grid-template-columns: repeat(auto-fit, minmax(9rem,1fr));">
+            <div class="fld"><label>Tanggal <span class="req">*</span></label><div class="inp">07/08/2026</div></div>
+            <div class="fld"><label>Santri <span class="req">*</span></label><div class="inp">Cari nama / NIS…</div></div>
+            <div class="fld"><label>Kilogram <span class="req">*</span></label><div class="inp">3,20</div></div>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>Tanggal</th><th>Santri</th><th>Jenjang</th><th class="num">Kg</th><th class="num">Kumulatif Agustus</th><th>Kuota</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>07/08</td><td>Ahmad Fauzi</td><td>SMP</td><td class="num">3,20</td><td class="num">32,50</td><td><span class="pill wait">lewat 12,50 kg</span></td></tr>
+              <tr><td>07/08</td><td>Hafizh Nur Rahman</td><td>SMA</td><td class="num">2,00</td><td class="num">18,40</td><td><span class="pill ok">sisa 1,60 kg</span></td></tr>
+              <tr><td>06/08</td><td>Bilal Ramadhan</td><td>SMP</td><td class="num">4,10</td><td class="num">9,70</td><td><span class="pill ok">sisa 10,30 kg</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="cap"><b>Baru seluruhnya.</b> Kolom kumulatif &amp; sisa kuota dihitung saat itu juga — tanpa itu petugas baru tahu ada santri yang melewati kuota pada akhir bulan, ketika tak ada lagi yang bisa dilakukan.</div>
+      </div>
+
+      <div class="prose">
+        <p>Penerbitannya menjumlahkan setoran satu bulan, memotong kuota, lalu mengalikan tarif. Yang masih di bawah kuota <b>tidak diterbitkan tagihan</b>:</p>
+      </div>
+
+      <div class="calc">Ahmad Fauzi &nbsp; 32,50 kg − 20 kg = 12,50 kg × Rp 7.000 = <b>Rp 87.500</b> → terbit<br>
+Hafizh Nur Rahman &nbsp; 18,40 kg − 20 kg = 0 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; → tidak terbit<br>
+Naufal Hakim &nbsp; tidak menyetor &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; → tidak terbit</div>
+
+      <div class="panel">
+        <div class="path">/ laundry / terbitkan</div>
+        <div class="body">
+          <div class="fields" style="grid-template-columns: repeat(auto-fit, minmax(9rem,1fr));">
+            <div class="fld"><label>Periode <span class="req">*</span></label><div class="inp">2026-08</div></div>
+            <div class="fld"><label>Tanggal tagihan <span class="req">*</span></label><div class="inp">01/09/2026</div></div>
+            <div class="fld"><label>Jatuh tempo</label><div class="inp">10/09/2026</div><div class="hint">Dipakai Reminder Tagihan.</div></div>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>Santri</th><th>Jenjang</th><th class="num">Total kg</th><th class="num">Kena tagih</th><th class="num">Nominal</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Ahmad Fauzi</td><td>SMP</td><td class="num">32,50</td><td class="num">12,50</td><td class="num">87.500</td></tr>
+              <tr><td>Salman Alfarisi</td><td>SMA</td><td class="num">27,00</td><td class="num">7,00</td><td class="num">49.000</td></tr>
+              <tr><td>Ikhsan Maulana</td><td>SMP</td><td class="num">44,80</td><td class="num">24,80</td><td class="num">173.600</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="cap"><b>3 tagihan akan terbit · total Rp 310.100.</b> 61 santri lain tidak diterbitkan tagihan karena masih di bawah kuota atau tidak menyetor — disebutkan jumlahnya, dan daftarnya bisa dibuka. Menerbitkan periode yang sama dua kali tidak menggandakan tagihan.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">05</span>
+      <span class="fam b">B · kepesertaan</span>
+      <h2>Ekskul, kegiatan khusus, umroh</h2>
+    </div>
+
+    <div class="keyed b" style="display:flex; flex-direction:column; gap:1.35rem;">
+      <div class="prose">
+        <p>Tiap kegiatan berdiri sebagai satu jenis biaya tersendiri — <em>Ekskul Panahan</em>, <em>Program Umroh 2026</em> — sehingga akun pendapatan, unit bisnis, dan tarifnya bisa berbeda-beda tanpa saling mengganggu.</p>
+        <p>Tarifnya disusun sebagai <b>matriks</b>, mengikuti pola yang sudah dipakai Tarif Biaya dan Potongan Gelombang: baris kegiatan, kolom jenjang.</p>
+      </div>
+
+      <div class="panel">
+        <div class="path">/ tagihan-lain / tarif</div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>Kegiatan</th><th class="num">SDTQ</th><th class="num">SMP</th><th class="num">SMA</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Ekskul Panahan</td><td class="num">—</td><td class="num">150.000</td><td class="num">150.000</td></tr>
+              <tr><td>Program Umroh 2026</td><td class="num">—</td><td class="num">28.500.000</td><td class="num">31.000.000</td></tr>
+              <tr><td>Studi Tur Kelas Akhir</td><td class="num">450.000</td><td class="num">750.000</td><td class="num">1.200.000</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="cap"><b>Sel kosong = jenjang itu tidak ikut kegiatannya</b>, dan santri jenjang tersebut tak bisa didaftarkan sebagai peserta. Ini <em>berbeda</em> dari matriks Tarif Biaya, yang memperlakukan sel kosong sebagai “belum diisi” lalu menghentikan penagihan dengan pesan. Perbedaannya disengaja dan perlu ditulis di layar.</div>
+      </div>
+
+      <div class="panel">
+        <div class="path">/ tagihan-lain / kegiatan / UMR26 / peserta</div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>NIS</th><th>Nama</th><th>Jenjang</th><th class="num">Tarif jenjang</th><th class="num">Nominal</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>2601001</td><td>Ahmad Fauzi</td><td>SMP</td><td class="num">28.500.000</td><td class="num">28.500.000</td><td><span class="pill ok">Ikut</span></td></tr>
+              <tr><td>2601022</td><td>Salman Alfarisi</td><td>SMA</td><td class="num">31.000.000</td><td class="num">31.000.000</td><td><span class="pill ok">Ikut</span></td></tr>
+              <tr><td>2601014</td><td>Naufal Hakim</td><td>SMA</td><td class="num">31.000.000</td><td class="num">24.000.000</td><td><span class="pill wait">Keringanan</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="cap">Nominal seorang santri boleh menyimpang dari tarif jenjangnya. Barisnya ditandai <b>Keringanan</b> supaya penyimpangan itu terlihat tanpa harus dibandingkan satu per satu — dan tarif jenjangnya tetap ditampilkan di sebelahnya sebagai pembanding.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">06</span>
+      <h2>Jalur jurnalnya</h2>
+    </div>
+    <div class="flow">
+      <div class="flowcard">
+        <h3>Laundry <span class="fam a">A</span> <span class="pill acc">Akrual</span></h3>
+        <div class="step"><em>Terbit</em><span>Piutang D / Pendapatan K — satu jurnal bertotal untuk seluruh santri sekali terbit</span></div>
+        <div class="step"><em>Dibayar</em><span>Kas atau Dompet D / Piutang K</span></div>
+        <div class="step"><em>Keliru</em><span>Koreksi nominal — jurnal penyesuaian, lewat modul yang <b>sudah ada</b></span></div>
+        <div class="step none"><em>Batal</em><span>tidak tersedia</span></div>
+      </div>
+      <div class="flowcard">
+        <h3>Kegiatan <span class="fam b">B</span> <span class="pill kas">Kas</span></h3>
+        <div class="step none"><em>Terbit</em><span>tidak menjurnal apa pun</span></div>
+        <div class="step"><em>Dibayar</em><span>Kas atau Dompet D / <b>Pendapatan</b> K</span></div>
+        <div class="step"><em>Keliru</em><span>Batalkan — selama belum ada pembayaran</span></div>
+        <div class="step none"><em>Koreksi</em><span>tidak perlu</span></div>
+      </div>
+    </div>
+    <div class="callout ok">
+      <span class="k">Sudah berjalan hari ini</span>
+      <p>Sisi kredit yang berpindah antara Pendapatan dan Piutang menurut <code>sudah_akrual</code> sudah benar di kode yang ada. Yang berubah hanya <em>siapa yang menentukan</em> nilai itu: dari “kebetulan akun piutangnya terisi” menjadi “pengakuan yang dipilih di master”.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">07</span>
+      <h2>Perubahan basis data</h2>
+    </div>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th style="width:14rem;">Objek</th><th>Perubahan</th><th style="width:7rem;">Keluarga</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>jenis_biaya.pengakuan</code></td>
+            <td>Kolom baru, <code>akrual</code> | <code>kas</code>, NOT NULL. Diisi mundur: <code>akrual</code> bila akun piutang terisi, selain itu <code>kas</code> — persis aturan implisit yang berlaku sekarang, jadi perilaku data lama tak berubah.</td>
+            <td>A + B</td>
+          </tr>
+          <tr>
+            <td><code>jenis_biaya.cara_tagih</code></td>
+            <td>Kolom baru, <code>pemakaian</code> | <code>kepesertaan</code>. Hanya bermakna untuk perilaku <code>lain</code>.</td>
+            <td>A + B</td>
+          </tr>
+          <tr>
+            <td><code>jenis_biaya</code> — satuan</td>
+            <td><code>tarif_satuan</code>, <code>nama_satuan</code>, <code>kuota_gratis</code>, semuanya boleh kosong. Wajib terisi bila <code>cara_tagih = pemakaian</code>.</td>
+            <td><span class="fam a">A</span></td>
+          </tr>
+          <tr>
+            <td><code>jenjang_pemakai</code></td>
+            <td>Tabel baru: (jenis biaya, jenjang). Menentukan siapa yang dianggap berlangganan.</td>
+            <td><span class="fam a">A</span></td>
+          </tr>
+          <tr>
+            <td><code>setoran_pemakaian</code></td>
+            <td>Tabel baru: jenis biaya, santri, tanggal, kuantitas, petugas, penanda tagihan yang sudah memungutnya. Penanda itu yang membuat setoran susulan jatuh ke periode berikutnya, bukan tertagih dua kali.</td>
+            <td><span class="fam a">A</span></td>
+          </tr>
+          <tr>
+            <td><code>tarif_tagihan_lain</code></td>
+            <td>Tabel baru: (jenis biaya, jenjang, nominal). Isi matriksnya. Tidak ada baris = jenjang itu tidak ikut.</td>
+            <td><span class="fam b">B</span></td>
+          </tr>
+          <tr>
+            <td><code>peserta_tagihan_lain</code></td>
+            <td>Tabel baru: (jenis biaya, santri, nominal, status). Unik per pasangan. Nominal boleh menyimpang dari tarif jenjang.</td>
+            <td><span class="fam b">B</span></td>
+          </tr>
+          <tr>
+            <td><code>tagihan_santri</code></td>
+            <td>Dua kolom baru boleh kosong: <code>kuantitas</code> dan <code>tarif_satuan</code> — nominal yang dibekukan saat terbit, sekaligus yang membuat kuitansi bisa menulis “12,5 kg × Rp 7.000”.</td>
+            <td><span class="fam a">A</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <span class="k">Tidak jadi dibuat</span>
+      <p><code>jadwal_tagihan_lain</code> dari rancangan lama <b>dibatalkan</b>. Ekskul ditagih per kegiatan, dan laundry tak bisa terbit tanpa timbangan — jadi tak ada yang tersisa untuk dijadwalkan. Begitu pula status <code>dikoreksi</code> beserta kolom <code>referensi_koreksi</code> dan <code>alasan_koreksi</code>: sudah terjawab oleh modul Koreksi Tagihan yang dibangun 7 Agustus.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">08</span>
+      <h2>Menu &amp; hak akses</h2>
+    </div>
+
+    <div class="prose">
+      <p>Tagihan Lain-lain berdiri sebagai <b>grup menu tersendiri</b>, tidak lagi menumpang di Kependidikan. Isinya dibagi dua sub-grup:</p>
+    </div>
+
+    <div class="tablebox">
+      <table>
+        <thead><tr><th style="width:15rem;">Sub-grup</th><th>Menu</th><th style="width:7rem;">Keluarga</th></tr></thead>
+        <tbody>
+          <tr>
+            <td rowspan="3"><b>Setting Tagihan Lain-lain</b></td>
+            <td>Jenis &amp; Cara Tagih <span class="meta">— layanan dan kegiatan, tarif satuan, kuota, jenjang pemakai, pengakuan</span></td>
+            <td>A + B</td>
+          </tr>
+          <tr><td>Matriks Tarif per Jenjang</td><td><span class="fam b">B</span></td></tr>
+          <tr><td>Peserta Kegiatan</td><td><span class="fam b">B</span></td></tr>
+          <tr>
+            <td rowspan="3"><b>Transaksi</b></td>
+            <td>Setoran Laundry <span class="meta">— dipakai tiap hari</span></td>
+            <td><span class="fam a">A</span></td>
+          </tr>
+          <tr><td>Terbitkan Tagihan</td><td>A + B</td></tr>
+          <tr><td>Daftar Tagihan Lain-lain</td><td>A + B</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <span class="k">Kenapa masternya tidak menumpang “Jenis Biaya” yang lama</span>
+      <p>Layar Jenis Biaya di Setting Biaya melayani seluruh perilaku — registrasi, uang pangkal, SPP, daftar ulang. Menambahkan tarif satuan, kuota, dan jenjang pemakai ke sana berarti empat isian yang <b>tak pernah dipakai</b> oleh mayoritas barisnya, muncul-hilang mengikuti pilihan tipe. Lebih jujur diberi layarnya sendiri yang hanya menyaring perilaku <code>lain</code> — satu tabel yang sama di basis data, dua layar yang masing-masing bicara satu bahasa.</p>
+    </div>
+
+    <div class="prose">
+      <p>Hak aksesnya menyusul pembagian itu:</p>
+    </div>
+
+    <div class="tablebox">
+      <table>
+        <thead><tr><th style="width:13rem;">Hak</th><th>Membuka</th><th>Alasan dipisah</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>setoran-laundry</code><br><span class="meta">baru</span></td>
+            <td>Hanya layar pencatatan setoran harian</td>
+            <td>Petugas laundry mencatat timbangan, bukan menerbitkan uang. Menumpangkannya ke hak penerbitan berarti memberi wewenang yang tak pernah ia butuhkan.</td>
+          </tr>
+          <tr>
+            <td><code>tagihan-lain</code><br><span class="meta">sudah ada</span></td>
+            <td>Menerbitkan tagihan, mengelola peserta &amp; matriks tarif</td>
+            <td>Tetap seperti sekarang.</td>
+          </tr>
+          <tr>
+            <td><code>koreksi-tagihan</code><br><span class="meta">sudah ada</span></td>
+            <td>Mengoreksi nominal tagihan yang sudah diakrualkan</td>
+            <td>Sudah terpasang sejak 7 Agustus; laundry tinggal memakainya.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">09</span>
+      <h2>Yang ikut berubah di luar layar</h2>
+    </div>
+    <ul class="list">
+      <li><b>Auto-debet dompet</b> — perilaku <code>lain</code> masuk ke aturan “penuh atau tidak sama sekali” yang selama ini hanya berlaku untuk SPP. Hari ini laundry Rp 87.500 dengan saldo Rp 40.000 <em>terpotong Rp 40.000</em> dan jadi tagihan cicilan, tanpa siapa pun menekan apa pun.</li>
+      <li><b>Jatuh tempo &amp; keterangan akhirnya tersimpan</b> — kedua isian itu ada di service tapi tak pernah dikirim dari layarnya, sehingga jatuh tempo selalu kosong dan tagihan lain <em>tak pernah</em> terjaring Reminder Tagihan.</li>
+      <li><b>Hasil penerbitan disebutkan</b> — service sudah menghitung berapa terbit, berapa dilewati, totalnya, dan nomor jurnalnya; layarnya membuang semua itu dan hanya menulis “Tagihan lain berhasil diterbitkan”.</li>
+      <li><b>Sumber jurnal</b> — akrual tagihan lain kini tercatat sebagai modul <code>TagihanSpp</code>. Diperbaiki jadi <code>TagihanLain</code> supaya penelusuran jurnal per modul tidak menyesatkan.</li>
+      <li><b>Pesan yang menggantung</b> — pembatalan menolak tagihan berakrual sambil menyuruh “lewat jurnal balik di modul keuangan”, jalur yang saat itu tak ada wujudnya. Sekarang ada; pesannya diganti menjadi tautan ke Koreksi Tagihan.</li>
+      <li><b>Uji otomatis</b> — modul ini sama sekali belum punya berkas ujinya. Dibuat bersamaan: kuota, pembulatan, idempotensi periode, larangan cicilan, akrual vs kas, dan setoran susulan yang jatuh ke bulan berikutnya.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">10</span>
+      <h2>Pekerjaan data sebelum dipakai</h2>
+    </div>
+    <div class="prose">
+      <p>Tiga jenis biaya berperilaku <code>lain</code> yang ada sekarang — <em>SMA-06</em>, <em>SMP-06</em>, <em>SDTQ-06</em>, masing-masing bernama “Tagihan Lainnya” — tersusun <b>per jenjang</b>. Itu bertentangan dengan aturan bahwa jenis <code>lain</code> tidak terikat jenjang.</p>
+      <p>Ketiganya perlu dipecah ulang <b>per layanan</b>: Laundry, Ekskul Panahan, Program Umroh 2026, dan seterusnya — masing-masing dengan cara tagih dan pengakuannya sendiri.</p>
+    </div>
+    <div class="callout warn">
+      <span class="k">Perlu diperiksa sebelum mulai</span>
+      <p>Rancangan lama bersandar pada keadaan “santri 0, tagihan 0”. Itu tidak berlaku lagi — <b>202 santri dan 206 tagihan</b> sudah masuk lewat impor data awal. Tagihan berperilaku <code>lain</code> kemungkinan besar masih nol, karena pengimpor menolak jenis berperilaku <code>lain</code> sebagai jenis tunggakan, tetapi ini <b>harus dihitung langsung ke basis data</b>, bukan disimpulkan. Kalau ternyata ada, pemecahan jenis di atas berubah dari pekerjaan data menjadi pemindahan riwayat.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">11</span>
+      <h2>Urutan yang diusulkan</h2>
+    </div>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th style="width:3rem;" class="ctr">#</th><th>Langkah</th><th style="width:9rem;">Ongkos</th></tr></thead>
+        <tbody>
+          <tr><td class="ctr">1</td><td>Sapuan murah: simpan jatuh tempo &amp; keterangan, tampilkan hasil penerbitan, betulkan <code>sumber_modul</code> dan pesan yang menggantung. <b>Tanpa migrasi.</b></td><td>kecil</td></tr>
+          <tr><td class="ctr">2</td><td><code>pengakuan</code> + <code>cara_tagih</code> di master, berikut grup menu tersendiri &amp; dua sub-grupnya — pondasi keduanya</td><td>sedang</td></tr>
+          <tr><td class="ctr">3</td><td>Pecah tiga jenis biaya lama jadi per layanan <span class="meta">(pekerjaan data, bukan kode)</span></td><td>kecil</td></tr>
+          <tr><td class="ctr">4</td><td><span class="fam b">B</span> matriks tarif + daftar peserta + penerbitan</td><td>sedang</td></tr>
+          <tr><td class="ctr">5</td><td>Auto-debet <code>lain</code> jadi penuh-atau-tidak-sama-sekali</td><td>kecil</td></tr>
+          <tr><td class="ctr">6</td><td><span class="fam a">A</span> setoran harian, kuota, penerbitan periode, hak akses petugas</td><td>besar</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="prose">
+      <p>Keluarga B didahulukan bukan karena lebih penting, melainkan karena ia tidak menuntut layar yang dipakai tiap hari — begitu langkah 4 selesai, kegiatan dan umroh sudah bisa ditagih sementara laundry masih disusun.</p>
+    </div>
+  </section>
+
+  <footer class="foot prose">
+    <p class="meta">Belum ada kode yang diubah. Menggantikan rancangan 1 Agustus 2026 seluruhnya. Setujui, atau koreksi bagian yang meleset.</p>
+  </footer>
+
+</div>

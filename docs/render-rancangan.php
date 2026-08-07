@@ -13,10 +13,36 @@
  *
  * Skripnya hanya menyiapkan salinan cetak (memaksa tema terang, mengunci lebar
  * A4, mencegah kartu terpotong antar-halaman) lalu memanggil Chrome. Sumbernya
- * sendiri — docs/rancangan-tagihan-lain.html — tidak disentuh.
+ * sendiri tidak disentuh.
+ *
+ * Ada DUA rancangan yang hidup berdampingan: v2 (dua keluarga — laundry berbasis
+ * pemakaian & kegiatan berbasis kepesertaan) yang berlaku, dan v1 yang disimpan
+ * sebagai riwayat keputusan. Tanpa argumen yang dicetak adalah v2:
+ *
+ *     C:\php\php.exe docs/render-rancangan.php        → v2
+ *     C:\php\php.exe docs/render-rancangan.php v1     → v1
  */
-$sumber = __DIR__.'/rancangan-tagihan-lain.html';
-$keluar = __DIR__.'/Rancangan-Tagihan-Lain-lain.pdf';
+$daftar = [
+    'v2' => ['rancangan-tagihan-lain-v2.html', 'Rancangan-Tagihan-Lain-lain-v2.pdf'],
+    'v1' => ['rancangan-tagihan-lain.html', 'Rancangan-Tagihan-Lain-lain.pdf'],
+];
+
+// Argumen berawalan `--` adalah saklar (mis. --simpan), bukan pilihan versi.
+$pilihan = 'v2';
+foreach (array_slice($argv, 1) as $arg) {
+    if (! str_starts_with($arg, '--')) {
+        $pilihan = $arg;
+        break;
+    }
+}
+if (! isset($daftar[$pilihan])) {
+    fwrite(STDERR, "Versi \"{$pilihan}\" tidak dikenal. Pilihan: ".implode(', ', array_keys($daftar))."\n");
+    exit(1);
+}
+
+[$namaSumber, $namaKeluar] = $daftar[$pilihan];
+$sumber = __DIR__.'/'.$namaSumber;
+$keluar = __DIR__.'/'.$namaKeluar;
 $sementara = __DIR__.'/.cetak-rancangan.html';
 
 if (! is_file($sumber)) {
@@ -86,6 +112,26 @@ $gayaCetak = <<<'CSS'
 </style>
 CSS;
 
+/**
+ * Tambahan khusus v2. Ia memakai token yang tak dikenal v1, dan satu di antaranya
+ * BERTABRAKAN artinya: `--accent` di v1 adalah kuning terang dekoratif, sedangkan
+ * di v2 ia warna TEKS emas tua yang duduk di atas `--accent-soft`. Menyamakan
+ * keduanya membuat penanda keluarga B jadi kuning di atas kuning — tak terbaca.
+ */
+$gayaV2 = <<<'CSS'
+<style>
+  :root {
+    --surface-sunk: #fbfbfd;
+    --accent: #9a6b00; --accent-bright: #f8c400; --accent-soft: #fdf4dc;
+  }
+  /* Blok berpenanda keluarga (.keyed) sengaja TIDAK dikunci: bagian Laundry
+     memuat tiga panel sekaligus dan takkan muat dalam satu halaman. */
+  .panel, .calc, .flowcard { break-inside: avoid; }
+  .panel table th, .panel table td { white-space: normal; }
+  table { min-width: 0; }
+</style>
+CSS;
+
 $html = file_get_contents($sumber);
 $penanda = '<div class="wrap">';
 if (! str_contains($html, $penanda)) {
@@ -94,7 +140,7 @@ if (! str_contains($html, $penanda)) {
 }
 
 $cetak = '<!doctype html><html lang="id"><head><meta charset="utf-8">'
-    .str_replace($penanda, $gayaCetak.'</head><body>'.$penanda, $html)
+    .str_replace($penanda, $gayaCetak.($pilihan === 'v2' ? $gayaV2 : '').'</head><body>'.$penanda, $html)
     .'</body></html>';
 
 file_put_contents($sementara, $cetak);
