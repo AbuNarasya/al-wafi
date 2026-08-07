@@ -87,8 +87,10 @@ class PembayaranSantriService
         if ($tagihan->status === 'lunas') {
             throw new AppException(422, 'Tagihan ini sudah lunas.');
         }
-        if ($tagihan->status === 'batal') {
-            throw new AppException(422, 'Tagihan ini sudah dibatalkan.');
+        if (! $tagihan->berlaku()) {
+            throw new AppException(422, $tagihan->status === 'dihapus'
+                ? 'Tagihan ini sudah dihapus lewat koreksi nominal, jadi tak ada yang perlu dibayar.'
+                : 'Tagihan ini sudah dibatalkan.');
         }
 
         $nominal = Money::of($data['nominal']);
@@ -197,8 +199,10 @@ class PembayaranSantriService
         if ($tagihan->status === 'lunas') {
             throw new AppException(422, 'Tagihan ini sudah lunas.');
         }
-        if ($tagihan->status === 'batal') {
-            throw new AppException(422, 'Tagihan ini sudah dibatalkan.');
+        if (! $tagihan->berlaku()) {
+            throw new AppException(422, $tagihan->status === 'dihapus'
+                ? 'Tagihan ini sudah dihapus lewat koreksi nominal, jadi tak ada yang perlu dibayar.'
+                : 'Tagihan ini sudah dibatalkan.');
         }
 
         $dompet = DompetWali::where('id_wali', $tagihan->santri->id_wali)->first();

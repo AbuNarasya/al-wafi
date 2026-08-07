@@ -205,7 +205,7 @@ class PendaftaranLanjutanService
                 // sudah dibayar TIDAK diterbitkan lagi — uangnya sudah diterima.
                 $lama = TagihanSantri::where('id_santri', $santri->id)->where('perilaku', 'registrasi')
                     ->where('kode_jenjang', $sasaran['kode_jenjang'])->where('tahun_ajaran', $taTujuan)
-                    ->where('status', '!=', 'batal')->first();
+                    ->whereNotIn('status', TagihanSantri::TIDAK_BERLAKU)->first();
 
                 if ($lama) {
                     if ($lama->status === 'lunas') {

@@ -26,7 +26,10 @@ class KoreksiTagihanController extends Controller
         // sudah berarti isian uang pangkal, dan ketiadaannya dipakai sebagai
         // bukti bahwa jalur bebas uang pangkal memang tak menawarkannya.
         $data = $request->validate([
-            'nominal_baru' => ['required', 'numeric', 'gt:0'],
+            // `min:0`, bukan `gt:0`: nol berarti penghapusan penuh — jurnal
+            // penyesuaiannya tetap terbit dan yang terlanjur dibayar pindah ke
+            // Dompet Wali. Yang mustahil hanyalah nominal negatif.
+            'nominal_baru' => ['required', 'numeric', 'min:0'],
             'alasan' => ['required', 'string', 'max:255'],
         ]);
 

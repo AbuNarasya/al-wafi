@@ -82,7 +82,7 @@ class TagihanMassalService
         $sudahAda = TagihanSantri::whereIn('id_santri', $santri->pluck('id'))
             ->where('perilaku', 'daftar_ulang')
             ->where('kode_jenjang', $jenjang)->where('tahun_ajaran', $ta)
-            ->where('status', '!=', 'batal')
+            ->whereNotIn('status', TagihanSantri::TIDAK_BERLAKU)
             ->pluck('id_santri')->flip();
 
         // Tingkat & jenjang yang BERLAKU pada T.A yang ditagih — bukan keadaan

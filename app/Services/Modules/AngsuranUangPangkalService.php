@@ -60,7 +60,7 @@ class AngsuranUangPangkalService
     {
         $tagihan = TagihanSantri::query()
             ->whereHas('jenis', fn ($q) => $q->whereIn('tipe', TipeBiaya::kodeBerperilaku(...array_keys(self::KOMPONEN))))
-            ->where('status', '!=', 'batal')
+            ->whereNotIn('status', TagihanSantri::TIDAK_BERLAKU)
             // Yang sudah mengundurkan diri tak perlu dijadwalkan angsurannya —
             // tagihannya sudah ditutup dan rencananya digantikan saat ia mundur.
             ->whereHas('santri', fn ($q) => $q->whereNotIn('status', Tahap::DISEMBUNYIKAN_DARI_PEMILIH))

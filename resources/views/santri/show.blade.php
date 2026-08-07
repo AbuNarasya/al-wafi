@@ -202,6 +202,15 @@
                                                     <b>Dompet Wali</b> sebagai titipan. Bila tagihan ini punya jadwal
                                                     angsuran, jadwalnya digugurkan dan harus disusun ulang bersama walinya.
                                                 </p>
+                                                {{-- Nol punya akibat yang berbeda dari sekadar "nominal lebih
+                                                     kecil", jadi disebut tersendiri — bukan dibiarkan
+                                                     ditemukan sendiri setelah tombolnya ditekan. --}}
+                                                <p class="text-[11px] leading-relaxed text-amber-700">
+                                                    Diisi <b>0</b> berarti tagihan ini <b>dihapus penuh</b>: statusnya jadi
+                                                    “Dihapus”, jurnal penyesuaian terbit membalik piutangnya, dan seluruh
+                                                    yang sudah dibayar dikembalikan ke Dompet Wali sebagai titipan.
+                                                    Tagihannya tak lagi dihitung sebagai piutang di laporan mana pun.
+                                                </p>
                                                 <button class="w-full rounded bg-brand px-2 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark">Simpan Koreksi</button>
                                             </form>
                                         </div>

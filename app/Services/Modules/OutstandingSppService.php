@@ -201,8 +201,10 @@ class OutstandingSppService
         if ($t->perilaku !== 'spp') {
             throw new AppException(422, 'Layar ini hanya mengoreksi tagihan SPP.');
         }
-        if ($t->status === 'batal') {
-            throw new AppException(422, 'Tagihan ini sudah dibatalkan, jadi nominalnya tak lagi bermakna.');
+        if (! $t->berlaku()) {
+            throw new AppException(422, $t->status === 'dihapus'
+                ? 'Tagihan ini sudah dihapus lewat koreksi nominal, jadi nominalnya tak lagi bermakna.'
+                : 'Tagihan ini sudah dibatalkan, jadi nominalnya tak lagi bermakna.');
         }
 
         $menunggu = PembayaranSantri::where('id_tagihan', $t->id)->where('status', 'menunggu_verifikasi')->count();

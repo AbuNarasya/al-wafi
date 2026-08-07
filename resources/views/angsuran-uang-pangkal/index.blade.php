@@ -5,7 +5,7 @@
 @php
     $bolehUbah = \App\Support\Akses::boleh('angsuran-uang-pangkal', 'ubah');
     $bolehBuat = \App\Support\Akses::boleh('angsuran-uang-pangkal', 'buat');
-    $labelTagihan = ['lunas' => 'Lunas', 'sebagian' => 'Sebagian', 'belum_bayar' => 'Belum bayar', 'batal' => 'Batal'];
+    $labelTagihan = ['lunas' => 'Lunas', 'sebagian' => 'Sebagian', 'belum_bayar' => 'Belum bayar', 'batal' => 'Batal', 'dihapus' => 'Dihapus'];
     $tgl = fn ($v) => $v ? \Illuminate\Support\Carbon::parse($v)->format('d/m/Y') : '—';
 @endphp
 

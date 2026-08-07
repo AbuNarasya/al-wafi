@@ -243,7 +243,9 @@ class KoreksiTagihanTest extends TestCase
         $t = $this->tagihan('1000000');
 
         foreach ([
-            ['0', 'Alasan ada', 'lebih dari nol'],
+            // Nol TIDAK lagi ditolak — itu penghapusan penuh, lihat
+            // KoreksiTagihanNolTest. Yang mustahil tinggal nominal negatif.
+            ['-1', 'Alasan ada', 'tidak boleh negatif'],
             ['500000', '   ', 'Alasan koreksi wajib'],
             ['1000000', 'Alasan ada', 'sama dengan yang sekarang'],
         ] as [$nominal, $alasan, $pesan]) {

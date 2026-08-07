@@ -49,7 +49,7 @@ final class BarisSantri
             ->get();
 
         $sisa = TagihanSantri::whereIn('id_santri', $santri->pluck('id'))
-            ->where('status', '!=', 'batal')
+            ->whereNotIn('status', TagihanSantri::TIDAK_BERLAKU)
             ->selectRaw('id_santri, COALESCE(SUM(sisa), 0) AS sisa')
             ->groupBy('id_santri')->pluck('sisa', 'id_santri');
 

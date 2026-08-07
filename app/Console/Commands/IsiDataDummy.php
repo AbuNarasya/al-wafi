@@ -523,7 +523,7 @@ class IsiDataDummy extends Command
     private function bayarRegistrasi(Santri $santri, bool $verifikasi): bool
     {
         $tagihan = TagihanSantri::where('id_santri', $santri->id)->where('perilaku', 'registrasi')
-            ->where('status', '!=', 'batal')->orderByDesc('id')->first();
+            ->whereNotIn('status', TagihanSantri::TIDAK_BERLAKU)->orderByDesc('id')->first();
 
         if (! $tagihan) {
             // Tarif registrasi BEBAS → tak ada yang perlu dibayar, dan

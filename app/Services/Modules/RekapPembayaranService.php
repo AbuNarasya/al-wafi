@@ -130,7 +130,7 @@ class RekapPembayaranService
         }
 
         $tagihan = TagihanSantri::whereIn('id_santri', $ids)
-            ->where('status', '!=', 'batal')
+            ->whereNotIn('status', TagihanSantri::TIDAK_BERLAKU)
             ->selectRaw('id_santri, COALESCE(SUM(nominal), 0) AS total, COALESCE(SUM(sisa), 0) AS sisa')
             ->groupBy('id_santri')->get()->keyBy('id_santri');
 

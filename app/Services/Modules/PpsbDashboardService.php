@@ -200,7 +200,7 @@ class PpsbDashboardService
 
         $rows = TagihanSantri::query()
             ->whereIn('id_santri', $ids)
-            ->where('status', '!=', 'batal')
+            ->whereNotIn('status', TagihanSantri::TIDAK_BERLAKU)
             ->whereHas('jenis', fn ($q) => $q->whereIn('tipe', TipeBiaya::kodeBerperilaku('uang_pangkal')))
             ->with('santri:id,kode_jenjang')
             ->get(['id', 'id_santri', 'sisa']);

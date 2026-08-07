@@ -776,7 +776,7 @@ class SantriService
             // Tagihan batal sengaja diabaikan: setelah dibatalkan, santrinya
             // memang boleh ditagih ulang (indeks unik anti tagih-ganda juga
             // mengecualikan status batal).
-            ->when(! $termasukBatal, fn ($q) => $q->where('status', '!=', 'batal'))
+            ->when(! $termasukBatal, fn ($q) => $q->whereNotIn('status', TagihanSantri::TIDAK_BERLAKU))
             ->with('jenis')->orderByDesc('id')->first();
     }
 

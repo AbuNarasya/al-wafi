@@ -36,7 +36,7 @@
                         <td class="px-4 py-3 text-gray-500">{{ $r->periode ?? '—' }}</td>
                         <td class="px-4 py-3 text-right tabular-nums">@rp($r->nominal)</td>
                         <td class="px-4 py-3 text-right tabular-nums">@rp($r->sisa)</td>
-                        <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $r->status === 'lunas' ? 'bg-emerald-100 text-emerald-700' : ($r->status === 'batal' ? 'bg-gray-100 text-gray-500' : 'bg-amber-100 text-amber-700') }}">{{ ucfirst(str_replace('_', ' ', $r->status)) }}</span></td>
+                        <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $r->status === 'lunas' ? 'bg-emerald-100 text-emerald-700' : (! $r->berlaku() ? 'bg-gray-100 text-gray-500' : 'bg-amber-100 text-amber-700') }}">{{ ucfirst(str_replace('_', ' ', $r->status)) }}</span></td>
                         <td class="px-4 py-3 text-right">
                             @if (in_array($r->status, ['belum_bayar'], true) && \App\Support\Akses::boleh('tagihan-lain', 'hapus'))
                                 <form method="POST" action="{{ route('tagihan_lain.batalkan', $r->id) }}" onsubmit="return confirm('Batalkan tagihan ini?')">@csrf @method('DELETE')<button class="text-red-600 hover:underline">Batalkan</button></form>

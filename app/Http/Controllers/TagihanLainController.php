@@ -45,7 +45,7 @@ class TagihanLainController extends Controller
             'q' => $q,
             'filter' => ['jenis' => $fJenis, 'status' => $fStatus],
             'opsiJenis' => $jenisLain->all(),
-            'opsiStatus' => ['belum_bayar' => 'Belum Bayar', 'sebagian' => 'Sebagian', 'lunas' => 'Lunas', 'batal' => 'Batal'],
+            'opsiStatus' => ['belum_bayar' => 'Belum Bayar', 'sebagian' => 'Sebagian', 'lunas' => 'Lunas', 'batal' => 'Batal', 'dihapus' => 'Dihapus'],
         ]);
     }
 

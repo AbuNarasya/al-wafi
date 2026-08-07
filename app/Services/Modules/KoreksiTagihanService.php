@@ -53,8 +53,13 @@ class KoreksiTagihanService
         }
 
         $baru = Money::of($nominalBaru);
-        if (! Money::gtZero($baru)) {
-            throw new AppException(422, 'Nominal baru harus lebih dari nol. Menolkan tagihan bukan koreksi — itu pembatalan.');
+        // NOL DIIZINKAN = penghapusan penuh. Dulu ditolak dengan alasan
+        // "menolkan tagihan bukan koreksi, itu pembatalan" — keliru: pembatalan
+        // menarik tagihan SEBELUM ada jurnal, sedangkan penghapusan lewat sini
+        // justru menerbitkan jurnal penyesuaian dan memindahkan uang yang
+        // terlanjur dibayar ke Dompet Wali. Negatif tetap mustahil.
+        if (Money::lt($baru, '0')) {
+            throw new AppException(422, 'Nominal baru tidak boleh negatif.');
         }
 
         // Sisa masih bergerak selama ada pembayaran yang belum diputuskan.
@@ -89,9 +94,16 @@ class KoreksiTagihanService
             $tagihan->update([
                 'nominal' => $baru,
                 'sisa' => $sisaBaru,
-                'status' => Money::isZero($sisaBaru)
-                    ? 'lunas'
-                    : (Money::gtZero($terbayar) ? 'sebagian' : 'belum_bayar'),
+                // Nominal nol ⇒ `dihapus`, BUKAN `lunas`. Sisa nol di sini tak
+                // berarti terbayar: tagihan yang dihapus tanpa dibayar sepeser
+                // pun akan terhitung sebagai tagihan tuntas di rekap pembayaran,
+                // dan kekeliruan itu tak bersuara.
+                'status' => match (true) {
+                    Money::isZero($baru) => 'dihapus',
+                    Money::isZero($sisaBaru) => 'lunas',
+                    Money::gtZero($terbayar) => 'sebagian',
+                    default => 'belum_bayar',
+                },
             ]);
 
             if (Money::gtZero($kelebihan)) {

@@ -227,7 +227,7 @@ class SantriController extends Controller
      */
     private function saringStatusBayar($query, string $status)
     {
-        $aktif = fn ($q) => $q->where('status', '!=', 'batal');
+        $aktif = fn ($q) => $q->whereNotIn('status', \App\Models\TagihanSantri::TIDAK_BERLAKU);
         $adaSisa = fn ($q) => $q->whereHas('tagihan', fn ($t) => $aktif($t)->where('sisa', '>', 0));
         $adaTerbayar = fn ($q) => $q->whereHas('tagihan', fn ($t) => $aktif($t)->whereColumn('sisa', '<', 'nominal'));
         $idMenunggu = PembayaranSantri::where('status', 'menunggu_verifikasi')

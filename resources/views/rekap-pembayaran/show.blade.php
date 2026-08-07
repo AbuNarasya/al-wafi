@@ -4,7 +4,7 @@
 
 @php
     $labelTipe = ['registrasi' => 'bg-blue-100 text-blue-700', 'uang_pangkal' => 'bg-purple-100 text-purple-700', 'perlengkapan' => 'bg-amber-100 text-amber-700', 'spp' => 'bg-emerald-100 text-emerald-700', 'lain' => 'bg-gray-100 text-gray-600'];
-    $labelStatusTagihan = ['belum_bayar' => 'bg-amber-100 text-amber-700', 'sebagian' => 'bg-blue-100 text-blue-700', 'lunas' => 'bg-emerald-100 text-emerald-700', 'batal' => 'bg-gray-100 text-gray-500'];
+    $labelStatusTagihan = ['belum_bayar' => 'bg-amber-100 text-amber-700', 'sebagian' => 'bg-blue-100 text-blue-700', 'lunas' => 'bg-emerald-100 text-emerald-700', 'batal' => 'bg-gray-100 text-gray-500', 'dihapus' => 'bg-gray-100 text-gray-500'];
     $labelStatusBayar = ['menunggu_verifikasi' => 'bg-amber-100 text-amber-700', 'terverifikasi' => 'bg-emerald-100 text-emerald-700', 'ditolak' => 'bg-red-100 text-red-700', 'void' => 'bg-gray-100 text-gray-500'];
 @endphp
 

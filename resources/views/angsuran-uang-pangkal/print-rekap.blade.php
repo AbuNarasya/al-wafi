@@ -1,7 +1,7 @@
 @php
     $rp = fn ($v) => "Rp " . number_format((float) $v, 0, ',', '.');
     $tgl = fn ($v) => $v ? \Illuminate\Support\Carbon::parse($v)->format('d/m/Y') : '—';
-    $labelTagihan = ['lunas' => 'Lunas', 'sebagian' => 'Sebagian', 'belum_bayar' => 'Belum bayar', 'batal' => 'Batal'];
+    $labelTagihan = ['lunas' => 'Lunas', 'sebagian' => 'Sebagian', 'belum_bayar' => 'Belum bayar', 'batal' => 'Batal', 'dihapus' => 'Dihapus'];
     $sum = fn ($k) => collect($rows)->sum(fn ($r) => (float) $r[$k]);
 @endphp
 <!doctype html>
