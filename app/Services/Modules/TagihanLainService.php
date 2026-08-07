@@ -37,6 +37,9 @@ class TagihanLainService
 
         $santri = Santri::whereIn('id', $data['id_santri'])->where('status', 'aktif')
             ->get(['id', 'nama', 'kode_jenjang', 'tahun_ajaran']);
+        // Yang dipilih tapi tak terjaring query di atas = sudah tidak berstatus
+        // aktif. Dihitung di sini karena sesudah ini mereka tak terlihat lagi.
+        $tidakAktif = count($data['id_santri']) - $santri->count();
         if ($santri->isEmpty()) {
             throw new AppException(422, 'Tidak ada santri aktif yang dipilih.');
         }
@@ -45,6 +48,9 @@ class TagihanLainService
             ->where('periode', $data['periode'] ?? null)
             ->whereIn('id_santri', $santri->pluck('id'))->pluck('id_santri')->all();
         $target = $santri->reject(fn ($s) => in_array($s->id, $sudahAda, true))->values();
+        // Namanya, bukan cuma jumlahnya: "3 santri dilewati" tak menolong siapa
+        // pun yang harus memutuskan apakah itu wajar atau salah pilih.
+        $namaDilewati = $santri->filter(fn ($s) => in_array($s->id, $sudahAda, true))->pluck('nama')->all();
         if ($target->isEmpty()) {
             throw new AppException(422, 'Seluruh santri yang dipilih sudah punya tagihan ini.');
         }
@@ -52,7 +58,7 @@ class TagihanLainService
         $akrual = (bool) $jenis->kode_coa_piutang;
         $total = Money::mul($nominal, (string) $target->count());
 
-        $hasil = DB::transaction(function () use ($data, $jenis, $nominal, $target, $akrual, $total, $idPengguna, $santri) {
+        $hasil = DB::transaction(function () use ($data, $jenis, $nominal, $target, $akrual, $total, $idPengguna, $namaDilewati, $tidakAktif) {
             $referensi = null;
             if ($akrual) {
                 $base = DocNumber::docBase('TGL', $data['tanggal']);
@@ -60,7 +66,7 @@ class TagihanLainService
                 $referensi = DocNumber::nextDocNumber($base, $last);
                 PostingService::postJournal([
                     'referensi' => $referensi, 'tanggal' => $data['tanggal'], 'kode_unit' => $jenis->kode_unit,
-                    'sumber_modul' => 'TagihanSpp', 'id_pengguna' => $idPengguna,
+                    'sumber_modul' => 'TagihanLain', 'id_pengguna' => $idPengguna,
                     'keterangan' => "{$jenis->nama}".(! empty($data['periode']) ? " {$data['periode']}" : '')." — {$target->count()} santri",
                     'lines' => [
                         ['kode_coa' => $jenis->kode_coa_piutang, 'debet' => $total, 'kredit' => '0'],
@@ -79,7 +85,15 @@ class TagihanLainService
                 'created_at' => $now, 'updated_at' => $now,
             ])->all());
 
-            return ['terbit' => $target->count(), 'dilewati' => $santri->count() - $target->count(), 'total' => $total, 'akrual' => $akrual, 'referensi' => $referensi];
+            return [
+                'terbit' => $target->count(),
+                'dilewati' => count($namaDilewati),
+                'dilewati_nama' => $namaDilewati,
+                'tidak_aktif' => $tidakAktif,
+                'total' => $total,
+                'akrual' => $akrual,
+                'referensi' => $referensi,
+            ];
         });
 
         $autoDebet = (new AutoDebetService)->jalankan($idPengguna, $data['tanggal']);
@@ -96,11 +110,15 @@ class TagihanLainService
         if (\App\Models\TipeBiaya::perilakuDari($t->jenis->tipe) !== 'lain') {
             throw new AppException(422, 'Hanya tagihan lain-lain yang bisa dibatalkan di sini.');
         }
+        // Dua pesan di bawah dulu menyuruh petugas "ke modul keuangan" — tempat
+        // yang saat itu belum ada wujudnya, sehingga jalan buntu yang terdengar
+        // seperti petunjuk. Sejak Koreksi Nominal Tagihan ada, tempatnya nyata
+        // dan disebut namanya.
         if ($t->pembayaran->isNotEmpty()) {
-            throw new AppException(422, 'Tagihan ini sudah punya pembayaran, jadi tidak bisa dibatalkan. Ajukan koreksi lewat modul keuangan.');
+            throw new AppException(422, 'Tagihan ini sudah punya pembayaran, jadi tidak bisa dibatalkan. Pakai Koreksi Nominal Tagihan — kelebihan bayarnya akan dipindahkan ke Dompet Wali sebagai titipan.');
         }
         if ($t->sudah_akrual) {
-            throw new AppException(422, 'Tagihan ini sudah diakrualkan ke buku besar. Pembatalannya harus lewat jurnal balik di modul keuangan, bukan dihapus di sini.');
+            throw new AppException(422, 'Tagihan ini sudah diakrualkan ke buku besar, jadi tidak bisa dihapus begitu saja. Pakai Koreksi Nominal Tagihan — jurnal penyesuaiannya terbit bersamaan, sehingga buku besar dan tagihan santri bergerak bersama.');
         }
         $t->update(['status' => 'batal', 'sisa' => '0']);
 

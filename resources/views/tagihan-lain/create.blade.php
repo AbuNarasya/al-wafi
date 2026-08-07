@@ -15,11 +15,17 @@
 
                 <x-field name="kode_jenis" label="Jenis Biaya (tipe Lain-lain)" :value="old('kode_jenis')" :options="$jenisOptions" required />
 
-                <div class="grid gap-4 sm:grid-cols-3">
+                <div class="grid gap-4 sm:grid-cols-2">
                     <x-field name="nominal" label="Nominal per Santri" type="number" :value="old('nominal')" required />
                     <x-field name="periode" label="Periode (opsional)" :value="old('periode')" placeholder="2026-07" />
                     <x-field name="tanggal" label="Tanggal" type="date" :value="old('tanggal', now()->toDateString())" required />
+                    <x-field name="jatuh_tempo" label="Jatuh Tempo (opsional)" type="date" :value="old('jatuh_tempo')"
+                             hint="Dipakai Reminder Tagihan. Dikosongkan berarti tagihan ini tak pernah masuk daftar pengingat." />
                 </div>
+
+                <x-field name="keterangan" label="Keterangan (opsional)" :value="old('keterangan')"
+                         placeholder="Seragam olahraga Agustus 2026"
+                         hint="Tampil di tagihan &amp; kuitansi wali. Dikosongkan berarti memakai nama jenis biayanya." />
 
                 <div>
                     <div class="mb-2 flex items-center justify-between">

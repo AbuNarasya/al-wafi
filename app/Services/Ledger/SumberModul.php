@@ -28,6 +28,10 @@ final class SumberModul
         'PembayaranSantri',
         'MutasiDompet',
         'TagihanSpp',
+        // Akrual tagihan lain-lain. Dulu menumpang 'TagihanSpp', sehingga jurnal
+        // laundry & kegiatan tak bisa dibedakan dari jurnal SPP saat ditelusuri
+        // per modul — dan unit bawaannya pun terpaksa ikut aturan SPP.
+        'TagihanLain',
     ];
 
     public static function isValid(string $v): bool
