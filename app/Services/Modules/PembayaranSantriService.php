@@ -36,6 +36,43 @@ class PembayaranSantriService
         'kesantrian' => 'Kependidikan (SPP, daftar ulang & tagihan lain)',
     ];
 
+    /**
+     * Perilaku yang harus DILUNASI SEKALIGUS — tak boleh dicicil dari mana pun.
+     *
+     * Hanya `lain`, mengikuti aturan "lunas sekaligus" yang dikunci rancangan
+     * Tagihan Lain-lain v2.
+     *
+     * SPP SENGAJA TIDAK IKUT di sini. Ia memang penuh-atau-tidak pada AUTO-DEBET
+     * (lihat AutoDebetService), tetapi pembayaran yang diketik petugas di loket
+     * selama ini boleh sebagian — dan tak ada keputusan yang pernah mengubahnya.
+     * Menyeretnya ke sini akan menolak setoran yang hari ini sah.
+     *
+     * Yang juga tidak masuk: uang pangkal (punya modul Angsuran tersendiri),
+     * daftar ulang, perlengkapan, dan registrasi.
+     */
+    private const LUNAS_SEKALIGUS = ['lain'];
+
+    /**
+     * Cicilan ditolak di sini, bukan didiamkan lalu meninggalkan status
+     * "sebagian" yang tak pernah direncanakan modul mana pun.
+     *
+     * Yang dibandingkan adalah RUANG, bukan `sisa`: kalau sudah ada setoran lain
+     * yang menunggu verifikasi, pelunasan yang sah justru sebesar ruang tersisa.
+     */
+    private function assertLunasSekaligus(TagihanSantri $tagihan, string $nominal, string $ruang): void
+    {
+        $perilaku = \App\Models\TipeBiaya::perilakuDari($tagihan->jenis?->tipe);
+        if (! in_array($perilaku, self::LUNAS_SEKALIGUS, true) || Money::eq($nominal, $ruang)) {
+            return;
+        }
+
+        throw new AppException(422, sprintf(
+            'Tagihan lain-lain harus dilunasi sekaligus, tidak bisa dicicil. Yang harus dibayar %s, bukan %s.',
+            Money::of($ruang),
+            Money::of($nominal),
+        ));
+    }
+
     /** Langkah 1 — PPSB mencatat setoran. Tidak ada jurnal. */
     public function catat(array $data, int $idPengguna, string $lingkup): PembayaranSantri
     {
@@ -62,6 +99,7 @@ class PembayaranSantriService
         if (Money::gt($nominal, $ruang)) {
             throw new AppException(422, "Nominal melebihi sisa tagihan yang belum tercatat ({$ruang}).");
         }
+        $this->assertLunasSekaligus($tagihan, $nominal, $ruang);
         $this->assertRekeningAda($data['kode_rekening']);
 
         $pembayaran = DB::transaction(function () use ($data, $idPengguna, $nominal) {
@@ -175,6 +213,7 @@ class PembayaranSantriService
         if (Money::gt($nominal, $ruang)) {
             throw new AppException(422, "Nominal melebihi sisa tagihan yang belum tercatat ({$ruang}).");
         }
+        $this->assertLunasSekaligus($tagihan, $nominal, $ruang);
         if (Money::lt($dompet->saldo, $nominal)) {
             throw new AppException(422, "Saldo Dompet Wali tidak cukup (tersedia {$dompet->saldo}).");
         }

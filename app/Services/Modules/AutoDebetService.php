@@ -21,13 +21,26 @@ use Illuminate\Support\Facades\DB;
  * proses latar akan memajukan tahap tanpa ada petugas yang menyaksikannya.
  *
  * SEBAGIAN boleh untuk tagihan yang memang bisa diangsur (uang pangkal punya
- * modul Angsurannya sendiri) — TETAPI TIDAK UNTUK SPP. SPP dipotong penuh atau
- * tidak sama sekali; yang saldonya kurang dibiarkan menggantung utuh sampai
- * dompetnya diisi, lalu terpotong penuh dengan sendirinya (verifikasi top-up
- * memanggil kembali auto-debet — lihat DompetService::verifikasiTopUp).
+ * modul Angsurannya sendiri) — TETAPI TIDAK UNTUK SPP DAN TAGIHAN LAIN-LAIN.
+ * Keduanya dipotong penuh atau tidak sama sekali; yang saldonya kurang dibiarkan
+ * menggantung utuh sampai dompetnya diisi, lalu terpotong penuh dengan sendirinya
+ * (verifikasi top-up memanggil kembali auto-debet — lihat
+ * DompetService::verifikasiTopUp).
  */
 class AutoDebetService
 {
+    /**
+     * Perilaku yang TIDAK BOLEH terpotong sebagian.
+     *
+     * `lain` menyusul SPP sejak rancangan Tagihan Lain-lain v2 mengunci aturan
+     * "lunas sekaligus". Sebelum ini laundry Rp 87.500 dengan saldo dompet
+     * Rp 40.000 TERPOTONG Rp 40.000 dan berubah jadi tagihan cicilan — tanpa
+     * siapa pun menekan apa pun, dan tanpa modul angsuran yang menaunginya.
+     * Sisa Rp 47.500 lalu menggantung sebagai "sebagian" yang tak pernah
+     * direncanakan siapa-siapa.
+     */
+    private const PENUH_ATAU_TIDAK = ['spp', 'lain'];
+
     public function setIzin(int $idWali, bool $aktif): Wali
     {
         $wali = Wali::find($idWali);
@@ -85,9 +98,9 @@ class AutoDebetService
                     continue;
                 }
 
-                if ($t->perilaku === 'spp') {
-                    // SPP: penuh atau tidak sama sekali. `continue` — bukan `break`
-                    // — supaya satu SPP yang tak terjangkau tidak ikut membekukan
+                if (in_array($t->perilaku, self::PENUH_ATAU_TIDAK, true)) {
+                    // Penuh atau tidak sama sekali. `continue` — bukan `break` —
+                    // supaya satu tagihan yang tak terjangkau tidak ikut membekukan
                     // tagihan lain keluarga yang sama yang saldonya cukup.
                     // Setoran yang belum diverifikasi juga menahan: sisanya masih
                     // bisa berubah, jadi "penuh" belum tentu benar-benar penuh.

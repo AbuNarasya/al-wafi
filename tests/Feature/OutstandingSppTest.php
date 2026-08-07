@@ -401,10 +401,17 @@ class OutstandingSppTest extends TestCase
     }
 
     /**
-     * Tagihan SELAIN SPP tetap boleh dicicil dari dompet — uang pangkal justru
-     * punya modul Angsurannya sendiri. Aturan "tak bisa dicicil" hanya milik SPP.
+     * DULU tagihan lain-lain boleh dicicil dari dompet, dan test ini yang
+     * menjaganya — aturan "tak bisa dicicil" memang hanya milik SPP.
+     *
+     * Sejak rancangan Tagihan Lain-lain v2 mengunci "lunas sekaligus", `lain`
+     * ikut terlarang: laundry Rp 87.500 dengan saldo Rp 40.000 dulu terpotong
+     * Rp 40.000 dan berubah jadi cicilan tanpa modul angsuran yang menaunginya.
+     *
+     * Batasnya tetap dijaga di tempat lain — uang pangkal masih boleh dicicil,
+     * lihat TagihanLainLunasSekaligusTest::test_uang_pangkal_tetap_boleh_terpotong_sebagian.
      */
-    public function test_tagihan_bukan_spp_masih_boleh_dicicil_dari_dompet(): void
+    public function test_tagihan_lain_kini_tak_boleh_dicicil_dari_dompet(): void
     {
         $this->buatBiaya(['kode' => 'LAIN', 'nama' => 'Seragam', 'tipe' => 'lain', 'nominal' => '500000',
             'kode_coa_pendapatan' => self::PEND, 'kode_coa_piutang' => self::PIUT,
@@ -419,12 +426,18 @@ class OutstandingSppTest extends TestCase
         ], $this->admin);
         $lain = TagihanSantri::where('id_santri', $santri->id)->where('kode_jenis', 'LAIN')->firstOrFail();
 
-        (new PembayaranSantriService)->bayarDariDompet([
-            'id_tagihan' => $lain->id, 'nominal' => '100000', 'tanggal' => '2026-07-05',
-        ], $this->admin);
+        try {
+            (new PembayaranSantriService)->bayarDariDompet([
+                'id_tagihan' => $lain->id, 'nominal' => '100000', 'tanggal' => '2026-07-05',
+            ], $this->admin);
+            $this->fail('Cicilan tagihan lain-lain seharusnya ditolak.');
+        } catch (AppException $e) {
+            $this->assertMatchesRegularExpression('/harus dilunasi sekaligus/', $e->getMessage());
+        }
 
-        $this->assertSame(400000.0, (float) $lain->refresh()->sisa);
-        $this->assertSame('sebagian', $lain->status);
+        // Tagihannya utuh — bukan terpotong lalu digulung balik separuh jalan.
+        $this->assertSame(500000.0, (float) $lain->refresh()->sisa);
+        $this->assertSame('belum_bayar', $lain->status);
     }
 
     /**

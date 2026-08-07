@@ -367,7 +367,7 @@
     <div class="eyebrow">Rancangan v2 · menggantikan versi 1 Agustus</div>
     <h1>Tagihan Lain-lain</h1>
     <p class="lede">Bukan satu jenis tagihan, melainkan dua watak yang bekerja dari akar yang berbeda: yang ditagih menurut <b>pemakaian</b>, dan yang ditagih menurut <b>kepesertaan</b>.</p>
-    <p class="meta">Al Wafi · disusun ulang 7 Agustus 2026 · belum ada baris kode yang diubah</p>
+    <p class="meta">Al Wafi · disusun ulang 7 Agustus 2026 · diperbarui setelah langkah 1, 2 &amp; 4 dikerjakan</p>
   </header>
 
   <section>
@@ -469,8 +469,8 @@
             <td>Kolom baru <code>jenis_biaya.pengakuan</code> — <code>akrual</code> atau <code>kas</code>. Sekarang sifat itu cuma <em>disimpulkan</em> dari kebetulan terisinya akun piutang.</td>
           </tr>
           <tr>
-            <td><b>Jenis <code>lain</code> tidak berjenjang</b></td>
-            <td>Satu jenis boleh ditagihkan ke santri jenjang mana pun. Jenjang berpindah tempat: ke <em>tarif</em> (keluarga B) atau ke <em>daftar jenjang peserta</em> (keluarga A).</td>
+            <td><b>Jenjang tetap di master; yang lintas jenjang adalah <em>anggotanya</em></b></td>
+            <td><code>jenis_biaya.kode_jenjang</code> tetap diisi seperti biasa. Yang tidak terikat jenjang adalah <b>kepesertaannya</b> — satu ekskul boleh beranggotakan santri SMP <em>dan</em> SMA sekaligus, dan tarifnya boleh berbeda untuk masing-masing. Karena itu penerbitan membaca jenjang <b>santrinya</b>, bukan jenjang yang tertulis di master.</td>
           </tr>
           <tr>
             <td><b>Kuota gratis</b></td>
@@ -811,15 +811,32 @@ Naufal Hakim &nbsp; tidak menyetor &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nb
   <section>
     <div class="sec-head">
       <span class="num">10</span>
-      <h2>Pekerjaan data sebelum dipakai</h2>
+      <h2>Keadaan data hari ini</h2>
     </div>
     <div class="prose">
-      <p>Tiga jenis biaya berperilaku <code>lain</code> yang ada sekarang — <em>SMA-06</em>, <em>SMP-06</em>, <em>SDTQ-06</em>, masing-masing bernama “Tagihan Lainnya” — tersusun <b>per jenjang</b>. Itu bertentangan dengan aturan bahwa jenis <code>lain</code> tidak terikat jenjang.</p>
-      <p>Ketiganya perlu dipecah ulang <b>per layanan</b>: Laundry, Ekskul Panahan, Program Umroh 2026, dan seterusnya — masing-masing dengan cara tagih dan pengakuannya sendiri.</p>
+      <p>Bagian ini semula menuntut tiga baris “Tagihan Lainnya” dipecah menjadi per layanan <em>tanpa jenjang</em>. <b>Tuntutan itu dicabut</b> — jenjang di master memang tetap dipakai; yang lintas jenjang adalah kepesertaannya (lihat aturan yang dikunci).</p>
+      <p>Diperiksa langsung ke basis data kerja, 7 Agustus 2026:</p>
+    </div>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th style="width:9rem;">Kode</th><th>Nama</th><th style="width:9rem;">Pengakuan</th><th style="width:11rem;">Cara tagih</th></tr></thead>
+        <tbody>
+          <tr><td><code>SMP-01</code></td><td>Ekskul Robotic</td><td><span class="pill kas">kas</span></td><td><span class="fam b">kepesertaan</span></td></tr>
+          <tr><td><code>SMP-07</code></td><td>Laundry SMP</td><td><span class="pill acc">akrual</span></td><td><span class="fam a">pemakaian</span></td></tr>
+          <tr><td><code>SMA-07</code></td><td>Laundry SMA</td><td><span class="pill acc">akrual</span></td><td><span class="fam a">pemakaian</span></td></tr>
+          <tr><td><code>SDTQ-06</code><br><code>SMP-06</code><br><code>SMA-06</code></td><td>“Tagihan Lainnya” — tiga baris lama</td><td><span class="pill acc">akrual</span></td><td><span class="pill off">belum diisi</span></td></tr>
+        </tbody>
+      </table>
     </div>
     <div class="callout warn">
-      <span class="k">Perlu diperiksa sebelum mulai</span>
-      <p>Rancangan lama bersandar pada keadaan “santri 0, tagihan 0”. Itu tidak berlaku lagi — <b>202 santri dan 206 tagihan</b> sudah masuk lewat impor data awal. Tagihan berperilaku <code>lain</code> kemungkinan besar masih nol, karena pengimpor menolak jenis berperilaku <code>lain</code> sebagai jenis tunggakan, tetapi ini <b>harus dihitung langsung ke basis data</b>, bukan disimpulkan. Kalau ternyata ada, pemecahan jenis di atas berubah dari pekerjaan data menjadi pemindahan riwayat.</p>
+      <span class="k">Yang tersisa</span>
+      <p>Tiga baris lama belum menyatakan cara tagihnya, sehingga <b>tidak muncul di layar mana pun</b> — bukan di matriks tarif, bukan di daftar peserta. Keduanya perlu diputuskan: diberi cara tagih supaya bisa dikelola, atau dinonaktifkan sebagai riwayat.</p>
+      <p><b>Ketiganya tidak bisa sekadar dihapus.</b> <code>SDTQ-06</code> sudah memikul satu tagihan hidup — Rp 300.000 atas nama seorang santri, berstatus belum bayar.</p>
+    </div>
+    <div class="callout">
+      <span class="k">Asal tagihan itu, supaya tak salah kira</span>
+      <p>Tagihan tersebut <b>bukan diketik petugas</b>: ia lahir dari <b>impor data awal</b> (batch <code>santri-lama</code>, detik yang sama dengan 202 santrinya). Pengimpor memang punya kolom tunggakan <code>lain</code> tersendiri — contoh bawaannya justru “Seragam &amp; buku” Rp 300.000.</p>
+      <p>Tunggakan hasil impor sengaja ber-<code>sudah_akrual = true</code> <b>tanpa jurnal</b>: nilainya sudah diakui sebagai pendapatan di catatan lama, dan total piutangnya masuk sekali lewat menu Saldo Awal. Penanda itu membuat pembayarannya nanti mengkredit <b>Piutang</b>, bukan Pendapatan. <b>Bukan cacat — jangan “dibetulkan”.</b></p>
     </div>
   </section>
 
@@ -830,24 +847,29 @@ Naufal Hakim &nbsp; tidak menyetor &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nb
     </div>
     <div class="tablebox">
       <table>
-        <thead><tr><th style="width:3rem;" class="ctr">#</th><th>Langkah</th><th style="width:9rem;">Ongkos</th></tr></thead>
+        <thead><tr><th style="width:3rem;" class="ctr">#</th><th>Langkah</th><th style="width:10rem;">Keadaan</th></tr></thead>
         <tbody>
-          <tr><td class="ctr">1</td><td>Sapuan murah: simpan jatuh tempo &amp; keterangan, tampilkan hasil penerbitan, betulkan <code>sumber_modul</code> dan pesan yang menggantung. <b>Tanpa migrasi.</b></td><td>kecil</td></tr>
-          <tr><td class="ctr">2</td><td><code>pengakuan</code> + <code>cara_tagih</code> di master, berikut grup menu tersendiri &amp; dua sub-grupnya — pondasi keduanya</td><td>sedang</td></tr>
-          <tr><td class="ctr">3</td><td>Pecah tiga jenis biaya lama jadi per layanan <span class="meta">(pekerjaan data, bukan kode)</span></td><td>kecil</td></tr>
-          <tr><td class="ctr">4</td><td><span class="fam b">B</span> matriks tarif + daftar peserta + penerbitan</td><td>sedang</td></tr>
-          <tr><td class="ctr">5</td><td>Auto-debet <code>lain</code> jadi penuh-atau-tidak-sama-sekali</td><td>kecil</td></tr>
-          <tr><td class="ctr">6</td><td><span class="fam a">A</span> setoran harian, kuota, penerbitan periode, hak akses petugas</td><td>besar</td></tr>
+          <tr><td class="ctr">1</td><td>Sapuan murah: simpan jatuh tempo &amp; keterangan, tampilkan hasil penerbitan, betulkan <code>sumber_modul</code> dan pesan yang menggantung. <b>Tanpa migrasi.</b></td><td><span class="pill ok">selesai</span></td></tr>
+          <tr><td class="ctr">2</td><td><code>pengakuan</code> + <code>cara_tagih</code> di master, berikut grup menu tersendiri &amp; dua sub-grupnya — pondasi keduanya</td><td><span class="pill ok">selesai</span></td></tr>
+          <tr><td class="ctr">4</td><td><span class="fam b">B</span> matriks tarif + daftar peserta + penerbitan</td><td><span class="pill ok">selesai</span></td></tr>
+          <tr><td class="ctr">3</td><td>Isi cara tagih tiga baris lama, atau nonaktifkan <span class="meta">(pekerjaan data, bukan kode)</span></td><td><span class="pill wait">menunggu keputusan</span></td></tr>
+          <tr><td class="ctr">5</td><td>Auto-debet <code>lain</code> jadi penuh-atau-tidak-sama-sekali</td><td><span class="pill off">berikutnya</span></td></tr>
+          <tr><td class="ctr">6</td><td><span class="fam a">A</span> setoran harian, kuota, penerbitan periode, hak akses petugas</td><td><span class="pill off">belum</span></td></tr>
         </tbody>
       </table>
     </div>
     <div class="prose">
       <p>Keluarga B didahulukan bukan karena lebih penting, melainkan karena ia tidak menuntut layar yang dipakai tiap hari — begitu langkah 4 selesai, kegiatan dan umroh sudah bisa ditagih sementara laundry masih disusun.</p>
     </div>
+    <div class="callout warn">
+      <span class="k">Terbuka, diputuskan saat langkah 6</span>
+      <p>Laundry kini terdaftar sebagai <b>dua baris</b> — <code>SMP-07</code> dan <code>SMA-07</code> — padahal tarifnya satu angka untuk semua jenjang (Rp 7.000/kg). Dua baris berarti dua tempat mengubah tarif dan, kelak, <b>dua kuota 20 kg yang terpisah</b>: santri yang naik dari SMP ke SMA di tengah bulan akan kehilangan hitungan kuotanya.</p>
+      <p>Alternatifnya satu baris “Laundry” dengan daftar <b>jenjang pemakai</b> — tetapi karena jenjang tetap dipakai di master, tabel <code>jenjang_pemakai</code> mungkin tak lagi diperlukan sama sekali. Bentuk akhirnya ditetapkan saat modulnya dibangun, ketika sudah bisa diuji.</p>
+    </div>
   </section>
 
   <footer class="foot prose">
-    <p class="meta">Belum ada kode yang diubah. Menggantikan rancangan 1 Agustus 2026 seluruhnya. Setujui, atau koreksi bagian yang meleset.</p>
+    <p class="meta">Menggantikan rancangan 1 Agustus 2026 seluruhnya. Langkah 1, 2 &amp; 4 sudah dikerjakan; sisanya menunggu.</p>
   </footer>
 
 </div>
