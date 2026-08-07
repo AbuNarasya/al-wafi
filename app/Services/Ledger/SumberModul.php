@@ -32,6 +32,15 @@ final class SumberModul
         // laundry & kegiatan tak bisa dibedakan dari jurnal SPP saat ditelusuri
         // per modul — dan unit bawaannya pun terpaksa ikut aturan SPP.
         'TagihanLain',
+        // Pencairan & cicilan pinjaman karyawan. Keduanya memanggil postJournal
+        // TANPA mengoper kode_unit sama sekali, jadi selama ia tak terdaftar di
+        // sini, `resolveDefaultUnit` tak punya baris untuk ditemukan dan seluruh
+        // baris jurnalnya lahir tanpa unit — tanpa cara membetulkannya dari layar.
+        'PinjamanKaryawan',
+        // Jurnal penyesuaian hasil koreksi nominal tagihan. Ia mengoper kode_unit
+        // sendiri dari jenis biayanya, jadi ketiadaannya di sini tak pernah
+        // berakibat pada angka — tapi layar Unit Default jadi tak mengenalnya.
+        'KoreksiTagihan',
     ];
 
     public static function isValid(string $v): bool
