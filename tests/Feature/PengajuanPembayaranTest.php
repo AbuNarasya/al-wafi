@@ -117,16 +117,59 @@ class PengajuanPembayaranTest extends TestCase
         $this->assertSame(0.0, (float) $p->sisa_hutang);
     }
 
-    public function test_pembayaran_sebagian_ditolak(): void
+    /**
+     * PEMBAYARAN SEBAGIAN kini DIIZINKAN — vendor lazim dibayar bertahap.
+     *
+     * Dulu dilarang bukan karena aturan usaha, melainkan karena baris hutangnya
+     * dipecah per unit: cicilan memaksa porsi tiap unit diprorata, lengkap
+     * dengan sisa pembulatan yang tak punya rumah. Sejak hutang & kas duduk di
+     * unit penampung neraca, pembagian itu tak ada lagi.
+     *
+     * Statusnya tetap `diposting` selama masih bersisa — yang menentukan boleh
+     * dibayar lagi memang sisanya, bukan namanya.
+     */
+    public function test_pembayaran_boleh_dicicil_sampai_lunas(): void
     {
         $p = $this->buatPengajuan();
         $inst = ApprovalInstance::where('jenis_dokumen', PengajuanPembayaranService::SUMBER)->where('id_dokumen', (string) $p->id)->first();
         $this->appr->approve($inst->id, $this->mudir);
         $this->svc->verifikasi($p->id, self::HUTANG, $this->keuangan);
 
-        $this->expectException(AppException::class);
-        $this->expectExceptionMessageMatches('/dilunasi PENUH/i');
-        $this->svc->applyPayment($p->id, '50000');
+        $this->svc->applyPayment($p->id, '30000');
+        $p->refresh();
+        $this->assertSame('diposting', $p->status, 'masih bersisa — belum boleh disebut lunas');
+        $this->assertSame(70000.0, (float) $p->sisa_hutang);
+
+        $this->svc->applyPayment($p->id, '70000');
+        $p->refresh();
+        $this->assertSame('lunas', $p->status);
+        $this->assertSame(0.0, (float) $p->sisa_hutang);
+    }
+
+    /** Yang tetap dilarang: melebihi sisa, dan nol/negatif. */
+    public function test_cicilan_tak_boleh_melebihi_sisa_hutang(): void
+    {
+        $p = $this->buatPengajuan();
+        $inst = ApprovalInstance::where('jenis_dokumen', PengajuanPembayaranService::SUMBER)->where('id_dokumen', (string) $p->id)->first();
+        $this->appr->approve($inst->id, $this->mudir);
+        $this->svc->verifikasi($p->id, self::HUTANG, $this->keuangan);
+        $this->svc->applyPayment($p->id, '60000');
+
+        try {
+            $this->svc->applyPayment($p->id, '50000');
+            $this->fail('pembayaran melebihi sisa seharusnya ditolak');
+        } catch (AppException $e) {
+            $this->assertStringContainsString('melebihi sisa hutang', $e->getMessage());
+        }
+
+        try {
+            $this->svc->applyPayment($p->id, '0');
+            $this->fail('nominal nol seharusnya ditolak');
+        } catch (AppException $e) {
+            $this->assertStringContainsString('lebih dari nol', $e->getMessage());
+        }
+
+        $this->assertSame(40000.0, (float) $p->refresh()->sisa_hutang, 'sisa tak boleh bergeser oleh percobaan yang gagal');
     }
 
     /**

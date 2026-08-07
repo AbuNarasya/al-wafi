@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\AppException;
 use App\Models\ApprovalFlow;
 use App\Models\ApprovalInstance;
 use App\Models\BankAccount;
@@ -128,5 +129,98 @@ class CashOutTest extends TestCase
         $pb->refresh();
         $this->assertSame('lunas', $pb->status);
         $this->assertSame(0.0, (float) $pb->sisa_hutang);
+    }
+
+    /**
+     * CICILAN lewat Kas Keluar — jalur yang sesungguhnya dipakai petugas.
+     *
+     * Yang dijaga di sini BUKAN sekadar sisa hutangnya berkurang, melainkan
+     * NOMINAL JURNALNYA. Dulu baris hutang dibentuk dari komposisi unit PENUH
+     * pengajuannya sementara vouchernya bernilai cicilan; debet tetap sama
+     * dengan kredit, jadi jurnalnya BALANCE dan tak ada pemeriksaan yang
+     * menangkapnya — buku besar diam-diam menggerakkan uang lebih banyak
+     * daripada yang benar-benar keluar. Itu baru ketahuan saat kas di buku tak
+     * cocok dengan rekening koran.
+     */
+    public function test_pengajuan_boleh_dicicil_dan_jurnalnya_sebesar_yang_dibayar(): void
+    {
+        LevelPengajuan::create(['peringkat' => 3, 'nama' => 'Mudir']);
+        LevelPengajuan::create(['peringkat' => 4, 'nama' => 'Staff']);
+        $staff = User::create(['username' => 'staff', 'nama' => 'Staff', 'password_hash' => 'x', 'kode_level' => 'L1', 'kode_bagian' => 'B1', 'peringkat_pengajuan' => 4])->id_pengguna;
+        $mudir = User::create(['username' => 'mudir', 'nama' => 'Mudir', 'password_hash' => 'x', 'kode_level' => 'L1', 'kode_bagian' => 'B1', 'peringkat_pengajuan' => 3])->id_pengguna;
+        $keuangan = User::create(['username' => 'keu', 'nama' => 'Keu', 'password_hash' => 'x', 'kode_level' => 'L1', 'tim_keuangan' => true])->id_pengguna;
+        $flow = ApprovalFlow::create(['kode_flow' => 'FPP', 'nama_flow' => 'PP', 'jenis_dokumen' => PengajuanPembayaranService::SUMBER]);
+        $flow->steps()->create(['urutan' => 1, 'nama_tahap' => 'Mudir', 'peringkat' => 3, 'scope' => 'bagian']);
+
+        $pengajuanSvc = new PengajuanPembayaranService;
+        $pb = $pengajuanSvc->create([
+            'tanggal' => '2026-07-15', 'jenis' => 'pembayaran', 'keterangan' => 'ATK',
+            'details' => [['kode_coa' => self::BEBAN_PB, 'kode_unit' => self::UNIT, 'nominal' => '100000']],
+        ], $staff);
+        $inst = ApprovalInstance::where('id_dokumen', (string) $pb->id)->first();
+        (new ApprovalService)->approve($inst->id, $mudir);
+        $pengajuanSvc->verifikasi($pb->id, self::HUTANG_PB, $keuangan);
+
+        // Cicilan pertama: 30rb dari 100rb.
+        $kk = $this->svc->create([
+            'tanggal' => '2026-07-20', 'kode_rekening' => self::KAS, 'keterangan' => 'Cicilan I',
+            'details' => [['tipe' => 'pengajuan', 'id_pengajuan' => $pb->id, 'nominal' => '30000']],
+        ], $this->admin);
+
+        $pb->refresh();
+        $this->assertSame('diposting', $pb->status, 'masih bersisa — belum lunas');
+        $this->assertSame(70000.0, (float) $pb->sisa_hutang);
+        $this->assertSame(30000.0, (float) $kk->nominal);
+
+        // INILAH intinya: jurnalnya bergerak 30rb, bukan 100rb.
+        $entry = JournalEntry::with('lines')->where('sumber_modul', 'KasKeluar')
+            ->where('id_sumber', (string) $kk->kode_transaksi)->sole();
+        $this->assertSame(30000.0, (float) $entry->lines->sum('debet'));
+        $this->assertSame(30000.0, (float) $entry->lines->sum('kredit'));
+        $this->assertSame(30000.0, (float) $entry->lines->where('kode_coa', self::HUTANG_PB)->sum('debet'));
+        $this->assertSame(30000.0, (float) $entry->lines->where('kode_coa', self::KAS)->sum('kredit'));
+
+        // Cicilan kedua melunasi sisanya.
+        $this->svc->create([
+            'tanggal' => '2026-07-25', 'kode_rekening' => self::KAS, 'keterangan' => 'Cicilan II',
+            'details' => [['tipe' => 'pengajuan', 'id_pengajuan' => $pb->id, 'nominal' => '70000']],
+        ], $this->admin);
+
+        $pb->refresh();
+        $this->assertSame('lunas', $pb->status);
+        $this->assertSame(0.0, (float) $pb->sisa_hutang);
+    }
+
+    /** Cicilan tak boleh melebihi sisa — penjagaan di Kas Keluar, sebelum apa pun diposting. */
+    public function test_cicilan_melebihi_sisa_ditolak_kas_keluar(): void
+    {
+        LevelPengajuan::create(['peringkat' => 3, 'nama' => 'Mudir']);
+        LevelPengajuan::create(['peringkat' => 4, 'nama' => 'Staff']);
+        $staff = User::create(['username' => 'staff', 'nama' => 'Staff', 'password_hash' => 'x', 'kode_level' => 'L1', 'kode_bagian' => 'B1', 'peringkat_pengajuan' => 4])->id_pengguna;
+        $mudir = User::create(['username' => 'mudir', 'nama' => 'Mudir', 'password_hash' => 'x', 'kode_level' => 'L1', 'kode_bagian' => 'B1', 'peringkat_pengajuan' => 3])->id_pengguna;
+        $keuangan = User::create(['username' => 'keu', 'nama' => 'Keu', 'password_hash' => 'x', 'kode_level' => 'L1', 'tim_keuangan' => true])->id_pengguna;
+        $flow = ApprovalFlow::create(['kode_flow' => 'FPP', 'nama_flow' => 'PP', 'jenis_dokumen' => PengajuanPembayaranService::SUMBER]);
+        $flow->steps()->create(['urutan' => 1, 'nama_tahap' => 'Mudir', 'peringkat' => 3, 'scope' => 'bagian']);
+
+        $pengajuanSvc = new PengajuanPembayaranService;
+        $pb = $pengajuanSvc->create([
+            'tanggal' => '2026-07-15', 'jenis' => 'pembayaran', 'keterangan' => 'ATK',
+            'details' => [['kode_coa' => self::BEBAN_PB, 'kode_unit' => self::UNIT, 'nominal' => '100000']],
+        ], $staff);
+        $inst = ApprovalInstance::where('id_dokumen', (string) $pb->id)->first();
+        (new ApprovalService)->approve($inst->id, $mudir);
+        $pengajuanSvc->verifikasi($pb->id, self::HUTANG_PB, $keuangan);
+
+        try {
+            $this->svc->create([
+                'tanggal' => '2026-07-20', 'kode_rekening' => self::KAS, 'keterangan' => 'Kelebihan',
+                'details' => [['tipe' => 'pengajuan', 'id_pengajuan' => $pb->id, 'nominal' => '150000']],
+            ], $this->admin);
+            $this->fail('nominal melebihi sisa seharusnya ditolak');
+        } catch (AppException $e) {
+            $this->assertStringContainsString('melebihi sisa hutang', $e->getMessage());
+        }
+
+        $this->assertSame(100000.0, (float) $pb->refresh()->sisa_hutang, 'sisa tak boleh bergeser');
     }
 }

@@ -191,14 +191,23 @@ class CashOutService
                     continue;
                 }
 
-                // PEMBAYARAN (accrual): mendebit akun Hutang Pengajuan, PELUNASAN PENUH.
+                // PEMBAYARAN (accrual): mendebit akun Hutang Pengajuan.
+                //
+                // BOLEH SEBAGIAN. Dulu wajib lunas sekali bayar, bukan karena
+                // aturan usaha melainkan karena baris hutangnya dipecah per
+                // unit — cicilan mengharuskan porsi tiap unit diprorata. Sejak
+                // hutang & kas dipusatkan di unit penampung neraca, pembagian
+                // itu tak ada lagi, dan cicilan tinggal soal mengurangi sisa.
                 if ($pb->status !== 'diposting') {
                     throw new AppException(422, "Pengajuan {$pb->nomor} berstatus {$pb->status}; hanya yang sudah disetujui & diposting yang bisa dibayar.");
                 }
                 $sisa = Money::of($pb->sisa_hutang);
                 $nominal = Money::of($l['nominal'] ?? 0);
-                if (! Money::eq($nominal, $sisa)) {
-                    throw new AppException(422, "Pengajuan {$pb->nomor} harus dilunasi PENUH sebesar {$sisa}; pembayaran sebagian tidak diizinkan.");
+                if (! Money::gtZero($nominal)) {
+                    throw new AppException(422, "Nominal pembayaran pengajuan {$pb->nomor} harus lebih dari nol.");
+                }
+                if (Money::gt($nominal, $sisa)) {
+                    throw new AppException(422, "Nominal melebihi sisa hutang pengajuan {$pb->nomor} sebesar {$sisa}.");
                 }
                 $kodeHutang = $pb->kode_coa_hutang;
                 if (! $kodeHutang) {
@@ -208,10 +217,25 @@ class CashOutService
                 $total = Money::add($total, $nominal);
                 $ket = $l['keterangan'] ?? "Pelunasan pengajuan {$pb->nomor}";
                 $details[] = ['tipe' => 'pengajuan', 'id_pengajuan' => $pb->id, 'kode_coa' => $kodeHutang, 'nama_coa' => $pbCoa?->nama_coa ?? $kodeHutang, 'nominal' => $nominal, 'keterangan' => $ket];
-                foreach (PengajuanPembayaranService::ringkasPerUnit($pb->details) as [$kodeUnit, $nom]) {
-                    $jLines[] = ['kode_coa' => $kodeHutang, 'nama_coa' => $pbCoa?->nama_coa, 'debet' => $nom, 'kredit' => '0', 'keterangan' => $ket, 'kode_unit' => $kodeUnit];
-                    $kasPerUnit[$kodeUnit] = Money::add($kasPerUnit[$kodeUnit] ?? '0', $nom);
-                }
+                // SATU baris hutang sebesar yang benar-benar dibayar — bukan
+                // komposisi penuh pengajuannya. Dulu keduanya kebetulan sama
+                // karena pelunasan wajib penuh; begitu cicilan dibolehkan,
+                // memakai komposisi penuh berarti jurnal menggerakkan lebih
+                // banyak uang daripada yang tertulis di vouchernya, dan tetap
+                // balance sehingga tak ada yang menangkapnya.
+                //
+                // Unitnya tak ditentukan di sini — PostingService menaruh baris
+                // hutang & kas di unit penampung neraca.
+                $jLines[] = ['kode_coa' => $kodeHutang, 'nama_coa' => $pbCoa?->nama_coa, 'debet' => $nominal, 'kredit' => '0', 'keterangan' => $ket];
+
+                // Sisi kas dititipkan ke unit PERTAMA pengajuannya semata-mata
+                // agar $kasPerUnit punya kunci yang pasti — nominalnya utuh,
+                // tidak dibagi. Bila unit penampung neraca disetel, baris kas
+                // ini ditimpa PostingService dan pilihan kunci tak berpengaruh
+                // sama sekali; bila tidak, perilakunya sama seperti dokumen
+                // satu unit lain (invoice, uang muka).
+                [$unitPertama] = PengajuanPembayaranService::ringkasPerUnit($pb->details)[0];
+                $kasPerUnit[$unitPertama] = Money::add($kasPerUnit[$unitPertama] ?? '0', $nominal);
                 $pengajuanPayments[] = ['id' => $pb->id, 'nominal' => $nominal];
             } elseif ($tipe === 'inventory') {
                 if (empty($l['kode_persediaan'])) {

@@ -40,6 +40,19 @@
                 Izinkan setor tunai langsung ke Dompet Santri
             </label>
 
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <x-field name="kode_unit_neraca" label="Unit Penampung Neraca"
+                         :value="$s->kode_unit_neraca"
+                         :options="['' => '— Tidak dipusatkan —'] + $opsiUnit" />
+                <p class="mt-2 text-xs text-gray-500">
+                    Seluruh baris <b>hutang</b> dan <b>kas/bank</b> dibukukan ke unit ini, modul mana pun asalnya.
+                    Baris beban &amp; aset tetap mengikuti unit yang mengajukan, sehingga laba rugi per unit tidak berubah.
+                    Neraca memang hanya dibaca di tingkat yayasan.
+                    <br>
+                    Dikosongkan = tiap baris mengikuti unit dokumennya, seperti sebelum pengaturan ini ada.
+                </p>
+            </div>
+
             <x-field name="keterangan" label="Keterangan" :value="$s->keterangan" textarea />
 
             <div class="flex justify-end border-t border-gray-100 pt-4">

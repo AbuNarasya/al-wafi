@@ -385,13 +385,21 @@ class PengajuanPembayaranService
                     'kode_bagian' => $rec->kode_bagian, 'kode_unit' => $d->kode_unit,
                 ];
             }
-            foreach (self::ringkasPerUnit($rec->details) as [$kodeUnit, $nominal]) {
-                $lines[] = [
-                    'kode_coa' => $rec->kode_coa_hutang, 'nama_coa' => $akunHutang?->nama_coa,
-                    'debet' => '0', 'kredit' => $nominal,
-                    'keterangan' => "Hutang atas pengajuan {$rec->nomor}", 'kode_unit' => $kodeUnit,
-                ];
-            }
+            // SATU baris hutang, tidak dipecah per unit.
+            //
+            // Dulu ia dipecah mengikuti komposisi unit rinciannya, dan justru
+            // itulah yang membuat pelunasan SEBAGIAN mustahil: porsi tiap unit
+            // harus diprorata, lengkap dengan sisa pembulatan yang tak punya
+            // rumah. Padahal tak ada laporan yang membacanya — `neraca()` tak
+            // menerima parameter unit sama sekali.
+            //
+            // Unitnya sengaja tidak ditentukan di sini: PostingService yang
+            // menaruhnya di unit penampung neraca (lihat konteksNeraca).
+            $lines[] = [
+                'kode_coa' => $rec->kode_coa_hutang, 'nama_coa' => $akunHutang?->nama_coa,
+                'debet' => '0', 'kredit' => $rec->nominal,
+                'keterangan' => "Hutang atas pengajuan {$rec->nomor}",
+            ];
 
             $entry = PostingService::postJournal([
                 'referensi' => $rec->nomor, 'tanggal' => $rec->tanggal,
@@ -718,7 +726,14 @@ class PengajuanPembayaranService
         return $rec->refresh();
     }
 
-    /** Dipanggil Kas Keluar saat pengajuan dibayar (§4.h). WAJIB PENUH. */
+    /**
+     * Dipanggil Kas Keluar saat pengajuan dibayar (§4.h). BOLEH SEBAGIAN.
+     *
+     * Cermin persis dari reversePayment(): sisa berkurang, dan statusnya `lunas`
+     * hanya ketika sisanya benar-benar nol. Selama masih bersisa dokumen tetap
+     * `diposting` — tak ada status "sebagian" tersendiri, karena yang menentukan
+     * boleh-tidaknya dibayar lagi memang sisanya, bukan namanya.
+     */
     public function applyPayment(int $id, string $nominal): void
     {
         $rec = PengajuanPembayaran::find($id);
@@ -729,10 +744,15 @@ class PengajuanPembayaranService
             throw new AppException(422, "Pengajuan {$rec->nomor} berstatus {$rec->status}; belum bisa dibayar.");
         }
         $sisa = Money::of($rec->sisa_hutang);
-        if (! Money::eq($nominal, $sisa)) {
-            throw new AppException(422, "Pengajuan {$rec->nomor} harus dilunasi PENUH sebesar {$sisa}; pembayaran sebagian tidak diizinkan.");
+        if (! Money::gtZero($nominal)) {
+            throw new AppException(422, "Nominal pembayaran pengajuan {$rec->nomor} harus lebih dari nol.");
         }
-        $rec->update(['sisa_hutang' => '0', 'status' => 'lunas']);
+        if (Money::gt($nominal, $sisa)) {
+            throw new AppException(422, "Nominal melebihi sisa hutang pengajuan {$rec->nomor} sebesar {$sisa}.");
+        }
+
+        $baru = Money::sub($sisa, $nominal);
+        $rec->update(['sisa_hutang' => $baru, 'status' => Money::isZero($baru) ? 'lunas' : 'diposting']);
     }
 
     /**

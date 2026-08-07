@@ -3,6 +3,8 @@
 namespace App\Services\Ledger;
 
 use App\Exceptions\AppException;
+use App\Models\BankAccount;
+use App\Models\CompanySettings;
 use App\Models\JournalEntry;
 use App\Models\UnitDefault;
 use App\Support\Money;
@@ -90,11 +92,53 @@ final class PostingService
     }
 
     /**
+     * Akun-akun NERACA yang unitnya dipaksa ke unit penampung: seluruh
+     * liabilitas (awalan "2") dan setiap rekening kas/bank.
+     *
+     * Dihitung sekali per proses — daftar rekening kas jarang berubah, dan
+     * postJournal dipanggil berkali-kali dalam satu permintaan.
+     *
+     * @return array{unit:?string, kas:array<string,true>}
+     */
+    /** @var array{unit:?string, kas:array<string,true>}|null */
+    private static ?array $konteksNeraca = null;
+
+    protected static function konteksNeraca(): array
+    {
+        return self::$konteksNeraca ??= [
+            'unit' => CompanySettings::query()->value('kode_unit_neraca'),
+            'kas' => array_fill_keys(BankAccount::pluck('kode_coa')->all(), true),
+        ];
+    }
+
+    /**
+     * Buang cache konteks. WAJIB dipanggil sesudah pengaturan unit penampung
+     * atau daftar rekening kas berubah — termasuk di test, yang membuat
+     * keduanya sesudah kelas ini mungkin sudah sempat membacanya.
+     */
+    public static function lupakanKonteksNeraca(): void
+    {
+        self::$konteksNeraca = null;
+    }
+
+    /** Baris ini termasuk neraca yang unitnya dipusatkan? */
+    private static function barisNeraca(string $kodeCoa, array $ctx): bool
+    {
+        return str_starts_with($kodeCoa, '2') || isset($ctx['kas'][$kodeCoa]);
+    }
+
+    /**
      * Memvalidasi balance lalu mem-persist SATU journal entry + baris-barisnya
      * secara atomik. Unit diresolusi PER BARIS, tiga tingkat (spesifik menang):
      *   1. unit baris → dokumen multi-unit
      *   2. unit dokumen → modul satu-unit (semua baris mewarisi)
      *   3. default modul → pengisi kekosongan terakhir
+     *
+     * KECUALI baris NERACA. Baris berakun liabilitas atau rekening kas/bank
+     * selalu memakai UNIT PENAMPUNG (company_settings.kode_unit_neraca),
+     * mengabaikan ketiga tingkat di atas — unit adalah pusat laba, dan neraca
+     * hanya bermakna di tingkat yayasan. Bila pengaturannya belum diisi,
+     * perilakunya persis seperti dulu.
      *
      * @param  array<string,mixed>  $input
      */
@@ -105,8 +149,9 @@ final class PostingService
         PeriodService::assertPeriodPostable($input['tanggal']);
 
         $unitDokumen = $input['kode_unit'] ?? self::resolveDefaultUnit($input['sumber_modul']);
+        $neraca = self::konteksNeraca();
 
-        return DB::transaction(function () use ($input, $unitDokumen) {
+        return DB::transaction(function () use ($input, $unitDokumen, $neraca) {
             $entry = JournalEntry::create([
                 'referensi' => $input['referensi'],
                 'tanggal' => $input['tanggal'],
@@ -128,7 +173,9 @@ final class PostingService
                         ? Money::of($l['kuantiti'], 4)
                         : null,
                     'kode_bagian' => $l['kode_bagian'] ?? null,
-                    'kode_unit' => $l['kode_unit'] ?? $unitDokumen,
+                    'kode_unit' => ($neraca['unit'] !== null && self::barisNeraca($l['kode_coa'], $neraca))
+                        ? $neraca['unit']
+                        : ($l['kode_unit'] ?? $unitDokumen),
                 ]);
             }
 
