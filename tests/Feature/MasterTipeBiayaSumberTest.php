@@ -249,6 +249,10 @@ class MasterTipeBiayaSumberTest extends TestCase
             'kode' => 'SRG-SMP', 'nama' => 'Seragam', 'tipe' => 'seragam',
             'tahun_ajaran' => self::TA, 'kode_jenjang' => 'SMP',
             'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'status' => 'aktif',
+            // Perilaku `lain` kini wajib menyatakan cara tagihnya — lihat
+            // JenisBiayaPengakuanTest. Seragam ditagih per santri yang menerima,
+            // jadi kepesertaan.
+            'pengakuan' => 'kas', 'cara_tagih' => 'kepesertaan',
         ])->assertRedirect();
 
         $jb = \App\Models\JenisBiaya::findOrFail('SRG-SMP');

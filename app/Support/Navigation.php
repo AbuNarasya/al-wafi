@@ -170,13 +170,19 @@ final class Navigation
         // Penagihan SPP: yang satu pekerjaan bulanan, yang ini pekerjaan harian.
         ['url' => '/kesantrian/outstanding-spp', 'label' => 'Daftar Outstanding SPP', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'outstanding-spp'],
 
+        // ---- 5b. Tagihan Lain-lain ----
+        // Sampai sekarang modul ini SAMA SEKALI tak punya item sidebar — satu-
+        // satunya jalan masuk adalah mengetik URL-nya. Grupnya sendiri sekaligus
+        // menutup lubang itu.
+        ['url' => '/kesantrian/tagihan-lain', 'label' => 'Daftar & Terbitkan', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi', 'modul' => 'tagihan-lain'],
+
         // ---- 6. Sistem ----
         ['url' => '/approvals', 'label' => 'Persetujuan Saya', 'group' => 'SISTEM'],
         // "Outstanding Approval" (/void-approvals) dibuang 2026-07-28 — tak ada
         // rutenya (404) & fiturnya belum diport. Lihat catatan di ModulRegistry.
     ];
 
-    public const GROUP_ORDER = ['', 'SETTING AWAL', 'ANGGARAN', 'PENGAJUAN PEMBAYARAN', 'KEUANGAN', 'PPSB', 'KEPENDIDIKAN', 'SISTEM'];
+    public const GROUP_ORDER = ['', 'SETTING AWAL', 'ANGGARAN', 'PENGAJUAN PEMBAYARAN', 'KEUANGAN', 'PPSB', 'KEPENDIDIKAN', 'TAGIHAN LAIN-LAIN', 'SISTEM'];
 
     public const SUB_ORDER = [
         'SETTING AWAL' => ['Setting Umum', 'Setting Biaya'],
@@ -184,6 +190,11 @@ final class Navigation
         'KEUANGAN' => ['Vendor & Customer', 'Aset & Persediaan', 'Transaksi', 'Laporan', 'Kontrol'],
         'PPSB' => ['Setting Awal', 'Data Master', 'Transaksi'],
         'KEPENDIDIKAN' => ['Master', 'Administrasi', 'Transaksi', 'Kontrol'],
+        // "Setting Tagihan Lain Lain" belum punya item: layar jenis & cara tagih
+        // serta matriks tarifnya baru lahir di langkah 4 rancangan v2. Sub tanpa
+        // item memang tidak dirender (lihat groups()), jadi menyebutnya di sini
+        // aman — urutannya sudah terpasang saat layarnya menyusul.
+        'TAGIHAN LAIN-LAIN' => ['Setting Tagihan Lain Lain', 'Transaksi'],
     ];
 
     /**

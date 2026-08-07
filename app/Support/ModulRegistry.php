@@ -121,7 +121,12 @@ final class ModulRegistry
 
         ['kode' => 'pembayaran-kesantrian', 'nama' => 'Pembayaran SPP & Tagihan Lain', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
         ['kode' => 'dompet', 'nama' => 'Dompet & Tabungan Santri', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
-        ['kode' => 'tagihan-lain', 'nama' => 'Tagihan Lain-lain (seragam, kegiatan, denda)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
+        // Grupnya sendiri sejak rancangan v2 — dua watak yang cara kerjanya
+        // berbeda (laundry berbasis pemakaian, kegiatan berbasis kepesertaan)
+        // tak lagi muat sebagai satu baris di antara menu Kependidikan.
+        // KODE MODULNYA TETAP `tagihan-lain`: ia tersimpan di `hak_akses_modul`,
+        // jadi menggantinya akan memutus hak yang sudah diberikan ke pengguna.
+        ['kode' => 'tagihan-lain', 'nama' => 'Tagihan Lain-lain (laundry, ekskul, kegiatan)', 'grup' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi'],
         // TANPA MENU: dijalankan dari halaman santri, bukan layar tersendiri.
         // Wewenangnya sengaja terpisah dari modul tagihan mana pun — ia mengubah
         // PIUTANG YANG SUDAH DIBUKUKAN, jadi tak boleh ikut hak `ubah` biasa.

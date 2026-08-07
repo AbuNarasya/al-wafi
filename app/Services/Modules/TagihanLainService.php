@@ -55,7 +55,12 @@ class TagihanLainService
             throw new AppException(422, 'Seluruh santri yang dipilih sudah punya tagihan ini.');
         }
 
-        $akrual = (bool) $jenis->kode_coa_piutang;
+        // Dulu: `(bool) $jenis->kode_coa_piutang`. Sifat akrual kini DINYATAKAN
+        // di master, bukan disimpulkan dari terisinya sebuah akun.
+        $akrual = $jenis->pengakuan === 'akrual';
+        if ($akrual && ! $jenis->kode_coa_piutang) {
+            throw new AppException(422, "Jenis biaya \"{$jenis->nama}\" berpengakuan akrual tetapi belum punya akun piutang, sehingga jurnalnya tak punya alamat. Lengkapi dulu di master Jenis Biaya.");
+        }
         $total = Money::mul($nominal, (string) $target->count());
 
         $hasil = DB::transaction(function () use ($data, $jenis, $nominal, $target, $akrual, $total, $idPengguna, $namaDilewati, $tidakAktif) {

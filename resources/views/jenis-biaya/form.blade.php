@@ -63,14 +63,43 @@
                 tetapi tetap berguna untuk memilah laporan dan membedakan jenis yang namanya mirip antar jenjang.
             </p>
 
+            {{-- Pengakuan mendahului akun: ia yang menentukan apakah akun piutang
+                 wajib, bukan sebaliknya. Sebelum kolom ini ada, sifat akrual
+                 ditebak dari terisinya akun piutang — sehingga mengisi akun
+                 "supaya lengkap" diam-diam mengubah kapan pendapatan diakui. --}}
             <fieldset class="rounded-lg border border-gray-200 p-4">
-                <legend class="px-2 text-sm font-semibold text-gray-700">Akun Akuntansi</legend>
+                <legend class="px-2 text-sm font-semibold text-gray-700">Pengakuan &amp; Akun</legend>
                 <div class="space-y-3">
+                    <x-field name="pengakuan" label="Pengakuan" required
+                             :value="$jb->pengakuan ?? 'kas'"
+                             :options="[
+                                 'kas' => 'Diakui saat DIBAYAR — belum ada jurnal saat tagihan terbit',
+                                 'akrual' => 'Diakui saat DITAGIHKAN — piutang langsung masuk buku besar',
+                             ]" />
+                    <div class="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                        <b>Saat ditagihkan:</b> tagihannya <b>tidak bisa dibatalkan</b> begitu terbit — kekeliruan
+                        diperbaiki lewat Koreksi Nominal Tagihan, yang menerbitkan jurnal penyesuaian.<br>
+                        <b>Saat dibayar:</b> tagihannya boleh dibatalkan selama belum ada pembayaran, karena tak ada
+                        jurnal yang perlu dibalik.
+                    </div>
+
                     <x-field name="kode_coa_pendapatan" label="Akun Pendapatan" :value="$jb->kode_coa_pendapatan" :options="$coaWajib" required />
                     <x-field name="kode_coa_piutang" label="Akun Piutang" :value="$jb->kode_coa_piutang" :options="$coaOpsional"
-                             hint="Kosongkan untuk CASH BASIS — pendapatan diakui saat uang diterima, tanpa piutang. Registrasi wajib kosong. Isi hanya untuk biaya yang ditagihkan lebih dulu (SPP, uang pangkal santri aktif)." />
+                             hint="Wajib diisi bila pengakuannya “saat ditagihkan” — ke sanalah piutangnya dibukukan. Untuk pengakuan “saat dibayar”, biarkan kosong." />
                 </div>
             </fieldset>
+
+            {{-- Hanya perilaku lain-lain. Registrasi, uang pangkal, SPP & daftar
+                 ulang punya alur penagihannya masing-masing. --}}
+            <div x-show="tipe === 'lain'" x-cloak>
+                <x-field name="cara_tagih" label="Cara Menagih" :value="$jb->cara_tagih"
+                         :options="[
+                             '' => '— pilih —',
+                             'kepesertaan' => 'Menurut kepesertaan — hanya santri yang ikut, tarif per jenjang',
+                             'pemakaian' => 'Menurut pemakaian — tarif per satuan dikali kuantitas',
+                         ]"
+                         hint="Kepesertaan untuk ekskul, kegiatan khusus, program umroh. Pemakaian untuk layanan bersatuan seperti laundry per kilogram." />
+            </div>
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <label class="flex items-center gap-2 text-sm text-gray-700">

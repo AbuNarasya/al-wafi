@@ -65,11 +65,12 @@ class TagihanLainTest extends TestCase
         TipeBiaya::firstOrCreate(['kode' => 'lain'],
             ['nama' => 'Lain-lain', 'perilaku' => 'lain', 'urutan' => 4, 'bawaan' => true, 'status' => 'aktif']);
 
-        // Berakun piutang ⇒ akrual, mengikuti aturan yang berlaku hari ini.
+        // Pengakuan DINYATAKAN, tidak lagi disimpulkan dari terisinya akun piutang.
         JenisBiaya::create([
             'kode' => 'LDR', 'nama' => 'Laundry', 'tipe' => 'lain',
             'kode_coa_pendapatan' => self::PENDAPATAN, 'kode_coa_piutang' => self::PIUTANG,
             'kode_unit' => 'ZZTLU', 'status' => 'aktif',
+            'pengakuan' => 'akrual', 'cara_tagih' => 'pemakaian',
         ]);
     }
 
@@ -185,6 +186,45 @@ class TagihanLainTest extends TestCase
 
         $this->assertStringContainsString('1 dilewati karena sudah tidak berstatus aktif', $pesan);
         $this->assertSame(1, TagihanSantri::count());
+    }
+
+    public function test_akun_piutang_terisi_tidak_lagi_membuat_tagihan_jadi_akrual(): void
+    {
+        // Akun piutangnya TETAP terisi, tapi pengakuannya kas. Sebelum ada kolom
+        // `pengakuan`, baris seperti ini mustahil dinyatakan: mengisi akun piutang
+        // "supaya lengkap" langsung menyeret piutangnya ke buku besar.
+        JenisBiaya::create([
+            'kode' => 'EKS', 'nama' => 'Ekskul Panahan', 'tipe' => 'lain',
+            'kode_coa_pendapatan' => self::PENDAPATAN, 'kode_coa_piutang' => self::PIUTANG,
+            'kode_unit' => 'ZZTLU', 'status' => 'aktif',
+            'pengakuan' => 'kas', 'cara_tagih' => 'kepesertaan',
+        ]);
+        $santri = $this->santri('990010', 'Fathan Aziz');
+
+        (new TagihanLainService)->terbitkan([
+            'kode_jenis' => 'EKS', 'id_santri' => [$santri->id],
+            'nominal' => '150000', 'tanggal' => '2026-09-01',
+        ], $this->petugas->id_pengguna);
+
+        $this->assertSame(0, JournalEntry::count(), 'Pengakuan kas tidak boleh menerbitkan jurnal saat tagihan terbit.');
+        $this->assertFalse((bool) TagihanSantri::where('id_santri', $santri->id)->value('sudah_akrual'));
+    }
+
+    public function test_akrual_tanpa_akun_piutang_ditolak_dengan_sebabnya(): void
+    {
+        JenisBiaya::create([
+            'kode' => 'RSK', 'nama' => 'Jenis Rusak', 'tipe' => 'lain',
+            'kode_coa_pendapatan' => self::PENDAPATAN, 'kode_coa_piutang' => null,
+            'kode_unit' => 'ZZTLU', 'status' => 'aktif', 'pengakuan' => 'akrual',
+        ]);
+        $santri = $this->santri('990011', 'Ghifari Rusdi');
+
+        $this->expectException(AppException::class);
+        $this->expectExceptionMessageMatches('/belum punya akun piutang/');
+        (new TagihanLainService)->terbitkan([
+            'kode_jenis' => 'RSK', 'id_santri' => [$santri->id],
+            'nominal' => '10000', 'tanggal' => '2026-09-01',
+        ], $this->petugas->id_pengguna);
     }
 
     public function test_pembatalan_tagihan_berakrual_menunjuk_koreksi_nominal_tagihan(): void

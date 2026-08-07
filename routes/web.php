@@ -656,7 +656,7 @@ Route::middleware('auth')->group(function () {
         ->name('rekap_pembayaran.ppsb')->defaults('lingkup', 'ppsb')
         ->middleware('hakakses:rekap-pembayaran,lihat');
 
-    // Tagihan Lain-lain (tanpa menu sidebar sendiri — dari Pembayaran Kesantrian).
+    // Tagihan Lain-lain — kini bergrup sidebar sendiri (lihat Navigation).
     Route::prefix('kesantrian/tagihan-lain')->name('tagihan_lain.')->controller(\App\Http\Controllers\TagihanLainController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:tagihan-lain,lihat');
         Route::get('/create', 'create')->name('create')->middleware('hakakses:tagihan-lain,buat');

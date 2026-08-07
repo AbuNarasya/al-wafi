@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\TipeBiaya;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -29,7 +30,19 @@ class JenisBiayaRequest extends FormRequest
             'tipe' => ['required', Rule::exists('tipe_biaya', 'kode')->where('status', 'aktif')],
             'kode_jenjang' => ['nullable', 'string', 'max:255'],
             'kode_coa_pendapatan' => ['required', 'string', 'exists:coa_detail,kode_coa'],
-            'kode_coa_piutang' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
+            // Akun piutang WAJIB bila pengakuannya akrual. Sebelum ada kolom
+            // `pengakuan`, terisinya akun inilah yang MENENTUKAN sifat akrual —
+            // kini keduanya berdiri sendiri dan karena itu bisa berselisih.
+            // Akrual tanpa akun piutang berarti jurnalnya tak punya alamat.
+            'kode_coa_piutang' => ['nullable', 'required_if:pengakuan,akrual', 'string', 'exists:coa_detail,kode_coa'],
+            'pengakuan' => ['required', Rule::in(['akrual', 'kas'])],
+            // Hanya bermakna untuk perilaku `lain` — registrasi, uang pangkal,
+            // SPP & daftar ulang punya alur penagihannya sendiri.
+            'cara_tagih' => [
+                Rule::requiredIf(fn () => TipeBiaya::perilakuDari($this->input('tipe')) === 'lain'),
+                'nullable',
+                Rule::in(['pemakaian', 'kepesertaan']),
+            ],
             'kode_coa_diterima_dimuka' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
             'kode_unit' => ['required', 'string', 'exists:business_units,kode_unit'],
             'berulang' => ['nullable', 'boolean'],
@@ -44,7 +57,7 @@ class JenisBiayaRequest extends FormRequest
             $data['kode'] = $this->input('kode');
         }
         $data['berulang'] = $this->boolean('berulang');
-        foreach (['kode_coa_piutang', 'kode_coa_diterima_dimuka', 'kode_jenjang'] as $f) {
+        foreach (['kode_coa_piutang', 'kode_coa_diterima_dimuka', 'kode_jenjang', 'cara_tagih'] as $f) {
             if (($data[$f] ?? '') === '') {
                 $data[$f] = null;
             }
