@@ -99,6 +99,24 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
+        /*
+         * NEON (produksi) — HANYA untuk menarik data ke lokal saat pemulihan.
+         *
+         * Kredensialnya TIDAK pernah ditulis di berkas mana pun di repo ini;
+         * isinya dibaca dari `NEON_URL` di `.env`, yang tak dilacak git. Kalau
+         * kosong, koneksi ini tak bisa dipakai dan itu memang disengaja —
+         * aplikasi tak pernah butuh dua database sekaligus saat berjalan normal.
+         */
+        'neon' => [
+            'driver' => 'pgsql',
+            'url' => env('NEON_URL'),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'require',
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

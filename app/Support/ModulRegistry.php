@@ -122,6 +122,11 @@ final class ModulRegistry
         ['kode' => 'pembayaran-kesantrian', 'nama' => 'Pembayaran SPP & Tagihan Lain', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
         ['kode' => 'dompet', 'nama' => 'Dompet & Tabungan Santri', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
         ['kode' => 'tagihan-lain', 'nama' => 'Tagihan Lain-lain (seragam, kegiatan, denda)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
+        // TANPA MENU: dijalankan dari halaman santri, bukan layar tersendiri.
+        // Wewenangnya sengaja terpisah dari modul tagihan mana pun — ia mengubah
+        // PIUTANG YANG SUDAH DIBUKUKAN, jadi tak boleh ikut hak `ubah` biasa.
+        // Diberikan hanya kepada kepala keuangan lewat matriks hak akses.
+        ['kode' => 'koreksi-tagihan', 'nama' => 'Koreksi Nominal Tagihan', 'grup' => 'TANPA MENU'],
         // 'ubah' = boleh mengoreksi nominal tagihan yang salah ketik. Dipisahkan
         // dari modul `spp` (yang menerbitkan): memeriksa tunggakan adalah pekerjaan
         // harian, menerbitkan tagihan tidak.
