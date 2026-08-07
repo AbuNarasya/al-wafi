@@ -664,6 +664,22 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{id}', 'batalkan')->name('batalkan')->middleware('hakakses:tagihan-lain,hapus')->whereNumber('id');
     });
 
+    // Keluarga B — matriks tarif per jenjang & daftar peserta kegiatan.
+    // Hak aksesnya menumpang modul `tagihan-lain`: memisahkannya hanya melahirkan
+    // keadaan aneh — boleh menerbitkan tagihan tapi tak boleh melihat tarif yang
+    // menentukan nominalnya.
+    Route::prefix('kesantrian/tagihan-lain')->name('tagihan_lain.')->controller(\App\Http\Controllers\KepesertaanLainController::class)->group(function () {
+        Route::get('/tarif', 'tarif')->name('tarif')->middleware('hakakses:tagihan-lain,lihat');
+        Route::put('/tarif', 'simpanTarif')->name('tarif.simpan')->middleware('hakakses:tagihan-lain,ubah');
+
+        Route::get('/peserta', 'peserta')->name('peserta')->middleware('hakakses:tagihan-lain,lihat');
+        Route::post('/peserta', 'tambahPeserta')->name('peserta.tambah')->middleware('hakakses:tagihan-lain,ubah');
+        Route::put('/peserta/{id}', 'ubahPeserta')->name('peserta.ubah')->middleware('hakakses:tagihan-lain,ubah')->whereNumber('id');
+        Route::put('/peserta/{id}/status', 'statusPeserta')->name('peserta.status')->middleware('hakakses:tagihan-lain,ubah')->whereNumber('id');
+
+        Route::post('/peserta/terbitkan', 'terbitkan')->name('peserta.terbitkan')->middleware('hakakses:tagihan-lain,buat');
+    });
+
     // Dompet & Tabungan Santri (wadi'ah).
     Route::prefix('kesantrian/dompet')->name('dompet.')->controller(\App\Http\Controllers\DompetController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:dompet,lihat');

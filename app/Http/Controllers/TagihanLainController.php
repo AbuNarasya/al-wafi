@@ -88,43 +88,7 @@ class TagihanLainController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('tagihan_lain.index')->with('status', $this->ringkasanTerbit($hasil));
-    }
-
-    /**
-     * Susun hasil penerbitan jadi satu kalimat.
-     *
-     * Service sudah menghitung semuanya sejak dulu — berapa terbit, berapa
-     * dilewati beserta namanya, totalnya, dan nomor jurnalnya — lalu seluruhnya
-     * dibuang dan diganti "Tagihan lain berhasil diterbitkan". Petugas jadi tak
-     * pernah tahu ada santri yang tak kebagian tagihan sampai ada yang menagih.
-     *
-     * @param  array<string,mixed>  $hasil
-     */
-    private function ringkasanTerbit(array $hasil): string
-    {
-        $rupiah = 'Rp '.number_format((float) $hasil['total'], 0, ',', '.');
-        $pesan = "{$hasil['terbit']} tagihan terbit — total {$rupiah}.";
-
-        if ($hasil['akrual'] && $hasil['referensi']) {
-            $pesan .= " Jurnal akrual {$hasil['referensi']}.";
-        }
-
-        if ($hasil['dilewati'] > 0) {
-            // Daftar nama dipenggal: satu kali terbit bisa melewati puluhan
-            // santri, dan pesan sepanjang layar tak lagi terbaca siapa pun.
-            $nama = $hasil['dilewati_nama'];
-            $tampil = array_slice($nama, 0, 8);
-            $sisa = count($nama) - count($tampil);
-            $daftar = implode(', ', $tampil).($sisa > 0 ? " dan {$sisa} lainnya" : '');
-            $pesan .= " {$hasil['dilewati']} dilewati karena sudah punya tagihan ini: {$daftar}.";
-        }
-
-        if ($hasil['tidak_aktif'] > 0) {
-            $pesan .= " {$hasil['tidak_aktif']} dilewati karena sudah tidak berstatus aktif.";
-        }
-
-        return $pesan;
+        return redirect()->route('tagihan_lain.index')->with('status', $this->service->ringkasanTerbit($hasil));
     }
 
     public function batalkan(string $id): RedirectResponse

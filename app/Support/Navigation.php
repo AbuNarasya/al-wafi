@@ -174,6 +174,11 @@ final class Navigation
         // Sampai sekarang modul ini SAMA SEKALI tak punya item sidebar — satu-
         // satunya jalan masuk adalah mengetik URL-nya. Grupnya sendiri sekaligus
         // menutup lubang itu.
+        // Matriks tarif mendahului peserta: santri hanya bisa didaftarkan pada
+        // jenjang yang selnya sudah terisi, jadi urutan menunya mengikuti urutan
+        // kerjanya.
+        ['url' => '/kesantrian/tagihan-lain/tarif', 'label' => 'Matriks Tarif Kegiatan', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Setting Tagihan Lain Lain', 'modul' => 'tagihan-lain'],
+        ['url' => '/kesantrian/tagihan-lain/peserta', 'label' => 'Peserta Kegiatan', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Setting Tagihan Lain Lain', 'modul' => 'tagihan-lain'],
         ['url' => '/kesantrian/tagihan-lain', 'label' => 'Daftar & Terbitkan', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi', 'modul' => 'tagihan-lain'],
 
         // ---- 6. Sistem ----
