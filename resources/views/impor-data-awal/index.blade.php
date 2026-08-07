@@ -171,5 +171,66 @@
                 <p class="mt-2 text-xs text-gray-400"><span class="text-red-500">*</span> wajib diisi. Urutan kolom bebas; yang dicocokkan namanya.</p>
             </div>
         </div>
+
+        {{-- RIWAYAT IMPOR — dan jalan keluar bila berkasnya ternyata keliru.
+             Selama belum ada yang menempel, seluruh barisnya bisa dibuang
+             sekaligus; sesudah itu alasannya disebutkan apa adanya, supaya
+             petugas tahu apa yang menghalangi, bukan sekadar tak bisa. --}}
+        @if ($batch)
+            <div class="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700">Riwayat Impor</div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                            <tr>
+                                <th class="px-4 py-2">Waktu</th>
+                                <th class="px-4 py-2">Berkas</th>
+                                <th class="px-4 py-2">Hasil</th>
+                                <th class="px-4 py-2">Oleh</th>
+                                <th class="px-4 py-2 text-right">Tindakan</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach ($batch as $b)
+                                @php $r = $b['rec']; @endphp
+                                <tr class="{{ $r->aktif() ? '' : 'bg-gray-50 text-gray-400' }}">
+                                    <td class="whitespace-nowrap px-4 py-2">{{ $r->dijalankan_pada->format('d M Y H:i') }}</td>
+                                    <td class="px-4 py-2 font-mono text-xs">{{ $r->nama_berkas ?? '—' }}</td>
+                                    <td class="px-4 py-2 text-xs">
+                                        @foreach ($r->ringkasan ?? [] as $k => $n)
+                                            <span class="mr-2">{{ $k }}: <b>{{ number_format($n, 0, ',', '.') }}</b></span>
+                                        @endforeach
+                                    </td>
+                                    <td class="px-4 py-2 text-xs">{{ $r->pelaksana?->nama ?? '—' }}</td>
+                                    <td class="px-4 py-2 text-right">
+                                        @if (! $r->aktif())
+                                            <span class="text-xs">Dibatalkan {{ $r->dibatalkan_pada->format('d M Y') }} — {{ $r->alasan_batal }}</span>
+                                        @elseif ($b['halangan'])
+                                            <span class="text-xs text-gray-500" title="{{ implode(' ', $b['halangan']) }}">
+                                                Tak bisa dibatalkan: {{ $b['halangan'][0] }}
+                                            </span>
+                                        @elseif (\App\Support\Akses::boleh('impor-data-awal', 'hapus'))
+                                            <div x-data="{ open: false }" class="relative inline-block">
+                                                <button @click="open = ! open"
+                                                        class="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Batalkan Impor</button>
+                                                <form x-show="open" x-cloak @click.outside="open = false" method="POST"
+                                                      action="{{ route('impor_data_awal.batalkan_batch', $r->id) }}"
+                                                      class="absolute right-0 z-10 mt-1 w-72 space-y-2 rounded-lg border border-gray-200 bg-white p-3 text-left shadow-lg">
+                                                    @csrf @method('DELETE')
+                                                    <p class="text-xs text-gray-600">Seluruh baris impor ini dihapus. Wali yang sudah ada sebelumnya tidak ikut terhapus.</p>
+                                                    <input type="text" name="alasan" required maxlength="255" placeholder="Alasan pembatalan"
+                                                           class="w-full rounded border-gray-300 text-xs">
+                                                    <button class="w-full rounded bg-red-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-red-700">Konfirmasi Batalkan</button>
+                                                </form>
+                                            </div>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
     </div>
 @endsection

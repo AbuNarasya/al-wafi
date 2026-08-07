@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
+use App\Models\ImporBatch;
 use App\Services\Impor\ImporSaldoAwal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -92,6 +93,7 @@ class ImporDataAwalController extends Controller
                 $data['jenis'],
                 Storage::path($data['berkas_path']),
                 $this->paramDari($request, $data['jenis']),
+                $request->user()->id_pengguna,
             );
         } catch (AppException $e) {
             return redirect()->route('impor_data_awal.index', ['jenis' => $data['jenis']])->with('error', $e->getMessage());
@@ -123,6 +125,26 @@ class ImporDataAwalController extends Controller
     }
 
     /** @return array<string,mixed> */
+    /**
+     * Batalkan seluruh baris sebuah impor.
+     *
+     * Menghapus ratusan baris sekaligus, jadi alasannya wajib — ia yang menjawab
+     * "kenapa data ini hilang?" berbulan-bulan kemudian.
+     */
+    public function batalkanBatch(Request $request, int $id): RedirectResponse
+    {
+        $data = $request->validate(['alasan' => ['required', 'string', 'max:255']]);
+
+        try {
+            $batch = $this->impor->batalkanBatch($id, $data['alasan'], $request->user()->id_pengguna);
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('impor_data_awal.index', ['jenis' => $batch->kunci])
+            ->with('status', "Impor {$batch->nama_berkas} dibatalkan beserta seluruh barisnya.");
+    }
+
     private function data(?string $jenis): array
     {
         $daftar = ImporSaldoAwal::daftar();
@@ -140,6 +162,13 @@ class ImporDataAwalController extends Controller
             'berkasPath' => null,
             'namaBerkas' => null,
             'param' => [],
+            // Riwayat impor jenis ini, beserta alasan yang menghalangi
+            // pembatalannya — dihitung sekali di sini supaya layar tak perlu
+            // memanggil service per baris.
+            'batch' => ImporBatch::where('kunci', $jenis)->with('pelaksana')
+                ->orderByDesc('id')->limit(20)->get()
+                ->map(fn ($b) => ['rec' => $b, 'halangan' => $this->impor->halanganBatalBatch($b)])
+                ->all(),
         ];
     }
 }

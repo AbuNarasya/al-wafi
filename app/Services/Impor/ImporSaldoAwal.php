@@ -3,6 +3,19 @@
 namespace App\Services\Impor;
 
 use App\Exceptions\AppException;
+use App\Models\DokumenSantri;
+use App\Models\DompetSantri;
+use App\Models\ImporBatch;
+use App\Models\MutasiDompet;
+use App\Models\NisSantri;
+use App\Models\PembayaranSantri;
+use App\Models\PrabayarSpp;
+use App\Models\RencanaAngsuranUangPangkal;
+use App\Models\RiwayatTingkat;
+use App\Models\Santri;
+use App\Models\TabunganSantri;
+use App\Models\TagihanSantri;
+use App\Models\Wali;
 use App\Services\Impor\Pemeta\PemetaAccruePrepaid;
 use App\Services\Impor\Pemeta\PemetaAsetTetap;
 use App\Services\Impor\Pemeta\PemetaInvoiceVendor;
@@ -209,7 +222,7 @@ class ImporSaldoAwal
      * @param  array<string,string>  $param
      * @return array{tersimpan:array<string,int>,siap:int,lewati:int,masalah:int}
      */
-    public function jalankan(string $kunci, string $path, array $param = []): array
+    public function jalankan(string $kunci, string $path, array $param = [], ?int $idPengguna = null): array
     {
         $pemeta = self::pemeta($kunci);
         if ($salah = $pemeta->periksaParameter($param)) {
@@ -237,9 +250,158 @@ class ImporSaldoAwal
             throw new AppException(422, 'Tidak ada baris yang siap diimpor.');
         }
 
-        $tersimpan = DB::transaction(fn () => $pemeta->simpan($siap, $param));
+        /*
+         * BATCH: satu nomor untuk seluruh baris yang lahir dari sekali impor.
+         *
+         * Dibuat DI DALAM transaksi bersama barisnya — kalau simpan() gagal di
+         * tengah, catatan batchnya ikut hilang, dan tak ada nomor yatim yang
+         * menunjuk baris yang tak pernah ada.
+         *
+         * Nomornya dititipkan lewat $param supaya kontrak Pemeta::simpan() tak
+         * perlu berubah. Pemeta yang belum mendukung pembatalan tinggal
+         * mengabaikannya — barisnya tetap tersimpan, hanya tak bisa dibatalkan
+         * sekaligus.
+         */
+        [$batch, $tersimpan] = DB::transaction(function () use ($pemeta, $siap, $param, $kunci, $path, $idPengguna) {
+            $batch = ImporBatch::create([
+                'kunci' => $kunci,
+                'nama_berkas' => basename($path),
+                'dijalankan_oleh' => $idPengguna,
+                'dijalankan_pada' => now(),
+            ]);
 
-        return ['tersimpan' => $tersimpan, 'siap' => count($siap), 'lewati' => $lewati, 'masalah' => $masalah];
+            $hasil = $pemeta->simpan($siap, $param + ['id_batch' => $batch->id]);
+            $batch->update(['ringkasan' => $hasil]);
+
+            return [$batch, $hasil];
+        });
+
+        return [
+            'tersimpan' => $tersimpan, 'siap' => count($siap),
+            'lewati' => $lewati, 'masalah' => $masalah,
+            'id_batch' => $batch->id,
+        ];
+    }
+
+    /**
+     * Alasan sebuah batch TIDAK bisa dibatalkan lagi.
+     *
+     * Membatalkan impor hanya sah selama belum ada apa pun yang menempel pada
+     * barisnya. Begitu ada pembayaran, mutasi dompet, atau jadwal angsuran,
+     * menghapus santrinya berarti membuang catatan uang yang benar-benar
+     * terjadi — dan itu bukan pembatalan, itu kehilangan.
+     *
+     * Mengembalikan DAFTAR, bukan melempar pada temuan pertama: petugas berhak
+     * melihat SEMUA yang menghalangi sekaligus, bukan menyingkirkannya satu per
+     * satu lalu mencoba lagi.
+     *
+     * @return list<string>
+     */
+    public function halanganBatalBatch(ImporBatch $batch): array
+    {
+        if (! $batch->aktif()) {
+            return ['Batch ini sudah dibatalkan pada '.$batch->dibatalkan_pada->format('d M Y H:i').'.'];
+        }
+
+        $idSantri = Santri::where('id_batch', $batch->id)->pluck('id');
+        if ($idSantri->isEmpty()) {
+            return ['Tidak ada baris yang bisa dibatalkan dari batch ini.'];
+        }
+
+        $idTagihan = TagihanSantri::whereIn('id_santri', $idSantri)->pluck('id');
+        $halangan = [];
+
+        if (($n = PembayaranSantri::whereIn('id_tagihan', $idTagihan)->count()) > 0) {
+            $halangan[] = "Sudah ada {$n} pembayaran atas tagihan santri batch ini.";
+        }
+
+        // Status yang bukan lagi `aktif` berarti santrinya sudah diproses lebih
+        // jauh — naik tingkat, mengundurkan diri, atau lulus.
+        $diproses = Santri::whereIn('id', $idSantri)->where('status', '!=', 'aktif')->count();
+        if ($diproses > 0) {
+            $halangan[] = "{$diproses} santri sudah berpindah status dari \"aktif\".";
+        }
+
+        // Rencana angsuran menggantung pada TAGIHAN, bukan langsung pada santri.
+        if (($n = RencanaAngsuranUangPangkal::whereIn('id_tagihan', $idTagihan)->count()) > 0) {
+            $halangan[] = "Sudah ada {$n} rencana angsuran uang pangkal.";
+        }
+
+        if (($n = PrabayarSpp::whereIn('id_santri', $idSantri)->count()) > 0) {
+            $halangan[] = "Sudah ada {$n} pembayaran SPP di muka.";
+        }
+
+        $idDompet = DompetSantri::whereIn('id_santri', $idSantri)->pluck('id');
+        if ($idDompet->isNotEmpty()
+            && ($n = MutasiDompet::where('pemilik', 'santri')->whereIn('id_dompet', $idDompet)->count()) > 0) {
+            $halangan[] = "Sudah ada {$n} mutasi dompet santri.";
+        }
+
+        // Tagihan yang TIDAK bertanda batch ini = diterbitkan petugas kemudian.
+        // Membuangnya bersama batch akan menghapus pekerjaan yang tak ada
+        // hubungannya dengan berkas yang keliru.
+        //
+        // Dibedakan lewat PENANDA, bukan perbandingan waktu: catatan batch dibuat
+        // sebelum barisnya disimpan, jadi tagihan dari impor itu sendiri selalu
+        // bertanggal sesudahnya — dan penjagaan berbasis waktu menolak impor
+        // membatalkan dirinya sendiri.
+        $tambahan = TagihanSantri::whereIn('id_santri', $idSantri)
+            ->where(fn ($q) => $q->whereNull('id_batch')->orWhere('id_batch', '!=', $batch->id))
+            ->count();
+        if ($tambahan > 0) {
+            $halangan[] = "Ada {$tambahan} tagihan yang diterbitkan di luar impor ini.";
+        }
+
+        return $halangan;
+    }
+
+    /**
+     * Batalkan seluruh baris sebuah batch impor.
+     *
+     * Yang dibuang: tagihan, riwayat NIS, riwayat tingkat, dompet & tabungan
+     * yang masih kosong, santrinya sendiri, dan wali yang LAHIR dari impor ini
+     * lagi tak menaungi siapa pun. Wali yang sudah ada sebelumnya tak disentuh.
+     */
+    public function batalkanBatch(int $idBatch, string $alasan, ?int $idPengguna = null): ImporBatch
+    {
+        $batch = ImporBatch::find($idBatch);
+        if (! $batch) {
+            throw new AppException(404, 'Batch impor tidak ditemukan.');
+        }
+        if (trim($alasan) === '') {
+            throw new AppException(422, 'Alasan pembatalan wajib diisi.');
+        }
+
+        $halangan = $this->halanganBatalBatch($batch);
+        if ($halangan !== []) {
+            throw new AppException(422, 'Batch ini tidak bisa dibatalkan lagi. '.implode(' ', $halangan));
+        }
+
+        return DB::transaction(function () use ($batch, $alasan, $idPengguna) {
+            $idSantri = Santri::where('id_batch', $batch->id)->pluck('id');
+
+            TagihanSantri::whereIn('id_santri', $idSantri)->delete();
+            NisSantri::whereIn('id_santri', $idSantri)->delete();
+            RiwayatTingkat::whereIn('id_santri', $idSantri)->delete();
+            DokumenSantri::whereIn('id_santri', $idSantri)->delete();
+            DompetSantri::whereIn('id_santri', $idSantri)->delete();
+            TabunganSantri::whereIn('id_santri', $idSantri)->delete();
+            Santri::whereIn('id', $idSantri)->delete();
+
+            // Wali dari batch ini yang kini tak menaungi santri mana pun. Yang
+            // masih punya anak (mis. kakaknya dari angkatan lain) dibiarkan.
+            Wali::where('id_batch', $batch->id)
+                ->whereNotExists(fn ($q) => $q->selectRaw(1)->from('santri')->whereColumn('santri.id_wali', 'wali.id'))
+                ->delete();
+
+            $batch->update([
+                'dibatalkan_pada' => now(),
+                'dibatalkan_oleh' => $idPengguna,
+                'alasan_batal' => $alasan,
+            ]);
+
+            return $batch->refresh();
+        });
     }
 
     /** Isi CSV template: baris judul + satu baris contoh. */

@@ -355,6 +355,11 @@ class PemetaSantriLama implements Pemeta
                     'nama' => $nama,
                     'telepon' => $telepon,
                     'status' => 'aktif',
+                    // HANYA wali yang benar-benar LAHIR dari impor ini yang
+                    // ditandai. Wali yang teleponnya sudah dikenal dipakai apa
+                    // adanya dan tak boleh ikut terhapus saat batch dibatalkan —
+                    // ia bisa saja menaungi anak dari angkatan sebelumnya.
+                    'id_batch' => $param['id_batch'] ?? null,
                 ]);
                 $dibuat['wali']++;
             }
@@ -382,6 +387,10 @@ class PemetaSantriLama implements Pemeta
                 'gelombang' => null,
                 'status' => 'aktif',
                 'id_wali' => $wali->id,
+                // Jangkar pembatalan batch: tagihan, riwayat tingkat, dan
+                // riwayat NIS semuanya menggantung di sini lewat `id_santri`,
+                // jadi hanya kolom ini yang perlu penanda.
+                'id_batch' => $param['id_batch'] ?? null,
             ]);
             $dibuat['santri']++;
 
@@ -414,6 +423,10 @@ class PemetaSantriLama implements Pemeta
                 $kodeJenis = trim($param["jenis_tunggakan_{$k}"]);
                 TagihanSantri::create([
                     'id_santri' => $santri->id,
+                    // Penanda batch — ini yang membedakan tunggakan hasil impor
+                    // dari tagihan yang diterbitkan petugas kemudian. Tanpa itu
+                    // pembatalan batch tak punya cara pasti membedakan keduanya.
+                    'id_batch' => $param['id_batch'] ?? null,
                     'kode_jenis' => $kodeJenis,
                     // Perilaku disalin dari jenis biayanya supaya tunggakan uang
                     // pangkal warisan tetap dikenali modul yang membacanya.
