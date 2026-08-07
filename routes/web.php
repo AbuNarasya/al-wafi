@@ -210,6 +210,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/template/{jenis}', [$i, 'template'])->name('template')->middleware('hakakses:impor-data-awal,lihat');
         Route::post('/pratinjau', [$i, 'pratinjau'])->name('pratinjau')->middleware('hakakses:impor-data-awal,buat');
         Route::post('/jalankan', [$i, 'jalankan'])->name('jalankan')->middleware('hakakses:impor-data-awal,buat');
+        // Membatalkan impor MENGHAPUS ratusan baris sekaligus — haknya `hapus`,
+        // bukan `buat` seperti menjalankan impornya.
+        Route::delete('/batch/{id}', [$i, 'batalkanBatch'])->name('batalkan_batch')
+            ->middleware('hakakses:impor-data-awal,hapus')->whereNumber('id');
     });
 
     // ---- Anggaran (Input & Realisasi) ----
@@ -332,8 +336,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/otorisasi', [$p, 'otorisasi'])->name('otorisasi')->middleware('hakakses:otorisasi-pembayaran,ubah')->whereNumber('id');
         Route::post('/{id}/tolak', [$p, 'tolak'])->name('tolak')->middleware('hakakses:otorisasi-pembayaran,ubah')->whereNumber('id');
         // Penutupan membatalkan pembayaran yang sudah DIOTORISASI pejabat, jadi
-        // haknya sama dengan otorisasi — bukan hak admin biasa.
-        Route::post('/{id}/tutup', [$p, 'tutup'])->name('tutup')->middleware('hakakses:otorisasi-pembayaran,ubah')->whereNumber('id');
+        // haknya tak boleh sembarangan — TAPI juga tak boleh menumpuk di satu
+        // orang. Yang berhak: pejabat pengotorisasi ATAU staf keuangan yang
+        // mengeksekusi pembayaran (hak Kas Keluar), karena dialah yang tahu
+        // kapan sebuah perintah sudah tuntas dijalankan. `hakakses` hanya tahu
+        // satu modul per rute, jadi pilihannya ditegakkan di controller.
+        Route::post('/{id}/tutup', [$p, 'tutup'])->name('tutup')->middleware('hakakses:perintah-pembayaran,lihat')->whereNumber('id');
     });
 
     Route::prefix('pengaturan/dana-bebas')->name('pengaturan_dana_bebas.')->group(function () {
@@ -589,6 +597,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/santri/{id}/edit', 'edit')->name('santri.edit')->middleware('hakakses:santri,ubah')->whereNumber('id');
         Route::put('/santri/{id}', 'update')->name('santri.update')->middleware('hakakses:santri,ubah')->whereNumber('id');
         Route::post('/santri/{id}/aksi/{aksi}', 'aksi')->name('santri.aksi')->middleware('hakakses:santri,ubah')->whereNumber('id');
+        // Koreksi nominal tagihan — hak TERPISAH dari `santri,ubah`. Ia mengubah
+        // piutang yang sudah dibukukan dan menerbitkan jurnal penyesuaian, jadi
+        // wewenangnya milik kepala keuangan, bukan siapa pun yang boleh
+        // menyunting data santri.
+        Route::post('/tagihan/{id}/koreksi', [\App\Http\Controllers\KoreksiTagihanController::class, 'koreksi'])
+            ->name('tagihan.koreksi')->middleware('hakakses:koreksi-tagihan,ubah')->whereNumber('id');
     });
 
     // Pendaftaran lanjutan (kenaikan jenjang internal lewat proses PPSB) —

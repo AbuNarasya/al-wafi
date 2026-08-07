@@ -41,6 +41,27 @@
             <p class="mt-2 text-xs text-gray-500">
                 Yang menetapkan tanggal &amp; metode pembayaran adalah pejabat saat mengotorisasi. Isian di sini hanya usulan.
             </p>
+
+            {{-- DUA ANGKA, bukan satu. "Saldo tersedia" adalah uang yang benar-benar
+                 ada di kas & bank; "bisa dipakai" adalah sisa setelah titipan milik
+                 orang lain dan perintah lain yang sudah diotorisasi dikeluarkan.
+                 Menampilkan yang pertama saja membuat penyusun mengira uangnya
+                 banyak; menampilkan yang kedua saja membuat angkanya tampak salah
+                 dibanding buku bank. --}}
+            <div class="mt-4 grid gap-3 border-t border-gray-200 pt-4 sm:grid-cols-3">
+                <div>
+                    <div class="text-xs text-gray-400">Saldo tersedia (kas &amp; bank)</div>
+                    <div class="tabular-nums font-semibold text-gray-900">@rp($dana['saldo_kas'])</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-400">Dikurangi titipan &amp; komitmen</div>
+                    <div class="tabular-nums text-gray-600">@rp(\App\Support\Money::add($dana['pengurang'], $dana['komitmen']))</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-400">Saldo yang bisa digunakan</div>
+                    <div class="tabular-nums text-lg font-bold text-brand">@rp($dana['dana_bebas'])</div>
+                </div>
+            </div>
         </div>
 
         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -113,7 +134,7 @@
                 <span class="text-sm"><b x-text="jumlahDipilih"></b> kewajiban dipilih · total
                     <b class="tabular-nums" x-text="rp(total)"></b></span>
                 <span x-show="total > danaBebas" x-cloak class="text-xs font-medium text-red-700">
-                    Melebihi dana yang bisa dipakai (<span x-text="rp(danaBebas)"></span>) — pejabat tak akan bisa mengotorisasinya.
+                    Melebihi dana yang bisa dipakai (<span x-text="rp(danaBebas)"></span>) — perintahnya tak akan bisa diajukan.
                 </span>
                 <div class="ml-auto flex gap-2">
                     <a href="{{ route('perintah_pembayaran.index') }}" class="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">Batal</a>

@@ -172,6 +172,26 @@ class PerintahPembayaranService
             throw new AppException(422, 'Tidak ada kewajiban yang diajukan.');
         }
 
+        /*
+         * Dana bebas diperiksa DI SINI JUGA, bukan hanya saat otorisasi.
+         *
+         * Penyusun berhak tahu sebelum dokumennya beredar: perintah yang sudah
+         * telanjur diajukan menyita perhatian pejabat, lalu ditolak karena
+         * alasan yang sebetulnya sudah bisa dilihat sejak awal.
+         *
+         * TIDAK menggantikan pemeriksaan di otorisasi. Dana bebas BERGERAK —
+         * perintah lain bisa diotorisasi di antara pengajuan dan otorisasi,
+         * sehingga yang tadinya cukup jadi kurang. Yang di sini menyaring lebih
+         * awal; yang di sana yang menjaga uangnya.
+         */
+        $total = $pp->detail()->get()->reduce(fn ($t, $d) => Money::add($t, $d->nominal_diajukan), '0');
+        $bebas = (new DanaBebasService)->danaBebasKecuali((int) $pp->kode_transaksi);
+        if (Money::gt($total, $bebas)) {
+            throw new AppException(422, "Total yang diajukan {$total} melebihi dana yang bisa dipakai ({$bebas}). "
+                .'Saldo kas dikurangi titipan dan perintah lain yang sudah diotorisasi tetapi belum dibayar. '
+                .'Kurangi nominalnya, atau tunggu perintah lain selesai dibayar.');
+        }
+
         $pp->update(['status' => 'menunggu']);
 
         return $pp->refresh();

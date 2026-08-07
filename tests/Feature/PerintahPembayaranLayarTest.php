@@ -312,7 +312,11 @@ class PerintahPembayaranLayarTest extends TestCase
         $this->assertSame('batal', $pp->detail()->sole()->status_baris);
     }
 
-    public function test_penutupan_butuh_hak_otorisasi(): void
+    /**
+     * Menyusun perintah saja tidak cukup untuk menutupnya. Penyusun di sini
+     * hanya berhak `perintah-pembayaran` — bukan otorisasi, bukan Kas Keluar.
+     */
+    public function test_penutupan_ditolak_bagi_yang_hanya_menyusun(): void
     {
         $pp = $this->buatLewatLayar($this->invoice('INV-0001', '5000000'), '5000000');
         $this->actingAs($this->penyusun)->post(route('perintah_pembayaran.ajukan', $pp->kode_transaksi));
@@ -320,6 +324,36 @@ class PerintahPembayaranLayarTest extends TestCase
         $this->actingAs($this->penyusun)
             ->post(route('perintah_pembayaran.tutup', $pp->kode_transaksi), ['alasan' => 'x'])
             ->assertForbidden();
+    }
+
+    /**
+     * STAF KEUANGAN YANG MENGEKSEKUSI pembayaran juga berhak menutup, walau tak
+     * berhak mengotorisasi.
+     *
+     * Menutup tidak mengeluarkan uang sepeser pun — ia justru MENGHENTIKAN sisa
+     * pembayaran. Menahannya di satu pejabat membuat perintah yang sudah lunas
+     * menggantung menunggu tanda tangan yang tak menambah pengamanan apa pun,
+     * dan komitmennya terus memakan dana bebas selama itu.
+     */
+    public function test_staf_kas_keluar_boleh_menutup_tanpa_hak_otorisasi(): void
+    {
+        $kasir = User::create(['username' => 'kasir', 'nama' => 'Staf Kas', 'password_hash' => 'x',
+            'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif']);
+        $this->beriHak($kasir, 'perintah-pembayaran');
+        $this->beriHak($kasir, 'cash-out');
+
+        $pp = $this->buatLewatLayar($this->invoice('INV-0001', '5000000'), '5000000');
+        $this->actingAs($this->penyusun)->post(route('perintah_pembayaran.ajukan', $pp->kode_transaksi));
+        (new PerintahPembayaranService)->otorisasi($pp->kode_transaksi, [
+            'tanggal_bayar' => '2026-08-10', 'metode' => 'transfer',
+            'baris' => [$pp->detail()->value('id') => '5000000'],
+        ], $this->pejabat->id_pengguna);
+
+        $this->actingAs($kasir)
+            ->post(route('perintah_pembayaran.tutup', $pp->kode_transaksi), ['alasan' => 'Vendor batal mengirim'])
+            ->assertRedirect();
+
+        $this->assertSame('selesai', $pp->refresh()->status);
     }
 
     // ---- Cetak ----

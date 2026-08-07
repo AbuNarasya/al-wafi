@@ -309,8 +309,13 @@ class PerintahPembayaranTest extends TestCase
     /**
      * Kas berlimpah tapi sebagian besar milik orang lain. Inilah keadaan yang
      * paling mudah menipu: saldo 130jt, yang boleh dipakai hanya 30jt.
+     *
+     * Penolakannya kini jatuh di PENGAJUAN, bukan otorisasi — perintah sebesar
+     * ini tak pernah sampai ke meja pejabat. Guguran di otorisasi tetap dijaga
+     * oleh test komitmen di bawah, yaitu keadaan yang memang hanya bisa muncul
+     * di sana: dana bebas menyusut SESUDAH perintahnya diajukan.
      */
-    public function test_otorisasi_ditolak_bila_melebihi_dana_bebas(): void
+    public function test_pengajuan_ditolak_bila_melebihi_dana_bebas(): void
     {
         $this->setorKas('100000000', self::TITIPAN);
         AkunPengurangDanaBebas::create(['kode_coa' => self::TITIPAN]);
@@ -320,14 +325,10 @@ class PerintahPembayaranTest extends TestCase
         $this->assertSame(30000000.0, (float) $svc->danaBebas(), 'tapi hanya 30jt yang boleh dibelanjakan');
 
         $pp = $this->buatPp($this->invoice('INV-0001', '35000000'), '35000000');
-        $this->svc()->ajukan($pp->kode_transaksi, $this->penyusun->id_pengguna);
-        $id = $pp->detail()->value('id');
 
         $this->expectException(AppException::class);
         $this->expectExceptionMessage('melebihi dana yang bisa dipakai');
-        $this->svc()->otorisasi($pp->kode_transaksi, [
-            'tanggal_bayar' => '2026-08-10', 'metode' => 'transfer', 'baris' => [$id => '35000000'],
-        ], $this->pejabat->id_pengguna);
+        $this->svc()->ajukan($pp->kode_transaksi, $this->penyusun->id_pengguna);
     }
 
     /**
@@ -336,11 +337,18 @@ class PerintahPembayaranTest extends TestCase
      */
     public function test_pp_kedua_terhalang_komitmen_pp_pertama(): void
     {
-        // Dana bebas 30jt; PP pertama mengunci 25jt.
-        $this->otorisasiPenuh($this->buatPp($this->invoice('INV-0001', '25000000'), '25000000'));
+        $pertama = $this->buatPp($this->invoice('INV-0001', '25000000'), '25000000');
 
+        // PP kedua DIAJUKAN SELAGI dana bebas masih utuh 30jt — kalau tidak, ia
+        // sudah tersaring di pengajuan dan komitmen PP pertama tak pernah
+        // teruji. Inilah keadaan yang sesungguhnya dijaga di sini: dana bebas
+        // BERGERAK di antara pengajuan dan otorisasi.
         $kedua = $this->buatPp($this->invoice('INV-0002', '10000000'), '10000000');
         $this->svc()->ajukan($kedua->kode_transaksi, $this->penyusun->id_pengguna);
+
+        // Baru sekarang PP pertama mengunci 25jt; sisa bebas tinggal 5jt.
+        $this->otorisasiPenuh($pertama);
+
         $id = $kedua->detail()->value('id');
 
         $this->expectException(AppException::class);
@@ -348,6 +356,29 @@ class PerintahPembayaranTest extends TestCase
         $this->svc()->otorisasi($kedua->kode_transaksi, [
             'tanggal_bayar' => '2026-08-11', 'metode' => 'transfer', 'baris' => [$id => '10000000'],
         ], $this->pejabat->id_pengguna);
+    }
+
+    /**
+     * Dana bebas dijaga SEJAK PENGAJUAN, bukan hanya saat otorisasi.
+     *
+     * Tanpa ini, perintah yang jelas-jelas tak terbayar tetap beredar sampai
+     * meja pejabat, lalu ditolak karena alasan yang sudah bisa dilihat sejak
+     * penyusunnya menekan simpan.
+     */
+    public function test_pp_tak_bisa_diajukan_bila_melebihi_dana_bebas(): void
+    {
+        // Dana bebas 30jt; perintah ini 40jt.
+        $pp = $this->buatPp($this->invoice('INV-0009', '40000000'), '40000000');
+
+        try {
+            $this->svc()->ajukan($pp->kode_transaksi, $this->penyusun->id_pengguna);
+            $this->fail('Pengajuan yang melebihi dana bebas seharusnya ditolak.');
+        } catch (AppException $e) {
+            $this->assertStringContainsString('melebihi dana yang bisa dipakai', $e->getMessage());
+        }
+
+        // Dan dokumennya TETAP draf — bukan menggantung di "menunggu".
+        $this->assertSame('draf', $pp->refresh()->status);
     }
 
     // ---- Penolakan & penutupan ----

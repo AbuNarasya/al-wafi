@@ -233,10 +233,17 @@
         @endif
     </div>
 
-    {{-- Tolak & tutup --}}
-    @if (\App\Support\Akses::boleh('otorisasi-pembayaran', 'ubah'))
+    {{-- Tolak & tutup — HAKNYA BERBEDA.
+         Menolak menggagalkan perintah sebelum uangnya bergerak: itu keputusan
+         pejabat. Menutup hanya menyatakan yang sudah berjalan itu tuntas, dan
+         staf keuangan yang mengeksekusi pembayaranlah yang paling tahu kapan. --}}
+    @php
+        $bolehTutup = \App\Support\Akses::boleh('otorisasi-pembayaran', 'ubah')
+            || \App\Support\Akses::boleh('cash-out', 'buat');
+    @endphp
+    @if ($bolehTutup)
         <div class="flex flex-wrap gap-3">
-            @if ($pp->status === 'menunggu' && $bolehOtorisasi)
+            @if ($pp->status === 'menunggu' && $bolehOtorisasi && \App\Support\Akses::boleh('otorisasi-pembayaran', 'ubah'))
                 <form method="POST" action="{{ route('perintah_pembayaran.tolak', $pp->kode_transaksi) }}"
                       class="flex items-center gap-2 rounded-xl border border-red-200 bg-white p-3 shadow-sm">
                     @csrf
@@ -246,7 +253,7 @@
                 </form>
             @endif
 
-            @if ($siapDitutup)
+            @if ($siapDitutup && $bolehTutup)
                 <form method="POST" action="{{ route('perintah_pembayaran.tutup', $pp->kode_transaksi) }}"
                       class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
                       onsubmit="return confirm('Nyatakan perintah ini selesai? Kewajiban yang belum dibayar akan dibatalkan dari perintah ini.')">

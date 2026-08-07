@@ -8,6 +8,7 @@ use App\Models\PerintahPembayaran;
 use App\Services\Ledger\DocNumber;
 use App\Services\Modules\DanaBebasService;
 use App\Services\Modules\PerintahPembayaranService;
+use App\Support\Akses;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -15,11 +16,15 @@ use Illuminate\View\View;
 /**
  * Perintah Pembayaran — dokumen KAS, tidak menjurnal.
  *
- * Dua keputusan digerbangi hak yang BERBEDA dari penyusunannya:
- * otorisasi & penutupan memakai modul `otorisasi-pembayaran` (aksi `ubah`),
- * sementara menyusun cukup `perintah-pembayaran` (aksi `buat`). Pemisahan itu
- * yang membuat empat mata bisa ditegakkan lewat pemberian hak, bukan sekadar
+ * Otorisasi digerbangi hak yang BERBEDA dari penyusunannya: `otorisasi-pembayaran`
+ * (aksi `ubah`) versus `perintah-pembayaran` (aksi `buat`). Pemisahan itu yang
+ * membuat empat mata bisa ditegakkan lewat pemberian hak, bukan sekadar
  * kesepakatan lisan.
+ *
+ * PENUTUPAN lebih longgar dari otorisasi — pejabat pengotorisasi ATAU staf
+ * keuangan yang mengeksekusi pembayaran. Menutup tidak mengeluarkan uang sepeser
+ * pun; ia justru MENGHENTIKAN sisa pembayaran. Menahannya di satu orang membuat
+ * perintah yang sudah lunas menggantung tanpa menambah pengamanan apa pun.
  */
 class PerintahPembayaranController extends Controller
 {
@@ -172,8 +177,25 @@ class PerintahPembayaranController extends Controller
             'Perintah pembayaran ditolak.', $id);
     }
 
+    /**
+     * Menutup perintah = menyatakan tuntas, dan membatalkan sisa yang belum
+     * dibayar. Dua peran yang berhak, bukan satu:
+     *
+     *  - pejabat pengotorisasi, yang memerintahkan pembayarannya;
+     *  - staf keuangan yang MENGEKSEKUSI pembayaran (hak Kas Keluar), karena
+     *    dialah yang tahu kapan perintahnya sudah benar-benar tuntas.
+     *
+     * Menahan penutupan di satu orang membuat perintah yang sudah lunas
+     * menggantung menunggu tanda tangan yang tak menambah apa pun.
+     */
     public function tutup(Request $request, int $id): RedirectResponse
     {
+        abort_unless(
+            Akses::boleh('otorisasi-pembayaran', 'ubah') || Akses::boleh('cash-out', 'buat'),
+            403,
+            'Penutupan perintah pembayaran hanya boleh oleh pejabat pengotorisasi atau staf keuangan yang mengeksekusi pembayaran.',
+        );
+
         $request->validate(['alasan' => ['nullable', 'string', 'max:255']]);
 
         return $this->jalankan(fn () => $this->service->tutup($id, $request->input('alasan'), $request->user()->id_pengguna),

@@ -395,9 +395,35 @@ class PengajuanController extends Controller
         return $nilai === '' ? null : $nilai;
     }
 
+    /**
+     * Pembatalan pengajuan — SIAPA yang boleh bergantung sudah sejauh mana.
+     *
+     *  - `diajukan` / `ditolak`: belum ada jurnal, belum disentuh keuangan.
+     *    Pemohonnya sendiri yang membatalkan, seperti membatalkan surat yang
+     *    belum sempat diproses.
+     *  - `diverifikasi` / `diposting`: hutangnya sudah dijurnal. Yang boleh
+     *    membatalkan TIM KEUANGAN, karena pembatalannya membalik jurnal —
+     *    bukan pemohon, yang tak melihat akibat akuntansinya.
+     *
+     * Tidak harus orang yang sama dengan yang memverifikasi: menahan pembatalan
+     * di satu orang membuat dokumen keliru menggantung saat ia berhalangan.
+     *
+     * `lunas` tak ada di sini sama sekali — servicenya menolaknya, dan jalannya
+     * memang lewat void voucher Kas Keluar yang melunasinya.
+     */
     public function void(Request $request, int $id): RedirectResponse
     {
         $data = $request->validate(['alasan' => ['required', 'string', 'max:255']]);
+
+        $rec = PengajuanPembayaran::findOrFail($id);
+        $user = $request->user();
+        $boleh = match ($rec->status) {
+            'diajukan', 'ditolak' => $user->is_admin || $user->id_pengguna === $rec->id_pengguna,
+            'diverifikasi', 'diposting' => $user->is_admin || (bool) $user->tim_keuangan,
+            default => false,
+        };
+
+        abort_unless($boleh, 403, "Pengajuan berstatus {$rec->status} tidak dapat Anda batalkan.");
 
         try {
             $this->service->void($id, $data['alasan'], $request->user()->id_pengguna);

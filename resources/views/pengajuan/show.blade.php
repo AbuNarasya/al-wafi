@@ -23,7 +23,17 @@
                 <a href="{{ route('pengajuan.cetak', $rec->id) }}" target="_blank"
                    class="rounded-lg border border-brand px-3 py-1.5 text-sm font-medium text-brand hover:bg-brand-soft">🖨 Cetak</a>
             @endif
-            @if (in_array($rec->status, ['diajukan', 'ditolak'], true) && ($user->is_admin || $user->id_pengguna === $rec->id_pengguna))
+            {{-- Pemohon membatalkan miliknya selagi belum berjurnal; sesudah
+                 diverifikasi yang membatalkan tim keuangan, karena pembatalannya
+                 membalik jurnal. Aturan yang sama ditegakkan di controller. --}}
+            @php
+                $bolehVoid = match ($rec->status) {
+                    'diajukan', 'ditolak' => $user->is_admin || $user->id_pengguna === $rec->id_pengguna,
+                    'diverifikasi', 'diposting' => $user->is_admin || $user->tim_keuangan,
+                    default => false,
+                };
+            @endphp
+            @if ($bolehVoid)
                 <div x-data="{ open: false }" class="relative">
                     <button @click="open = !open" class="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100">Batalkan</button>
                     <form x-show="open" x-cloak @click.outside="open = false" method="POST" action="{{ route('pengajuan.void', $rec->id) }}"

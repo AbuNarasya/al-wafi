@@ -31,11 +31,11 @@
 
         {{-- Pilih wali --}}
         <form method="GET" action="{{ route('dompet.index') }}" class="mb-4 flex items-end gap-2 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            {{-- Bisa dicari — daftarnya seratusan nama, dan menggulung <select>
+                 bawaan peramban untuk mencari satu wali itu pekerjaan sendiri.
+                 Pemilih santri di bawah sudah memakai komponen yang sama. --}}
             <div class="flex-1"><label class="mb-1 block text-xs font-medium text-gray-500">Wali / Keluarga</label>
-                <select name="id_wali" class="w-full rounded-lg border-gray-300 px-3 py-2 text-sm">
-                    <option value="">— pilih wali —</option>
-                    @foreach ($waliOptions as $id => $label)<option value="{{ $id }}" @selected($idWali === $id)>{{ $label }}</option>@endforeach
-                </select></div>
+                <x-search-select name="id_wali" :options="$waliOptions" :value="$idWali" placeholder="— pilih wali —" /></div>
             <button class="rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-900">Lihat</button>
         </form>
 

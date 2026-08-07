@@ -24,7 +24,7 @@
         @endif
     </div>
 
-    @php $uid = auth()->user()->id_pengguna; $isAdmin = auth()->user()->is_admin; @endphp
+    @php $uid = auth()->user()->id_pengguna; $isAdmin = auth()->user()->is_admin; $timKeuangan = (bool) auth()->user()->tim_keuangan; @endphp
     <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -80,7 +80,17 @@
                                     </form>
                                 @endif
                                 <a href="{{ route('pengajuan.show', $r->id) }}" class="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50">Detail</a>
-                                @if (in_array($r->status, ['diajukan', 'ditolak'], true) && ($isAdmin || $r->id_pengguna === $uid))
+                                {{-- Sesudah diverifikasi, yang membatalkan tim keuangan —
+                                     pembatalannya membalik jurnal. Aturan yang sama
+                                     ditegakkan di controller. --}}
+                                @php
+                                    $bolehVoid = match ($r->status) {
+                                        'diajukan', 'ditolak' => $isAdmin || $r->id_pengguna === $uid,
+                                        'diverifikasi', 'diposting' => $isAdmin || $timKeuangan,
+                                        default => false,
+                                    };
+                                @endphp
+                                @if ($bolehVoid)
                                     <div x-data="{ open: false }" class="relative inline-block">
                                         <button @click="open = !open" class="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">Void</button>
                                         <form x-show="open" x-cloak @click.outside="open = false" method="POST" action="{{ route('pengajuan.void', $r->id) }}"
