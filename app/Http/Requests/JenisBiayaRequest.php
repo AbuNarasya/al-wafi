@@ -45,6 +45,13 @@ class JenisBiayaRequest extends FormRequest
             ],
             'kode_coa_diterima_dimuka' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
             'kode_unit' => ['required', 'string', 'exists:business_units,kode_unit'],
+            // Tarif & satuan WAJIB bila ditagih menurut pemakaian — tanpa
+            // keduanya kuantitas yang dicatat petugas tak bisa diubah jadi
+            // rupiah, dan layarnya tak punya kata untuk menyebut "kilogram".
+            'tarif_satuan' => ['nullable', 'required_if:cara_tagih,pemakaian', 'numeric', 'gt:0'],
+            'nama_satuan' => ['nullable', 'required_if:cara_tagih,pemakaian', 'string', 'max:20'],
+            // Kuota boleh kosong (tak ada jatah gratis); nol berarti sama.
+            'kuota_gratis' => ['nullable', 'numeric', 'min:0'],
             'berulang' => ['nullable', 'boolean'],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
         ];
@@ -57,7 +64,8 @@ class JenisBiayaRequest extends FormRequest
             $data['kode'] = $this->input('kode');
         }
         $data['berulang'] = $this->boolean('berulang');
-        foreach (['kode_coa_piutang', 'kode_coa_diterima_dimuka', 'kode_jenjang', 'cara_tagih'] as $f) {
+        foreach (['kode_coa_piutang', 'kode_coa_diterima_dimuka', 'kode_jenjang', 'cara_tagih',
+            'tarif_satuan', 'nama_satuan', 'kuota_gratis'] as $f) {
             if (($data[$f] ?? '') === '') {
                 $data[$f] = null;
             }

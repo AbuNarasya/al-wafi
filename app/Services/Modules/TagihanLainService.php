@@ -55,6 +55,22 @@ class TagihanLainService
         return $this->terbitkanUntuk($jenis, $peta, $data, $idPengguna, $gugur);
     }
 
+    /**
+     * Penerbitan dari PEMAKAIAN (keluarga A — laundry).
+     *
+     * Nominal per santri sudah dihitung PemakaianLainService dari kuantitas ×
+     * tarif satuan dikurangi kuota; yang tersisa di sini hanyalah menuliskannya
+     * jadi tagihan dan jurnal, sama seperti dua jalur lainnya.
+     *
+     * @param  array<int,string>  $nominalPerSantri
+     */
+    public function terbitkanUntukPemakaian(JenisBiaya $jenis, array $nominalPerSantri, array $data, int $idPengguna): array
+    {
+        $this->pastikanBisaDitagih($jenis);
+
+        return $this->terbitkanUntuk($jenis, $nominalPerSantri, $data, $idPengguna);
+    }
+
     private function jenisSah(string $kode): JenisBiaya
     {
         $jenis = JenisBiaya::find($kode);

@@ -127,6 +127,11 @@ final class ModulRegistry
         // KODE MODULNYA TETAP `tagihan-lain`: ia tersimpan di `hak_akses_modul`,
         // jadi menggantinya akan memutus hak yang sudah diberikan ke pengguna.
         ['kode' => 'tagihan-lain', 'nama' => 'Tagihan Lain-lain (laundry, ekskul, kegiatan)', 'grup' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi'],
+        // Hak petugas laundry. SENGAJA TERPISAH dari `tagihan-lain`: ia mencatat
+        // timbangan tiap hari, dan tak pernah butuh wewenang menerbitkan tagihan
+        // ke siapa pun. Penerbitan periodenya tetap menuntut hak `tagihan-lain`,
+        // jadi satu layar melayani dua wewenang yang berbeda.
+        ['kode' => 'setoran-laundry', 'nama' => 'Setoran Pemakaian (timbangan laundry harian)', 'grup' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi'],
         // TANPA MENU: dijalankan dari halaman santri, bukan layar tersendiri.
         // Wewenangnya sengaja terpisah dari modul tagihan mana pun — ia mengubah
         // PIUTANG YANG SUDAH DIBUKUKAN, jadi tak boleh ikut hak `ubah` biasa.

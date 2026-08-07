@@ -99,6 +99,18 @@
                              'pemakaian' => 'Menurut pemakaian — tarif per satuan dikali kuantitas',
                          ]"
                          hint="Kepesertaan untuk ekskul, kegiatan khusus, program umroh. Pemakaian untuk layanan bersatuan seperti laundry per kilogram." />
+
+                {{-- Hanya berarti untuk cara tagih "pemakaian". Ditampilkan
+                     mengikuti pilihan tipe; isian yang tak dipakai tetap terkirim
+                     kosong dan dinolkan di JenisBiayaRequest::tersimpan(). --}}
+                <div class="mt-4 grid gap-4 sm:grid-cols-3">
+                    <x-field name="tarif_satuan" label="Tarif per Satuan" type="number" :value="$jb->tarif_satuan"
+                             hint="Mis. 7000 untuk laundry Rp 7.000/kg." />
+                    <x-field name="nama_satuan" label="Nama Satuan" :value="$jb->nama_satuan" placeholder="kg"
+                             hint="Dipakai di seluruh layar: “12,5 kg”." />
+                    <x-field name="kuota_gratis" label="Kuota Gratis per Periode" type="number" :value="$jb->kuota_gratis"
+                             hint="Mis. 20 — tagihan hanya terbit atas kelebihannya. Kosongkan bila tak ada jatah gratis." />
+                </div>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">

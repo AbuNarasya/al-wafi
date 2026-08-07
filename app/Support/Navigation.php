@@ -179,6 +179,9 @@ final class Navigation
         // kerjanya.
         ['url' => '/kesantrian/tagihan-lain/tarif', 'label' => 'Matriks Tarif Kegiatan', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Setting Tagihan Lain Lain', 'modul' => 'tagihan-lain'],
         ['url' => '/kesantrian/tagihan-lain/peserta', 'label' => 'Peserta Kegiatan', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Setting Tagihan Lain Lain', 'modul' => 'tagihan-lain'],
+        // Setoran mendahului daftar tagihan: ia yang dibuka tiap hari, sedangkan
+        // daftar tagihan dilihat sesekali.
+        ['url' => '/kesantrian/setoran-pemakaian', 'label' => 'Setoran Laundry', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi', 'modul' => 'setoran-laundry'],
         ['url' => '/kesantrian/tagihan-lain', 'label' => 'Daftar & Terbitkan', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi', 'modul' => 'tagihan-lain'],
 
         // ---- 6. Sistem ----

@@ -102,11 +102,17 @@ class Referensi
      * jadi menawarkannya di pemilih hanya membuka jalan salah-pilih ke anak yang
      * sudah tak ada urusannya dengan pesantren.
      */
-    public static function santri(?string $status = null): array
+    /**
+     * $kodeJenjang menyempitkan daftarnya ke satu jenjang — dipakai layar yang
+     * memang hanya melayani satu jenjang (mis. setoran laundry SMP), supaya
+     * santri jenjang lain tak bisa terpilih karena kemiripan nama.
+     */
+    public static function santri(?string $status = null, ?string $kodeJenjang = null): array
     {
         $peta = Jenjang::pluck('nama', 'kode')->all();
 
         return Santri::when($status, fn ($q) => $q->where('status', $status))
+            ->when($kodeJenjang, fn ($q) => $q->where('kode_jenjang', $kodeJenjang))
             ->whereNotIn('status', Tahap::DISEMBUNYIKAN_DARI_PEMILIH)
             ->orderBy('nama')
             ->get(['id', 'nis', 'no_pendaftaran', 'nama', 'kode_jenjang', 'tingkat'])

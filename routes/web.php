@@ -680,6 +680,16 @@ Route::middleware('auth')->group(function () {
         Route::post('/peserta/terbitkan', 'terbitkan')->name('peserta.terbitkan')->middleware('hakakses:tagihan-lain,buat');
     });
 
+    // Keluarga A — setoran pemakaian (laundry). Haknya TERPISAH: petugas laundry
+    // mencatat timbangan, bukan menerbitkan uang. Penerbitan periodenya tetap
+    // menuntut hak `tagihan-lain`.
+    Route::prefix('kesantrian/setoran-pemakaian')->name('setoran_pemakaian.')->controller(\App\Http\Controllers\SetoranPemakaianController::class)->group(function () {
+        Route::get('/', 'index')->name('index')->middleware('hakakses:setoran-laundry,lihat');
+        Route::post('/', 'catat')->name('catat')->middleware('hakakses:setoran-laundry,buat');
+        Route::delete('/{id}', 'hapus')->name('hapus')->middleware('hakakses:setoran-laundry,buat')->whereNumber('id');
+        Route::post('/terbitkan', 'terbitkan')->name('terbitkan')->middleware('hakakses:tagihan-lain,buat');
+    });
+
     // Dompet & Tabungan Santri (wadi'ah).
     Route::prefix('kesantrian/dompet')->name('dompet.')->controller(\App\Http\Controllers\DompetController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:dompet,lihat');
