@@ -25,16 +25,33 @@
         <span x-text="label() || @js($placeholder)" :class="value ? 'text-gray-800' : 'text-gray-400'" class="truncate"></span>
         <span class="shrink-0 text-gray-400">▾</span>
     </button>
+    {{--
+      Isian cari DI LUAR area gulir, bukan `sticky` di dalamnya.
+
+      Dulu ia `sticky top-0` tetapi TANPA latar: sticky memang menahannya di
+      tempat, namun baris pilihan yang lewat di belakangnya tetap terlihat
+      menembus, sehingga tulisan "Cari…" bertindihan dengan nama santri begitu
+      daftarnya digulir. Memberinya `bg-white` saja sudah menutup gejalanya, tapi
+      masih menyisakan urusan z-index dengan baris yang datang sesudahnya di DOM.
+
+      Dijadikan dua bagian — kepala tetap + badan bergulir — persoalannya hilang
+      seluruhnya: tak ada yang perlu ditumpuk, jadi tak ada yang bisa tembus.
+    --}}
     <div x-show="open" x-cloak :style="gaya"
-         class="fixed z-50 max-h-60 overflow-auto rounded-lg border border-gray-200 bg-white shadow-xl">
+         class="fixed z-50 flex max-h-60 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl">
         <input x-ref="q" x-model="q" type="text" placeholder="Cari…"
-               class="sticky top-0 w-full border-0 border-b border-gray-200 px-3 py-2 text-sm focus:outline-none">
-        <template x-for="o in filtered()" :key="o.v">
-            <div @click="pick(o.v)"
-                 class="cursor-pointer truncate px-3 py-1.5 text-sm hover:bg-brand-soft"
-                 :class="String(o.v) === String(value) ? 'bg-brand-soft font-medium text-brand' : 'text-gray-700'"
-                 x-text="o.l"></div>
-        </template>
-        <div x-show="filtered().length === 0" class="px-3 py-2 text-sm text-gray-400">Tidak ada hasil.</div>
+               class="w-full shrink-0 border-0 border-b border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none">
+        {{-- `min-h-0` wajib: tanpa itu anak flex menolak menyusut di bawah tinggi
+             isinya, dan `overflow-auto` tak pernah aktif — panelnya justru
+             memanjang melewati `max-h-60`. --}}
+        <div class="min-h-0 flex-1 overflow-auto">
+            <template x-for="o in filtered()" :key="o.v">
+                <div @click="pick(o.v)"
+                     class="cursor-pointer truncate px-3 py-1.5 text-sm hover:bg-brand-soft"
+                     :class="String(o.v) === String(value) ? 'bg-brand-soft font-medium text-brand' : 'text-gray-700'"
+                     x-text="o.l"></div>
+            </template>
+            <div x-show="filtered().length === 0" class="px-3 py-2 text-sm text-gray-400">Tidak ada hasil.</div>
+        </div>
     </div>
 </div>
