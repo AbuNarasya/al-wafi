@@ -98,6 +98,37 @@ class JenisBiayaPengakuanTest extends TestCase
         $this->assertNull(JenisBiaya::find('UJI-1')?->cara_tagih);
     }
 
+    public function test_cara_tagih_pemakaian_menuntut_tarif_dan_nama_satuan(): void
+    {
+        $this->kirim(['cara_tagih' => 'pemakaian', 'tarif_satuan' => '', 'nama_satuan' => ''])
+            ->assertSessionHasErrors(['tarif_satuan', 'nama_satuan']);
+    }
+
+    public function test_kepesertaan_tidak_menyimpan_sisa_tarif_satuan(): void
+    {
+        // Isian yang disembunyikan di layar TETAP terkirim peramban. Nilai sisa
+        // dari pilihan sebelumnya tak boleh menempel pada baris kepesertaan —
+        // ia tak dipakai siapa pun, tapi terbaca sebagai kesengajaan.
+        $this->kirim(['cara_tagih' => 'kepesertaan', 'tarif_satuan' => '7000', 'nama_satuan' => 'kg', 'kuota_gratis' => '20'])
+            ->assertSessionHasNoErrors();
+
+        $jb = JenisBiaya::find('UJI-1');
+        $this->assertNull($jb?->tarif_satuan);
+        $this->assertNull($jb?->nama_satuan);
+        $this->assertNull($jb?->kuota_gratis);
+    }
+
+    public function test_perilaku_selain_lain_tidak_dituntut_tarif_walau_cara_tagih_terkirim(): void
+    {
+        // `cara_tagih` sisa "pemakaian" pada baris SPP tak boleh menuntut tarif
+        // satuan — SPP tak pernah mengenal satuan apa pun.
+        $this->kirim(['tipe' => 'spp', 'cara_tagih' => 'pemakaian', 'tarif_satuan' => '', 'nama_satuan' => '',
+            'pengakuan' => 'akrual', 'kode_coa_piutang' => self::PIUTANG])
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull(JenisBiaya::find('UJI-1')?->cara_tagih);
+    }
+
     public function test_pengakuan_bawaannya_kas_bukan_akrual(): void
     {
         // Baris yang lahir tanpa menyebut pengakuannya lebih baik tidak menjurnal

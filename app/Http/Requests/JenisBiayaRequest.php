@@ -48,13 +48,25 @@ class JenisBiayaRequest extends FormRequest
             // Tarif & satuan WAJIB bila ditagih menurut pemakaian — tanpa
             // keduanya kuantitas yang dicatat petugas tak bisa diubah jadi
             // rupiah, dan layarnya tak punya kata untuk menyebut "kilogram".
-            'tarif_satuan' => ['nullable', 'required_if:cara_tagih,pemakaian', 'numeric', 'gt:0'],
-            'nama_satuan' => ['nullable', 'required_if:cara_tagih,pemakaian', 'string', 'max:20'],
+            //
+            // Perilakunya ikut diperiksa, bukan cuma `cara_tagih`: isian yang
+            // disembunyikan di layar TETAP terkirim peramban, jadi nilai sisa
+            // "pemakaian" dari pilihan sebelumnya bisa menuntut tarif pada baris
+            // SPP yang tak pernah mengenalnya.
+            'tarif_satuan' => ['nullable', Rule::requiredIf(fn () => $this->pakaiSatuan()), 'numeric', 'gt:0'],
+            'nama_satuan' => ['nullable', Rule::requiredIf(fn () => $this->pakaiSatuan()), 'string', 'max:20'],
             // Kuota boleh kosong (tak ada jatah gratis); nol berarti sama.
             'kuota_gratis' => ['nullable', 'numeric', 'min:0'],
             'berulang' => ['nullable', 'boolean'],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
         ];
+    }
+
+    /** Jenis ini benar-benar ditagih per satuan (laundry per kilogram). */
+    private function pakaiSatuan(): bool
+    {
+        return TipeBiaya::perilakuDari($this->input('tipe')) === 'lain'
+            && $this->input('cara_tagih') === 'pemakaian';
     }
 
     public function tersimpan(): array
@@ -69,6 +81,19 @@ class JenisBiayaRequest extends FormRequest
             if (($data[$f] ?? '') === '') {
                 $data[$f] = null;
             }
+        }
+
+        // Isian yang tak berlaku dibersihkan DI SINI, bukan diandalkan pada
+        // tersembunyinya di layar. Tanpa ini, baris kepesertaan bisa menyimpan
+        // sisa tarif satuan dari pilihan sebelumnya — angka yang tak dipakai
+        // siapa pun tapi tetap terbaca sebagai kesengajaan oleh pembaca berikutnya.
+        if (TipeBiaya::perilakuDari($data['tipe'] ?? null) !== 'lain') {
+            $data['cara_tagih'] = null;
+        }
+        if (($data['cara_tagih'] ?? null) !== 'pemakaian') {
+            $data['tarif_satuan'] = null;
+            $data['nama_satuan'] = null;
+            $data['kuota_gratis'] = null;
         }
 
         return $data;
