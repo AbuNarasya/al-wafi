@@ -23,6 +23,9 @@ use Illuminate\Support\Facades\DB;
  */
 class KepesertaanLainService
 {
+    /** @var array<string,string>|null peta kode → nama jenjang, dibaca sekali */
+    private ?array $petaJenjang = null;
+
     /** Jenis biaya yang ditagih menurut kepesertaan, untuk pemilih & matriks. */
     public function jenisKepesertaan()
     {
@@ -133,6 +136,22 @@ class KepesertaanLainService
             ->values()->all();
     }
 
+    /**
+     * NAMA jenjang, bukan kode `J001` — aturan tetap di aplikasi ini, dan
+     * berlaku juga untuk pesan galat: "Jenjang J001 belum punya tarif" tak
+     * memberi tahu petugas jenjang mana yang dimaksud.
+     */
+    private function namaJenjang(?string $kode): string
+    {
+        if ($kode === null) {
+            return '(tanpa jenjang)';
+        }
+
+        $this->petaJenjang ??= Jenjang::pluck('nama', 'kode')->all();
+
+        return $this->petaJenjang[$kode] ?? $kode;
+    }
+
     public function tarifJenjang(string $kodeJenis, ?string $kodeJenjang): ?string
     {
         if ($kodeJenjang === null) {
@@ -161,6 +180,7 @@ class KepesertaanLainService
 
                 return [
                     'rec' => $p,
+                    'nama_jenjang' => $this->namaJenjang($p->santri?->kode_jenjang),
                     'tarif' => $tarif,
                     'nominal' => $nominal,
                     'keringanan' => $p->nominal !== null && $tarif !== null && ! Money::eq(Money::of($p->nominal), $tarif),
@@ -184,7 +204,7 @@ class KepesertaanLainService
         // sini supaya kekeliruannya ketahuan saat mendaftarkan, bukan berbulan
         // kemudian saat penerbitan diam-diam melewatinya.
         if ($nominal === null && $this->tarifJenjang($kodeJenis, $santri->kode_jenjang) === null) {
-            throw new AppException(422, "Jenjang {$santri->kode_jenjang} belum punya tarif untuk kegiatan ini, jadi jenjang itu dianggap tidak ikut. Isi dulu selnya di Matriks Tarif, atau beri {$santri->nama} nominal khusus.");
+            throw new AppException(422, 'Jenjang '.$this->namaJenjang($santri->kode_jenjang)." belum punya tarif untuk kegiatan ini, jadi jenjang itu dianggap tidak ikut. Isi dulu selnya di Matriks Tarif, atau beri {$santri->nama} nominal khusus.");
         }
 
         if (PesertaTagihanLain::where('kode_jenis', $kodeJenis)->where('id_santri', $idSantri)->exists()) {
@@ -257,7 +277,7 @@ class KepesertaanLainService
                 continue;
             }
             if ($p['nominal'] === null) {
-                $gugur[] = "{$nama} — jenjang {$santri->kode_jenjang} belum punya tarif";
+                $gugur[] = "{$nama} — jenjang ".$this->namaJenjang($santri->kode_jenjang).' belum punya tarif';
 
                 continue;
             }

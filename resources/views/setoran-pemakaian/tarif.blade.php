@@ -46,8 +46,8 @@
                             <tr class="hover:bg-gray-50/60">
                                 <td class="px-4 py-2.5">
                                     <div class="font-medium text-gray-800">{{ $b['nama'] }}</div>
-                                    <div class="font-mono text-[11px] text-gray-400">
-                                        {{ $b['kode'] }}{{ $b['kode_jenjang'] ? ' · '.$b['kode_jenjang'] : '' }}
+                                    <div class="text-[11px] text-gray-400">
+                                        <span class="font-mono">{{ $b['kode'] }}</span>{{ $b['nama_jenjang'] ? ' · '.$b['nama_jenjang'] : '' }}
                                     </div>
                                     @if ($b['status'] !== 'aktif')
                                         <div class="mt-0.5 text-[11px] text-amber-600">jenis biayanya nonaktif</div>

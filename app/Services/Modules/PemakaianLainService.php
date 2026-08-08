@@ -4,6 +4,7 @@ namespace App\Services\Modules;
 
 use App\Exceptions\AppException;
 use App\Models\JenisBiaya;
+use App\Models\Jenjang;
 use App\Models\Santri;
 use App\Models\SetoranPemakaian;
 use App\Models\TagihanSantri;
@@ -73,11 +74,13 @@ class PemakaianLainService
     public function gridTarif(): array
     {
         $tarif = TarifPemakaian::get()->keyBy('kode_jenis');
+        // NAMA jenjang, bukan kode `J001` — aturan tetap di aplikasi ini.
+        $jenjang = Jenjang::pluck('nama', 'kode');
 
         return $this->jenisPemakaian()->map(fn ($jb) => [
             'kode' => $jb->kode,
             'nama' => $jb->nama,
-            'kode_jenjang' => $jb->kode_jenjang,
+            'nama_jenjang' => $jb->kode_jenjang ? ($jenjang[$jb->kode_jenjang] ?? $jb->kode_jenjang) : null,
             'status' => $jb->status,
             'tarif_satuan' => $tarif[$jb->kode]->tarif_satuan ?? null,
             'nama_satuan' => $tarif[$jb->kode]->nama_satuan ?? null,

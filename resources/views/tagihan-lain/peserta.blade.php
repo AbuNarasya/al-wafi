@@ -69,7 +69,7 @@
                                     <div class="font-medium text-gray-800">{{ $p->santri?->nama }}</div>
                                     <div class="font-mono text-[11px] text-gray-400">{{ $p->santri?->nis }}</div>
                                 </td>
-                                <td class="px-4 py-2.5 text-gray-600">{{ $p->santri?->kode_jenjang }}</td>
+                                <td class="px-4 py-2.5 text-gray-600">{{ $b['nama_jenjang'] }}</td>
                                 <td class="px-4 py-2.5 text-right tabular-nums text-gray-500">
                                     @if ($b['tarif'] === null)
                                         <span class="text-amber-600">tidak ikut</span>

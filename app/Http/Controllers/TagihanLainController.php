@@ -52,7 +52,9 @@ class TagihanLainController extends Controller
 
     public function create(Request $request): View
     {
-        $daftar = JenisBiaya::whereIn('tipe', TipeBiaya::kodeBerperilaku('lain'))
+        // `jenjang` dimuat karena labelnya menyebut NAMA jenjang, bukan kode
+        // `J001` — aturan tetap di aplikasi ini.
+        $daftar = JenisBiaya::with('jenjang')->whereIn('tipe', TipeBiaya::kodeBerperilaku('lain'))
             ->where('status', 'aktif')->orderBy('kode')->get();
 
         $kode = trim((string) $request->query('jenis', ''));
@@ -63,7 +65,7 @@ class TagihanLainController extends Controller
             // berperilaku "lain", dua baris bisa bernama mirip dan hanya
             // dibedakan jenjangnya.
             'jenisOptions' => $daftar->mapWithKeys(fn ($j) => [
-                $j->kode => "{$j->kode} — {$j->nama}".($j->kode_jenjang ? " ({$j->kode_jenjang})" : ''),
+                $j->kode => "{$j->kode} — {$j->nama}".($j->kode_jenjang ? ' ('.($j->jenjang?->nama ?? $j->kode_jenjang).')' : ''),
             ])->all(),
             'kodeJenis' => $jenis?->kode ?? '',
             'jenis' => $jenis,
