@@ -138,6 +138,68 @@ class ImporTanpaNPlusSatuTest extends TestCase
         $this->assertSame(2, $hasil['siap']);
     }
 
+    /** @return array{hasil:array,kueri:int} */
+    private function jalankanImpor(int $jumlah): array
+    {
+        $path = $this->berkas($jumlah);
+        $param = ['jenis_tunggakan_spp' => 'SPP-UJI', 'jenis_tunggakan_uang_pangkal' => '',
+            'jenis_tunggakan_daftar_ulang' => '', 'jenis_tunggakan_lain' => ''];
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $hasil = (new ImporSaldoAwal)->jalankan('santri-lama', $path, $param, null);
+        $kueri = count(DB::getQueryLog());
+        DB::disableQueryLog();
+        @unlink($path);
+
+        return ['hasil' => $hasil, 'kueri' => $kueri];
+    }
+
+    public function test_jumlah_kueri_impor_tidak_tumbuh_mengikuti_jumlah_baris(): void
+    {
+        // Ini yang membuat produksi menjawab 503 padahal datanya sudah masuk:
+        // `simpan()` dulu menulis 6–9 kali per santri — wali, santri, riwayat
+        // tingkat (SELECT + INSERT), riwayat NIS, lalu satu per tunggakan.
+        $kecil = $this->jalankanImpor(5);
+        Santri::query()->delete();
+        Wali::query()->delete();
+        $besar = $this->jalankanImpor(40);
+
+        $this->assertSame(5, $kecil['hasil']['tersimpan']['santri']);
+        $this->assertSame(40, $besar['hasil']['tersimpan']['santri']);
+
+        $this->assertLessThanOrEqual(
+            $kecil['kueri'] + 3,
+            $besar['kueri'],
+            "Impor 40 baris memakai {$besar['kueri']} kueri, sedangkan 5 baris {$kecil['kueri']} — "
+            .'jumlahnya masih tumbuh mengikuti baris.',
+        );
+        $this->assertLessThan(30, $besar['kueri']);
+    }
+
+    public function test_seluruh_turunan_santri_ikut_tertulis(): void
+    {
+        // Yang paling mudah hilang saat menulis berkelompok: baris turunan yang
+        // dulu dibuat satu per satu tepat setelah santrinya lahir.
+        $hasil = $this->jalankanImpor(6)['hasil'];
+
+        $this->assertSame(6, $hasil['tersimpan']['santri']);
+        $this->assertSame(6, $hasil['tersimpan']['tagihan'], 'Tiap baris punya satu tunggakan SPP.');
+        $this->assertSame(6, DB::table('nis_santri')->count());
+        $this->assertSame(6, DB::table('riwayat_tingkat')->count());
+
+        // Turunannya harus menunjuk santri yang BENAR, bukan sekadar berjumlah sama.
+        $santri = Santri::orderBy('nis')->first();
+        $this->assertSame(1, DB::table('nis_santri')->where('id_santri', $santri->id)->where('nis', $santri->nis)->count());
+        $this->assertSame(1, DB::table('riwayat_tingkat')->where('id_santri', $santri->id)
+            ->where('tahun_ajaran', $santri->tahun_ajaran)->count());
+
+        $tagihan = DB::table('tagihan_santri')->where('id_santri', $santri->id)->first();
+        $this->assertSame('spp', $tagihan->perilaku, 'Perilaku disalin dari jenis biayanya.');
+        $this->assertTrue((bool) $tagihan->sudah_akrual);
+        $this->assertSame(0, bccomp($tagihan->nominal, '150000', 2));
+    }
+
     public function test_kakak_beradik_seberkas_tetap_berbagi_satu_wali(): void
     {
         // Yang paling mudah rusak oleh simpanan: wali yang baru dibuat di tengah

@@ -107,7 +107,10 @@ class PemetaSantriLama implements Pemeta
             'jalur' => ['wajib' => true, 'contoh' => 'LAMA', 'ket' => 'Kode jalur dari master. Disarankan jalur khusus "Santri Lama".'],
             'wali_nama' => ['wajib' => true, 'contoh' => 'Bapak Fauzi', 'ket' => 'Dibuat otomatis bila belum ada.'],
             'wali_telepon' => ['wajib' => true, 'contoh' => '08123456789', 'ket' => 'Kunci pengait: telepon sama = wali yang sama, jadi kakak-beradik menempel ke satu wali.'],
-            'angkatan' => ['wajib' => false, 'contoh' => '2023', 'ket' => 'Tahun masuk.'],
+            // TIDAK ADA `angkatan`: tabel santri tak punya kolom itu, jadi isinya
+            // selalu terbuang. Menawarkannya di templat hanya membuat petugas
+            // mengisi kolom yang tak pernah sampai ke mana-mana.
+            // Tahun masuk sudah terwakili `tahun_ajaran`.
             'tempat_lahir' => ['wajib' => false, 'contoh' => 'Bogor', 'ket' => ''],
             'tanggal_lahir' => ['wajib' => false, 'contoh' => '2011-05-17', 'ket' => 'Format YYYY-MM-DD.'],
             'nisn' => ['wajib' => false, 'contoh' => '0071234567', 'ket' => ''],
@@ -419,48 +422,104 @@ class PemetaSantriLama implements Pemeta
         return $this->siap();
     }
 
+    /**
+     * Menyimpan BERKELOMPOK, bukan sebaris demi sebaris.
+     *
+     * Dulu tiap santri berarti 6–9 perjalanan ke database: wali, santri, riwayat
+     * tingkat (`updateOrCreate` = SELECT lalu INSERT), riwayat NIS, dan satu per
+     * kolom tunggakan. Untuk 201 santri itu ±1.500 perjalanan berurutan di dalam
+     * SATU transaksi — dan di produksi, dengan Neon di seberang jaringan, itu
+     * puluhan detik. Permintaan sepanjang itu memblokir `artisan serve` yang satu
+     * proses, health check Render diam, container direstart, dan penggunanya
+     * melihat 503 padahal datanya sudah masuk seluruhnya.
+     *
+     * Sekarang tujuh perjalanan, apa pun jumlah barisnya: satu insert + satu
+     * select untuk wali (perlu id-nya), begitu pula santri, lalu tiga insert
+     * untuk turunannya.
+     *
+     * `insert()` melewati Eloquent, jadi `created_at`/`updated_at` diisi tangan —
+     * pola yang sama sudah dipakai TagihanLainService. Aman karena tak ada model
+     * di jalur ini yang punya nilai bawaan atau kait `creating`.
+     */
     public function simpan(array $baris, array $param): array
     {
         $dibuat = ['santri' => 0, 'wali' => 0, 'tagihan' => 0];
-        $urut = $this->urutTerakhirNoPendaftaran();
+        $now = now();
+        $idBatch = $param['id_batch'] ?? null;
 
+        $dibuat['wali'] = $this->simpanWali($baris, $idBatch, $now);
+        [$idPerNis, $dibuat['santri']] = $this->simpanSantri($baris, $idBatch, $now);
+        $dibuat['tagihan'] = $this->simpanTurunan($baris, $idPerNis, $param, $idBatch, $now);
+
+        return $dibuat;
+    }
+
+    /**
+     * Wali yang belum dikenal teleponnya — satu insert untuk semuanya.
+     *
+     * Telepon yang berulang DI DALAM berkas (kakak-beradik) hanya melahirkan satu
+     * wali: kuncinya dipakai sebagai indeks larik, jadi kemunculan kedua menimpa
+     * yang pertama alih-alih menambah baris.
+     */
+    private function simpanWali(array $baris, ?int $idBatch, $now): int
+    {
+        $baru = [];
         foreach ($baris as $b) {
             $telepon = trim($b['wali_telepon']);
-            $wali = $this->waliBerTelepon($telepon);
-            if (! $wali) {
-                $nama = trim($b['wali_nama']);
-                // `nama` & `telepon` di tabel wali adalah SALINAN kontak utama,
-                // bukan isian tersendiri — jadi sumbernya wajib ikut diisi.
-                // Sebelumnya hanya salinannya yang ditulis, sehingga wali hasil
-                // impor tak bisa disunting sama sekali: WaliService::update
-                // menuntut kontak utama lengkap dan menolak dengan "Kontak utama
-                // belum lengkap" walau di layar namanya jelas terbaca.
-                // Berkasnya tak menyebut peran, jadi diperlakukan sebagai ayah —
-                // sama dengan bawaan kolom `kontak_utama`, dan petugas bisa
-                // memindahkannya ke ibu/wali dari form kapan saja.
-                $wali = Wali::create([
-                    'kontak_utama' => 'ayah',
-                    'nama_ayah' => $nama,
-                    'telepon_ayah' => $telepon,
-                    'nama' => $nama,
-                    'telepon' => $telepon,
-                    'status' => 'aktif',
-                    // HANYA wali yang benar-benar LAHIR dari impor ini yang
-                    // ditandai. Wali yang teleponnya sudah dikenal dipakai apa
-                    // adanya dan tak boleh ikut terhapus saat batch dibatalkan —
-                    // ia bisa saja menaungi anak dari angkatan sebelumnya.
-                    'id_batch' => $param['id_batch'] ?? null,
-                ]);
-                $dibuat['wali']++;
-
-                // WAJIB didaftarkan ke simpanan. Sebelum ada simpanan, baris
-                // berikutnya menemukannya lewat kueri; sekarang tidak — dan tanpa
-                // baris ini kakak-beradik yang berbagi satu nomor telepon akan
-                // melahirkan wali kembar, masing-masing menaungi satu anak.
-                $this->waliPerTelepon[$telepon] = $wali;
+            if ($telepon !== '' && ! $this->waliBerTelepon($telepon) && ! isset($baru[$telepon])) {
+                $baru[$telepon] = trim($b['wali_nama']);
             }
+        }
+        if ($baru === []) {
+            return 0;
+        }
 
-            $santri = Santri::create([
+        Wali::insert(array_map(fn ($telepon, $nama) => [
+            // `nama` & `telepon` di tabel wali adalah SALINAN kontak utama, bukan
+            // isian tersendiri — jadi sumbernya wajib ikut diisi. Sebelumnya hanya
+            // salinannya yang ditulis, sehingga wali hasil impor tak bisa disunting
+            // sama sekali: WaliService::update menuntut kontak utama lengkap dan
+            // menolak dengan "Kontak utama belum lengkap" walau di layar namanya
+            // jelas terbaca. Berkasnya tak menyebut peran, jadi diperlakukan
+            // sebagai ayah — sama dengan bawaan kolom `kontak_utama`.
+            'kontak_utama' => 'ayah',
+            'nama_ayah' => $nama,
+            'telepon_ayah' => $telepon,
+            'nama' => $nama,
+            'telepon' => $telepon,
+            'status' => 'aktif',
+            // HANYA wali yang benar-benar LAHIR dari impor ini yang ditandai. Wali
+            // yang teleponnya sudah dikenal dipakai apa adanya dan tak boleh ikut
+            // terhapus saat batch dibatalkan — ia bisa saja menaungi anak dari
+            // angkatan sebelumnya.
+            'id_batch' => $idBatch,
+            'created_at' => $now, 'updated_at' => $now,
+        ], array_keys($baru), $baru));
+
+        // Sekali select untuk memungut id-nya, lalu masuk simpanan supaya baris
+        // santri di bawah bisa menunjuknya tanpa bertanya lagi.
+        foreach (Wali::whereIn('telepon', array_keys($baru))->get(['id', 'nama', 'telepon']) as $w) {
+            $this->waliPerTelepon[$w->telepon] = $w;
+        }
+
+        return count($baru);
+    }
+
+    /**
+     * Santri — satu insert, lalu satu select untuk memetakan NIS → id.
+     *
+     * Id-nya dibutuhkan tiga tabel turunan, dan `insert()` massal tak
+     * mengembalikannya. NIS dipakai sebagai jembatan karena ia berindeks unik dan
+     * sudah dipastikan ada serta tak kembar oleh periksa().
+     *
+     * @return array{0: array<string,int>, 1: int}
+     */
+    private function simpanSantri(array $baris, ?int $idBatch, $now): array
+    {
+        $urut = $this->urutTerakhirNoPendaftaran();
+        $rows = [];
+        foreach ($baris as $b) {
+            $rows[] = [
                 // Awalan sendiri supaya santri lama langsung terbedakan dari
                 // pendaftar PPSB dan tak mengacaukan penomoran PSB.
                 'no_pendaftaran' => 'LAMA-'.str_pad((string) (++$urut), 4, '0', STR_PAD_LEFT),
@@ -472,7 +531,11 @@ class PemetaSantriLama implements Pemeta
                 'nisn' => $this->kosongJadiNull($b['nisn'] ?? ''),
                 'kode_jenjang' => $this->cariJenjang(trim($b['kode_jenjang']))?->kode,
                 'tingkat' => (int) trim($b['tingkat']),
-                'angkatan' => ($a = trim($b['angkatan'] ?? '')) !== '' ? (int) $a : null,
+                // `angkatan` SENGAJA TIDAK ditulis: tabel santri tak punya kolom
+                // itu. Kode lama mengopernya ke Santri::create() dan Eloquent
+                // membuangnya diam-diam lewat penyaringan $fillable, jadi isian
+                // itu tak pernah tersimpan sejak awal. `insert()` tak menyaring
+                // apa pun, dan justru itulah yang menyingkapkannya.
                 'tahun_ajaran' => trim($b['tahun_ajaran']),
                 // Santri lama masuk langsung sebagai aktif, jadi tahun yang sedang
                 // DIJALANI sama dengan tahun pada berkasnya. Tanpa ini, pencarian
@@ -482,53 +545,88 @@ class PemetaSantriLama implements Pemeta
                 // Tanpa gelombang: santri lama tak boleh kena hitungan potongan gelombang.
                 'gelombang' => null,
                 'status' => 'aktif',
-                'id_wali' => $wali->id,
-                // Jangkar pembatalan batch: tagihan, riwayat tingkat, dan
-                // riwayat NIS semuanya menggantung di sini lewat `id_santri`,
-                // jadi hanya kolom ini yang perlu penanda.
-                'id_batch' => $param['id_batch'] ?? null,
-            ]);
-            $dibuat['santri']++;
+                'id_wali' => $this->waliBerTelepon(trim($b['wali_telepon']))?->id,
+                // Jangkar pembatalan batch: tagihan, riwayat tingkat, dan riwayat
+                // NIS semuanya menggantung di sini lewat `id_santri`, jadi hanya
+                // kolom ini yang perlu penanda.
+                'id_batch' => $idBatch,
+                'created_at' => $now, 'updated_at' => $now,
+            ];
+        }
+
+        Santri::insert($rows);
+
+        $nis = array_column($rows, 'nis');
+
+        return [Santri::whereIn('nis', $nis)->pluck('id', 'nis')->all(), count($rows)];
+    }
+
+    /**
+     * Riwayat tingkat, riwayat NIS, dan tunggakan — masing-masing satu insert.
+     *
+     * Riwayat tingkat dulu `updateOrCreate` (SELECT + INSERT per santri); di sini
+     * cukup insert biasa karena santrinya baru saja lahir pada baris di atas,
+     * jadi mustahil sudah punya riwayat. Dua baris untuk santri yang sama dalam
+     * satu berkas pun mustahil — NIS berindeks unik dan kekembarannya sudah
+     * disaring pratinjau.
+     */
+    private function simpanTurunan(array $baris, array $idPerNis, array $param, ?int $idBatch, $now): int
+    {
+        $riwayat = [];
+        $nisSantri = [];
+        $tagihan = [];
+
+        foreach ($baris as $b) {
+            $nis = trim($b['nis']);
+            $id = $idPerNis[$nis] ?? null;
+            if ($id === null) {
+                continue; // tak mungkin terjadi; dilewati daripada menulis baris yatim
+            }
+            $kodeJenjang = $this->cariJenjang(trim($b['kode_jenjang']))?->kode;
+            $tingkat = (int) trim($b['tingkat']);
+            $ta = trim($b['tahun_ajaran']);
 
             // Baris pertama riwayat tingkatnya. Santri lama tak melewati daftar
             // ulang PPSB, jadi tanpa ini riwayatnya kosong dan kenaikan pertama
             // mereka kehilangan titik awalnya.
-            if ($santri->kode_jenjang) {
-                RiwayatTingkat::updateOrCreate(
-                    ['id_santri' => $santri->id, 'tahun_ajaran' => $santri->tahun_ajaran],
-                    ['kode_jenjang' => $santri->kode_jenjang, 'tingkat' => $santri->tingkat,
-                        'catatan' => 'Impor data awal santri lama.'],
-                );
+            if ($kodeJenjang) {
+                $riwayat[] = [
+                    'id_santri' => $id, 'tahun_ajaran' => $ta,
+                    'kode_jenjang' => $kodeJenjang, 'tingkat' => $tingkat,
+                    'catatan' => 'Impor data awal santri lama.',
+                    'created_at' => $now, 'updated_at' => $now,
+                ];
             }
 
             // NIS bawaan dari berkas ikut dicatat sebagai riwayat pertamanya.
             // Tanpa ini ia berdiri di luar catatan, dan layar Generate NIS akan
             // mengira santri ini belum pernah bernomor lalu menawarkan yang baru.
-            \App\Models\NisSantri::create([
-                'id_santri' => $santri->id, 'nis' => $santri->nis,
-                'kode_jenjang' => $santri->kode_jenjang, 'tingkat' => $santri->tingkat,
-                'tahun_ajaran' => $santri->tahun_ajaran, 'berlaku' => true,
-                'diterbitkan_pada' => now()->toDateString(),
-            ]);
+            $nisSantri[] = [
+                'id_santri' => $id, 'nis' => $nis,
+                'kode_jenjang' => $kodeJenjang, 'tingkat' => $tingkat,
+                'tahun_ajaran' => $ta, 'berlaku' => true,
+                'diterbitkan_pada' => $now->toDateString(),
+                'created_at' => $now, 'updated_at' => $now,
+            ];
 
             foreach (self::TUNGGAKAN as $k => $t) {
                 $nilai = $this->angka($b["tunggakan_{$k}"] ?? '');
                 if ($nilai === null || ! Money::gtZero($nilai)) {
                     continue;
                 }
-                $kodeJenis = trim($param["jenis_tunggakan_{$k}"]);
-                TagihanSantri::create([
-                    'id_santri' => $santri->id,
+                $kodeJenis = trim($param["jenis_tunggakan_{$k}"] ?? '');
+                $tagihan[] = [
+                    'id_santri' => $id,
                     // Penanda batch — ini yang membedakan tunggakan hasil impor
                     // dari tagihan yang diterbitkan petugas kemudian. Tanpa itu
                     // pembatalan batch tak punya cara pasti membedakan keduanya.
-                    'id_batch' => $param['id_batch'] ?? null,
+                    'id_batch' => $idBatch,
                     'kode_jenis' => $kodeJenis,
                     // Perilaku disalin dari jenis biayanya supaya tunggakan uang
                     // pangkal warisan tetap dikenali modul yang membacanya.
                     'perilaku' => TipeBiaya::perilakuDari($this->jenisBiaya($kodeJenis)?->tipe),
-                    'kode_jenjang' => $santri->kode_jenjang,
-                    'tahun_ajaran' => $santri->tahun_ajaran,
+                    'kode_jenjang' => $kodeJenjang,
+                    'tahun_ajaran' => $ta,
                     'nominal' => $nilai,
                     'sisa' => $nilai,
                     'status' => 'belum_bayar',
@@ -536,13 +634,24 @@ class PemetaSantriLama implements Pemeta
                     // pembayaran nanti mengkredit PIUTANG, bukan Pendapatan.
                     'sudah_akrual' => true,
                     'keterangan' => $this->kosongJadiNull($b["ket_tunggakan_{$k}"] ?? '') ?? $t['bawaan_ket'],
-                ]);
-                $dibuat['tagihan']++;
+                    'created_at' => $now, 'updated_at' => $now,
+                ];
             }
         }
 
-        return $dibuat;
+        if ($riwayat !== []) {
+            RiwayatTingkat::insert($riwayat);
+        }
+        if ($nisSantri !== []) {
+            \App\Models\NisSantri::insert($nisSantri);
+        }
+        if ($tagihan !== []) {
+            TagihanSantri::insert($tagihan);
+        }
+
+        return count($tagihan);
     }
+
 
     private function urutTerakhirNoPendaftaran(): int
     {
