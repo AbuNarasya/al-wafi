@@ -75,6 +75,18 @@ sebelum mulai.
 
 ## Catatan teknis
 
+- **Server: Apache (`php:8.4-apache`), bukan `php artisan serve`.** Server bawaan
+  PHP melayani SATU permintaan pada satu waktu — satu impor panjang membekukan
+  seluruh aplikasi termasuk health check, Render menyimpulkan service-nya mati,
+  lalu merestart container di tengah pekerjaan. Gejalanya: datanya tersimpan,
+  tetapi penggunanya melihat 502/503. Perutean memakai `public/.htaccess` bawaan
+  Laravel (karena itu `AllowOverride All` di `docker/apache.conf`).
+- **Pekerja Apache dibatasi 8** (`docker/apache-mpm.conf`). Bawaan Debian 150,
+  dan tiap pekerja satu proses PHP utuh — pada 512 MB paket gratis itu membuat
+  container dibunuh kernel tanpa pesan yang menjelaskan apa-apa.
+- Port Apache ditulis ulang saat container menyala (`sed` di `docker/start.sh`),
+  karena konfigurasi Apache tak mengenal variabel lingkungan sedangkan Render
+  baru menyuntikkan `$PORT` saat runtime.
 - `route:cache` sengaja tidak dijalankan: `routes/web.php` memakai closure pada
   rute `/`, dan Laravel menolak men-serialisasi closure.
 - `trustProxies` ditambahkan di `bootstrap/app.php`. Tanpa itu Laravel mengira

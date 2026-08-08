@@ -31,5 +31,14 @@ set -e
 # (rute '/' yang mengalihkan ke dashboard), dan Laravel menolak men-serialisasi
 # closure — route:cache akan gagal dan menggagalkan deploy.
 
-echo "→ Menyalakan server di port ${PORT:-7860}…"
-exec php artisan serve --host=0.0.0.0 --port="${PORT:-7860}"
+# Apache tak mengenal variabel lingkungan di konfigurasinya, sedangkan Render
+# baru menyuntikkan $PORT saat container menyala. Karena itu baris `Listen`
+# ditulis ulang di sini — satu-satunya tempat yang perlu tahu portnya, sebab
+# vhost-nya memakai wildcard `*:*`.
+echo "→ Menyalakan Apache di port ${PORT:-7860}…"
+sed -ri "s/^Listen .*/Listen ${PORT:-7860}/" /etc/apache2/ports.conf
+
+# `apache2-foreground` = entrypoint bawaan image php:*-apache. Dijalankan lewat
+# exec supaya ia menjadi PID 1 dan menerima sinyal berhenti dari Render langsung
+# — tanpa itu container butuh waktu lebih lama mati dan deploy terasa menggantung.
+exec apache2-foreground
