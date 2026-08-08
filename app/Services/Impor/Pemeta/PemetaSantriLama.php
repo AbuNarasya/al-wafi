@@ -183,7 +183,7 @@ class PemetaSantriLama implements Pemeta
             // sama akan melanggar indeks unik anti tagih-ganda begitu keduanya
             // terisi pada satu santri. Ditolak di sini supaya pesannya menuntun,
             // bukan muncul sebagai galat basis data di tengah impor.
-            $perilaku = TipeBiaya::perilakuDari(JenisBiaya::whereKey($kode)->value('tipe'));
+            $perilaku = TipeBiaya::perilakuDari($this->jenisBiaya($kode)?->tipe);
             if ($perilaku === null || $perilaku === 'lain') {
                 continue;
             }
@@ -198,12 +198,59 @@ class PemetaSantriLama implements Pemeta
         return null;
     }
 
+    /*
+     |--------------------------------------------------------------------------
+     | SIMPANAN SEKALI-BACA
+     |--------------------------------------------------------------------------
+     | `periksa()` dipanggil SEKALI PER BARIS, dan tiap panggilan dulu menembak
+     | database sendiri-sendiri: NIS, jenjang (dua kueri — kode lalu nama), tahun
+     | ajaran, jalur, wali, ditambah satu kueri per kolom tunggakan yang terisi.
+     | Untuk berkas 202 santri itu ±1.200 kueri berurutan.
+     |
+     | Di mesin pengembang tak terasa: PostgreSQL-nya di komputer yang sama,
+     | ±0,1 ms sekali jalan. Di produksi database ada di Neon, belasan milidetik
+     | sekali jalan — dan 1.200 kali belasan milidetik itulah yang membuat
+     | pratinjau impor berakhir 502: permintaannya kelewat panjang, `artisan
+     | serve` yang satu proses ikut terblokir, health check Render diam, dan
+     | container-nya direstart di tengah jalan.
+     |
+     | Semua yang ditanyakan berulang itu MASTER yang tak berubah selama impor
+     | berjalan, jadi cukup dibaca sekali lalu disimpan di instance ini —
+     | pemetanya memang dibuat sekali per impor. Menukar sedikit memori dengan
+     | seribu perjalanan bolak-balik ke seberang jaringan.
+     |
+     | Yang TIDAK boleh ikut disimpan: apa pun yang ditulis `simpan()` sendiri.
+     | Wali karena itu punya penanganan khusus — lihat catatannya di sana.
+     */
+
+    /** @var array<string,Jenjang>|null kode & nama (huruf kecil) → Jenjang */
+    private ?array $petaJenjang = null;
+
+    /** @var array<string,true>|null */
+    private ?array $kodeTahunAjaran = null;
+
+    /** @var array<string,true>|null */
+    private ?array $kodeJalur = null;
+
+    /** @var array<string,JenisBiaya|null> */
+    private array $petaJenis = [];
+
+    /** @var array<string,true>|null NIS yang sudah ada di tabel santri */
+    private ?array $nisTerpakai = null;
+
+    /** @var array<string,Wali>|null telepon → wali */
+    private ?array $waliPerTelepon = null;
+
     /**
      * Jenjang dicari lewat KODE dulu, lalu NAMA.
      *
      * Sejak kode jenjang berformat `J001`, angka itu tak bisa ditebak penyusun
      * berkas — sedangkan berkas pindahan biasanya sudah menuliskan "SDTQ"/"SMP".
      * Menerima keduanya membuat berkas lama tetap terpakai tanpa ditulis ulang.
+     *
+     * Pencocokannya kini tak lagi peka huruf besar-kecil untuk KODE juga, karena
+     * keduanya dikunci dalam huruf kecil. Itu melonggarkan, bukan mengetatkan:
+     * berkas yang menulis `j001` dulu ditolak, sekarang diterima.
      */
     private function cariJenjang(string $kodeAtauNama): ?Jenjang
     {
@@ -211,8 +258,45 @@ class PemetaSantriLama implements Pemeta
             return null;
         }
 
-        return Jenjang::find($kodeAtauNama)
-            ?? Jenjang::whereRaw('lower(nama) = ?', [mb_strtolower($kodeAtauNama)])->first();
+        if ($this->petaJenjang === null) {
+            $this->petaJenjang = [];
+            foreach (Jenjang::all() as $j) {
+                // Nama lebih dulu, kode sesudahnya — bila sebuah nama kebetulan
+                // sama dengan kode jenjang lain, kodelah yang menang.
+                $this->petaJenjang[mb_strtolower((string) $j->nama)] = $j;
+                $this->petaJenjang[mb_strtolower((string) $j->kode)] = $j;
+            }
+        }
+
+        return $this->petaJenjang[mb_strtolower($kodeAtauNama)] ?? null;
+    }
+
+    private function tahunAjaranAda(string $kode): bool
+    {
+        $this->kodeTahunAjaran ??= TahunAjaran::pluck('kode')->flip()->all();
+
+        return isset($this->kodeTahunAjaran[$kode]);
+    }
+
+    private function jalurAda(string $kode): bool
+    {
+        $this->kodeJalur ??= JalurPendaftaran::pluck('kode')->flip()->all();
+
+        return isset($this->kodeJalur[$kode]);
+    }
+
+    private function nisSudahAda(string $nis): bool
+    {
+        $this->nisTerpakai ??= Santri::whereNotNull('nis')->pluck('nis')->flip()->all();
+
+        return isset($this->nisTerpakai[$nis]);
+    }
+
+    private function waliBerTelepon(string $telepon): ?Wali
+    {
+        $this->waliPerTelepon ??= Wali::get(['id', 'nama', 'telepon'])->keyBy('telepon')->all();
+
+        return $this->waliPerTelepon[$telepon] ?? null;
     }
 
     /** Jenis biaya tunggakan sah? Kosong dianggap sah (berkas boleh tanpa tunggakan). */
@@ -221,7 +305,7 @@ class PemetaSantriLama implements Pemeta
         if ($kode === '') {
             return null;
         }
-        $jenis = JenisBiaya::whereKey($kode)->first();
+        $jenis = $this->jenisBiaya($kode);
         if (! $jenis) {
             return "Jenis biaya \"{$kode}\" tidak ditemukan.";
         }
@@ -230,6 +314,12 @@ class PemetaSantriLama implements Pemeta
         }
 
         return null;
+    }
+
+    /** Disimpan PER KODE, bukan seluruh tabel: yang ditanya paling banyak empat. */
+    private function jenisBiaya(string $kode): ?JenisBiaya
+    {
+        return $this->petaJenis[$kode] ??= JenisBiaya::whereKey($kode)->first();
     }
 
     /**
@@ -252,7 +342,7 @@ class PemetaSantriLama implements Pemeta
         if ($nis === '') {
             return $this->masalah('NIS kosong.');
         }
-        if (Santri::where('nis', $nis)->exists()) {
+        if ($this->nisSudahAda($nis)) {
             return $this->lewati(); // sudah pernah diimpor
         }
         if (trim($baris['nama'] ?? '') === '') {
@@ -285,13 +375,13 @@ class PemetaSantriLama implements Pemeta
         }
 
         $ta = trim($baris['tahun_ajaran'] ?? '');
-        if (! TahunAjaran::where('kode', $ta)->exists()) {
+        if (! $this->tahunAjaranAda($ta)) {
             return $this->masalah("Tahun ajaran \"{$ta}\" tidak ada di master Tahun Ajaran.");
         }
 
         // Jalur berlaku lintas tahun ajaran, jadi cukup diperiksa keberadaannya.
         $jalur = trim($baris['jalur'] ?? '');
-        if (! JalurPendaftaran::whereKey($jalur)->exists()) {
+        if (! $this->jalurAda($jalur)) {
             return $this->masalah("Jalur \"{$jalur}\" tidak ada di master Jalur Pendaftaran.");
         }
 
@@ -300,8 +390,8 @@ class PemetaSantriLama implements Pemeta
         if ($telepon === '' || $namaWali === '') {
             return $this->masalah('Nama atau telepon wali kosong.');
         }
-        $waliAda = Wali::where('telepon', $telepon)->first();
-        if ($waliAda && mb_strtolower($waliAda->nama) !== mb_strtolower($namaWali)) {
+        $waliAda = $this->waliBerTelepon($telepon);
+        if ($waliAda && mb_strtolower((string) $waliAda->nama) !== mb_strtolower($namaWali)) {
             return $this->masalah("Telepon {$telepon} sudah dipakai wali bernama \"{$waliAda->nama}\" — periksa apakah datanya keliru.");
         }
 
@@ -336,7 +426,7 @@ class PemetaSantriLama implements Pemeta
 
         foreach ($baris as $b) {
             $telepon = trim($b['wali_telepon']);
-            $wali = Wali::where('telepon', $telepon)->first();
+            $wali = $this->waliBerTelepon($telepon);
             if (! $wali) {
                 $nama = trim($b['wali_nama']);
                 // `nama` & `telepon` di tabel wali adalah SALINAN kontak utama,
@@ -362,6 +452,12 @@ class PemetaSantriLama implements Pemeta
                     'id_batch' => $param['id_batch'] ?? null,
                 ]);
                 $dibuat['wali']++;
+
+                // WAJIB didaftarkan ke simpanan. Sebelum ada simpanan, baris
+                // berikutnya menemukannya lewat kueri; sekarang tidak — dan tanpa
+                // baris ini kakak-beradik yang berbagi satu nomor telepon akan
+                // melahirkan wali kembar, masing-masing menaungi satu anak.
+                $this->waliPerTelepon[$telepon] = $wali;
             }
 
             $santri = Santri::create([
@@ -430,7 +526,7 @@ class PemetaSantriLama implements Pemeta
                     'kode_jenis' => $kodeJenis,
                     // Perilaku disalin dari jenis biayanya supaya tunggakan uang
                     // pangkal warisan tetap dikenali modul yang membacanya.
-                    'perilaku' => TipeBiaya::perilakuDari(JenisBiaya::whereKey($kodeJenis)->value('tipe')),
+                    'perilaku' => TipeBiaya::perilakuDari($this->jenisBiaya($kodeJenis)?->tipe),
                     'kode_jenjang' => $santri->kode_jenjang,
                     'tahun_ajaran' => $santri->tahun_ajaran,
                     'nominal' => $nilai,
