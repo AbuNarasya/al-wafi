@@ -107,12 +107,20 @@ class Referensi
      * memang hanya melayani satu jenjang (mis. setoran laundry SMP), supaya
      * santri jenjang lain tak bisa terpilih karena kemiripan nama.
      */
-    public static function santri(?string $status = null, ?string $kodeJenjang = null): array
+    public static function santri(?string $status = null, ?string $kodeJenjang = null, ?array $hanyaId = null): array
     {
+        // Larik KOSONG berbeda dari null: "tak seorang pun" harus menghasilkan
+        // daftar kosong, bukan seluruh santri. `when()` menganggap [] falsy,
+        // jadi penyaringnya ditulis eksplisit.
+        if ($hanyaId !== null && $hanyaId === []) {
+            return [];
+        }
+
         $peta = Jenjang::pluck('nama', 'kode')->all();
 
         return Santri::when($status, fn ($q) => $q->where('status', $status))
             ->when($kodeJenjang, fn ($q) => $q->where('kode_jenjang', $kodeJenjang))
+            ->when($hanyaId, fn ($q) => $q->whereIn('id', $hanyaId))
             ->whereNotIn('status', Tahap::DISEMBUNYIKAN_DARI_PEMILIH)
             ->orderBy('nama')
             ->get(['id', 'nis', 'no_pendaftaran', 'nama', 'kode_jenjang', 'tingkat'])

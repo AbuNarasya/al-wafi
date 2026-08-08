@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
 use App\Models\JenisBiaya;
+use App\Models\PesertaTagihanLain;
 use App\Models\Santri;
 use App\Models\TagihanSantri;
 use App\Models\TipeBiaya;
@@ -49,19 +50,61 @@ class TagihanLainController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $daftar = JenisBiaya::whereIn('tipe', TipeBiaya::kodeBerperilaku('lain'))
+            ->where('status', 'aktif')->orderBy('kode')->get();
+
+        $kode = trim((string) $request->query('jenis', ''));
+        $jenis = $kode !== '' ? $daftar->firstWhere('kode', $kode) : null;
+
         return view('tagihan-lain.create', [
-            'jenisOptions' => ['' => '— pilih jenis —'] + JenisBiaya::whereIn('tipe', TipeBiaya::kodeBerperilaku('lain'))->where('status', 'aktif')->orderBy('kode')->get()
-                // Jenjang ikut ditampilkan: sejak jenjang bisa diisi pada jenis
-                // berperilaku "lain", dua baris bisa bernama mirip dan hanya
-                // dibedakan jenjangnya.
-                ->mapWithKeys(fn ($j) => [$j->kode => "{$j->kode} — {$j->nama}".($j->kode_jenjang ? " ({$j->kode_jenjang})" : '')])->all(),
-            // [id => "NIS - Nama - Jenjang - Tingkat"] — daftar centang ini dulu
-            // hanya menampilkan nama + KODE jenjang mentah (`J001`), sehingga dua
-            // santri bernama mirip tak bisa dibedakan sama sekali.
-            'santriAktif' => Referensi::santri('aktif'),
+            // Jenjang ikut ditampilkan: sejak jenjang bisa diisi pada jenis
+            // berperilaku "lain", dua baris bisa bernama mirip dan hanya
+            // dibedakan jenjangnya.
+            'jenisOptions' => $daftar->mapWithKeys(fn ($j) => [
+                $j->kode => "{$j->kode} — {$j->nama}".($j->kode_jenjang ? " ({$j->kode_jenjang})" : ''),
+            ])->all(),
+            'kodeJenis' => $jenis?->kode ?? '',
+            'jenis' => $jenis,
+            'santriAktif' => $jenis ? $this->santriUntuk($jenis) : [],
+            'sumberDaftar' => $jenis ? $this->sumberDaftar($jenis) : null,
         ]);
+    }
+
+    /**
+     * Santri yang MASUK AKAL ditagih untuk jenis ini.
+     *
+     * Dulu layar ini menumpahkan SELURUH santri aktif — 202 baris centang tanpa
+     * penyaring apa pun, termasuk santri SDTQ pada baris "Laundry SMA". Yang
+     * ditawarkan kini menyempit mengikuti sifat jenisnya:
+     *
+     *   kepesertaan → hanya yang terdaftar sebagai peserta & masih ikut
+     *   berjenjang → hanya santri jenjang itu
+     *   selain itu  → seluruh santri aktif (jenis lintas jenjang tanpa peserta)
+     *
+     * @return array<int,string>
+     */
+    private function santriUntuk(JenisBiaya $jenis): array
+    {
+        if ($jenis->cara_tagih === 'kepesertaan') {
+            $ids = PesertaTagihanLain::where('kode_jenis', $jenis->kode)->where('status', 'ikut')->pluck('id_santri');
+
+            return Referensi::santri('aktif', hanyaId: $ids->all());
+        }
+
+        return Referensi::santri('aktif', $jenis->kode_jenjang);
+    }
+
+    /** Kalimat yang menerangkan KENAPA daftarnya sependek itu. */
+    private function sumberDaftar(JenisBiaya $jenis): string
+    {
+        return match (true) {
+            $jenis->cara_tagih === 'kepesertaan' => 'Hanya peserta terdaftar kegiatan ini. Tambah/hentikan peserta di menu Peserta Kegiatan.',
+            $jenis->cara_tagih === 'pemakaian' => 'Nominal layanan bersatuan biasanya diterbitkan dari menu Setoran Laundry, bukan diketik di sini.',
+            (bool) $jenis->kode_jenjang => 'Hanya santri aktif jenjang jenis biaya ini.',
+            default => 'Seluruh santri aktif — jenis biaya ini tidak terikat jenjang.',
+        };
     }
 
     public function store(Request $request): RedirectResponse

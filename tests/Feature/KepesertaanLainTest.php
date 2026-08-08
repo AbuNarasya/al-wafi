@@ -241,6 +241,66 @@ class KepesertaanLainTest extends TestCase
         $this->svc()->jenis('LDR');
     }
 
+    /**
+     * Layar Terbitkan dulu menumpahkan SELURUH santri aktif — 202 baris centang
+     * tanpa penyaring, termasuk santri SDTQ pada baris "Laundry SMA". Kini
+     * daftarnya menyempit mengikuti sifat jenisnya.
+     */
+    public function test_layar_terbitkan_hanya_menawarkan_peserta_kegiatan(): void
+    {
+        $ikut = $this->santri('880020', 'Miftah Ridwan', 'SMP');
+        $bukan = $this->santri('880021', 'Nabil Arkan', 'SMP');
+        $this->svc()->tambah('UMR', $ikut->id);
+
+        $html = $this->actingAs($this->petugas)
+            ->get(route('tagihan_lain.create', ['jenis' => 'UMR']))->assertOk()->getContent();
+
+        // Yang diperiksa markup centangnya, bukan sekadar nama muncul di halaman.
+        $this->assertStringContainsString('value="'.$ikut->id.'"', $html);
+        $this->assertStringNotContainsString('value="'.$bukan->id.'"', $html);
+    }
+
+    public function test_peserta_yang_dihentikan_tak_lagi_ditawarkan(): void
+    {
+        $stop = $this->santri('880022', 'Oka Pramudya', 'SMP');
+        $p = $this->svc()->tambah('UMR', $stop->id);
+        $this->svc()->ubahStatus($p->id, 'berhenti');
+
+        $html = $this->actingAs($this->petugas)
+            ->get(route('tagihan_lain.create', ['jenis' => 'UMR']))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('value="'.$stop->id.'"', $html);
+        $this->assertStringContainsString('Belum ada peserta terdaftar', $html);
+    }
+
+    public function test_jenis_berjenjang_hanya_menawarkan_santri_jenjang_itu(): void
+    {
+        JenisBiaya::create([
+            'kode' => 'LDR-SMA', 'nama' => 'Laundry SMA', 'tipe' => 'lain', 'kode_jenjang' => 'SMA',
+            'kode_coa_pendapatan' => self::PENDAPATAN, 'kode_unit' => 'ZZKPU', 'status' => 'aktif',
+            'pengakuan' => 'kas', 'cara_tagih' => 'pemakaian',
+        ]);
+        $sma = $this->santri('880023', 'Putra Ramadhan', 'SMA');
+        $sdtq = $this->santri('880024', 'Qasim Halim', 'SDTQ');
+
+        $html = $this->actingAs($this->petugas)
+            ->get(route('tagihan_lain.create', ['jenis' => 'LDR-SMA']))->assertOk()->getContent();
+
+        $this->assertStringContainsString('value="'.$sma->id.'"', $html);
+        $this->assertStringNotContainsString('value="'.$sdtq->id.'"', $html);
+    }
+
+    public function test_tanpa_memilih_jenis_belum_ada_santri_yang_ditawarkan(): void
+    {
+        $s = $this->santri('880025', 'Rafi Zulkarnain', 'SMP');
+
+        $html = $this->actingAs($this->petugas)
+            ->get(route('tagihan_lain.create'))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('name="id_santri[]"', $html);
+        $this->assertStringContainsString('Pilih jenis biayanya dulu', $html);
+    }
+
     public function test_matriks_hanya_memuat_jenis_berkepesertaan(): void
     {
         JenisBiaya::create([
