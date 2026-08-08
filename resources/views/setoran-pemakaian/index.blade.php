@@ -4,7 +4,7 @@
 
 @section('content')
     @php
-        $satuan = $jenis?->nama_satuan ?: 'satuan';
+        $satuan = $tarif?->nama_satuan ?: 'satuan';
         $bolehCatat = \App\Support\Akses::boleh('setoran-laundry', 'buat');
         $bolehTerbit = \App\Support\Akses::boleh('tagihan-lain', 'buat');
         $angka = fn ($v) => rtrim(rtrim(number_format((float) $v, 2, ',', '.'), '0'), ',');
@@ -31,10 +31,11 @@
                     @endforeach
                 </select>
             </div>
-            @if ($jenis && $jenis->tarif_satuan)
+            @if ($tarif)
                 <div class="text-xs text-gray-500">
-                    Tarif <b>Rp {{ number_format((float) $jenis->tarif_satuan, 0, ',', '.') }}</b> / {{ $satuan }}
-                    &middot; kuota gratis <b>{{ $angka($jenis->kuota_gratis ?? 0) }} {{ $satuan }}</b> per periode
+                    Tarif <b>Rp {{ number_format((float) $tarif->tarif_satuan, 0, ',', '.') }}</b> / {{ $satuan }}
+                    &middot; kuota gratis <b>{{ $angka($tarif->kuota_gratis ?? 0) }} {{ $satuan }}</b> per periode
+                    &middot; <a href="{{ route('setoran_pemakaian.tarif') }}" class="font-medium text-brand hover:underline">ubah</a>
                 </div>
             @endif
             <noscript><button class="rounded-lg border border-gray-300 px-3 py-2 text-sm">Tampilkan</button></noscript>

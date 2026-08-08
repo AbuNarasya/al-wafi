@@ -75,7 +75,7 @@
                 </table>
             </div>
 
-            @if (\App\Support\Akses::boleh('tagihan-lain', 'ubah'))
+            @if (\App\Support\Akses::boleh('tarif-kepesertaan', 'ubah'))
                 <div class="mt-3 flex justify-end gap-2">
                     <a href="{{ route('tagihan_lain.tarif') }}"
                        class="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">Batal</a>

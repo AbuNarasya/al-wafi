@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * IDENTITAS AKUNTANSI jenis biaya kesantrian: nama, perilaku (lewat `tipe`),
@@ -38,6 +39,17 @@ class JenisBiaya extends Model
     public function jenjang(): BelongsTo
     {
         return $this->belongsTo(Jenjang::class, 'kode_jenjang', 'kode');
+    }
+
+    /**
+     * Besaran layanan bersatuan — TIDAK di master ini.
+     *
+     * Master hanya menyatakan bahwa jenis ini ditagih menurut pemakaian
+     * (`cara_tagih`); berapa per satuannya diatur di Matriks Tarif Layanan.
+     */
+    public function tarifPemakaian(): HasOne
+    {
+        return $this->hasOne(TarifPemakaian::class, 'kode_jenis', 'kode');
     }
 
     /**

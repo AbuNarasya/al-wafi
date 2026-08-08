@@ -21,6 +21,32 @@ class SetoranPemakaianController extends Controller
 {
     public function __construct(private readonly PemakaianLainService $service = new PemakaianLainService) {}
 
+    // ---- Matriks tarif layanan ----
+
+    public function tarif(): View
+    {
+        return view('setoran-pemakaian.tarif', ['grid' => $this->service->gridTarif()]);
+    }
+
+    public function simpanTarif(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'baris' => ['array'],
+            'baris.*.tarif_satuan' => ['nullable', 'numeric', 'min:0'],
+            'baris.*.nama_satuan' => ['nullable', 'string', 'max:20'],
+            'baris.*.kuota_gratis' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $hasil = $this->service->simpanGridTarif($data['baris'] ?? []);
+
+        $pesan = "Tarif layanan tersimpan — {$hasil['tersimpan']} layanan berlaku";
+        $pesan .= $hasil['dihapus'] > 0 ? ", {$hasil['dihapus']} dikosongkan." : '.';
+
+        return redirect()->route('setoran_pemakaian.tarif')->with('status', $pesan);
+    }
+
+    // ---- Pencatatan harian ----
+
     public function index(Request $request): View
     {
         $daftar = $this->service->jenisPemakaian();
@@ -30,9 +56,11 @@ class SetoranPemakaianController extends Controller
         // Rekap & riwayat hanya bisa disusun bila layanannya lengkap; jenis yang
         // belum bertarif melempar dari service, dan itu ditangkap jadi pesan.
         $rekap = [];
+        $tarif = null;
         $galat = null;
         if ($jenis) {
             try {
+                $tarif = $this->service->tarif($jenis);
                 $rekap = $this->service->rekap($jenis->kode);
             } catch (AppException $e) {
                 $galat = $e->getMessage();
@@ -43,6 +71,7 @@ class SetoranPemakaianController extends Controller
             'opsiJenis' => $daftar->mapWithKeys(fn ($j) => [$j->kode => $j->nama])->all(),
             'kodeJenis' => $kode,
             'jenis' => $jenis,
+            'tarif' => $tarif,
             'rekap' => $rekap,
             'galat' => $galat,
             // Hanya santri jenjang layanan itu — mencatat santri jenjang lain

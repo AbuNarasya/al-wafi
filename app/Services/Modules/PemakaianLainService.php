@@ -7,6 +7,7 @@ use App\Models\JenisBiaya;
 use App\Models\Santri;
 use App\Models\SetoranPemakaian;
 use App\Models\TagihanSantri;
+use App\Models\TarifPemakaian;
 use App\Models\TipeBiaya;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
@@ -38,11 +39,93 @@ class PemakaianLainService
         if (! $jenis || $jenis->cara_tagih !== 'pemakaian') {
             throw new AppException(404, 'Layanan tidak ditemukan, atau jenis biayanya tidak ditagih menurut pemakaian.');
         }
-        if (! $jenis->tarif_satuan || ! Money::gtZero(Money::of($jenis->tarif_satuan))) {
-            throw new AppException(422, "\"{$jenis->nama}\" belum punya tarif per satuan, jadi pemakaiannya tak bisa dihitung. Lengkapi dulu di master Jenis Biaya.");
-        }
 
         return $jenis;
+    }
+
+    /**
+     * Besarannya — dan ia TIDAK di master jenis biaya.
+     *
+     * Dipisahkan mengikuti pembagian yang sudah berlaku di sini: master itu
+     * identitas akuntansi, besarannya tinggal di tabelnya sendiri. Selama
+     * barisnya belum ada, mencatat timbangan pun ditolak: kuantitas yang tak
+     * bisa dihargai hanya menumpuk jadi pekerjaan yang harus diulang.
+     */
+    public function tarif(JenisBiaya $jenis): TarifPemakaian
+    {
+        $tarif = TarifPemakaian::where('kode_jenis', $jenis->kode)->first();
+        if (! $tarif || ! Money::gtZero(Money::of($tarif->tarif_satuan))) {
+            throw new AppException(422, "\"{$jenis->nama}\" belum punya tarif per satuan, jadi pemakaiannya tak bisa dihitung. Isi dulu di Matriks Tarif Layanan.");
+        }
+
+        return $tarif;
+    }
+
+    /**
+     * Matriks tarif layanan: satu baris per layanan bersatuan.
+     *
+     * Bukan matriks per jenjang seperti tarif kegiatan — jenis pemakaian sudah
+     * berjenjang sendiri (Laundry SMP, Laundry SMA), jadi yang berbeda tiap
+     * baris adalah satuan dan kuotanya, bukan jenjangnya.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function gridTarif(): array
+    {
+        $tarif = TarifPemakaian::get()->keyBy('kode_jenis');
+
+        return $this->jenisPemakaian()->map(fn ($jb) => [
+            'kode' => $jb->kode,
+            'nama' => $jb->nama,
+            'kode_jenjang' => $jb->kode_jenjang,
+            'status' => $jb->status,
+            'tarif_satuan' => $tarif[$jb->kode]->tarif_satuan ?? null,
+            'nama_satuan' => $tarif[$jb->kode]->nama_satuan ?? null,
+            'kuota_gratis' => $tarif[$jb->kode]->kuota_gratis ?? null,
+        ])->all();
+    }
+
+    /**
+     * Simpan seluruh matriks sekaligus.
+     *
+     * Tarif yang dikosongkan MENGHAPUS barisnya — bukan disimpan sebagai nol.
+     * Nol berarti layanan gratis yang tetap dicatat pemakaiannya; tak ada baris
+     * berarti besarannya belum diatur, dan pencatatan setorannya ditolak.
+     *
+     * @param  array<string,array<string,string|null>>  $baris
+     * @return array{tersimpan:int,dihapus:int}
+     */
+    public function simpanGridTarif(array $baris): array
+    {
+        $sah = $this->jenisPemakaian()->pluck('kode')->flip();
+        $tersimpan = $dihapus = 0;
+
+        DB::transaction(function () use ($baris, $sah, &$tersimpan, &$dihapus) {
+            foreach ($baris as $kode => $isi) {
+                if (! isset($sah[$kode])) {
+                    continue;
+                }
+
+                $tarif = trim((string) ($isi['tarif_satuan'] ?? ''));
+                if ($tarif === '') {
+                    $dihapus += TarifPemakaian::where('kode_jenis', $kode)->delete();
+
+                    continue;
+                }
+
+                $kuota = trim((string) ($isi['kuota_gratis'] ?? ''));
+                TarifPemakaian::updateOrCreate(['kode_jenis' => $kode], [
+                    'tarif_satuan' => Money::of($tarif),
+                    // Satuan tak boleh kosong bila tarifnya terisi — layar yang
+                    // menulis "12,5" tanpa satuan tak memberi tahu apa pun.
+                    'nama_satuan' => trim((string) ($isi['nama_satuan'] ?? '')) ?: 'satuan',
+                    'kuota_gratis' => $kuota === '' ? null : Money::of($kuota),
+                ]);
+                $tersimpan++;
+            }
+        });
+
+        return ['tersimpan' => $tersimpan, 'dihapus' => $dihapus];
     }
 
     /**
@@ -55,6 +138,7 @@ class PemakaianLainService
     public function catat(array $data, int $idPengguna): SetoranPemakaian
     {
         $jenis = $this->jenis($data['kode_jenis']);
+        $this->tarif($jenis);
 
         $santri = Santri::find($data['id_santri']);
         if (! $santri) {
@@ -108,7 +192,8 @@ class PemakaianLainService
     public function rekap(string $kodeJenis, ?string $sampai = null): array
     {
         $jenis = $this->jenis($kodeJenis);
-        $kuota = Money::of($jenis->kuota_gratis ?? '0');
+        $tarif = $this->tarif($jenis);
+        $kuota = Money::of($tarif->kuota_gratis ?? '0');
 
         $baris = SetoranPemakaian::belumTertagih()
             ->where('kode_jenis', $kodeJenis)
@@ -126,7 +211,7 @@ class PemakaianLainService
                 'santri' => $kumpulan->first()->santri,
                 'kuantitas' => $total,
                 'kena_tagih' => $kenaTagih,
-                'nominal' => Money::mul($kenaTagih, $jenis->tarif_satuan),
+                'nominal' => Money::mul($kenaTagih, $tarif->tarif_satuan),
                 'sisa_kuota' => Money::gt($kuota, $total) ? Money::sub($kuota, $total) : '0',
                 'jumlah_setoran' => $kumpulan->count(),
             ];

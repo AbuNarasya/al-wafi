@@ -669,8 +669,11 @@ Route::middleware('auth')->group(function () {
     // keadaan aneh — boleh menerbitkan tagihan tapi tak boleh melihat tarif yang
     // menentukan nominalnya.
     Route::prefix('kesantrian/tagihan-lain')->name('tagihan_lain.')->controller(\App\Http\Controllers\KepesertaanLainController::class)->group(function () {
-        Route::get('/tarif', 'tarif')->name('tarif')->middleware('hakakses:tagihan-lain,lihat');
-        Route::put('/tarif', 'simpanTarif')->name('tarif.simpan')->middleware('hakakses:tagihan-lain,ubah');
+        // Modul tersendiri, dibedakan dari matriks tarif LAYANAN: yang satu
+        // besaran per jenjang untuk kegiatan berpeserta, yang lain besaran per
+        // satuan untuk layanan bersatuan.
+        Route::get('/tarif', 'tarif')->name('tarif')->middleware('hakakses:tarif-kepesertaan,lihat');
+        Route::put('/tarif', 'simpanTarif')->name('tarif.simpan')->middleware('hakakses:tarif-kepesertaan,ubah');
 
         Route::get('/peserta', 'peserta')->name('peserta')->middleware('hakakses:tagihan-lain,lihat');
         Route::post('/peserta', 'tambahPeserta')->name('peserta.tambah')->middleware('hakakses:tagihan-lain,ubah');
@@ -684,6 +687,9 @@ Route::middleware('auth')->group(function () {
     // mencatat timbangan, bukan menerbitkan uang. Penerbitan periodenya tetap
     // menuntut hak `tagihan-lain`.
     Route::prefix('kesantrian/setoran-pemakaian')->name('setoran_pemakaian.')->controller(\App\Http\Controllers\SetoranPemakaianController::class)->group(function () {
+        Route::get('/tarif', 'tarif')->name('tarif')->middleware('hakakses:tarif-pemakaian,lihat');
+        Route::put('/tarif', 'simpanTarif')->name('tarif.simpan')->middleware('hakakses:tarif-pemakaian,ubah');
+
         Route::get('/', 'index')->name('index')->middleware('hakakses:setoran-laundry,lihat');
         Route::post('/', 'catat')->name('catat')->middleware('hakakses:setoran-laundry,buat');
         Route::delete('/{id}', 'hapus')->name('hapus')->middleware('hakakses:setoran-laundry,buat')->whereNumber('id');

@@ -13,6 +13,7 @@ use App\Models\Santri;
 use App\Models\SetoranPemakaian;
 use App\Models\TagihanSantri;
 use App\Models\TahunAjaran;
+use App\Models\TarifPemakaian;
 use App\Models\TipeBiaya;
 use App\Models\User;
 use App\Models\Wali;
@@ -73,7 +74,12 @@ class PemakaianLaundryTest extends TestCase
             'kode' => 'LDR-SMP', 'nama' => 'Laundry SMP', 'tipe' => 'lain', 'kode_jenjang' => 'SMP',
             'kode_coa_pendapatan' => self::PENDAPATAN, 'kode_coa_piutang' => self::PIUTANG,
             'kode_unit' => 'ZZLDU', 'status' => 'aktif', 'pengakuan' => 'akrual',
-            'cara_tagih' => 'pemakaian', 'tarif_satuan' => '7000', 'nama_satuan' => 'kg', 'kuota_gratis' => '20',
+            'cara_tagih' => 'pemakaian',
+        ]);
+        // Besarannya TIDAK di master — ia tinggal di tabelnya sendiri, sama
+        // seperti tarif biasa dan tarif kegiatan.
+        TarifPemakaian::create([
+            'kode_jenis' => 'LDR-SMP', 'tarif_satuan' => '7000', 'nama_satuan' => 'kg', 'kuota_gratis' => '20',
         ]);
     }
 
@@ -223,16 +229,54 @@ class PemakaianLaundryTest extends TestCase
         $this->svc()->hapusSetoran(SetoranPemakaian::first()->id);
     }
 
-    public function test_layanan_tanpa_tarif_satuan_menolak_dengan_sebabnya(): void
+    public function test_layanan_tanpa_baris_tarif_menolak_pencatatan_dengan_sebabnya(): void
+    {
+        // Layanan ada di master, tapi besarannya belum diatur di matriks. Timbangan
+        // yang tak bisa dihargai hanya menumpuk jadi pekerjaan yang harus diulang,
+        // jadi pencatatannya ditolak sejak awal — bukan didiamkan.
+        JenisBiaya::create([
+            'kode' => 'LDR-X', 'nama' => 'Laundry Belum Lengkap', 'tipe' => 'lain', 'kode_jenjang' => 'SMP',
+            'kode_coa_pendapatan' => self::PENDAPATAN, 'kode_unit' => 'ZZLDU', 'status' => 'aktif',
+            'pengakuan' => 'kas', 'cara_tagih' => 'pemakaian',
+        ]);
+        $s = $this->santri('550009', 'Yusuf Habibi');
+
+        $this->expectException(AppException::class);
+        $this->expectExceptionMessageMatches('/belum punya tarif per satuan/');
+        $this->svc()->catat([
+            'kode_jenis' => 'LDR-X', 'id_santri' => $s->id,
+            'tanggal' => '2026-08-05', 'kuantitas' => '5',
+        ], $this->petugas->id_pengguna);
+    }
+
+    public function test_matriks_tarif_layanan_menyimpan_dan_mengosongkan(): void
     {
         JenisBiaya::create([
-            'kode' => 'LDR-X', 'nama' => 'Laundry Belum Lengkap', 'tipe' => 'lain',
+            'kode' => 'LDR-SMA', 'nama' => 'Laundry SMA', 'tipe' => 'lain', 'kode_jenjang' => 'SMA',
             'kode_coa_pendapatan' => self::PENDAPATAN, 'kode_unit' => 'ZZLDU', 'status' => 'aktif',
             'pengakuan' => 'kas', 'cara_tagih' => 'pemakaian',
         ]);
 
-        $this->expectException(AppException::class);
-        $this->expectExceptionMessageMatches('/belum punya tarif per satuan/');
-        $this->svc()->jenis('LDR-X');
+        $hasil = $this->svc()->simpanGridTarif([
+            'LDR-SMA' => ['tarif_satuan' => '8000', 'nama_satuan' => 'kg', 'kuota_gratis' => '15'],
+            // Tarif dikosongkan ⇒ barisnya dihapus, bukan disimpan sebagai nol.
+            'LDR-SMP' => ['tarif_satuan' => '', 'nama_satuan' => 'kg', 'kuota_gratis' => '20'],
+        ]);
+
+        $this->assertSame(1, $hasil['tersimpan']);
+        $this->assertSame(1, $hasil['dihapus']);
+        $this->assertSame(0, bccomp(TarifPemakaian::where('kode_jenis', 'LDR-SMA')->value('tarif_satuan'), '8000', 2));
+        $this->assertNull(TarifPemakaian::where('kode_jenis', 'LDR-SMP')->first());
+    }
+
+    public function test_master_jenis_biaya_tak_lagi_menyimpan_besaran(): void
+    {
+        // Aturan proyek: `jenis_biaya` = identitas akuntansi saja, tanpa nominal.
+        foreach (['tarif_satuan', 'nama_satuan', 'kuota_gratis'] as $kolom) {
+            $this->assertFalse(
+                \Illuminate\Support\Facades\Schema::hasColumn('jenis_biaya', $kolom),
+                "Kolom {$kolom} seharusnya sudah pindah ke tarif_pemakaian.",
+            );
+        }
     }
 }

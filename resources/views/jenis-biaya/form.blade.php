@@ -110,21 +110,16 @@
                     @error('cara_tagih')<span class="text-red-600">{{ $message }}</span>@enderror
                 </p>
 
-                {{-- Tarif satuan & kuota hanya berarti bagi "pemakaian". Untuk
-                     kepesertaan, besarannya datang dari Matriks Tarif per jenjang
-                     — memunculkan isian ini di sana hanya mengundang salah isi. --}}
-                <div x-show="caraTagih === 'pemakaian'" x-cloak class="mt-4 grid gap-4 sm:grid-cols-3">
-                    <x-field name="tarif_satuan" label="Tarif per Satuan" type="number" :value="$jb->tarif_satuan"
-                             hint="Mis. 7000 untuk laundry Rp 7.000/kg." />
-                    <x-field name="nama_satuan" label="Nama Satuan" :value="$jb->nama_satuan" placeholder="kg"
-                             hint="Dipakai di seluruh layar: “12,5 kg”." />
-                    <x-field name="kuota_gratis" label="Kuota Gratis per Periode" type="number" :value="$jb->kuota_gratis"
-                             hint="Mis. 20 — tagihan hanya terbit atas kelebihannya. Kosongkan bila tak ada jatah gratis." />
-                </div>
-
+                {{-- BESARANNYA TIDAK DI SINI, apa pun cara tagihnya — master ini
+                     identitas akuntansi, sama seperti tarif biasa yang tinggal di
+                     menu Tarif. Yang ditampilkan cuma penunjuk arahnya. --}}
                 <p x-show="caraTagih === 'kepesertaan'" x-cloak class="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
                     Besarannya diatur di <b>Matriks Tarif Kegiatan</b>, per jenjang — bukan di sini.
                     Sel yang dikosongkan di sana berarti jenjang itu tidak ikut kegiatannya.
+                </p>
+                <p x-show="caraTagih === 'pemakaian'" x-cloak class="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                    Tarif per satuan, nama satuan, dan kuota gratisnya diatur di <b>Matriks Tarif Layanan</b> — bukan di sini.
+                    Selama belum diisi, Setoran Laundry menolak mencatat pemakaiannya.
                 </p>
             </div>
 
