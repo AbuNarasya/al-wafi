@@ -165,16 +165,36 @@ class TingkatJenjangTest extends TestCase
     public function test_menu_master_data_santri_digabung_jadi_satu(): void
     {
         $this->actingAs($this->admin);
-        $menu = collect(Navigation::items())->where('group', 'KEPENDIDIKAN')->where('sub', 'Master');
+        // Daftar orangnya berkumpul di SATU grup — dulu tercecer: calon di PPSB,
+        // yang aktif & arsip di KEPENDIDIKAN.
+        $menu = collect(Navigation::items())->where('group', 'DATA SISWA/SANTRI');
 
         $this->assertSame(
-            ['Santri Aktif', 'Alumni', 'Santri Keluar'],
+            [
+                'Wali / Keluarga', 'Calon Santri', 'Calon Santri Siap Aktivasi',
+                'Calon Mengundurkan Diri', 'Santri Aktif', 'Alumni', 'Santri Keluar',
+            ],
             $menu->pluck('label')->values()->all(),
-            'daftar berjalan dulu, dua daftar arsip di belakangnya',
+            'urut menurut perjalanan santri: keluarga → calon → aktif → arsip',
         );
-        $this->assertSame('/kesantrian/santri', $menu->first()['url']);
-        // Ketiganya memakai modul hak akses yang sama.
-        $this->assertSame(['santri'], $menu->pluck('modul')->unique()->values()->all());
+        $this->assertSame('/kesantrian/santri', $menu->firstWhere('label', 'Santri Aktif')['url']);
+        // Selain Wali, semuanya memakai modul hak akses yang sama.
+        $this->assertSame(
+            ['wali', 'santri'],
+            $menu->pluck('modul')->unique()->values()->all(),
+        );
+        // Grupnya tanpa sub: satu deret, tak perlu ketukan tambahan.
+        $this->assertSame([], $menu->pluck('sub')->filter()->all());
+        $this->assertArrayNotHasKey('DATA SISWA/SANTRI', Navigation::SUB_ORDER);
+        // Sub "Master" di KEPENDIDIKAN ikut hilang — isinya sudah pindah.
+        $this->assertNotContains('Master', Navigation::SUB_ORDER['KEPENDIDIKAN']);
+        // Begitu pula "Data Master" di PPSB: sisanya cuma Angsuran Uang Pangkal,
+        // dan itu urusan uang — tempatnya di Transaksi.
+        $this->assertNotContains('Data Master', Navigation::SUB_ORDER['PPSB']);
+        $this->assertSame(
+            'Transaksi',
+            collect(Navigation::items())->firstWhere('url', '/ppsb/angsuran-uang-pangkal')['sub'],
+        );
 
         // Jenjang baru TIDAK lagi menambah menu.
         Jenjang::create(['kode' => 'MA', 'nama' => 'MA', 'jumlah_tingkat' => 3, 'urutan' => 4]);
@@ -193,9 +213,10 @@ class TingkatJenjangTest extends TestCase
         foreach ([[], ['jenjang' => 'SDTQ'], ['jenjang' => 'SMP'], ['tingkat' => 1]] as $saring) {
             $this->get(route('santri.aktif', $saring))->assertOk();
             $this->assertSame('/kesantrian/santri', Navigation::activeUrl());
-            // Accordion-nya ikut terbentang di grup & sub yang benar.
-            $this->assertSame('KEPENDIDIKAN', Navigation::activeGroup());
-            $this->assertSame('Master', Navigation::activeSub());
+            // Accordion-nya ikut terbentang di grup yang benar; grup ini tanpa
+            // sub, jadi tak ada sub-accordion yang perlu dibuka.
+            $this->assertSame('DATA SISWA/SANTRI', Navigation::activeGroup());
+            $this->assertNull(Navigation::activeSub());
         }
 
         // Halaman lain tak ikut terpengaruh.

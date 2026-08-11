@@ -108,7 +108,37 @@ final class Navigation
         ['url' => '/period-close', 'label' => 'Tutup Buku Periode', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'period-close'],
         ['url' => '/export', 'label' => 'Export Data', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'reports'],
 
-        // ---- 5. PPSB & Kependidikan ----
+        // ---- 5. Data Siswa/Santri ----
+        // Satu grup untuk SELURUH daftar orangnya, dari wali sampai alumni.
+        // Sebelumnya tercecer di dua grup: calon di PPSB, yang aktif & arsip di
+        // KEPENDIDIKAN — padahal orangnya sama, cuma beda tahap, dan yang mencari
+        // "di mana daftar santrinya" harus menebak dulu tahap mana yang dimaksud.
+        // URL & kode modul hak akses SENGAJA tak ikut pindah: kode modul tersimpan
+        // di `hak_akses_modul`, jadi menggantinya memutus hak yang sudah diberikan.
+        // Urutannya mengikuti perjalanan santri: keluarganya → calon (diproses →
+        // siap aktivasi → mundur) → aktif → dua daftar arsip.
+        ['url' => '/wali', 'label' => 'Wali / Keluarga', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'wali'],
+        ['url' => '/ppsb/calon-santri', 'label' => 'Calon Santri', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        // Berkasnya tuntas, tinggal menunggu tahun ajarannya dimulai. Dipisah dari
+        // Calon Santri supaya jumlah yang MASIH diproses tak bercampur dengan yang
+        // sudah selesai diurus — dan supaya aktivasi massalnya punya satu tempat.
+        ['url' => '/ppsb/siap-aktivasi', 'label' => 'Calon Santri Siap Aktivasi', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        // Arsip, sejajar dengan Alumni & Santri Keluar: calon yang mundur bukan
+        // lagi pekerjaan berjalan, dan membiarkannya di daftar Calon membuat
+        // jumlah pendaftar di layar tak pernah sama dengan yang ditunggu.
+        ['url' => '/ppsb/calon-mundur', 'label' => 'Calon Mengundurkan Diri', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        // SATU daftar untuk seluruh jenjang. Penyaring jenjang ada DI HALAMANNYA
+        // (`?jenjang=…`), bukan dipecah jadi menu sendiri-sendiri seperti dulu:
+        // sidebar jadi memanjang seiring bertambahnya jenjang, padahal isinya
+        // halaman yang sama dengan satu penyaring berbeda.
+        ['url' => '/kesantrian/santri', 'label' => 'Santri Aktif', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        // Alumni & santri keluar berdaftar SENDIRI: dulu keduanya ikut nongol di
+        // daftar Santri, sehingga jumlah di layar tak pernah sama dengan jumlah
+        // santri yang benar-benar bersekolah. Modul hak aksesnya tetap `santri`.
+        ['url' => '/kesantrian/alumni', 'label' => 'Alumni', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        ['url' => '/kesantrian/santri-keluar', 'label' => 'Santri Keluar', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+
+        // ---- 6. PPSB & Kependidikan ----
         // CATATAN: label grupnya "KEPENDIDIKAN", tetapi URL (/kesantrian/…) dan
         // kode modul (`pembayaran-kesantrian`) sengaja TIDAK ikut diganti —
         // kode modul tersimpan di `hak_akses_modul`, jadi menggantinya akan
@@ -122,33 +152,21 @@ final class Navigation
         ['url' => '/ppsb/gelombang/potongan', 'label' => 'Potongan Gelombang', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'potongan-gelombang'],
         ['url' => '/ppsb/target-santri', 'label' => 'Target Santri', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'target-santri'],
         ['url' => '/ppsb/termin-filter', 'label' => 'Setting Filter Termin Jatuh Tempo', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'termin-filter'],
-        ['url' => '/wali', 'label' => 'Wali / Keluarga', 'group' => 'PPSB', 'sub' => 'Data Master', 'modul' => 'wali'],
-        ['url' => '/ppsb/calon-santri', 'label' => 'Calon Santri', 'group' => 'PPSB', 'sub' => 'Data Master', 'modul' => 'santri'],
-        // Arsip, sejajar dengan Alumni & Santri Keluar di Kependidikan: calon yang
-        // mundur bukan lagi pekerjaan berjalan, dan membiarkannya di daftar Calon
-        // membuat jumlah pendaftar di layar tak pernah sama dengan yang ditunggu.
-        // Berkasnya tuntas, tinggal menunggu tahun ajarannya dimulai. Dipisah dari
-        // Calon Santri supaya jumlah yang MASIH diproses tak bercampur dengan yang
-        // sudah selesai diurus — dan supaya aktivasi massalnya punya satu tempat.
-        ['url' => '/ppsb/siap-aktivasi', 'label' => 'Calon Santri Siap Aktivasi', 'group' => 'PPSB', 'sub' => 'Data Master', 'modul' => 'santri'],
-        ['url' => '/ppsb/calon-mundur', 'label' => 'Calon Mengundurkan Diri', 'group' => 'PPSB', 'sub' => 'Data Master', 'modul' => 'santri'],
-        ['url' => '/ppsb/angsuran-uang-pangkal', 'label' => 'Angsuran Uang Pangkal', 'group' => 'PPSB', 'sub' => 'Data Master', 'modul' => 'angsuran-uang-pangkal'],
+        // Sub "Data Master" grup ini sudah kosong: daftar orangnya (wali, calon,
+        // siap aktivasi, mundur) pindah ke grup DATA SISWA/SANTRI, dan Angsuran
+        // Uang Pangkal turun ke Transaksi — ia memang urusan uang, bukan master.
+        // Jadwal angsurannya disusun DULU, pembayarannya menyusul, jadi ia
+        // mendahului Pembayaran Tagihan PPSB.
+        ['url' => '/ppsb/angsuran-uang-pangkal', 'label' => 'Angsuran Uang Pangkal', 'group' => 'PPSB', 'sub' => 'Transaksi', 'modul' => 'angsuran-uang-pangkal'],
         ['url' => '/ppsb/pembayaran', 'label' => 'Pembayaran Tagihan PPSB', 'group' => 'PPSB', 'sub' => 'Transaksi', 'modul' => 'pembayaran-ppsb'],
         // URL-nya BEDA dari kembarannya di Kependidikan: yang ini hanya memuat
         // santri yang masih punya kewajiban uang pangkal / perlengkapan. Dulu
         // keduanya menunjuk /rekap-pembayaran yang sama persis, sehingga menu
         // PPSB menampilkan seluruh santri — termasuk yang sudah lama lunas.
         ['url' => '/ppsb/rekap-pembayaran', 'label' => 'Rekap Pembayaran Santri', 'group' => 'PPSB', 'sub' => 'Transaksi', 'modul' => 'rekap-pembayaran'],
-        // SATU daftar untuk seluruh jenjang. Penyaring jenjang ada DI HALAMANNYA
-        // (`?jenjang=…`), bukan dipecah jadi menu sendiri-sendiri seperti dulu:
-        // sidebar jadi memanjang seiring bertambahnya jenjang, padahal isinya
-        // halaman yang sama dengan satu penyaring berbeda.
-        ['url' => '/kesantrian/santri', 'label' => 'Santri Aktif', 'group' => 'KEPENDIDIKAN', 'sub' => 'Master', 'modul' => 'santri'],
-        // Alumni & santri keluar berdaftar SENDIRI: dulu keduanya ikut nongol di
-        // daftar Santri, sehingga jumlah di layar tak pernah sama dengan jumlah
-        // santri yang benar-benar bersekolah. Modul hak aksesnya tetap `santri`.
-        ['url' => '/kesantrian/alumni', 'label' => 'Alumni', 'group' => 'KEPENDIDIKAN', 'sub' => 'Master', 'modul' => 'santri'],
-        ['url' => '/kesantrian/santri-keluar', 'label' => 'Santri Keluar', 'group' => 'KEPENDIDIKAN', 'sub' => 'Master', 'modul' => 'santri'],
+        // Sub "Master" grup ini sudah kosong — Santri Aktif, Alumni, & Santri
+        // Keluar pindah ke grup DATA SISWA/SANTRI. Yang tersisa di sini adalah
+        // pekerjaannya, bukan daftar orangnya.
 
         // Administrasi = pekerjaan BERKALA yang MENERBITKAN sesuatu (tagihan,
         // tingkat baru, nomor induk) — dipisah dari Transaksi yang menerima uang
@@ -170,7 +188,7 @@ final class Navigation
         // Penagihan SPP: yang satu pekerjaan bulanan, yang ini pekerjaan harian.
         ['url' => '/kesantrian/outstanding-spp', 'label' => 'Daftar Outstanding SPP', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'outstanding-spp'],
 
-        // ---- 5b. Tagihan Lain-lain ----
+        // ---- 7. Tagihan Lain-lain ----
         // Sampai sekarang modul ini SAMA SEKALI tak punya item sidebar — satu-
         // satunya jalan masuk adalah mengetik URL-nya. Grupnya sendiri sekaligus
         // menutup lubang itu.
@@ -185,20 +203,25 @@ final class Navigation
         ['url' => '/kesantrian/setoran-pemakaian', 'label' => 'Setoran Laundry', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi', 'modul' => 'setoran-laundry'],
         ['url' => '/kesantrian/tagihan-lain', 'label' => 'Daftar & Terbitkan', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi', 'modul' => 'tagihan-lain'],
 
-        // ---- 6. Sistem ----
+        // ---- 8. Sistem ----
         ['url' => '/approvals', 'label' => 'Persetujuan Saya', 'group' => 'SISTEM'],
         // "Outstanding Approval" (/void-approvals) dibuang 2026-07-28 — tak ada
         // rutenya (404) & fiturnya belum diport. Lihat catatan di ModulRegistry.
     ];
 
-    public const GROUP_ORDER = ['', 'SETTING AWAL', 'ANGGARAN', 'PENGAJUAN PEMBAYARAN', 'KEUANGAN', 'PPSB', 'KEPENDIDIKAN', 'TAGIHAN LAIN-LAIN', 'SISTEM'];
+    // DATA SISWA/SANTRI mendahului PPSB & KEPENDIDIKAN: isinya orang yang jadi
+    // rujukan kedua grup itu, dan itu pula yang paling sering dibuka.
+    public const GROUP_ORDER = ['', 'SETTING AWAL', 'ANGGARAN', 'PENGAJUAN PEMBAYARAN', 'KEUANGAN', 'DATA SISWA/SANTRI', 'PPSB', 'KEPENDIDIKAN', 'TAGIHAN LAIN-LAIN', 'SISTEM'];
 
     public const SUB_ORDER = [
         'SETTING AWAL' => ['Setting Umum', 'Setting Biaya'],
         'PENGAJUAN PEMBAYARAN' => ['Buat Pengajuan', 'Pengajuan'],
         'KEUANGAN' => ['Vendor & Customer', 'Aset & Persediaan', 'Transaksi', 'Laporan', 'Kontrol'],
-        'PPSB' => ['Setting Awal', 'Data Master', 'Transaksi'],
-        'KEPENDIDIKAN' => ['Master', 'Administrasi', 'Transaksi', 'Kontrol'],
+        // DATA SISWA/SANTRI sengaja TANPA sub: tujuh menunya satu deret menurut
+        // perjalanan santri, dan memecahnya jadi sub cuma menambah satu ketukan
+        // untuk daftar yang justru paling sering dibuka.
+        'PPSB' => ['Setting Awal', 'Transaksi'],
+        'KEPENDIDIKAN' => ['Administrasi', 'Transaksi', 'Kontrol'],
         // "Setting Tagihan Lain Lain" belum punya item: layar jenis & cara tagih
         // serta matriks tarifnya baru lahir di langkah 4 rancangan v2. Sub tanpa
         // item memang tidak dirender (lihat groups()), jadi menyebutnya di sini
