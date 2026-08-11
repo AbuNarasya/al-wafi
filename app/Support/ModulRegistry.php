@@ -90,10 +90,19 @@ final class ModulRegistry
         ['kode' => 'opening-balance', 'nama' => 'Saldo Awal', 'grup' => 'KEUANGAN', 'sub' => 'Kontrol'],
         ['kode' => 'period-close', 'nama' => 'Tutup Buku Periode', 'grup' => 'KEUANGAN', 'sub' => 'Kontrol'],
 
+        // ---- Data Siswa/Santri ----
+        // Sekelompok dengan grup sidebar bernama sama. Satu modul `santri`
+        // menggerbangi SELURUH tahapnya (calon, siap aktivasi, mundur, aktif,
+        // alumni, keluar): tujuh menu di sidebar, satu baris di matriks — memang
+        // satu daftar orang yang sama dengan penyaring berbeda.
+        ['kode' => 'wali', 'nama' => 'Wali / Keluarga Santri', 'grup' => 'DATA SISWA/SANTRI'],
+        ['kode' => 'santri', 'nama' => 'Calon Santri & Santri (semua tahap)', 'grup' => 'DATA SISWA/SANTRI'],
+        // TANPA MENU sendiri: dibuka dari halaman santri. Ikut ke grup ini karena
+        // isinya berkas orang yang sama, bukan urusan pendaftaran.
+        ['kode' => 'dokumen-santri', 'nama' => 'Berkas Santri (KTP, akta, KK, med check)', 'grup' => 'DATA SISWA/SANTRI'],
+
         // ---- PPSB ----
         ['kode' => 'tahun-ajaran', 'nama' => 'Tahun Ajaran', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
-        ['kode' => 'wali', 'nama' => 'Wali / Keluarga Santri', 'grup' => 'PPSB', 'sub' => 'Data Master'],
-        ['kode' => 'santri', 'nama' => 'Calon Santri & Santri', 'grup' => 'PPSB', 'sub' => 'Data Master'],
         // Urutan mengikuti sidebar: jalur dulu, baru jenis biaya yang tarifnya
         // dibedakan per jalur.
         ['kode' => 'jalur-pendaftaran', 'nama' => 'Jalur Pendaftaran', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
@@ -104,8 +113,8 @@ final class ModulRegistry
         ['kode' => 'potongan-gelombang', 'nama' => 'Gelombang & Potongan Uang Pangkal', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
         ['kode' => 'target-santri', 'nama' => 'Target Santri per Tahun Ajaran & Jenjang', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
         ['kode' => 'termin-filter', 'nama' => 'Setting Filter Termin Jatuh Tempo', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
-        ['kode' => 'dokumen-santri', 'nama' => 'Berkas Santri (KTP, akta, KK, med check)', 'grup' => 'PPSB', 'sub' => 'Data Master'],
-        ['kode' => 'angsuran-uang-pangkal', 'nama' => 'Angsuran Uang Pangkal (Termin & Reminder)', 'grup' => 'PPSB', 'sub' => 'Data Master'],
+        // Turun ke Transaksi bersama menunya: ia mengatur uang, bukan master.
+        ['kode' => 'angsuran-uang-pangkal', 'nama' => 'Angsuran Uang Pangkal (Termin & Reminder)', 'grup' => 'PPSB', 'sub' => 'Transaksi'],
         ['kode' => 'pembayaran-ppsb', 'nama' => 'Pembayaran Tagihan PPSB (registrasi & uang pangkal)', 'grup' => 'PPSB', 'sub' => 'Transaksi'],
         ['kode' => 'rekap-pembayaran', 'nama' => 'Rekap Pembayaran Santri', 'grup' => 'PPSB', 'sub' => 'Transaksi'],
 
@@ -170,26 +179,40 @@ final class ModulRegistry
         ['kode' => 'pengaturan-dana-bebas', 'nama' => 'Akun Pengurang Dana Bebas', 'grup' => 'TANPA MENU'],
     ];
 
-    /** Urutan tampil grup — sama dengan urutan sidebar. */
+    /**
+     * Urutan tampil grup — sama dengan urutan sidebar.
+     *
+     * Grup yang TIDAK disebut di sini tetap ikut tampil, tapi melayang ke paling
+     * atas: `array_search` mengembalikan false dan false-dikurangi-angka dihitung
+     * sebagai 0 (lihat HakAksesController::modulTerurut). Itulah yang terjadi pada
+     * TAGIHAN LAIN-LAIN sampai sekarang — barisnya nongol mendahului UMUM.
+     * Tiap grup baru WAJIB didaftarkan di sini.
+     */
     public const GRUP_ORDER = [
         'UMUM',
         'SETTING AWAL',
         'ANGGARAN',
         'PENGAJUAN PEMBAYARAN',
         'KEUANGAN',
+        'DATA SISWA/SANTRI',
         'PPSB',
         'KEPENDIDIKAN',
+        'TAGIHAN LAIN-LAIN',
         'SISTEM',
         'TANPA MENU',
     ];
 
-    /** Urutan sub-grup di dalam grup. */
+    /**
+     * Urutan sub-grup di dalam grup. Grup tanpa entri di sini (mis. DATA
+     * SISWA/SANTRI) menampilkan modulnya sebagai satu deret tanpa sub.
+     */
     public const SUB_ORDER = [
         'SETTING AWAL' => ['Setting Umum', 'Setting Biaya'],
         'PENGAJUAN PEMBAYARAN' => ['Pengajuan'],
         'KEUANGAN' => ['Vendor & Customer', 'Aset & Persediaan', 'Transaksi', 'Laporan', 'Kontrol'],
-        'PPSB' => ['Setting Awal', 'Data Master', 'Transaksi'],
+        'PPSB' => ['Setting Awal', 'Transaksi'],
         'KEPENDIDIKAN' => ['Administrasi', 'Transaksi', 'Kontrol'],
+        'TAGIHAN LAIN-LAIN' => ['Setting Tagihan Lain Lain', 'Transaksi'],
     ];
 
     /**

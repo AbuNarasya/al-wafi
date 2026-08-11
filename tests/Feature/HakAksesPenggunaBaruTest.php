@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\HakAksesModul;
 use App\Models\Level;
 use App\Models\User;
+use App\Support\ModulRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -100,5 +101,53 @@ class HakAksesPenggunaBaruTest extends TestCase
         $this->actingAs($this->admin)->put(route('users.update', $this->tuPengguna), $this->isian([
             'username' => 'tata', 'nama' => 'Tata Usaha Baru', 'password' => '',
         ]))->assertRedirect(route('users.index'));
+    }
+
+    /**
+     * Tiap grup & sub yang dipakai baris registri HARUS terdaftar urutannya.
+     *
+     * Grup yang terlewat tidak hilang, tapi MELAYANG ke paling atas matriks:
+     * `array_search` mengembalikan false, dan false dikurangi angka dihitung
+     * sebagai 0 (HakAksesController::modulTerurut). TAGIHAN LAIN-LAIN pernah
+     * begitu berbulan-bulan tanpa ada yang menyadarinya.
+     */
+    public function test_semua_grup_dan_sub_registri_punya_urutan(): void
+    {
+        foreach (ModulRegistry::MODUL as $m) {
+            $this->assertContains($m['grup'], ModulRegistry::GRUP_ORDER, "grup {$m['grup']} tak punya urutan");
+
+            if (! empty($m['sub'])) {
+                $this->assertContains(
+                    $m['sub'],
+                    ModulRegistry::SUB_ORDER[$m['grup']] ?? [],
+                    "sub {$m['sub']} di grup {$m['grup']} tak punya urutan",
+                );
+            }
+        }
+    }
+
+    /**
+     * Matriks hak akses mengelompokkan modul sama seperti sidebar: daftar
+     * orangnya berkumpul di DATA SISWA/SANTRI, bukan tercecer di PPSB.
+     * Kode modulnya SENGAJA tak ikut berubah — ia tersimpan di `hak_akses_modul`,
+     * dan menggantinya memutus hak yang sudah diberikan.
+     */
+    public function test_grup_matriks_mengikuti_sidebar(): void
+    {
+        $grup = collect(ModulRegistry::MODUL)->groupBy('grup')->map(fn ($m) => $m->pluck('kode')->all());
+
+        $this->assertSame(['wali', 'santri', 'dokumen-santri'], $grup['DATA SISWA/SANTRI']);
+        $this->assertNotContains('santri', $grup['PPSB']);
+        // Angsuran Uang Pangkal ikut menunya turun ke Transaksi.
+        $this->assertSame(
+            'Transaksi',
+            collect(ModulRegistry::MODUL)->firstWhere('kode', 'angsuran-uang-pangkal')['sub'],
+        );
+        $this->assertNotContains('Data Master', ModulRegistry::SUB_ORDER['PPSB']);
+
+        // Dan grup barunya benar-benar tercetak di layar matriks.
+        $this->actingAs($this->admin)->get(route('hak_akses.edit', $this->tuPengguna))
+            ->assertOk()
+            ->assertSee('DATA SISWA/SANTRI');
     }
 }
