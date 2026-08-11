@@ -38,6 +38,11 @@ class PengajuanRequest extends FormRequest
             'details.*.kode_unit' => ['required', 'string', 'exists:business_units,kode_unit'],
             'details.*.nominal' => ['required', 'numeric', 'gt:0'],
             'details.*.keterangan' => ['nullable', 'string'],
+            // Lampiran pendukung — boleh kosong, boleh beberapa berkas sekaligus.
+            // Batas & daftar tipenya dari App\Support\Unggahan, sama dengan
+            // seluruh isian berkas di aplikasi ini.
+            'lampiran' => ['nullable', 'array'],
+            'lampiran.*' => \App\Support\Unggahan::aturan(wajib: false),
         ];
     }
 

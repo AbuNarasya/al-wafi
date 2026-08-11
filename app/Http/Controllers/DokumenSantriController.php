@@ -41,7 +41,8 @@ class DokumenSantriController extends Controller
         $data = $request->validate([
             'jenis' => ['required', Rule::in(self::JENIS)],
             'keterangan' => ['nullable', 'string', 'max:255'],
-            'berkas' => ['required', 'file', 'max:5120', 'mimes:pdf,jpg,jpeg,png'],
+            // Batas & daftar tipe dari satu tempat — lihat App\Support\Unggahan.
+            'berkas' => \App\Support\Unggahan::aturan(),
         ]);
         $data['id_santri'] = $id;
 

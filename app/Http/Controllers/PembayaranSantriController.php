@@ -149,7 +149,7 @@ class PembayaranSantriController extends Controller
             'metode' => ['nullable', 'string', 'max:255'],
             'catatan' => ['nullable', 'string'],
             // Bukti transfer (opsional) — diperiksa tim keuangan sebelum verifikasi.
-            'bukti' => ['nullable', 'file', 'max:5120', 'mimes:pdf,jpg,jpeg,png,webp'],
+            'bukti' => \App\Support\Unggahan::aturan(wajib: false),
         ]);
         $data['id_santri'] = (int) $data['id_santri'];
         $data['id_tagihan'] = (int) $data['id_tagihan'];

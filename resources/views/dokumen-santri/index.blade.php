@@ -53,8 +53,8 @@
                             <x-field name="keterangan" label="Keterangan" :value="old('keterangan')" hint="Wajib bila jenis 'Lainnya'." />
                         </div>
                         <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700">File (PDF/JPG/PNG, maks 5 MB) <span class="text-red-500">*</span></label>
-                            <input type="file" name="berkas" accept=".pdf,.jpg,.jpeg,.png" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                            <label class="mb-1 block text-sm font-medium text-gray-700">File (PDF/JPG/PNG/WEBP, maks {{ \App\Support\Unggahan::maksLabel() }}) <span class="text-red-500">*</span></label>
+                            <input type="file" name="berkas" accept=".pdf,.jpg,.jpeg,.png,.webp" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
                             @error('berkas')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                         </div>
                         <div class="flex justify-end"><button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Unggah</button></div>

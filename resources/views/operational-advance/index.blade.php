@@ -33,6 +33,15 @@
                         <td class="px-4 py-3 text-right tabular-nums font-medium">@rp($r->sisa)</td>
                         <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $labelStatus[$r->status] ?? '' }}">{{ ucfirst($r->status) }}</span></td>
                         <td class="px-4 py-3 text-right">
+                            {{-- Lampiran: nota/kwitansi belanja. Jumlahnya dihitung sekali
+                                 untuk seluruh halaman (SumberLampiran::jumlahPer), bukan
+                                 satu query per baris. --}}
+                            <a href="{{ route('lampiran.index', [\App\Support\SumberLampiran::UANG_MUKA, $r->id]) }}"
+                               class="mr-3 text-gray-600 hover:underline">Lampiran
+                                @if (($jumlahLampiran[(string) $r->id] ?? 0) > 0)
+                                    <span class="rounded-full bg-gray-100 px-1.5 text-xs">{{ $jumlahLampiran[(string) $r->id] }}</span>
+                                @endif
+                            </a>
                             @if ($r->status === 'outstanding' && \App\Support\Akses::boleh('operational-advance', 'hapus'))
                                 <div x-data="{ open: false }" class="relative inline-block text-left">
                                     <button @click="open = !open" class="text-red-600 hover:underline">Void</button>

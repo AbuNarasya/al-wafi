@@ -42,7 +42,9 @@
             </div>
         @endunless
 
-        <form method="POST" action="{{ $aksi }}" x-data="pengajuan(@js($initRows), @js($opts))"
+        {{-- enctype WAJIB: form ini ikut membawa lampiran. Tanpa itu berkasnya
+             tak pernah sampai ke server dan isiannya diam-diam terbuang. --}}
+        <form method="POST" action="{{ $aksi }}" enctype="multipart/form-data" x-data="pengajuan(@js($initRows), @js($opts))"
               class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             @csrf
             @if ($perbaikan) @method('PUT') @endif
@@ -163,6 +165,21 @@
                 <template x-for="([kode, nom], i) in ringkasUnit" :key="kode">
                     <span><span x-show="i > 0"> · </span><b x-text="unitLabel(kode)"></b> <span x-text="fmt(nom)"></span></span>
                 </template>
+            </div>
+
+            {{-- Lampiran: dokumen pendukung ikut terkirim bersama pengajuannya,
+                 supaya penyetuju tak perlu menagih buktinya lewat jalur lain.
+                 Boleh beberapa berkas sekaligus; susulan bisa ditambahkan dari
+                 halaman detail selama pengajuannya belum diverifikasi. --}}
+            <div class="border-t border-gray-100 pt-4">
+                <label class="mb-1 block text-sm font-medium text-gray-700">Lampiran Pendukung</label>
+                <input type="file" name="lampiran[]" multiple accept=".pdf,.jpg,.jpeg,.png,.webp"
+                       class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                <p class="mt-1 text-xs text-gray-400">
+                    Invoice, penawaran, nota, atau kwitansi · PDF/JPG/PNG/WEBP · maks
+                    {{ \App\Support\Unggahan::maksLabel() }} per berkas. Boleh dikosongkan dan dilengkapi nanti.
+                </p>
+                @error('lampiran.*')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
             </div>
 
             <div class="flex items-center justify-end gap-2 border-t border-gray-100 pt-4">

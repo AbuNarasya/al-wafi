@@ -262,6 +262,21 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{id}', [$p, 'void'])->name('void')->middleware('hakakses:pengajuan-pembayaran,hapus')->whereNumber('id');
     });
 
+    // ---- Lampiran dokumen keuangan ----
+    // SATU layar untuk semua sumber yang boleh dilampiri (lihat SumberLampiran).
+    // TANPA middleware `hakakses:` — modul penggerbangnya ditentukan `{jenis}`
+    // di URL, jadi pemeriksaannya di controller (Akses::boleh). Rute berkas &
+    // unduh sengaja TIDAK menyebut jenis: nomor lampirannya yang menentukan,
+    // dan haknya diperiksa dari baris lampiran itu sendiri.
+    Route::prefix('lampiran')->name('lampiran.')->group(function () {
+        $l = \App\Http\Controllers\LampiranController::class;
+        Route::get('/berkas/{lampiran}', [$l, 'berkas'])->name('berkas')->whereNumber('lampiran');
+        Route::get('/unduh/{lampiran}', [$l, 'unduh'])->name('unduh')->whereNumber('lampiran');
+        Route::delete('/{lampiran}', [$l, 'destroy'])->name('destroy')->whereNumber('lampiran');
+        Route::get('/{jenis}/{id}', [$l, 'index'])->name('index');
+        Route::post('/{jenis}/{id}', [$l, 'store'])->name('store');
+    });
+
     // Persetujuan Saya (approval inbox) — di luar matriks modul (wewenang dari
     // peringkat/fungsi), hanya wajib login.
     Route::prefix('approvals')->name('approvals.')->group(function () {

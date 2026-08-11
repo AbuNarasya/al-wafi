@@ -26,7 +26,16 @@ class AdvanceSettlementController extends Controller
 
     public function index(): View
     {
-        return view('advance-settlement.index', ['rows' => $this->service->list()]);
+        $rows = $this->service->list();
+
+        return view('advance-settlement.index', [
+            'rows' => $rows,
+            // Satu query untuk seluruh halaman — bukan satu per baris.
+            'jumlahLampiran' => \App\Support\SumberLampiran::jumlahPer(
+                \App\Support\SumberLampiran::PENYELESAIAN,
+                collect($rows)->pluck('id')->all(),
+            ),
+        ]);
     }
 
     public function create(): View

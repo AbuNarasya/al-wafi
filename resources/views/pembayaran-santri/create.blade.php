@@ -75,7 +75,7 @@
                     <label class="mb-1 block text-sm font-medium text-gray-700">Bukti Transfer</label>
                     <input type="file" name="bukti" accept="image/jpeg,image/png,image/webp,application/pdf"
                            class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-brand-soft file:px-3 file:py-1 file:text-sm file:text-brand">
-                    <p class="mt-1 text-xs text-gray-400">JPG, PNG, WebP, atau PDF · maksimal 5 MB. Ini yang diperiksa tim keuangan sebelum memverifikasi — tanpa bukti, verifikasinya bisa tertahan.</p>
+                    <p class="mt-1 text-xs text-gray-400">JPG, PNG, WebP, atau PDF · maksimal {{ \App\Support\Unggahan::maksLabel() }}. Ini yang diperiksa tim keuangan sebelum memverifikasi — tanpa bukti, verifikasinya bisa tertahan.</p>
                     @error('bukti')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
 

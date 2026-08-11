@@ -15,7 +15,7 @@
     <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <tr><th class="px-4 py-3">Referensi</th><th class="px-4 py-3">Tanggal</th><th class="px-4 py-3">Akun UM → Realisasi</th><th class="px-4 py-3 text-right">Uang Muka</th><th class="px-4 py-3 text-right">Realisasi</th><th class="px-4 py-3">Status</th></tr>
+                <tr><th class="px-4 py-3">Referensi</th><th class="px-4 py-3">Tanggal</th><th class="px-4 py-3">Akun UM → Realisasi</th><th class="px-4 py-3 text-right">Uang Muka</th><th class="px-4 py-3 text-right">Realisasi</th><th class="px-4 py-3">Status</th><th class="px-4 py-3 text-right">Lampiran</th></tr>
                 <tr class="bg-white">
                     <x-fcol :col="0" /><x-fcol :col="1" /><x-fcol :col="2" /><x-fcol type="blank" /><x-fcol type="blank" /><x-fcol :col="5" type="select" />
                 </tr>
@@ -33,11 +33,21 @@
                         <td class="px-4 py-3 text-right tabular-nums">@rp($r->nominal_uang_muka)</td>
                         <td class="px-4 py-3 text-right tabular-nums">@rp($r->nominal_realisasi)</td>
                         <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $r->status === 'aktif' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500' }}">{{ ucfirst($r->status) }}</span></td>
+                        {{-- Bukti realisasi belanja (nota, kwitansi). Jumlahnya
+                             dihitung sekali untuk seluruh halaman. --}}
+                        <td class="px-4 py-3 text-right">
+                            <a href="{{ route('lampiran.index', [\App\Support\SumberLampiran::PENYELESAIAN, $r->id]) }}"
+                               class="text-gray-600 hover:underline">Lampiran
+                                @if (($jumlahLampiran[(string) $r->id] ?? 0) > 0)
+                                    <span class="rounded-full bg-gray-100 px-1.5 text-xs">{{ $jumlahLampiran[(string) $r->id] }}</span>
+                                @endif
+                            </a>
+                        </td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="px-4 py-10 text-center text-gray-400">Belum ada penyelesaian uang muka.</td></tr>
+                    <tr><td colspan="7" class="px-4 py-10 text-center text-gray-400">Belum ada penyelesaian uang muka.</td></tr>
                 @endforelse
-                <tr data-empty style="display:none"><td colspan="6" class="px-4 py-10 text-center text-gray-400">Tidak ada data yang cocok dengan filter.</td></tr>
+                <tr data-empty style="display:none"><td colspan="7" class="px-4 py-10 text-center text-gray-400">Tidak ada data yang cocok dengan filter.</td></tr>
             </tbody>
         </table>
     </div>

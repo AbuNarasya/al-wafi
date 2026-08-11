@@ -24,7 +24,16 @@ class OperationalAdvanceController extends Controller
 
     public function index(): View
     {
-        return view('operational-advance.index', ['rows' => $this->service->list()]);
+        $rows = $this->service->list();
+
+        return view('operational-advance.index', [
+            'rows' => $rows,
+            // Satu query untuk seluruh halaman — bukan satu per baris.
+            'jumlahLampiran' => \App\Support\SumberLampiran::jumlahPer(
+                \App\Support\SumberLampiran::UANG_MUKA,
+                collect($rows)->pluck('id')->all(),
+            ),
+        ]);
     }
 
     public function create(): View

@@ -49,7 +49,10 @@ class ImporDataAwalController extends Controller
     {
         $data = $request->validate([
             'jenis' => ['required', 'string'],
-            'berkas' => ['required', 'file', 'mimes:csv,txt', 'max:8192'],
+            // 500 KB memuat ±4.000 baris santri (berkas uji 202 santri = 23 KB),
+            // jadi batas seragam ini tak menghalangi impor sebesar apa pun yang
+            // pernah dipakai. Berkas lebih besar: pecah per jenjang.
+            'berkas' => \App\Support\Unggahan::aturan(\App\Support\Unggahan::DATA),
         ]);
 
         $path = $request->file('berkas')->store(self::FOLDER);

@@ -114,6 +114,37 @@
             </table>
         </div>
 
+        {{-- Lampiran pendukung — ditaruh TEPAT DI BAWAH rincian dan DI ATAS
+             rantai persetujuan: penyetuju membaca angkanya, lalu buktinya,
+             baru memutuskan. --}}
+        <div class="mb-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div class="flex items-center justify-between gap-3">
+                <h3 class="text-sm font-semibold text-gray-800">Lampiran Pendukung
+                    <span class="ml-1 text-xs font-normal text-gray-400">({{ $lampiran->count() }})</span>
+                </h3>
+                <a href="{{ route('lampiran.index', [\App\Support\SumberLampiran::PENGAJUAN, $rec->id]) }}"
+                   class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                    {{ $lampiranTerbuka ? 'Kelola Lampiran' : 'Lihat Lampiran' }}
+                </a>
+            </div>
+            @if ($lampiran->isEmpty())
+                <p class="mt-2 text-sm text-gray-400">
+                    Belum ada lampiran.
+                    @if ($lampiranTerbuka) Invoice, penawaran, atau nota bisa ditambahkan lewat tombol di atas. @endif
+                </p>
+            @else
+                <ul class="mt-3 space-y-1.5 text-sm">
+                    @foreach ($lampiran as $l)
+                        <li class="flex items-center justify-between gap-3">
+                            <a href="{{ route('lampiran.berkas', $l->id) }}" target="_blank" rel="noreferrer"
+                               class="min-w-0 truncate text-brand underline hover:text-brand-dark">{{ $l->nama_asli }}</a>
+                            <span class="shrink-0 text-xs text-gray-400">{{ $l->ukuranTerbaca() }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
+
         {{-- Rantai persetujuan — satu daftar: pengajuan, tiap tahap berikut
              penyetujunya, lalu verifikasi keuangan. --}}
         @if ($timeline)

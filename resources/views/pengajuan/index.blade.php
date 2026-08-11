@@ -79,6 +79,15 @@
                                         @csrf<button class="rounded border border-brand px-2 py-1 text-xs font-medium text-brand hover:bg-brand-soft">Ajukan Ulang</button>
                                     </form>
                                 @endif
+                                {{-- Penanda lampiran: tim keuangan bisa melihat mana yang
+                                     sudah berbukti sebelum membukanya satu per satu. --}}
+                                @if (($jumlahLampiran[(string) $r->id] ?? 0) > 0)
+                                    <a href="{{ route('lampiran.index', [\App\Support\SumberLampiran::PENGAJUAN, $r->id]) }}"
+                                       class="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                                       title="{{ $jumlahLampiran[(string) $r->id] }} lampiran">
+                                        📎 {{ $jumlahLampiran[(string) $r->id] }}
+                                    </a>
+                                @endif
                                 <a href="{{ route('pengajuan.show', $r->id) }}" class="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50">Detail</a>
                                 {{-- Sesudah diverifikasi, yang membatalkan tim keuangan —
                                      pembatalannya membalik jurnal. Aturan yang sama

@@ -69,6 +69,11 @@ class PengajuanController extends Controller
             'rows' => $rows,
             'q' => $q,
             'menunggu' => $menunggu,
+            // Satu query untuk seluruh halaman — bukan satu per baris.
+            'jumlahLampiran' => \App\Support\SumberLampiran::jumlahPer(
+                \App\Support\SumberLampiran::PENGAJUAN,
+                $rows->pluck('id')->all(),
+            ),
             'filter' => ['jenis' => $fJenis, 'status' => $fStatus],
             'opsiJenis' => [
                 'pembayaran' => 'Pembayaran', 'uang_muka' => 'Uang Muka',
@@ -127,8 +132,10 @@ class PengajuanController extends Controller
         }
 
         $this->simpanKeBukuRekening($request);
+        $pesanLampiran = $this->simpanLampiran($request, $rec->id);
 
-        return redirect()->route('pengajuan.show', $rec->id)->with('status', "Pengajuan {$rec->nomor} berhasil diajukan.");
+        return redirect()->route('pengajuan.show', $rec->id)
+            ->with('status', "Pengajuan {$rec->nomor} berhasil diajukan.{$pesanLampiran}");
     }
 
     /** Perbaiki pengajuan yang ditolak — form yang sama dengan Buat, mode edit. */
@@ -158,9 +165,10 @@ class PengajuanController extends Controller
         }
 
         $this->simpanKeBukuRekening($request);
+        $pesanLampiran = $this->simpanLampiran($request, $id);
 
         return redirect()->route('pengajuan.index')
-            ->with('status', "Perbaikan pengajuan {$rec->nomor} disimpan. Tekan \"Ajukan Ulang\" untuk memulai rantai persetujuan.");
+            ->with('status', "Perbaikan pengajuan {$rec->nomor} disimpan.{$pesanLampiran} Tekan \"Ajukan Ulang\" untuk memulai rantai persetujuan.");
     }
 
     /** Ajukan ulang pengajuan yang ditolak (memulai rantai persetujuan lagi). */
@@ -173,6 +181,38 @@ class PengajuanController extends Controller
         }
 
         return redirect()->route('pengajuan.index')->with('status', "Pengajuan {$rec->nomor} berhasil diajukan ulang.");
+    }
+
+    /**
+     * Simpan lampiran yang ikut dikirim form. Sama seperti buku rekening:
+     * kegagalan unggah TIDAK menggagalkan pengajuannya — dokumennya sudah
+     * terbit dengan nomor resmi, dan memaksa pemohon mengetik ulang seluruh
+     * rincian gara-gara satu berkas rusak jauh lebih merugikan daripada
+     * memintanya melampirkan susulan dari halaman detail.
+     *
+     * Yang gagal DISEBUTKAN namanya, supaya tak ada yang mengira berkasnya
+     * sudah masuk padahal tidak.
+     */
+    private function simpanLampiran(Request $request, int $idPengajuan): string
+    {
+        $berkas = array_filter((array) $request->file('lampiran', []));
+        if ($berkas === []) {
+            return '';
+        }
+
+        $hasil = app(\App\Services\Modules\LampiranService::class)->unggahBanyak(
+            \App\Support\SumberLampiran::PENGAJUAN,
+            (string) $idPengajuan,
+            $berkas,
+            $request->user()->id_pengguna,
+        );
+
+        $pesan = $hasil['berhasil'] > 0 ? " {$hasil['berhasil']} lampiran terunggah." : '';
+        if ($hasil['gagal'] !== []) {
+            $pesan .= ' Gagal diunggah: '.implode(', ', $hasil['gagal']).' — silakan ulangi dari halaman detail.';
+        }
+
+        return $pesan;
     }
 
     /**
@@ -263,7 +303,13 @@ class PengajuanController extends Controller
             PengajuanPembayaranService::SUMBER, (string) $id, $request->user()->id_pengguna,
         );
 
-        return view('pengajuan.show', compact('rec', 'instance', 'hutangOptions', 'rekeningOptions', 'coaOptions', 'timeline', 'bolehMemutuskan', 'timKeuangan', 'selisihPenyelesaian'));
+        // Lampiran pendukung: ditampilkan langsung di halaman ini supaya
+        // penyetuju melihat buktinya tanpa berpindah layar.
+        $lampiran = app(\App\Services\Modules\LampiranService::class)
+            ->daftar(\App\Support\SumberLampiran::PENGAJUAN, (string) $id);
+        $lampiranTerbuka = \App\Support\SumberLampiran::terbuka(\App\Support\SumberLampiran::PENGAJUAN, $rec);
+
+        return view('pengajuan.show', compact('rec', 'instance', 'hutangOptions', 'rekeningOptions', 'coaOptions', 'timeline', 'bolehMemutuskan', 'timKeuangan', 'selisihPenyelesaian', 'lampiran', 'lampiranTerbuka'));
     }
 
     /**
