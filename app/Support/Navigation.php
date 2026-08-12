@@ -23,7 +23,7 @@ final class Navigation
      */
     public const ITEMS = [
         // Cukup berhak atas SALAH SATU tab untuk melihat menunya.
-        ['url' => '/dashboard', 'label' => 'Dashboard', 'group' => '', 'modulAny' => ['dashboard', 'dashboard-ppsb', 'dashboard-anggaran']],
+        ['url' => '/dashboard', 'label' => 'Dashboard', 'group' => '', 'modulAny' => ['dashboard', 'dashboard-ppsb', 'dashboard-anggaran', 'dashboard-kesantrian']],
 
         // ---- 1. Setting Awal ----
         // Dipecah dua sub: yang menyetel LEMBAGA & ORANGNYA (Setting Umum) vs yang

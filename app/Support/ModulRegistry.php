@@ -22,6 +22,9 @@ final class ModulRegistry
         // Dipisah dari tab Keuangan supaya mudir/kepala bagian bisa memantau
         // anggaran & pengajuannya tanpa ikut melihat kas dan laba rugi.
         ['kode' => 'dashboard-anggaran', 'nama' => 'Dashboard — tab Anggaran & Pengajuan', 'grup' => 'UMUM'],
+        // Dipisah dari tab Keuangan: bagian kesantrian perlu melihat keadaan
+        // piutang santri tanpa ikut melihat kas, hutang, dan laba rugi.
+        ['kode' => 'dashboard-kesantrian', 'nama' => 'Dashboard — tab Tagihan Santri Aktif', 'grup' => 'UMUM'],
 
         // ---- Setting Awal ----
         // Sub-nya mengikuti sidebar (lihat Navigation::SUB_ORDER): Setting Umum =

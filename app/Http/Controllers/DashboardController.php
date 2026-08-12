@@ -44,6 +44,7 @@ class DashboardController extends Controller
             'keuangan' => Akses::boleh('dashboard', 'lihat') ? 'Keuangan' : null,
             'anggaran' => Akses::boleh('dashboard-anggaran', 'lihat') ? 'Anggaran & Pengajuan' : null,
             'ppsb' => Akses::boleh('dashboard-ppsb', 'lihat') ? 'PPSB' : null,
+            'kesantrian' => Akses::boleh('dashboard-kesantrian', 'lihat') ? 'Tagihan Santri Aktif' : null,
         ]);
         abort_if($tabs === [], 403, 'Anda belum diberi akses ke dashboard mana pun.');
 
@@ -60,6 +61,7 @@ class DashboardController extends Controller
             ...match ($tab) {
                 'ppsb' => $this->dataPpsb($request),
                 'anggaran' => $this->dataAnggaran($request),
+                'kesantrian' => $this->dataKesantrian($request),
                 default => $this->dataKeuangan(),
             },
         ]);
@@ -128,6 +130,40 @@ class DashboardController extends Controller
             'labaRugiUnit' => $this->svc->labaRugiUnit($lines, $unitName),
             'pencapaian' => $this->svc->pencapaian($lines),
             'approvals' => $this->svc->approvals(),
+        ];
+    }
+
+    /**
+     * Tab Tagihan Santri Aktif. Penyaring tahun ajaran bawaannya = T.A yang
+     * sedang berjalan; tunggakan tahun-tahun sebelumnya dihitung TERPISAH
+     * (lihat KesantrianDashboardService::tunggakanTahunLama) supaya tak
+     * bercampur dengan angka berjalan, tapi juga tak menghilang dari layar.
+     *
+     * @return array<string,mixed>
+     */
+    private function dataKesantrian(Request $request): array
+    {
+        $svc = new \App\Services\Modules\KesantrianDashboardService;
+
+        $opsiTa = $svc->opsiTa();
+        $ta = (string) $request->query('ta', '');
+        if ($ta === '' || ! isset($opsiTa[$ta])) {
+            $ta = $svc->taBerjalan() ?? (string) array_key_first($opsiTa);
+        }
+        // "semua" = tanpa penyaring tahun; disediakan karena piutang total lintas
+        // tahun adalah angka yang dipakai saat menutup buku.
+        $saring = $request->query('ta') === 'semua' ? null : ($ta !== '' ? $ta : null);
+
+        return [
+            'ta' => $saring === null ? 'semua' : $ta,
+            'opsiTa' => $opsiTa,
+            'ringkasan' => $svc->ringkasan($saring),
+            'perPerilaku' => $svc->perPerilaku($saring),
+            'aging' => $svc->aging($saring),
+            'perJenjang' => $svc->perJenjang($saring),
+            'penunggak' => $svc->penunggakTeratas($saring),
+            'dompetCukup' => $svc->dompetCukup($saring),
+            'tahunLama' => $saring === null ? [] : $svc->tunggakanTahunLama($saring),
         ];
     }
 
