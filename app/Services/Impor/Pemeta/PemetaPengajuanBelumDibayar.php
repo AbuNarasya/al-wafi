@@ -158,6 +158,11 @@ class PemetaPengajuanBelumDibayar implements Pemeta
                 // Satu-satunya status yang diterima applyPayment(); tanpa ini
                 // Kas Keluar akan menolak melunasinya.
                 'status' => 'diposting',
+                // Berstatus diposting TANPA jurnal — keadaan yang di jalur normal
+                // mustahil, karena di sana status & journal_entry_id ditetapkan
+                // bersamaan. Penandanya membuat keadaan itu terbaca, bukan hanya
+                // tersimpul dari kolom yang kebetulan kosong.
+                'saldo_awal' => true,
                 'id_pengguna' => $pemohon ?? $idPengimpor,
             ]);
 

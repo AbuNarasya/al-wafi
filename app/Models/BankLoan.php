@@ -18,12 +18,13 @@ class BankLoan extends Model
         'nama_bank', 'nomor_kontrak', 'jenis_akad', 'pokok_awal', 'margin',
         'tenor_bulan', 'tanggal_mulai', 'tanggal_jatuh_tempo', 'kode_coa_hutang',
         'kode_coa_beban_bunga', 'kode_rekening', 'pokok_terbayar', 'status',
-        'keterangan', 'void_reason', 'void_by', 'void_at', 'id_pengguna',
+        'keterangan', 'void_reason', 'void_by', 'void_at', 'id_pengguna', 'saldo_awal',
     ];
 
     protected function casts(): array
     {
         return [
+            'saldo_awal' => 'boolean',
             'pokok_awal' => 'decimal:2',
             'margin' => 'decimal:2',
             'tenor_bulan' => 'integer',

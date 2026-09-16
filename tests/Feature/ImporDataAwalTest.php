@@ -318,6 +318,11 @@ class ImporDataAwalTest extends TestCase
         $this->assertSame(1500000.0, (float) $t->nominal);
         $this->assertSame(1500000.0, (float) $t->sisa);
         $this->assertTrue((bool) $t->sudah_akrual, 'tunggakan lama WAJIB sudah_akrual agar pembayaran mengkredit piutang');
+        // Penanda yang dipakai BERSAMA pintu manual (TunggakanAwalService):
+        // "berakrual TANPA jurnal". Tanpa ini ia tak terbedakan dari tagihan
+        // akrual biasa yang justru punya jurnal, dan pembetulan tanpa jurnal
+        // di layar detail santri jadi tak aman.
+        $this->assertTrue((bool) $t->saldo_awal, 'tunggakan impor adalah saldo awal, sama seperti yang dicatat manual');
         $this->assertSame('Tunggakan Jan-Jun', $t->keterangan);
 
         // Nilainya sudah diakui di catatan lama → tak boleh ada jurnal dari sini.

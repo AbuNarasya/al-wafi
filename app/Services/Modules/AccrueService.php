@@ -49,6 +49,11 @@ class AccrueService
                 'nomor_referensi' => $ref,
                 'keterangan' => $input['keterangan'] ?? null,
                 'status' => 'aktif',
+                // Penanda pindahan sistem: dokumennya ada, jurnalnya tidak.
+                // Dipakai baris turunan di menu Saldo Awal, dan dipakai layar
+                // untuk memutuskan apakah baris ini masih boleh dihapus tanpa
+                // jurnal — yang hanya sah selama memang tak ada jurnal.
+                'saldo_awal' => ! empty($input['tanpa_jurnal']),
                 'id_pengguna' => $idPengguna ?? 0,
             ]);
 

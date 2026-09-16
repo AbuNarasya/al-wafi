@@ -245,6 +245,7 @@ return [
                         'kode_coa_debet' => 'Akun yang didebet.',
                         'kode_coa_kredit' => 'Akun yang dikredit.',
                         'nomor_referensi' => 'Nomor dokumen accrue.',
+                        'saldo_awal' => 'Dokumen pindahan sistem: dicatat TANPA jurnal. Nilainya masuk buku besar lewat baris turunan di menu Saldo Awal — dan hanya sisi neracanya, karena bebannya milik periode lalu.',
                     ],
                 ],
                 'accounting_periods' => [
@@ -386,6 +387,7 @@ return [
                         'pokok_terbayar' => 'Akumulasi pokok yang sudah diangsur.',
                         'kode_coa_hutang' => 'Akun liabilitas pembiayaan.',
                         'kode_coa_beban_bunga' => 'Akun beban margin.',
+                        'saldo_awal' => 'Pembiayaan yang uangnya cair SEBELUM pindah sistem — dicatat tanpa jurnal pencairan. Hutangnya masuk buku besar lewat baris turunan di menu Saldo Awal.',
                     ],
                 ],
                 'pinjaman_karyawan' => [
@@ -396,6 +398,7 @@ return [
                         'pokok' => 'Nilai pinjaman.',
                         'terbayar' => 'Akumulasi yang sudah dikembalikan.',
                         'kode_coa_piutang' => 'Akun piutang karyawan.',
+                        'saldo_awal' => 'Pinjaman yang uangnya diserahkan SEBELUM pindah sistem — dicatat tanpa jurnal pencairan. Piutangnya masuk buku besar lewat baris turunan di menu Saldo Awal.',
                     ],
                 ],
                 'termin_pinjaman_karyawan' => [
@@ -468,6 +471,7 @@ return [
                         'penerima' => 'Orang yang memegang uangnya.',
                         'nominal_diselesaikan' => 'Bagian yang sudah dipertanggungjawabkan; sisanya = nominal − ini.',
                         'id_pengajuan_sumber' => 'Pengajuan uang muka yang melahirkannya, bila lewat jalur pengajuan.',
+                        'saldo_awal' => 'Uang muka yang diserahkan SEBELUM pindah sistem — didaftarkan ke pool tanpa jurnal, karena kas keluarnya sudah terjadi di pembukuan lama. Masuk buku besar lewat baris turunan di menu Saldo Awal.',
                     ],
                 ],
                 'advance_settlements' => [
@@ -553,6 +557,7 @@ return [
                         'nilai_residu' => 'Nilai sisa yang tak ikut disusutkan.',
                         'akumulasi_depresiasi' => 'Penyusutan yang sudah dibebankan sampai kini.',
                         'sumber_ref' => 'Dokumen asal perolehan.',
+                        'saldo_awal' => 'Aset yang sudah dimiliki SEBELUM pindah sistem. Pencatatan aset memang tak pernah menjurnal — yang menjurnal hanya depresiasi bulanan — jadi kolom ini satu-satunya pembeda dari aset yang dibeli lewat Kas Keluar, yang nilainya sudah masuk buku besar dari sisi pembayarannya.',
                     ],
                 ],
                 'asset_movements' => [
@@ -625,6 +630,7 @@ return [
                         'no_rekening_tujuan' => 'Nomor rekening tujuan.',
                         'atas_nama_tujuan' => 'Nama pemilik rekening tujuan.',
                         'referensi' => 'Rujukan dokumen pendukung.',
+                        'saldo_awal' => 'Hutang yang sudah disetujui di pembukuan lama tetapi belum dicairkan saat pindah sistem. Lahir langsung berstatus `diposting` tanpa rantai persetujuan dan tanpa jurnal — keadaan yang di jalur normal mustahil, karena di sana status & `journal_entry_id` ditetapkan bersamaan.',
                     ],
                 ],
                 'pengajuan_pembayaran_detail' => [
@@ -1039,7 +1045,8 @@ return [
                     'kolom' => [
                         'periode' => 'Periode tagihan (mis. bulan SPP).',
                         'sisa' => 'Yang belum terbayar; disimpan agar tak perlu dihitung ulang tiap kali dibaca.',
-                        'sudah_akrual' => 'Piutangnya sudah dijurnal.',
+                        'sudah_akrual' => 'Piutangnya sudah diakui — menentukan sisi kredit saat dibayar: Piutang, bukan Pendapatan.',
+                        'saldo_awal' => 'Tunggakan warisan yang masuk sebagai keadaan pindahan sistem: berakrual TANPA jurnal. Buku besarnya masuk terpisah lewat menu Saldo Awal. Pembeda dari tagihan akrual biasa, yang justru punya jurnal.',
                         'jatuh_tempo' => 'Tanggal jatuh tempo.',
                         'perilaku' => 'Salinan perilaku biaya saat tagihan terbit.',
                         'kode_jenjang' => 'Salinan jenjang saat tagihan terbit.',

@@ -29,6 +29,23 @@
 
             <x-field name="keterangan" label="Keterangan" :value="old('keterangan')" textarea required />
 
+            {{-- Idiom yang sama dengan Pembiayaan Bank, Pinjaman Karyawan, dan
+                 Accrue: pertanyaannya positif, melepasnya berarti saldo awal. --}}
+            <div x-data="{ posting: {{ old('posting_jurnal', true) ? 'true' : 'false' }} }" class="space-y-2">
+                <label class="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                    <input type="hidden" name="posting_jurnal" value="0">
+                    <input type="checkbox" name="posting_jurnal" value="1" x-model="posting"
+                           class="rounded border-gray-300 text-brand focus:ring-brand">
+                    Posting jurnal pengeluaran sekarang (Debit uang muka, Kredit kas/rekening)
+                </label>
+                <p x-show="! posting" x-cloak class="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+                    <b>Saldo awal pindahan sistem.</b> Uangnya sudah diserahkan sebelum aplikasi ini dipakai, jadi
+                    kasnya <b>tidak</b> berkurang lagi sekarang dan <b>tidak ada jurnal yang terbit</b>. Barisnya
+                    tetap masuk pool uang muka sehingga bisa dipertanggungjawabkan lewat Penyelesaian Uang Muka,
+                    dan nilainya otomatis ikut sebagai <b>baris turunan</b> di menu <b>Saldo Awal</b>.
+                </p>
+            </div>
+
             <div class="flex items-center justify-end gap-2 border-t border-gray-100 pt-4">
                 <a href="{{ route('operational_advance.index') }}" class="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">Batal</a>
                 <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Posting Uang Muka</button>

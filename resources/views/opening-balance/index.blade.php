@@ -18,7 +18,42 @@
                 @csrf<button class="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50">Void Finalisasi</button>
             </form>
         </div>
+
+        {{-- Dokumen saldo awal boleh bertambah sesudah finalisasi — tunggakan
+             warisan kerap baru ketemu berbulan-bulan kemudian. Jurnal yang sudah
+             terbit TIDAK diubah diam-diam; selisihnya ditunjukkan, dan yang
+             memutuskan menyusun ulang tetap orang. --}}
+        @if (! empty($selisihTerbit))
+            <div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                <div class="text-sm font-semibold text-amber-900">
+                    Ada dokumen saldo awal yang berubah setelah jurnal pembuka terbit.
+                </div>
+                <p class="mt-1 text-xs leading-relaxed text-amber-800">
+                    Jurnal pembuka masih memuat angka lama. Untuk menyamakannya: <b>Void Finalisasi</b> di atas,
+                    lalu finalisasi ulang — baris turunannya akan terhitung ulang sendiri.
+                </p>
+                <table class="mt-3 min-w-full text-xs">
+                    <thead class="text-left text-amber-900">
+                        <tr><th class="py-1 pr-4">Akun</th><th class="py-1 pr-4 text-right">Di jurnal</th><th class="py-1 pr-4 text-right">Seharusnya</th><th class="py-1 text-right">Selisih</th></tr>
+                    </thead>
+                    <tbody class="text-amber-900">
+                        @foreach ($selisihTerbit as $s)
+                            <tr class="border-t border-amber-200">
+                                <td class="py-1 pr-4"><span class="font-mono text-[11px] text-amber-700">{{ $s['kode_coa'] }}</span> {{ $s['nama_coa'] }}</td>
+                                <td class="py-1 pr-4 text-right tabular-nums">@rp($s['terbit'])</td>
+                                <td class="py-1 pr-4 text-right tabular-nums">@rp($s['sekarang'])</td>
+                                <td class="py-1 text-right font-semibold tabular-nums">@rp($s['selisih'])</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
     @endif
+
+    @foreach ($catatanTurunan as $c)
+        <div class="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-gray-600">{{ $c }}</div>
+    @endforeach
 
     {{-- Form tambah baris (hanya bila belum final) --}}
     @unless ($summary['posted'])
@@ -39,6 +74,24 @@
                 <tr><th class="px-4 py-3">Akun</th><th class="px-4 py-3 text-right">Debet</th><th class="px-4 py-3 text-right">Kredit</th><th class="px-4 py-3 text-right">Aksi</th></tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
+                {{-- BARIS TURUNAN — dihitung dari dokumen saldo awal, bukan diketik.
+                     Ditaruh di atas baris manual karena inilah yang tak perlu
+                     dikerjakan siapa pun: petugas cukup melengkapi sisanya. --}}
+                @foreach ($turunan as $t)
+                    <tr class="bg-sky-50/40">
+                        <td class="px-4 py-3">
+                            <span class="font-mono text-xs text-gray-400">{{ $t['kode_coa'] }}</span> {{ $t['nama_coa'] }}
+                            <div class="mt-0.5 text-xs text-sky-700">
+                                otomatis dari {{ implode(', ', $t['sumber']) }} — {{ $t['jumlah_dokumen'] }} dokumen
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-right tabular-nums">@if ($t['jenis_saldo'] === 'debet')@rp($t['saldo'])@endif</td>
+                        <td class="px-4 py-3 text-right tabular-nums">@if ($t['jenis_saldo'] === 'kredit')@rp($t['saldo'])@endif</td>
+                        <td class="px-4 py-3 text-right">
+                            <span class="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">turunan</span>
+                        </td>
+                    </tr>
+                @endforeach
                 @forelse ($rows as $r)
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3"><span class="font-mono text-xs text-gray-400">{{ $r->kode_coa }}</span> {{ $r->coa?->nama_coa }}</td>
@@ -53,7 +106,15 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="px-4 py-10 text-center text-gray-400">Belum ada baris saldo awal.</td></tr>
+                    @if (empty($turunan))
+                        <tr><td colspan="4" class="px-4 py-10 text-center text-gray-400">Belum ada baris saldo awal.</td></tr>
+                    @else
+                        {{-- Ada baris turunan tetapi belum ada baris ketikan. Ini keadaan
+                             yang wajar di tengah pindahan sistem, bukan "kosong". --}}
+                        <tr><td colspan="4" class="px-4 py-6 text-center text-xs text-gray-400">
+                            Belum ada baris manual. Lengkapi kas, bank, persediaan, dan <b>ekuitas awal</b> sebagai penyeimbang.
+                        </td></tr>
+                    @endif
                 @endforelse
             </tbody>
             <tfoot class="bg-gray-50">

@@ -6,6 +6,7 @@ use App\Exceptions\AppException;
 use App\Models\JadwalPerubahanSantri;
 use App\Models\JalurNonaktif;
 use App\Models\JalurPendaftaran;
+use App\Models\JenisBiaya;
 use App\Models\Jenjang;
 use App\Models\PembayaranSantri;
 use App\Models\Pendaftaran;
@@ -24,6 +25,7 @@ use App\Services\Modules\SantriService;
 use App\Services\Modules\SppService;
 use App\Services\Modules\TahunAjaranService;
 use App\Services\Modules\TarifService;
+use App\Services\Modules\TunggakanAwalService;
 use App\Services\Ppsb\Tahap;
 use App\Support\Akses;
 use App\Support\Export\BarisSantri;
@@ -522,6 +524,20 @@ class SantriController extends Controller
             ];
         }
 
+        // Tunggakan awal (pintu manual saldo awal). Halangannya dihitung PER
+        // TAGIHAN dari sumber yang sama dengan yang dipakai service menolak,
+        // supaya tombol yang terlihat dan tindakan yang diterima tak pernah
+        // berbeda pendapat.
+        $bolehTunggakanAwal = Akses::boleh('impor-data-awal', 'buat');
+        $halanganTunggakanAwal = [];
+        if ($bolehTunggakanAwal) {
+            foreach ($santri->tagihan as $t) {
+                if ($t->saldo_awal) {
+                    $halanganTunggakanAwal[$t->id] = TunggakanAwalService::halangan($t);
+                }
+            }
+        }
+
         return view('santri.show', [
             'santri' => $santri,
             'labelStatus' => Tahap::labelStatus($santri->status),
@@ -542,6 +558,24 @@ class SantriController extends Controller
             'koreksiPerlengkapan' => $koreksiPerlengkapan,
             'keluarAktif' => $keluarAktif,
             'menungguPerTagihan' => $menungguPerTagihan,
+            'bolehTunggakanAwal' => $bolehTunggakanAwal,
+            'halanganTunggakanAwal' => $halanganTunggakanAwal,
+            // Hanya jenis yang PUNYA akun piutang: tunggakan warisan selalu
+            // dibayar dengan mengkreditnya. Yang tak punya disaring di sini juga,
+            // bukan cuma ditolak service, supaya petugas tak memilih sesuatu yang
+            // pasti gagal. Jenjang santri + baris tanpa jenjang (pesantren yang
+            // memakai satu pasang akun untuk semua jenjang).
+            'opsiJenisTunggakan' => $bolehTunggakanAwal
+                ? JenisBiaya::where('status', 'aktif')->whereNotNull('kode_coa_piutang')
+                    ->where(fn ($q) => $q->where('kode_jenjang', $santri->kode_jenjang)->orWhereNull('kode_jenjang'))
+                    ->orderBy('nama')->get(['kode', 'nama'])
+                : collect(),
+            // SELURUH tahun ajaran, bukan yang aktif saja: tunggakan warisan
+            // justru berasal dari tahun yang sudah lewat, dan itulah yang membuat
+            // aging piutangnya jujur.
+            'opsiTahunAjaranTunggakan' => $bolehTunggakanAwal
+                ? TahunAjaran::orderByDesc('kode')->pluck('kode')->all()
+                : [],
             // Kenaikan jenjang internal lewat proses PPSB. Sasarannya null bila
             // santri ini memang tak bisa naik (jenjang terakhir → alumni).
             'lanjutan' => $this->bahanLanjutan($santri),

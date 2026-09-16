@@ -139,22 +139,126 @@
         </div>
 
         {{-- Tagihan --}}
+        {{-- Koreksi nominal hanya untuk pemegang hak `koreksi-tagihan` (kepala
+             keuangan). Ia mengubah piutang yang sudah dibukukan dan menerbitkan
+             jurnal penyesuaian, jadi kolomnya pun tak ditampilkan bagi yang tak
+             berwenang. Kolom aksi tetap muncul bila pemegang hak impor boleh
+             menyunting tunggakan awal — dua wewenang berbeda, satu kolom. --}}
+        @php
+            $bolehKoreksi = \App\Support\Akses::boleh('koreksi-tagihan', 'ubah');
+            $adaKolomAksi = $bolehKoreksi || $bolehTunggakanAwal;
+        @endphp
         <div class="mb-4 rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div class="border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-700">Tagihan</div>
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
+                <span class="text-sm font-semibold text-gray-700">Tagihan</span>
+                @if ($bolehTunggakanAwal)
+                    {{-- MODAL, bukan popover gantung. Lima isian tak muat di panel
+                         selebar tombolnya: di layar sempit panelnya menyusut dan
+                         tiap label pecah jadi dua-tiga baris. Pola modalnya sama
+                         dengan modul SPP (spp/index.blade.php) — satu bentuk untuk
+                         seluruh aplikasi. --}}
+                    <div x-data="{ buka: false }">
+                        <button type="button" @click="buka = true"
+                                class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                            + Tunggakan Awal
+                        </button>
+                        <div x-show="buka" x-cloak @keydown.escape.window="buka = false"
+                             class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+                             @click.self="buka = false">
+                            <div class="my-10 w-full max-w-lg rounded-xl bg-white text-left shadow-xl">
+                                <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+                                    <h3 class="font-semibold text-gray-800">Tunggakan Awal</h3>
+                                    <button type="button" @click="buka = false" class="text-gray-400 hover:text-gray-700">&times;</button>
+                                </div>
+                                <form method="POST" action="{{ route('tunggakan_awal.store', $santri->id) }}" class="space-y-3 p-5">
+                                    @csrf
+                                    <p class="rounded bg-slate-50 px-3 py-2 text-xs leading-relaxed text-gray-500">
+                                        Sisa kewajiban yang <b>{{ $santri->nama }}</b> bawa dari pembukuan lama —
+                                        <b>bukan</b> tagihan baru. Pintu yang sama dengan Impor Data Awal, bagi santri yang
+                                        sudah telanjur ada di aplikasi sehingga tak terjangkau berkas impor.
+                                    </p>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-600">Jenis biaya</label>
+                                        <select name="kode_jenis" required class="w-full rounded border-gray-300 px-3 py-2 text-sm">
+                                            <option value="">— pilih —</option>
+                                            @foreach ($opsiJenisTunggakan as $j)
+                                                <option value="{{ $j->kode }}">{{ $j->nama }}</option>
+                                            @endforeach
+                                        </select>
+                                        @if ($opsiJenisTunggakan->isEmpty())
+                                            <p class="mt-1 text-xs leading-relaxed text-amber-700">
+                                                Belum ada jenis biaya berakun piutang untuk jenjang ini. Tunggakan warisan
+                                                selalu dibayar dengan mengkredit piutang, jadi akunnya harus dilengkapi
+                                                dulu di master Jenis Biaya.
+                                            </p>
+                                        @endif
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <div>
+                                            <label class="mb-1 block text-xs font-medium text-gray-600">Tahun ajaran tunggakan</label>
+                                            <select name="tahun_ajaran" required class="w-full rounded border-gray-300 px-3 py-2 text-sm">
+                                                @foreach ($opsiTahunAjaranTunggakan as $ta)
+                                                    <option value="{{ $ta }}" @selected($ta === ($santri->tahun_ajaran_berjalan ?? $santri->tahun_ajaran))>{{ $ta }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="mb-1 block text-xs font-medium text-gray-600">Nominal tunggakan</label>
+                                            {{-- `nominal_tunggakan`, bukan `nominal`: di halaman ini
+                                                 `name="nominal"` sudah berarti isian uang pangkal, dan
+                                                 ketiadaannya dipakai sebagai bukti bahwa jalur bebas
+                                                 uang pangkal memang tak menawarkannya. --}}
+                                            <x-input-rupiah name="nominal_tunggakan" required placeholder="mis. 1500000" class="px-3 py-2" />
+                                        </div>
+                                    </div>
+                                    {{-- Tahun ASAL tunggakannya, bukan tahun hari ini. Inilah yang
+                                         membuat umur piutangnya jujur di aging dashboard. --}}
+                                    <p class="text-xs text-gray-500">Pilih tahun <b>asal</b> tunggakannya — itu yang menentukan umurnya di aging piutang.</p>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-600">Keterangan</label>
+                                        <input type="text" name="keterangan" required maxlength="255"
+                                               placeholder="mis. Tunggakan SPP Jan–Jun 2025"
+                                               class="w-full rounded border-gray-300 px-3 py-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-600">Jatuh tempo <span class="text-gray-400">(boleh dikosongkan)</span></label>
+                                        <input type="date" name="jatuh_tempo" class="w-full rounded border-gray-300 px-3 py-2 text-sm sm:w-56">
+                                    </div>
+                                    {{-- Akibat yang tak diminta petugas secara langsung, dan yang paling
+                                         mudah luput: buku pembantu bergerak, buku besar tidak. --}}
+                                    <p class="rounded bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+                                        <b>Tidak menerbitkan jurnal.</b> Nilainya dianggap sudah diakui sebagai pendapatan
+                                        di pembukuan lama, sehingga pembayarannya kelak mengkredit <b>Piutang</b>, bukan
+                                        Pendapatan. Piutangnya masuk buku besar lewat <b>baris turunan</b> di menu
+                                        <b>Saldo Awal</b>, yang menghitung ulang sendiri — tak perlu diketik di sana.
+                                    </p>
+                                    <div class="flex justify-end gap-2 border-t border-gray-100 pt-3">
+                                        <button type="button" @click="buka = false" class="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">Batal</button>
+                                        <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Catat Tunggakan Awal</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+            </div>
             <table class="min-w-full text-sm">
-                {{-- Koreksi nominal hanya untuk pemegang hak `koreksi-tagihan`
-                     (kepala keuangan). Ia mengubah piutang yang sudah dibukukan
-                     dan menerbitkan jurnal penyesuaian, jadi kolomnya pun tak
-                     ditampilkan bagi yang tak berwenang. --}}
-                @php $bolehKoreksi = \App\Support\Akses::boleh('koreksi-tagihan', 'ubah'); @endphp
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="px-4 py-2">Jenis</th><th class="px-4 py-2">Keterangan</th><th class="px-4 py-2 text-right">Nominal</th><th class="px-4 py-2 text-right">Sisa</th><th class="px-4 py-2">Status</th>@if ($bolehKoreksi)<th class="px-4 py-2"></th>@endif</tr></thead>
+                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="px-4 py-2">Jenis</th><th class="px-4 py-2">Keterangan</th><th class="px-4 py-2 text-right">Nominal</th><th class="px-4 py-2 text-right">Sisa</th><th class="px-4 py-2">Status</th>@if ($adaKolomAksi)<th class="px-4 py-2"></th>@endif</tr></thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse ($santri->tagihan as $t)
                         {{-- Setoran yang sudah dicatat tapi belum diverifikasi keuangan tidak
                              mengurangi `sisa`. Tanpa ditampilkan, tagihan yang baru dibayar
                              tampak seolah belum tersentuh — petugas bisa menagih dua kali. --}}
                         @php $tunggu = $menungguPerTagihan[$t->id] ?? null; @endphp
-                        <tr><td class="px-4 py-2">{{ $t->kode_jenis }}</td><td class="px-4 py-2 text-gray-600">{{ $t->keterangan }}</td>
+                        <tr><td class="px-4 py-2">{{ $t->kode_jenis }}</td>
+                            <td class="px-4 py-2 text-gray-600">{{ $t->keterangan }}
+                                {{-- Ditandai di layar, bukan hanya di kolom database: baris
+                                     ini berakrual TANPA jurnal, dan siapa pun yang mengadu
+                                     tagihan santri dengan neraca perlu tahu yang mana. --}}
+                                @if ($t->saldo_awal)
+                                    <span class="ml-1 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] text-sky-700">saldo awal</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-2 text-right tabular-nums">@rp($t->nominal)</td>
                             <td class="px-4 py-2 text-right tabular-nums">@rp($t->sisa)
                                 @if ($tunggu && (float) $tunggu > 0)
@@ -167,9 +271,10 @@
                                     <div class="mt-0.5 text-[11px] text-gray-500">sudah disetor, menunggu keuangan</div>
                                 @endif
                             </td>
-                            @if ($bolehKoreksi)
+                            @if ($adaKolomAksi)
                                 <td class="px-4 py-2 text-right">
-                                    @if ($t->status !== 'batal')
+                                    <div class="flex items-center justify-end gap-1">
+                                    @if ($bolehKoreksi && $t->status !== 'batal')
                                         <div x-data="{ buka: false }" class="relative inline-block">
                                             <button type="button" @click="buka = ! buka"
                                                     class="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50">Koreksi</button>
@@ -215,11 +320,79 @@
                                             </form>
                                         </div>
                                     @endif
+
+                                    {{-- Sunting & hapus TANPA jurnal — hanya untuk baris saldo awal
+                                         yang belum tersentuh sama sekali. Halangannya dihitung di
+                                         controller lewat TunggakanAwalService::halangan(), sumber yang
+                                         sama dengan yang dipakai service menolak, supaya tombol yang
+                                         terlihat tak pernah menjanjikan lebih dari yang diterima. --}}
+                                    @if ($bolehTunggakanAwal && $t->saldo_awal && ($halanganTunggakanAwal[$t->id] ?? []) === [])
+                                        {{-- Modal juga, sebentuk dengan tombol Tunggakan Awal di
+                                             kepala blok — bukan panel gantung yang menyempit. --}}
+                                        <div x-data="{ ubah: false }" class="inline-block">
+                                            <button type="button" @click="ubah = true"
+                                                    class="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50">Ubah</button>
+                                            <div x-show="ubah" x-cloak @keydown.escape.window="ubah = false"
+                                                 class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+                                                 @click.self="ubah = false">
+                                                <div class="my-10 w-full max-w-md rounded-xl bg-white text-left shadow-xl">
+                                                    <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+                                                        <h3 class="font-semibold text-gray-800">Ubah Tunggakan Awal</h3>
+                                                        <button type="button" @click="ubah = false" class="text-gray-400 hover:text-gray-700">&times;</button>
+                                                    </div>
+                                                    <form method="POST" action="{{ route('tunggakan_awal.update', $t->id) }}" class="space-y-3 p-5">
+                                                        @csrf
+                                                        @method('PUT')
+                                                        <p class="rounded bg-slate-50 px-3 py-2 text-xs leading-relaxed text-gray-500">
+                                                            Membetulkan salah ketik pada <b>{{ $t->kode_jenis }}</b> ({{ $t->tahun_ajaran }}).
+                                                            Belum ada pembayaran atasnya, jadi tak ada jurnal yang perlu dibalik.
+                                                        </p>
+                                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                            <div>
+                                                                <label class="mb-1 block text-xs font-medium text-gray-600">Nominal</label>
+                                                                <x-input-rupiah name="nominal_tunggakan" :value="$t->nominal" required class="px-3 py-2" />
+                                                            </div>
+                                                            <div>
+                                                                <label class="mb-1 block text-xs font-medium text-gray-600">Jatuh tempo <span class="text-gray-400">(opsional)</span></label>
+                                                                <input type="date" name="jatuh_tempo" value="{{ $t->jatuh_tempo?->format('Y-m-d') }}"
+                                                                       class="w-full rounded border-gray-300 px-3 py-2 text-sm">
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label class="mb-1 block text-xs font-medium text-gray-600">Keterangan</label>
+                                                            <input type="text" name="keterangan" required maxlength="255"
+                                                                   value="{{ $t->keterangan }}" class="w-full rounded border-gray-300 px-3 py-2 text-sm">
+                                                        </div>
+                                                        {{-- Jenis biaya & tahun ajaran sengaja tak bisa diubah —
+                                                             keduanya menentukan slot indeks unik. Yang salah jenisnya
+                                                             dihapus lalu dibuat ulang. --}}
+                                                        <p class="text-xs leading-relaxed text-gray-500">
+                                                            Jenis biaya & tahun ajarannya tak bisa diubah di sini. Bila keduanya yang keliru,
+                                                            hapus barisnya lalu catat ulang.
+                                                        </p>
+                                                        <div class="flex justify-end gap-2 border-t border-gray-100 pt-3">
+                                                            <button type="button" @click="ubah = false" class="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">Batal</button>
+                                                            <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Simpan</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {{-- @rp() TIDAK dipakai di dalam atribut: ia mengeluarkan
+                                             <span class="rp">, dan kutipnya menutup atributnya lebih awal. --}}
+                                        <form method="POST" action="{{ route('tunggakan_awal.destroy', $t->id) }}" class="inline"
+                                              data-confirm="Hapus tunggakan awal Rp {{ number_format((float) $t->nominal, 0, ',', '.') }}? Tak ada jurnal yang dibalik — baris ini memang belum pernah menyentuh buku besar.">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="rounded border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50">Hapus</button>
+                                        </form>
+                                    @endif
+                                    </div>
                                 </td>
                             @endif
                         </tr>
                     @empty
-                        <tr><td colspan="{{ $bolehKoreksi ? 6 : 5 }}" class="px-4 py-6 text-center text-gray-400">Belum ada tagihan.</td></tr>
+                        <tr><td colspan="{{ $adaKolomAksi ? 6 : 5 }}" class="px-4 py-6 text-center text-gray-400">Belum ada tagihan.</td></tr>
                     @endforelse
                 </tbody>
             </table>

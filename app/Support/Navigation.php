@@ -37,6 +37,10 @@ final class Navigation
         ['url' => '/hak-akses', 'label' => 'Hak Akses Modul', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'adminOnly' => true],
         ['url' => '/karyawan', 'label' => 'Karyawan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'karyawan'],
         ['url' => '/impor-data-awal', 'label' => 'Impor Data Awal', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'impor-data-awal'],
+        // Menumpang modul yang sama: pekerjaannya sama-sama pemindahan sistem,
+        // hanya satuannya berbeda (satu dokumen vs satu berkas). Tak ada kode
+        // modul baru, jadi tak ada kotak baru yang harus dicentangi.
+        ['url' => '/pengajuan-saldo-awal', 'label' => 'Hutang Belum Dibayar (Saldo Awal)', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'impor-data-awal'],
 
         ['url' => '/jenjang', 'label' => 'Jenjang Pendidikan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Biaya', 'modul' => 'jenjang'],
         // Tipe Biaya mendahului Jenis Biaya: jenis biaya memilih tipenya dari sini.
@@ -187,6 +191,7 @@ final class Navigation
         // Sejajar dengan sub "Kontrol" di KEUANGAN, dan sengaja dipisah dari menu
         // Penagihan SPP: yang satu pekerjaan bulanan, yang ini pekerjaan harian.
         ['url' => '/kesantrian/outstanding-spp', 'label' => 'Daftar Outstanding SPP', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'outstanding-spp'],
+        ['url' => '/kesantrian/outstanding-lain', 'label' => 'Daftar Outstanding Tagihan Lain', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'outstanding-lain'],
 
         // ---- 7. Tagihan Lain-lain ----
         // Sampai sekarang modul ini SAMA SEKALI tak punya item sidebar — satu-

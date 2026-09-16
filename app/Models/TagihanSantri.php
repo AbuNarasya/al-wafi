@@ -23,6 +23,18 @@ class TagihanSantri extends Model
      */
     public const TIDAK_BERLAKU = ['batal', 'dihapus'];
 
+    /**
+     * Perilaku yang hanya boleh punya SATU tagihan berlaku per
+     * (santri, jenjang, tahun ajaran, periode).
+     *
+     * Cerminan indeks unik parsial `tagihan_santri_sekali_per_ta` — tinggal di
+     * model, bukan di service mana pun, karena yang diwakilinya adalah aturan
+     * TABEL ini. Dipakai untuk menolak tabrakan dengan kalimat yang bisa dibaca
+     * petugas, sebelum PostgreSQL menolaknya dengan SQLSTATE[23505] di tengah
+     * jalan. Menambah perilaku baru ke indeks berarti menambahkannya di sini juga.
+     */
+    public const SEKALI_PER_TA = ['registrasi', 'uang_pangkal', 'perlengkapan', 'daftar_ulang', 'spp'];
+
     protected $table = 'tagihan_santri';
 
     protected $guarded = ['id'];
@@ -44,6 +56,7 @@ class TagihanSantri extends Model
             'nominal' => 'decimal:2',
             'sisa' => 'decimal:2',
             'sudah_akrual' => 'boolean',
+            'saldo_awal' => 'boolean',
             'jatuh_tempo' => 'date',
         ];
     }

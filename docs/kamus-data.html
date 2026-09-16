@@ -57,8 +57,8 @@
     <h1>Kamus Data</h1>
     <div class="sub">Al Wafi ERP — Aplikasi Keuangan &amp; Kesantrian Pesantren</div>
     <div class="meta">
-        108 tabel &middot; 1161 kolom<br>
-        Disusun 11 Agustus 2026<br><br>
+        108 tabel &middot; 1168 kolom<br>
+        Disusun 16 September 2026<br><br>
         Struktur dibaca langsung dari database <b>al_wafi_php</b>,<br>
         sehingga isinya tak pernah berbeda dari keadaan sebenarnya.
     </div>
@@ -469,7 +469,7 @@ dikosongkan.</p>
                         </tbody>
         </table>
             <h3>Accrue &amp; Prepaid &nbsp;<span class="judul-tabel">accrues</span>
-            <span class="jml">(15 kolom)</span></h3>
+            <span class="jml">(16 kolom)</span></h3>
         <p>Jurnal penyesuaian yang dibuat manual: biaya yang sudah terjadi tapi belum dibayar (accrue), dan biaya dibayar di muka yang mulai diakui (prepaid). Akun debet &amp; kreditnya dipilih sendiri oleh penginput.</p>
         
         <table class="kolom">
@@ -584,6 +584,13 @@ dikosongkan.</p>
                     <td class="t">timestamp</td>
                     <td class="n">&check;</td>
                     <td>Waktu baris terakhir diubah.</td>
+                </tr>
+                            <tr>
+                    <td class="k">
+                        saldo_awal                                                                    </td>
+                    <td class="t">boolean</td>
+                    <td class="n"></td>
+                    <td>Dokumen pindahan sistem: dicatat TANPA jurnal. Nilainya masuk buku besar lewat baris turunan di menu Saldo Awal — dan hanya sisi neracanya, karena bebannya milik periode lalu.</td>
                 </tr>
                         </tbody>
         </table>
@@ -1721,7 +1728,7 @@ dikosongkan.</p>
     <div class="ringkas">Hutang lembaga kepada bank, dan piutang lembaga kepada karyawan.</div>
     
             <h3>Pembiayaan Bank &nbsp;<span class="judul-tabel">bank_loans</span>
-            <span class="jml">(21 kolom)</span></h3>
+            <span class="jml">(22 kolom)</span></h3>
         <p>Pokok pembiayaan/pinjaman bank berakad syariah beserta marginnya. Sisa pokok dihitung dari pokok awal dikurangi yang sudah terbayar lewat Kas Keluar.</p>
         
         <table class="kolom">
@@ -1879,10 +1886,17 @@ dikosongkan.</p>
                     <td class="n">&check;</td>
                     <td>Waktu baris terakhir diubah.</td>
                 </tr>
+                            <tr>
+                    <td class="k">
+                        saldo_awal                                                                    </td>
+                    <td class="t">boolean</td>
+                    <td class="n"></td>
+                    <td>Pembiayaan yang uangnya cair SEBELUM pindah sistem — dicatat tanpa jurnal pencairan. Hutangnya masuk buku besar lewat baris turunan di menu Saldo Awal.</td>
+                </tr>
                         </tbody>
         </table>
             <h3>Pinjaman Karyawan &nbsp;<span class="judul-tabel">pinjaman_karyawan</span>
-            <span class="jml">(15 kolom)</span></h3>
+            <span class="jml">(16 kolom)</span></h3>
         <p>Piutang lembaga kepada pegawai. Pokok dicairkan sekali, lalu dicicil menurut termin yang disepakati.</p>
         
         <table class="kolom">
@@ -1997,6 +2011,13 @@ dikosongkan.</p>
                     <td class="t">timestamp</td>
                     <td class="n">&check;</td>
                     <td>Waktu baris terakhir diubah.</td>
+                </tr>
+                            <tr>
+                    <td class="k">
+                        saldo_awal                                                                    </td>
+                    <td class="t">boolean</td>
+                    <td class="n"></td>
+                    <td>Pinjaman yang uangnya diserahkan SEBELUM pindah sistem — dicatat tanpa jurnal pencairan. Piutangnya masuk buku besar lewat baris turunan di menu Saldo Awal.</td>
                 </tr>
                         </tbody>
         </table>
@@ -2706,7 +2727,7 @@ dikosongkan.</p>
                         </tbody>
         </table>
             <h3>Uang Muka Operasional &nbsp;<span class="judul-tabel">operational_advances</span>
-            <span class="jml">(19 kolom)</span></h3>
+            <span class="jml">(20 kolom)</span></h3>
         <p>Uang yang diserahkan lebih dulu kepada seseorang untuk berbelanja. Tercatat sebagai ASET (piutang) sampai dipertanggungjawabkan.</p>
         
         <table class="kolom">
@@ -2849,6 +2870,13 @@ dikosongkan.</p>
                     <td class="t">timestamp</td>
                     <td class="n">&check;</td>
                     <td>Waktu baris terakhir diubah.</td>
+                </tr>
+                            <tr>
+                    <td class="k">
+                        saldo_awal                                                                    </td>
+                    <td class="t">boolean</td>
+                    <td class="n"></td>
+                    <td>Uang muka yang diserahkan SEBELUM pindah sistem — didaftarkan ke pool tanpa jurnal, karena kas keluarnya sudah terjadi di pembukuan lama. Masuk buku besar lewat baris turunan di menu Saldo Awal.</td>
                 </tr>
                         </tbody>
         </table>
@@ -3494,7 +3522,7 @@ dikosongkan.</p>
                         </tbody>
         </table>
             <h3>Aset Tetap &nbsp;<span class="judul-tabel">assets</span>
-            <span class="jml">(15 kolom)</span></h3>
+            <span class="jml">(16 kolom)</span></h3>
         <p>Barang bernilai besar yang disusutkan selama umur manfaatnya.</p>
         
         <table class="kolom">
@@ -3609,6 +3637,13 @@ dikosongkan.</p>
                     <td class="t">timestamp</td>
                     <td class="n">&check;</td>
                     <td>Waktu baris terakhir diubah.</td>
+                </tr>
+                            <tr>
+                    <td class="k">
+                        saldo_awal                                                                    </td>
+                    <td class="t">boolean</td>
+                    <td class="n"></td>
+                    <td>Aset yang sudah dimiliki SEBELUM pindah sistem. Pencatatan aset memang tak pernah menjurnal — yang menjurnal hanya depresiasi bulanan — jadi kolom ini satu-satunya pembeda dari aset yang dibeli lewat Kas Keluar, yang nilainya sudah masuk buku besar dari sisi pembayarannya.</td>
                 </tr>
                         </tbody>
         </table>
@@ -4050,7 +4085,7 @@ dikosongkan.</p>
     <div class="ringkas">Jalur permohonan pembayaran dari staf sampai disetujui &amp; diverifikasi keuangan, beserta mesin persetujuan yang dipakai bersama oleh beberapa modul.</div>
     
             <h3>Pengajuan Pembayaran &nbsp;<span class="judul-tabel">pengajuan_pembayaran</span>
-            <span class="jml">(24 kolom)</span></h3>
+            <span class="jml">(25 kolom)</span></h3>
         <p>Permohonan pembayaran dari staf. Satu tabel melayani tiga jenis sekaligus lewat kolom `jenis`: pembayaran biasa, pengajuan uang muka, dan penyelesaian uang muka.</p>
                     <div class="catatan"><b>Perhatian.</b> Alur: dibuat staf → rantai persetujuan → verifikasi keuangan (menerbitkan jurnal hutang) → dibayar lewat Kas Keluar.</div>
         
@@ -4229,6 +4264,13 @@ dikosongkan.</p>
                     <td class="t">numeric(18,2)</td>
                     <td class="n"></td>
                     <td>Kekurangan yang masih harus dibayar pada dokumen penyelesaian uang muka.</td>
+                </tr>
+                            <tr>
+                    <td class="k">
+                        saldo_awal                                                                    </td>
+                    <td class="t">boolean</td>
+                    <td class="n"></td>
+                    <td>Hutang yang sudah disetujui di pembukuan lama tetapi belum dicairkan saat pindah sistem. Lahir langsung berstatus `diposting` tanpa rantai persetujuan dan tanpa jurnal — keadaan yang di jalur normal mustahil, karena di sana status &amp; `journal_entry_id` ditetapkan bersamaan.</td>
                 </tr>
                         </tbody>
         </table>
@@ -7767,7 +7809,7 @@ dikosongkan.</p>
     <div class="ringkas">Buku piutang santri: penerbitan tagihan, setoran pembayaran, koreksi, angsuran uang pangkal, dan tagihan lain-lain.</div>
     
             <h3>Tagihan Santri &nbsp;<span class="judul-tabel">tagihan_santri</span>
-            <span class="jml">(16 kolom)</span></h3>
+            <span class="jml">(17 kolom)</span></h3>
         <p>Buku pembantu piutang per santri. Setiap kewajiban — registrasi, uang pangkal, perlengkapan, daftar ulang, SPP, tagihan lain — menjadi satu baris di sini.</p>
                     <div class="catatan"><b>Perhatian.</b> Perilaku, jenjang, dan tahun ajaran disimpan sebagai SALINAN agar tagihan lama tak ikut berubah saat masternya berubah. `tahun_ajaran` di sini adalah tahun TAGIHAN, berbeda dari tahun masuk santri. Indeks unik parsial menjaga satu perilaku tak terbit dua kali dalam satu tahun ajaran.</div>
         
@@ -7833,7 +7875,7 @@ dikosongkan.</p>
                         sudah_akrual                                                                    </td>
                     <td class="t">boolean</td>
                     <td class="n"></td>
-                    <td>Piutangnya sudah dijurnal.</td>
+                    <td>Piutangnya sudah diakui — menentukan sisi kredit saat dibayar: Piutang, bukan Pendapatan.</td>
                 </tr>
                             <tr>
                     <td class="k">
@@ -7890,6 +7932,13 @@ dikosongkan.</p>
                     <td class="t">integer</td>
                     <td class="n">&check;</td>
                     <td>Batch impor asal, bila tagihan ini hasil impor data awal.</td>
+                </tr>
+                            <tr>
+                    <td class="k">
+                        saldo_awal                                                                    </td>
+                    <td class="t">boolean</td>
+                    <td class="n"></td>
+                    <td>Tunggakan warisan yang masuk sebagai keadaan pindahan sistem: berakrual TANPA jurnal. Buku besarnya masuk terpisah lewat menu Saldo Awal. Pembeda dari tagihan akrual biasa, yang justru punya jurnal.</td>
                 </tr>
                         </tbody>
         </table>

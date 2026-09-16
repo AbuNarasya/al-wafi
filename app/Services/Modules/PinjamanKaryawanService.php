@@ -94,6 +94,10 @@ class PinjamanKaryawanService
                 'kode_rekening' => $input['kode_rekening'] ?? null,
                 'status' => 'aktif',
                 'keterangan' => $input['keterangan'] ?? null,
+                // Tanpa pencairan berjurnal = uangnya diserahkan sebelum pindah
+                // sistem; piutangnya belum pernah masuk buku besar dari sini.
+                // `$rek` hanya terisi bila `posting_pencairan` dicentang.
+                'saldo_awal' => $rek === null,
                 'id_pengguna' => $idPengguna,
             ]);
 

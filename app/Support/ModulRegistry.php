@@ -158,6 +158,7 @@ final class ModulRegistry
         // dari modul `spp` (yang menerbitkan): memeriksa tunggakan adalah pekerjaan
         // harian, menerbitkan tagihan tidak.
         ['kode' => 'outstanding-spp', 'nama' => 'Outstanding SPP (tunggakan & koreksi nominal)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Kontrol'],
+        ['kode' => 'outstanding-lain', 'nama' => 'Outstanding Tagihan Lain (lain-lain & daftar ulang)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Kontrol'],
 
         // ---- Sistem ----
         // 'void-approvals' DIBUANG 2026-07-28: menunya menunjuk /void-approvals

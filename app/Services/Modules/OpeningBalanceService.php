@@ -3,8 +3,10 @@
 namespace App\Services\Modules;
 
 use App\Exceptions\AppException;
+use App\Models\CoaDetail;
 use App\Models\CompanySettings;
 use App\Models\JournalEntry;
+use App\Models\JournalLine;
 use App\Models\OpeningBalance;
 use App\Services\Ledger\DocNumber;
 use App\Services\Ledger\PostingService;
@@ -46,6 +48,7 @@ class OpeningBalanceService
     public function state(): array
     {
         $rows = OpeningBalance::with('coa')->orderBy('kode_coa')->get();
+        $turunan = (new SaldoAwalTurunan)->baris();
 
         $totalDebet = '0';
         $totalKredit = '0';
@@ -56,6 +59,15 @@ class OpeningBalanceService
                 $totalKredit = Money::add($totalKredit, $r->saldo);
             }
         }
+        // Baris turunan ikut ditimbang. Kalau tidak, layar akan mengatakan
+        // "sudah balance" untuk jurnal yang belum memuat separuh isinya.
+        foreach ($turunan as $t) {
+            if ($t['jenis_saldo'] === 'debet') {
+                $totalDebet = Money::add($totalDebet, $t['saldo']);
+            } else {
+                $totalKredit = Money::add($totalKredit, $t['saldo']);
+            }
+        }
 
         $posted = $rows->contains(fn ($r) => $r->posted);
         $journalRef = null;
@@ -64,14 +76,25 @@ class OpeningBalanceService
             $journalRef = JournalEntry::where('id', $entryId)->value('referensi');
         }
 
+        $jumlahBaris = $rows->count() + count($turunan);
+
         return [
             'rows' => $rows,
+            'turunan' => $turunan,
+            'catatanTurunan' => (new SaldoAwalTurunan)->catatan(),
+            // Setelah difinalisasi, dokumen saldo awal masih boleh bertambah —
+            // tunggakan warisan kerap baru ketemu berbulan-bulan sesudahnya.
+            // Yang terbit tak diubah diam-diam; selisihnya DITUNJUKKAN, dan yang
+            // memutuskan menyusun ulang tetap orang.
+            'selisihTerbit' => $posted ? $this->selisihTerbit($entryId, $turunan) : null,
             'summary' => [
-                'count' => $rows->count(),
+                'count' => $jumlahBaris,
+                'countManual' => $rows->count(),
+                'countTurunan' => count($turunan),
                 'totalDebet' => Money::of($totalDebet),
                 'totalKredit' => Money::of($totalKredit),
                 'selisih' => Money::sub($totalDebet, $totalKredit),
-                'balanced' => $rows->count() > 0 && Money::eq($totalDebet, $totalKredit),
+                'balanced' => $jumlahBaris > 0 && Money::eq($totalDebet, $totalKredit),
                 'posted' => $posted,
                 'journalRef' => $journalRef,
             ],
@@ -85,7 +108,74 @@ class OpeningBalanceService
             throw new AppException(409, 'Akun ini sudah ada di daftar saldo awal.');
         }
 
+        // Penjaga anti-hitung-dua-kali. Akun yang angkanya sudah datang sendiri
+        // dari dokumen saldo awal tak boleh diketik lagi di sini — itu cara
+        // paling gampang membuat piutang atau hutang tercatat dobel, dan
+        // selisihnya baru ketahuan berbulan-bulan kemudian.
+        $turunan = collect((new SaldoAwalTurunan)->baris())->firstWhere('kode_coa', $data['kode_coa']);
+        if ($turunan) {
+            throw new AppException(409, 'Akun "'.$turunan['nama_coa'].'" sudah terisi otomatis '
+                .Money::of($turunan['saldo']).' dari '.$turunan['jumlah_dokumen'].' dokumen saldo awal ('
+                .implode(', ', $turunan['sumber']).'). Mengetiknya lagi membuat angkanya terhitung dua kali — '
+                .'betulkan lewat dokumennya, bukan di sini.');
+        }
+
         return OpeningBalance::create($data);
+    }
+
+    /**
+     * Selisih antara jurnal pembuka YANG SUDAH TERBIT dan keadaan dokumen saat ini.
+     *
+     * Baris manual terkunci sesudah finalisasi, jadi satu-satunya yang bisa
+     * bergerak adalah sisi turunannya — dokumen saldo awal yang bertambah,
+     * dibatalkan, atau dikoreksi sesudah jurnalnya terbit.
+     *
+     * @param  list<array<string,mixed>>  $turunan
+     * @return list<array{kode_coa:string,nama_coa:string,terbit:string,sekarang:string,selisih:string}>
+     */
+    private function selisihTerbit(?int $entryId, array $turunan): array
+    {
+        if (! $entryId) {
+            return [];
+        }
+
+        // Netto per akun: debet positif, kredit negatif. Dibandingkan sebagai
+        // netto supaya akun yang berpindah sisi pun tetap terbaca selisihnya.
+        $terbit = [];
+        foreach (JournalLine::where('entry_id', $entryId)->get() as $l) {
+            $terbit[$l->kode_coa] = Money::add($terbit[$l->kode_coa] ?? '0', Money::sub($l->debet, $l->kredit));
+        }
+
+        $sekarang = [];
+        foreach (OpeningBalance::all() as $r) {
+            $n = $r->jenis_saldo === 'debet' ? Money::of($r->saldo) : Money::sub('0', $r->saldo);
+            $sekarang[$r->kode_coa] = Money::add($sekarang[$r->kode_coa] ?? '0', $n);
+        }
+        foreach ($turunan as $t) {
+            $n = $t['jenis_saldo'] === 'debet' ? Money::of($t['saldo']) : Money::sub('0', $t['saldo']);
+            $sekarang[$t['kode_coa']] = Money::add($sekarang[$t['kode_coa']] ?? '0', $n);
+        }
+
+        $nama = CoaDetail::whereIn('kode_coa', array_unique([...array_keys($terbit), ...array_keys($sekarang)]))
+            ->pluck('nama_coa', 'kode_coa');
+
+        $hasil = [];
+        foreach (array_unique([...array_keys($terbit), ...array_keys($sekarang)]) as $kode) {
+            $a = $terbit[$kode] ?? '0';
+            $b = $sekarang[$kode] ?? '0';
+            if (Money::eq($a, $b)) {
+                continue;
+            }
+            $hasil[] = [
+                'kode_coa' => $kode,
+                'nama_coa' => $nama[$kode] ?? $kode,
+                'terbit' => Money::of($a),
+                'sekarang' => Money::of($b),
+                'selisih' => Money::sub($b, $a),
+            ];
+        }
+
+        return $hasil;
     }
 
     public function updateLine(int $id, array $data): OpeningBalance
@@ -108,7 +198,9 @@ class OpeningBalanceService
     {
         $this->assertDraft();
         $rows = OpeningBalance::with('coa')->get();
-        if ($rows->count() < 2) {
+        $turunan = (new SaldoAwalTurunan)->baris();
+
+        if ($rows->count() + count($turunan) < 2) {
             throw new AppException(422, 'Butuh minimal 2 akun yang saling menyeimbangkan (total Debet = total Kredit) sebelum finalisasi.');
         }
 
@@ -119,6 +211,19 @@ class OpeningBalanceService
             'kredit' => $r->jenis_saldo === 'kredit' ? Money::of($r->saldo) : '0',
             'keterangan' => 'Saldo awal',
         ])->all();
+
+        // Baris turunan ikut terbit sebagai baris jurnal betulan. Keterangannya
+        // menyebut asalnya supaya yang membaca buku besar setahun lagi tahu
+        // angka ini datang dari dokumen, bukan dari ketikan seseorang.
+        foreach ($turunan as $t) {
+            $lines[] = [
+                'kode_coa' => $t['kode_coa'],
+                'nama_coa' => $t['nama_coa'],
+                'debet' => $t['jenis_saldo'] === 'debet' ? Money::of($t['saldo']) : '0',
+                'kredit' => $t['jenis_saldo'] === 'kredit' ? Money::of($t['saldo']) : '0',
+                'keterangan' => 'Saldo awal — '.implode(', ', $t['sumber']).' ('.$t['jumlah_dokumen'].' dokumen)',
+            ];
+        }
 
         $tanggal = $this->periodeAwal();
 

@@ -163,6 +163,12 @@ class PemetaAsetTetap implements Pemeta
                 'kode_coa' => $this->kosongJadiNull($b['kode_coa'] ?? ''),
                 'status' => 'aktif',
                 'sumber_ref' => 'impor-saldo-awal',
+                // Pencatatan aset TIDAK pernah menjurnal; yang menjurnal hanya
+                // depresiasi bulanan. Jadi penanda ini bukan sekadar catatan —
+                // ia satu-satunya pembeda antara aset pindahan (nilainya belum
+                // di buku besar) dan aset yang dibeli lewat Kas Keluar (nilainya
+                // sudah masuk dari sisi pembayarannya).
+                'saldo_awal' => true,
             ]);
             $jumlah++;
         }

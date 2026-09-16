@@ -24,6 +24,10 @@ class OpeningBalanceController extends Controller
 
         return view('opening-balance.index', [
             'rows' => $state['rows'],
+            // Baris yang dihitung dari dokumen saldo awal — tak diketik siapa pun.
+            'turunan' => $state['turunan'],
+            'catatanTurunan' => $state['catatanTurunan'],
+            'selisihTerbit' => $state['selisihTerbit'],
             'summary' => $state['summary'],
             'coaOptions' => ['' => '— pilih akun —'] + CoaDetail::where('status', 'aktif')->orderBy('kode_coa')->get()
                 ->mapWithKeys(fn ($c) => [$c->kode_coa => "{$c->kode_coa} — {$c->nama_coa}"])->all(),

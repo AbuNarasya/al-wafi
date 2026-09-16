@@ -132,6 +132,11 @@ class BankLoanService
                 'pokok_terbayar' => '0',
                 'status' => 'aktif',
                 'keterangan' => $input['keterangan'] ?? null,
+                // Tanpa jurnal pencairan = uangnya cair sebelum pindah sistem,
+                // jadi hutangnya belum pernah masuk buku besar dari sini. Itulah
+                // arti `saldo_awal`, dan itu yang membuatnya ikut dihitung
+                // sebagai baris turunan di menu Saldo Awal.
+                'saldo_awal' => empty($input['posting_pencairan']),
                 'id_pengguna' => $idPengguna,
             ]);
 

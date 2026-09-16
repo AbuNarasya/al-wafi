@@ -16,7 +16,7 @@ class PinjamanKaryawan extends Model
 
     protected function casts(): array
     {
-        return ['tanggal' => 'date', 'pokok' => 'decimal:2', 'terbayar' => 'decimal:2'];
+        return ['tanggal' => 'date', 'pokok' => 'decimal:2', 'terbayar' => 'decimal:2', 'saldo_awal' => 'boolean'];
     }
 
     public function karyawan(): BelongsTo

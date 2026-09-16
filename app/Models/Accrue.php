@@ -27,6 +27,7 @@ class Accrue extends Model
         'nomor_referensi',
         'keterangan',
         'status',
+        'saldo_awal',
         'id_pengguna',
     ];
 
@@ -35,6 +36,7 @@ class Accrue extends Model
         return [
             'tanggal' => 'date',
             'nominal' => 'decimal:2',
+            'saldo_awal' => 'boolean',
         ];
     }
 

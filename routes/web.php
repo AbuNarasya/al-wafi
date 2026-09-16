@@ -201,6 +201,18 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/termin', [$p, 'aturTermin'])->name('termin')->middleware('hakakses:pinjaman-karyawan,ubah')->whereNumber('id');
     });
 
+    // ---- Pengajuan Belum Dibayar (saldo awal, pintu manual) ----
+    // Menumpang hak `impor-data-awal`, BUKAN `pengajuan-pembayaran`: dokumen yang
+    // dilahirkannya berstatus `diposting` tanpa melewati rantai persetujuan, dan
+    // langsung bisa dicairkan Kas Keluar. Itu wewenang pemindah sistem, bukan
+    // wewenang setiap orang yang boleh mengajukan pembayaran.
+    Route::prefix('pengajuan-saldo-awal')->name('pengajuan_saldo_awal.')->group(function () {
+        $psa = \App\Http\Controllers\PengajuanSaldoAwalController::class;
+        Route::get('/', [$psa, 'index'])->name('index')->middleware('hakakses:impor-data-awal,lihat');
+        Route::post('/', [$psa, 'store'])->name('store')->middleware('hakakses:impor-data-awal,buat');
+        Route::delete('/{id}', [$psa, 'destroy'])->name('destroy')->middleware('hakakses:impor-data-awal,buat')->whereNumber('id');
+    });
+
     // ---- Impor Data Awal (alat pindahan sistem) ----
     // Menulis dokumen TANPA jurnal; saldonya masuk lewat menu Saldo Awal.
     // 'lihat' cukup untuk melihat & memeriksa berkas; menulis butuh 'buat'.
@@ -618,6 +630,18 @@ Route::middleware('auth')->group(function () {
         // menyunting data santri.
         Route::post('/tagihan/{id}/koreksi', [\App\Http\Controllers\KoreksiTagihanController::class, 'koreksi'])
             ->name('tagihan.koreksi')->middleware('hakakses:koreksi-tagihan,ubah')->whereNumber('id');
+
+        // Tunggakan awal — pintu KEDUA saldo awal, di samping Impor Data Awal.
+        // Menulis tagihan TANPA jurnal, jadi wewenangnya menumpang modul impor:
+        // pekerjaannya sama (memasukkan keadaan pindahan), orangnya pun sama.
+        // `buat` juga untuk hapus — yang dibuang adalah barisnya sendiri yang
+        // belum tersentuh, setara membatalkan batch impor.
+        Route::post('/santri/{id}/tunggakan-awal', [\App\Http\Controllers\TunggakanAwalController::class, 'store'])
+            ->name('tunggakan_awal.store')->middleware('hakakses:impor-data-awal,buat')->whereNumber('id');
+        Route::put('/tunggakan-awal/{id}', [\App\Http\Controllers\TunggakanAwalController::class, 'update'])
+            ->name('tunggakan_awal.update')->middleware('hakakses:impor-data-awal,buat')->whereNumber('id');
+        Route::delete('/tunggakan-awal/{id}', [\App\Http\Controllers\TunggakanAwalController::class, 'destroy'])
+            ->name('tunggakan_awal.destroy')->middleware('hakakses:impor-data-awal,buat')->whereNumber('id');
     });
 
     // Pendaftaran lanjutan (kenaikan jenjang internal lewat proses PPSB) —
@@ -751,6 +775,16 @@ Route::middleware('auth')->group(function () {
         ->controller(\App\Http\Controllers\OutstandingSppController::class)->group(function () {
             Route::get('/', 'index')->name('index')->middleware('hakakses:outstanding-spp,lihat');
             Route::put('/{idTagihan}', 'koreksi')->name('koreksi')->middleware('hakakses:outstanding-spp,ubah')->whereNumber('idTagihan');
+        });
+
+    // Outstanding Tagihan Lain — tunggakan Kesantrian SELAIN SPP (lain-lain &
+    // daftar ulang). Keduanya memicu penanda tugas yang sama seperti SPP, tetapi
+    // selama ini tak punya layar untuk menelusuri siapa & berapa. Modulnya
+    // sendiri, sejalan dengan `outstanding-spp`.
+    Route::prefix('kesantrian/outstanding-lain')->name('outstanding_lain.')
+        ->controller(\App\Http\Controllers\OutstandingLainController::class)->group(function () {
+            Route::get('/', 'index')->name('index')->middleware('hakakses:outstanding-lain,lihat');
+            Route::put('/{idTagihan}', 'koreksi')->name('koreksi')->middleware('hakakses:outstanding-lain,ubah')->whereNumber('idTagihan');
         });
 
     // Wali / Keluarga Santri.

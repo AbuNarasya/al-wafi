@@ -106,6 +106,15 @@ class AssetController extends Controller
             'akumulasi_depresiasi' => [$isCreate ? 'nullable' : 'prohibited', 'numeric', 'min:0'],
             'kode_coa' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
             'status' => ['required', Rule::in(['draft', 'aktif', 'dilepas'])],
+            // Aset pindahan sistem: nilainya BELUM ada di buku besar, jadi ia
+            // ikut dihitung sebagai baris turunan di menu Saldo Awal. Aset yang
+            // dibeli lewat Kas Keluar TIDAK boleh ditandai — nilainya sudah masuk
+            // buku besar dari sisi pembayarannya, dan menandainya membuat
+            // angkanya terhitung dua kali.
+            //
+            // Hanya saat membuat. Mengubahnya di kemudian hari berarti menggeser
+            // neraca pembuka tanpa jejak dokumen apa pun.
+            'saldo_awal' => [$isCreate ? 'nullable' : 'prohibited', 'boolean'],
         ]);
     }
 

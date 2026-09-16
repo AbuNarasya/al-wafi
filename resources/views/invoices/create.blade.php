@@ -65,6 +65,28 @@
 
             <div class="border-t border-gray-200 pt-3 text-sm font-medium text-gray-700">Rincian Item (dikredit ke Hutang)</div>
 
+            {{-- Pengetahuan yang sebelumnya hanya ada di dalam kode (PemetaInvoiceVendor):
+                 saldo awal hutang vendor dicatat lewat layar ini juga, bedanya baris
+                 rinciannya diarahkan ke akun perantara alih-alih akun beban. Tanpa
+                 keterangan ini, satu-satunya cara mengetahuinya adalah membaca pemetanya. --}}
+            <details class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-gray-600">
+                <summary class="cursor-pointer font-medium text-gray-700">Mencatat hutang vendor lama (saldo awal pindahan sistem)?</summary>
+                <p class="mt-2">
+                    Pakai layar ini juga, dengan dua penyesuaian: <b>tanggal invoice</b> diisi tanggal cut-off
+                    pembukuan (jatuh temponya tetap tanggal asli, supaya aging-nya benar), dan baris rinciannya
+                    diarahkan ke <b>akun perantara saldo awal</b> — bukan ke akun beban, karena bebannya milik
+                    periode lalu dan sudah melebur ke ekuitas awal.
+                </p>
+                <p class="mt-2">
+                    Invoice memang <b>menerbitkan jurnal</b> (Debit perantara, Kredit hutang), jadi hutangnya
+                    sudah masuk buku besar dari sini — ia <b>tidak</b> ikut sebagai baris turunan di menu Saldo Awal.
+                    Yang perlu diseimbangkan di sana adalah saldo akun perantaranya.
+                </p>
+                <p class="mt-2">
+                    Untuk banyak invoice sekaligus, lebih cepat lewat <b>Impor Data Awal → Hutang Vendor</b>.
+                </p>
+            </details>
+
             <div class="space-y-3">
                 <template x-for="(row, i) in rows" :key="i">
                     <div class="space-y-2 rounded-lg border border-gray-200 p-3">

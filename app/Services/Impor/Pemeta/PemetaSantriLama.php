@@ -633,6 +633,11 @@ class PemetaSantriLama implements Pemeta
                     // Nilainya sudah diakui sebagai pendapatan di catatan lama →
                     // pembayaran nanti mengkredit PIUTANG, bukan Pendapatan.
                     'sudah_akrual' => true,
+                    // Penanda saldo awal, dipakai bersama pintu manual
+                    // (TunggakanAwalService): "berakrual TANPA jurnal". Tanpa ini
+                    // ia tak terbedakan dari tagihan akrual biasa yang justru
+                    // PUNYA jurnal, dan pembetulan tanpa jurnal jadi tak aman.
+                    'saldo_awal' => true,
                     'keterangan' => $this->kosongJadiNull($b["ket_tunggakan_{$k}"] ?? '') ?? $t['bawaan_ket'],
                     'created_at' => $now, 'updated_at' => $now,
                 ];

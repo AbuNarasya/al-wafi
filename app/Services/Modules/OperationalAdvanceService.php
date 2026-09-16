@@ -95,6 +95,12 @@ class OperationalAdvanceService
             'keterangan' => $data['keterangan'], 'nominal' => Money::of($data['nominal']), 'nominal_diselesaikan' => '0',
             'status' => 'outstanding', 'id_pengguna' => $data['id_pengguna'] ?? null,
             'id_pengajuan_sumber' => $data['id_pengajuan_sumber'] ?? null,
+            // Method ini melayani DUA pihak yang berbeda maksudnya. Dari alur
+            // Pengajuan Pembayaran, jurnalnya memang ada — milik Kas Keluar —
+            // jadi barisnya BUKAN saldo awal. Dari impor & pintu manual, tak ada
+            // jurnal di mana pun. Pemanggil yang menyatakannya, bukan ditebak di
+            // sini dari ada-tidaknya id_pengajuan_sumber.
+            'saldo_awal' => (bool) ($data['saldo_awal'] ?? false),
         ]);
     }
 

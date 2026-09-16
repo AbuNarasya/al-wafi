@@ -49,13 +49,24 @@ class AccrueController extends Controller
 
     public function store(AccrueRequest $request): RedirectResponse
     {
+        $data = $request->validated();
+        // Layar bertanya "posting jurnal sekarang?", service menerima
+        // kebalikannya. Diterjemahkan di sini supaya pertanyaannya tetap positif
+        // di mata petugas — isian bermakna negatif ("jangan jurnal") adalah cara
+        // tercepat membuat orang salah centang.
+        $saldoAwal = ! $request->boolean('posting_jurnal');
+        $data['tanpa_jurnal'] = $saldoAwal;
+        unset($data['posting_jurnal']);
+
         try {
-            $this->service->create($request->validated(), $request->user()->id_pengguna);
+            $this->service->create($data, $request->user()->id_pengguna);
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('accrue.index')->with('status', 'Accrue berhasil diposting.');
+        return redirect()->route('accrue.index')->with('status', $saldoAwal
+            ? 'Accrue saldo awal dicatat TANPA jurnal. Buku besarnya ikut lewat baris turunan di menu Saldo Awal.'
+            : 'Accrue berhasil diposting.');
     }
 
     /** Reversal awal bulan — balik semua accrue aktif dari periode sebelumnya. */

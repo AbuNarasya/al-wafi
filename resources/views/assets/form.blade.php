@@ -37,6 +37,26 @@
 
             @unless ($aset->exists)
                 <x-field name="akumulasi_depresiasi" label="Akumulasi Depresiasi Awal" type="number" :value="old('akumulasi_depresiasi', 0)" hint="Isi bila aset sudah berjalan; setelahnya bertambah otomatis via Jalankan Depresiasi." />
+
+                {{-- Pencatatan aset tak pernah menjurnal — yang menjurnal hanya
+                     depresiasi bulanan. Jadi penanda ini satu-satunya pembeda
+                     antara aset pindahan (nilainya belum di buku besar) dan aset
+                     yang dibeli lewat Kas Keluar (sudah masuk dari sisi
+                     pembayarannya). Salah centang = nilainya terhitung dua kali. --}}
+                <div x-data="{ awal: {{ old('saldo_awal') ? 'true' : 'false' }} }" class="space-y-2">
+                    <label class="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-gray-700">
+                        <input type="hidden" name="saldo_awal" value="0">
+                        <input type="checkbox" name="saldo_awal" value="1" x-model="awal"
+                               class="mt-0.5 rounded border-gray-300 text-brand focus:ring-brand">
+                        <span>Aset <b>pindahan sistem</b> — sudah dimiliki sebelum aplikasi ini dipakai</span>
+                    </label>
+                    <p x-show="awal" x-cloak class="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+                        Nilai perolehan dan akumulasi depresiasinya akan ikut terhitung sebagai <b>baris turunan</b>
+                        di menu <b>Saldo Awal</b>. <b>Jangan dicentang</b> untuk aset yang dibeli lewat Kas Keluar
+                        atau Pengajuan Pembayaran — nilainya sudah masuk buku besar dari sisi pembayarannya, dan
+                        mencentangnya membuat angkanya terhitung dua kali.
+                    </p>
+                </div>
             @endunless
 
             <x-field name="kode_coa" label="Akun COA Aset" :value="old('kode_coa', $aset->kode_coa)" :options="$coaOptions"

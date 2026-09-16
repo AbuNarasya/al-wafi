@@ -30,11 +30,13 @@ class Asset extends Model
         'kode_coa',
         'status',
         'sumber_ref',
+        'saldo_awal',
     ];
 
     protected function casts(): array
     {
         return [
+            'saldo_awal' => 'boolean',
             'kuantiti' => 'decimal:4',
             'harga_perolehan' => 'decimal:2',
             'tanggal_perolehan' => 'date',

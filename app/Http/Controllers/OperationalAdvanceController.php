@@ -43,13 +43,33 @@ class OperationalAdvanceController extends Controller
 
     public function store(OperationalAdvanceRequest $request): RedirectResponse
     {
+        $data = $request->validated();
+        $saldoAwal = ! $request->boolean('posting_jurnal');
+
         try {
-            $this->service->create($request->validated(), $request->user()->id_pengguna);
+            if ($saldoAwal) {
+                // registerOutstanding() sudah ada sejak lama, dipakai impor dan
+                // alur Pengajuan, tetapi belum pernah punya pintu dari layar.
+                // Ia butuh NAMA akun uang muka, bukan hanya kodenya.
+                $akun = CoaDetail::find($data['kode_coa_uang_muka']);
+                if (! $akun) {
+                    throw new AppException(400, 'Akun uang muka tidak ditemukan.');
+                }
+                $this->service->registerOutstanding($data + [
+                    'nama_coa_uang_muka' => $akun->nama_coa,
+                    'id_pengguna' => $request->user()->id_pengguna,
+                    'saldo_awal' => true,
+                ]);
+            } else {
+                $this->service->create($data, $request->user()->id_pengguna);
+            }
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('operational_advance.index')->with('status', 'Uang muka operasional berhasil diposting.');
+        return redirect()->route('operational_advance.index')->with('status', $saldoAwal
+            ? 'Uang muka saldo awal didaftarkan TANPA jurnal. Buku besarnya ikut lewat baris turunan di menu Saldo Awal.'
+            : 'Uang muka operasional berhasil diposting.');
     }
 
     public function void(Request $request, OperationalAdvance $operational_advance): RedirectResponse

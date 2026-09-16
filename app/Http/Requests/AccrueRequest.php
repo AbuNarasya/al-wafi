@@ -26,6 +26,10 @@ class AccrueRequest extends FormRequest
             'kode_unit' => ['nullable', 'string', 'exists:business_units,kode_unit'],
             'kode_bagian' => ['nullable', 'string', 'exists:bagian,kode_bagian'],
             'keterangan' => ['nullable', 'string'],
+            // Melepas centangnya = saldo awal pindahan sistem: dokumennya dibuat,
+            // jurnalnya tidak. Pola yang sama dengan Pembiayaan Bank & Pinjaman
+            // Karyawan, supaya satu idiom berlaku di seluruh aplikasi.
+            'posting_jurnal' => ['nullable', 'boolean'],
         ];
     }
 

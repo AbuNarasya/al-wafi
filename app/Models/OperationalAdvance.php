@@ -17,6 +17,7 @@ class OperationalAdvance extends Model
         'nomor_ref', 'tanggal', 'kode_unit', 'kode_rekening', 'kode_coa_uang_muka',
         'nama_coa_uang_muka', 'penerima', 'keterangan', 'nominal', 'nominal_diselesaikan',
         'status', 'void_reason', 'void_by', 'void_at', 'id_pengguna', 'id_pengajuan_sumber',
+        'saldo_awal',
     ];
 
     protected function casts(): array
@@ -26,6 +27,7 @@ class OperationalAdvance extends Model
             'nominal' => 'decimal:2',
             'nominal_diselesaikan' => 'decimal:2',
             'void_at' => 'datetime',
+            'saldo_awal' => 'boolean',
         ];
     }
 

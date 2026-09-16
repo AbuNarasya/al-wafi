@@ -26,6 +26,10 @@ class OperationalAdvanceRequest extends FormRequest
             'penerima' => ['nullable', 'string', 'max:255'],
             'nominal' => ['required', 'numeric', 'gt:0'],
             'keterangan' => ['required', 'string'],
+            // Melepas centangnya = uang mukanya diserahkan SEBELUM pindah sistem:
+            // barisnya didaftarkan ke pool tanpa jurnal, karena kas keluarnya
+            // sudah terjadi di pembukuan lama.
+            'posting_jurnal' => ['nullable', 'boolean'],
         ];
     }
 

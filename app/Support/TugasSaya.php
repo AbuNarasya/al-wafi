@@ -119,34 +119,83 @@ final class TugasSaya
      */
     private static function jatuhTempo(): array
     {
-        $modul = [
-            // Label menyebut "mendekati/lewat" karena hitungannya memang memuat
-            // yang BELUM jatuh tempo: jendelanya H-n dari pengaturan reminder
-            // (mis. 7,3,1 → semua yang jatuh tempo ≤ 7 hari lagi ikut terhitung).
-            // Menyebutnya "jatuh tempo" saja membuat orang menyangka ada yang
-            // sudah telat padahal belum.
-            '/ppsb/angsuran-uang-pangkal' => ['modul' => 'angsuran-uang-pangkal', 'jumlah' => 0, 'label' => 'angsuran mendekati/lewat jatuh tempo'],
-            '/ppsb/pembayaran' => ['modul' => 'pembayaran-ppsb', 'jumlah' => 0, 'label' => 'tagihan mendekati/lewat jatuh tempo'],
-            '/kesantrian/pembayaran' => ['modul' => 'pembayaran-kesantrian', 'jumlah' => 0, 'label' => 'tagihan mendekati/lewat jatuh tempo'],
-            '/invoices' => ['modul' => 'invoices', 'jumlah' => 0, 'label' => 'invoice mendekati/lewat jatuh tempo'],
+        // Label menyebut "mendekati/lewat" karena hitungannya memang memuat yang
+        // BELUM jatuh tempo: jendelanya H-n dari pengaturan reminder (mis. 7,3,1
+        // → semua yang jatuh tempo ≤ 7 hari lagi ikut terhitung). Menyebutnya
+        // "jatuh tempo" saja membuat orang menyangka ada yang sudah telat
+        // padahal belum.
+        //
+        // Tujuannya BERLAPIS, dicoba berurutan sampai ada yang boleh dibuka
+        // pengguna ini. Yang pertama selalu DAFTAR TUNGGAKAN — layar yang
+        // menyebut siapa & berapa; yang kedua layar pencatatan pembayaran
+        // seperti dulu.
+        //
+        // Berlapis, bukan sekadar diganti, karena `outstanding-lain` modul baru
+        // yang belum dicentangi siapa pun: mengarahkan penanda ke sana tanpa
+        // cadangan akan MENGHILANGKAN notifikasinya dari layar semua orang
+        // sampai hak itu dibagikan — memperbaiki kebingungan dengan cara
+        // membuat pekerjaannya tak terlihat sama sekali.
+        $tujuan = [
+            'angsuran' => [
+                'label' => 'angsuran mendekati/lewat jatuh tempo',
+                'lapis' => [['/ppsb/angsuran-uang-pangkal', 'angsuran-uang-pangkal']],
+            ],
+            'ppsb' => [
+                'label' => 'tagihan mendekati/lewat jatuh tempo',
+                'lapis' => [['/ppsb/pembayaran', 'pembayaran-ppsb']],
+            ],
+            'spp' => [
+                'label' => 'tagihan SPP mendekati/lewat jatuh tempo',
+                'lapis' => [
+                    ['/kesantrian/outstanding-spp', 'outstanding-spp'],
+                    ['/kesantrian/pembayaran', 'pembayaran-kesantrian'],
+                ],
+            ],
+            'lain' => [
+                'label' => 'tagihan lain-lain & daftar ulang mendekati/lewat jatuh tempo',
+                'lapis' => [
+                    ['/kesantrian/outstanding-lain', 'outstanding-lain'],
+                    ['/kesantrian/pembayaran', 'pembayaran-kesantrian'],
+                ],
+            ],
+            'invoice' => [
+                'label' => 'invoice mendekati/lewat jatuh tempo',
+                'lapis' => [['/invoices', 'invoices']],
+            ],
         ];
 
+        $jumlah = array_fill_keys(array_keys($tujuan), 0);
+
         foreach ((new ReminderTagihanService)->daftarMendekati() as $item) {
-            $url = match ($item['sumber']) {
-                'angsuran_uang_pangkal' => '/ppsb/angsuran-uang-pangkal',
-                'invoice_vendor' => '/invoices',
-                'tagihan_santri' => in_array($item['tipe'] ?? 'lain', ['registrasi', 'uang_pangkal', 'perlengkapan'], true)
-                    ? '/ppsb/pembayaran' : '/kesantrian/pembayaran',
+            $kunci = match ($item['sumber']) {
+                'angsuran_uang_pangkal' => 'angsuran',
+                'invoice_vendor' => 'invoice',
+                // SPP dipisah dari lain-lain & daftar ulang: ketiganya ditangani
+                // modul pembayaran yang sama, tetapi daftar tunggakannya dua layar
+                // yang berbeda.
+                'tagihan_santri' => match ($item['tipe'] ?? 'lain') {
+                    'registrasi', 'uang_pangkal', 'perlengkapan' => 'ppsb',
+                    'spp' => 'spp',
+                    default => 'lain',
+                },
                 default => null,
             };
-            if ($url !== null) {
-                $modul[$url]['jumlah']++;
+            if ($kunci !== null) {
+                $jumlah[$kunci]++;
             }
         }
 
         $hasil = [];
-        foreach ($modul as $url => $m) {
-            $hasil[] = [$url, Akses::bolehMenu($m['modul']) ? $m['jumlah'] : 0, $m['label']];
+        foreach ($tujuan as $kunci => $t) {
+            foreach ($t['lapis'] as [$url, $modul]) {
+                if (Akses::bolehMenu($modul)) {
+                    $hasil[] = [$url, $jumlah[$kunci], $t['label']];
+
+                    continue 2;
+                }
+            }
+            // Tak satu pun tujuannya boleh dibuka → pekerjaan ini milik orang lain.
+            $hasil[] = [$t['lapis'][0][0], 0, $t['label']];
         }
 
         return $hasil;

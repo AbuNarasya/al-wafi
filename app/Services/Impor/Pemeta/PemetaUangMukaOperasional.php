@@ -144,6 +144,9 @@ class PemetaUangMukaOperasional implements Pemeta
                 'keterangan' => $bukti.($ket !== '' ? " — {$ket}" : ' — saldo awal uang muka'),
                 'nominal' => $this->angka($b['sisa_uang_muka']),
                 'id_pengguna' => $idPengguna,
+                // Dinyatakan, bukan ditebak: method yang sama juga melayani alur
+                // Pengajuan Pembayaran, yang jurnalnya memang ada.
+                'saldo_awal' => true,
             ]);
             $jumlah++;
         }
