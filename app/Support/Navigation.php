@@ -35,6 +35,9 @@ final class Navigation
         ['url' => '/levels', 'label' => 'Level Otorisasi Keuangan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'levels'],
         ['url' => '/level-pengajuan', 'label' => 'Level Pengajuan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'level-pengajuan'],
         ['url' => '/hak-akses', 'label' => 'Hak Akses Modul', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'adminOnly' => true],
+        // Khusus admin, sekelompok dengan Impor Data Awal: sama-sama alat
+        // pindahan sistem, bedanya satu berkas vs satu orang.
+        ['url' => '/santri-manual', 'label' => 'Input Manual Santri Aktif', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'adminOnly' => true],
         ['url' => '/karyawan', 'label' => 'Karyawan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'karyawan'],
         ['url' => '/impor-data-awal', 'label' => 'Impor Data Awal', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'impor-data-awal'],
         // Menumpang modul yang sama: pekerjaannya sama-sama pemindahan sistem,

@@ -110,6 +110,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/hak-akses', [HakAksesController::class, 'index'])->name('hak_akses.index');
         Route::get('/hak-akses/{user}', [HakAksesController::class, 'edit'])->name('hak_akses.edit');
         Route::put('/hak-akses/{user}', [HakAksesController::class, 'update'])->name('hak_akses.update');
+
+        // Input Manual Santri Aktif — juga khusus admin, dan bukan kehati-hatian
+        // berlebihan: santri lahir langsung AKTIF tanpa melewati PPSB, dan tiap
+        // tagihannya memilih sendiri apakah menerbitkan jurnal. Dua wewenang yang
+        // di alur biasa dipegang orang yang berbeda.
+        $sm = \App\Http\Controllers\SantriManualController::class;
+        Route::get('/santri-manual', [$sm, 'create'])->name('santri_manual.create');
+        Route::post('/santri-manual', [$sm, 'store'])->name('santri_manual.store');
+        Route::delete('/santri-manual/{id}', [$sm, 'destroy'])->name('santri_manual.destroy')->whereNumber('id');
     });
 
     // ---- Keuangan: Kontrol / Master ----
