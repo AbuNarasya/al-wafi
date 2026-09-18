@@ -32,3 +32,13 @@ Thumbs.db
 # Setelan Claude Code per-mesin: ditulis ulang otomatis oleh alatnya, memuat
 # jalur & kredensial lokal. Bukan berkas yang layak dibagikan.
 /.claude/settings.local.json
+
+# Catatan kredensial yang disimpan di akar proyek. Ditutup dari git karena
+# sekali kredensial masuk ke riwayat, membuangnya jauh lebih repot daripada
+# mencegahnya — dan repo ini punya remote.
+#
+# Menutupnya di sini adalah pengaman lapis kedua, BUKAN tempat yang benar:
+# berkas semacam ini lebih baik tinggal di LUAR folder repo sama sekali.
+/Password.txt
+/password.txt
+/*.env.backup
