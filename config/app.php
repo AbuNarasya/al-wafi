@@ -74,12 +74,29 @@ return [
     |--------------------------------------------------------------------------
     |
     | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. The timezone
-    | is set to "UTC" by default as it is suitable for most use cases.
+    | will be used by the PHP date and date-time functions.
+    |
+    | ASIA/JAKARTA, bukan UTC bawaan Laravel. Seluruh pemakai aplikasi ini
+    | berada di satu zona waktu, dan setiap angka waktu yang mereka lihat atau
+    | tentukan berarti WIB: jam pengiriman reminder, tanggal jatuh tempo,
+    | stempel waktu pada bukti pembayaran, dan hitungan "lewat N hari".
+    |
+    | Dengan UTC, `dailyAt('07:00')` pada pengaturan reminder mengirim pukul
+    | 14:00 WIB — tujuh jam dari yang dimaksud petugas yang mengetiknya. Dan
+    | pergantian hari untuk perhitungan jatuh tempo terjadi pukul 07:00 pagi,
+    | bukan tengah malam.
+    |
+    | Diubah pada 19 Sep 2026, saat database transaksi masih KOSONG. Itu
+    | disengaja: sesudah ada ribuan tagihan & jurnal, mengubahnya melahirkan
+    | satu kolom berisi dua zona waktu yang tak bisa dipisahkan lagi tanpa
+    | menebak baris mana milik zona mana.
+    |
+    | Lewat env supaya lingkungan lain (mis. pemeriksaan lintas zona) bisa
+    | menimpanya tanpa menyunting berkas ini.
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Asia/Jakarta'),
 
     /*
     |--------------------------------------------------------------------------
