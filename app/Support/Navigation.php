@@ -81,6 +81,9 @@ final class Navigation
         ['url' => '/inventory', 'label' => 'Persediaan', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'inventory'],
         ['url' => '/asset-categories', 'label' => 'Kategori Aset', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'asset-categories'],
         ['url' => '/assets', 'label' => 'Aset Tetap', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'assets'],
+        // Menyusul Aset Tetap: ia pintu keluarnya, dan sejak ada di sini tombol
+        // Hapus tak lagi boleh dipakai untuk aset yang nilainya sudah dibukukan.
+        ['url' => '/assets/pelepasan', 'label' => 'Pelepasan Aset', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'assets'],
 
         ['url' => '/purchase-orders', 'label' => 'Purchase Order', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'purchase-orders'],
         ['url' => '/perintah-pembayaran', 'label' => 'Perintah Pembayaran', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'perintah-pembayaran'],

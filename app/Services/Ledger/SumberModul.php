@@ -46,6 +46,10 @@ final class SumberModul
         // Kas Keluar) supaya satu dokumen bisa melahirkan BEBERAPA jurnal
         // persediaan tanpa saling menimpa saat dibatalkan.
         'Persediaan',
+        // Pelepasan aset tetap: jual, hibah, hapus. Dulu aset hanya bisa
+        // dihapus dari daftar tanpa jurnal sama sekali, sehingga register aset
+        // dan buku besar bercerai diam-diam.
+        'PelepasanAset',
     ];
 
     public static function isValid(string $v): bool

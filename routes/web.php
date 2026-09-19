@@ -207,8 +207,18 @@ Route::middleware('auth')->group(function () {
     crudModul('customer-types', SimpleMasterController::class, 'id');
     crudModul('asset-categories', SimpleMasterController::class, 'id');
 
-    // Aset Tetap (CRUD + jalankan depresiasi bulanan).
+    // Aset Tetap (CRUD + depresiasi bulanan + pelepasan).
     Route::post('/assets/run-depreciation', [AssetController::class, 'runDepreciation'])->name('assets.run_depreciation')->middleware('hakakses:assets,ubah');
+
+    // Pelepasan aset (jual / hibah / hapus). Memakai sumbu `hapus` pada modul
+    // `assets`: inilah pintu yang menggantikan tombol Hapus untuk aset yang
+    // nilainya sudah masuk buku besar, jadi haknya pun yang sama. Didaftarkan
+    // SEBELUM crudModul supaya `/assets/pelepasan` tak tertangkap sebagai
+    // `/assets/{asset}`.
+    Route::get('/assets/pelepasan', [AssetController::class, 'pelepasanIndex'])->name('assets.pelepasan')->middleware('hakakses:assets,lihat');
+    Route::post('/assets/pelepasan', [AssetController::class, 'lepas'])->name('assets.lepas')->middleware('hakakses:assets,hapus');
+    Route::delete('/assets/pelepasan/{id}', [AssetController::class, 'voidPelepasan'])->name('assets.pelepasan_void')->middleware('hakakses:assets,hapus')->whereNumber('id');
+
     crudModul('assets', AssetController::class, 'asset');
 
     // Persediaan (CRUD + pemakaian/opname berjurnal + kartu stok).

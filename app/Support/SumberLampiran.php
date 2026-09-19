@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\AdvanceSettlement;
 use App\Models\LampiranDokumen;
 use App\Models\OperationalAdvance;
+use App\Models\PelepasanAset;
 use App\Models\PengajuanPembayaran;
 use Illuminate\Database\Eloquent\Model;
 
@@ -31,6 +32,8 @@ final class SumberLampiran
 
     public const PENYELESAIAN = 'advance_settlement';
 
+    public const PELEPASAN_ASET = 'pelepasan_aset';
+
     /**
      * @var array<string,array{label:string,model:class-string<Model>,modul:string,status_terbuka:list<string>,kolom_nomor:string}>
      */
@@ -56,6 +59,16 @@ final class SumberLampiran
             'modul' => 'advance-settlement',
             'status_terbuka' => ['aktif'],
             'kolom_nomor' => 'nomor_referensi',
+        ],
+        self::PELEPASAN_ASET => [
+            'label' => 'Pelepasan Aset',
+            'model' => PelepasanAset::class,
+            'modul' => 'assets',
+            // Berita acara & bukti jualnya masih boleh dilengkapi selama
+            // dokumennya hidup. Begitu di-void, berkasnya tetap bisa dibaca
+            // tapi tak bisa ditukar lagi.
+            'status_terbuka' => ['aktif'],
+            'kolom_nomor' => 'nomor_ref',
         ],
     ];
 
@@ -119,6 +132,7 @@ final class SumberLampiran
             self::PENGAJUAN => route('pengajuan.show', $id),
             self::UANG_MUKA => route('operational_advance.index'),
             self::PENYELESAIAN => route('advance_settlement.index'),
+            self::PELEPASAN_ASET => route('assets.pelepasan'),
         };
     }
 
