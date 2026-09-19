@@ -41,6 +41,11 @@ final class SumberModul
         // sendiri dari jenis biayanya, jadi ketiadaannya di sini tak pernah
         // berakibat pada angka — tapi layar Unit Default jadi tak mengenalnya.
         'KoreksiTagihan',
+        // Harga pokok & penyesuaian persediaan: pemakaian barang, harga pokok
+        // penjualan, dan selisih opname. Dipisah dari modul asalnya (KasMasuk,
+        // Kas Keluar) supaya satu dokumen bisa melahirkan BEBERAPA jurnal
+        // persediaan tanpa saling menimpa saat dibatalkan.
+        'Persediaan',
     ];
 
     public static function isValid(string $v): bool

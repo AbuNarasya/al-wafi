@@ -32,6 +32,11 @@ class InvoiceRequest extends FormRequest
             'details.*.harga_satuan' => ['required', 'numeric', 'gt:0'],
             'details.*.kode_bagian' => ['nullable', 'string', 'exists:bagian,kode_bagian'],
             'details.*.keterangan' => ['nullable', 'string'],
+            // Item persediaan yang dibeli baris ini. Kosong = bukan persediaan.
+            // Tanpa isian ini, stok dulu dicocokkan lewat kode_coa — yang lazim
+            // dipakai banyak barang sekaligus, sehingga barang yang salah yang
+            // bertambah.
+            'details.*.kode_persediaan' => ['nullable', 'string', 'exists:inventory,kode_persediaan'],
             // Perlakuan aset: '' (bukan aset), '__new__' (buat draft), atau kode_aset.
             'details.*.aset_pilih' => ['nullable', 'string'],
         ];
@@ -57,6 +62,7 @@ class InvoiceRequest extends FormRequest
                 'harga_satuan' => $d['harga_satuan'],
                 'kode_bagian' => ($d['kode_bagian'] ?? '') ?: null,
                 'keterangan' => $d['keterangan'] ?? null,
+                'kode_persediaan' => ($d['kode_persediaan'] ?? '') ?: null,
                 // Perlakuan aset (kapitalisasi): __new__ → buat draft; kode aset → tambah nilai.
                 'buat_aset' => $aset === '__new__',
                 'kode_aset' => ($aset && $aset !== '__new__') ? $aset : null,

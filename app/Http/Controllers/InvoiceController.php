@@ -4,10 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
 use App\Http\Requests\InvoiceRequest;
+use App\Models\Asset;
 use App\Models\Bagian;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
+use App\Models\Inventory;
 use App\Models\Invoice;
+use App\Models\PurchaseOrder;
 use App\Models\Vendor;
 use App\Services\Modules\InvoiceService;
 use Illuminate\Http\RedirectResponse;
@@ -41,7 +44,7 @@ class InvoiceController extends Controller
             'rows' => $rows,
             'q' => $q,
             'filter' => ['vendor' => $fVendor, 'status' => $fStatus],
-            'opsiVendor' => \App\Models\Vendor::orderBy('nama_vendor')->pluck('nama_vendor', 'kode_vendor')->all(),
+            'opsiVendor' => Vendor::orderBy('nama_vendor')->pluck('nama_vendor', 'kode_vendor')->all(),
             'opsiStatus' => ['belum_bayar' => 'Belum Bayar', 'sebagian' => 'Sebagian', 'lunas' => 'Lunas', 'void' => 'Void'],
         ]);
     }
@@ -95,7 +98,7 @@ class InvoiceController extends Controller
     private function opsi(): array
     {
         // PO status open/sebagian → dropdown referensi + data untuk auto-isi baris.
-        $openPos = \App\Models\PurchaseOrder::with('details')
+        $openPos = PurchaseOrder::with('details')
             ->whereIn('status', ['open', 'sebagian'])
             ->orderByDesc('id_po')->get();
 
@@ -116,6 +119,9 @@ class InvoiceController extends Controller
                     'kode_bagian' => '',
                     'kuantiti' => (string) $d->kuantiti,
                     'harga_satuan' => (string) $d->harga_satuan,
+                    // Item persediaan ikut terbawa dari baris PO — dulu berhenti
+                    // di PO dan tak pernah sampai ke invoice.
+                    'kode_persediaan' => (string) ($d->kode_persediaan ?? ''),
                     'aset_pilih' => '',
                 ])->all(),
             ])->values()->all(),
@@ -129,10 +135,15 @@ class InvoiceController extends Controller
                 ->map(fn ($c) => ['v' => $c->kode_coa, 'l' => "{$c->kode_coa} — {$c->nama_coa}"])->values()->all(),
             'bagianOptions' => Bagian::where('status', 'aktif')->orderBy('kode_bagian')->get()
                 ->map(fn ($b) => ['v' => $b->kode_bagian, 'l' => "{$b->kode_bagian} — {$b->nama_bagian}"])->values()->all(),
+            // Item persediaan per baris. Barang yang DIPILIH di sinilah yang
+            // stoknya bertambah — dulu stok dicocokkan lewat akun COA, yang
+            // lazim dipakai banyak barang sekaligus.
+            'persediaanOptions' => Inventory::where('status', 'aktif')->orderBy('kode_persediaan')->get()
+                ->map(fn ($i) => ['v' => $i->kode_persediaan, 'l' => "{$i->kode_persediaan} — {$i->nama_persediaan} ({$i->satuan})"])->values()->all(),
             // Perlakuan aset per baris: buat draft baru atau tambah nilai ke aset yang ada.
             'asetOptions' => array_merge(
                 [['v' => '__new__', 'l' => '➕ Buat aset baru (draft)']],
-                \App\Models\Asset::orderBy('kode_aset')->get()
+                Asset::orderBy('kode_aset')->get()
                     ->map(fn ($a) => ['v' => $a->kode_aset, 'l' => "{$a->kode_aset} — {$a->nama_aset}"])->values()->all(),
             ),
         ];

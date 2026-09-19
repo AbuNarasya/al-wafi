@@ -22,6 +22,9 @@
             <x-field name="kode_grup" label="Grup COA" :value="$akun->kode_grup" :options="$grupOptions" required />
             <x-field name="jenis_saldo" label="Saldo Normal" :value="$akun->jenis_saldo"
                      :options="['debet' => 'Debet', 'kredit' => 'Kredit']" required />
+            <x-field name="klasifikasi_arus_kas" label="Klasifikasi Arus Kas" :value="$akun->klasifikasi_arus_kas"
+                     :options="['' => '— belum ditentukan —', 'operasi' => 'Aktivitas Operasi', 'investasi' => 'Aktivitas Investasi', 'pendanaan' => 'Aktivitas Pendanaan']"
+                     hint="Kelompok akun ini di Laporan Arus Kas. Piutang & hutang usaha = operasi; aset tetap = investasi; pinjaman & modal = pendanaan. Dibiarkan kosong pun aman — laporannya menampilkannya terpisah, bukan menebak." />
             <x-field name="status" label="Status" :value="$akun->status ?? 'aktif'"
                      :options="['aktif' => 'Aktif', 'nonaktif' => 'Nonaktif']" />
             <x-field name="keterangan" label="Keterangan" :value="$akun->keterangan" textarea />

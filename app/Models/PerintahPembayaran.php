@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Audit\MencatatJejak;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -15,6 +16,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class PerintahPembayaran extends Model
 {
+    use MencatatJejak;
+
+    /** Kode modul hak akses — penyaring di layar Jejak Audit. */
+    protected $jejakModul = 'perintah-pembayaran';
+
     protected $table = 'perintah_pembayaran';
 
     protected $primaryKey = 'kode_transaksi';

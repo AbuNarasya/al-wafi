@@ -6,13 +6,12 @@ use App\Exceptions\AppException;
 use App\Models\Asset;
 use App\Models\BankAccount;
 use App\Models\BusinessUnit;
-use App\Models\CashIn;
-use App\Models\CashOut;
 use App\Models\CoaDetail;
 use App\Models\CoaGroup;
 use App\Models\CompanySettings;
 use App\Models\Inventory;
 use App\Models\JournalEntry;
+use App\Models\JournalLine;
 use App\Models\OpeningBalance;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
@@ -26,6 +25,19 @@ use Illuminate\Support\Facades\DB;
 class ReportsService
 {
     public const KELOMPOK_LABEL = ['1' => 'Aset', '2' => 'Liabilitas', '3' => 'Ekuitas', '4' => 'Pendapatan', '5' => 'Beban'];
+
+    /**
+     * Kelompok Laporan Arus Kas. `belum` BUKAN kategori akuntansi — ia wadah
+     * bagi akun yang klasifikasinya belum diisi, sengaja ditampilkan terpisah
+     * dan mencolok. Menyembunyikannya, atau menumpangkannya ke "operasi",
+     * membuat laporan tampak lengkap padahal sebagian arusnya salah kamar.
+     */
+    public const KLASIFIKASI_ARUS = [
+        'operasi' => 'Aktivitas Operasi',
+        'investasi' => 'Aktivitas Investasi',
+        'pendanaan' => 'Aktivitas Pendanaan',
+        'belum' => 'Belum Diklasifikasikan',
+    ];
 
     // ---- Helper COA ----
 
@@ -50,7 +62,8 @@ class ReportsService
         foreach ($groups as $g) {
             $rootOf($g->kode_grup);
         }
-        $accounts = CoaDetail::orderBy('kode_coa')->get(['kode_coa', 'nama_coa', 'kode_grup', 'jenis_saldo', 'status'])->all();
+        $accounts = CoaDetail::orderBy('kode_coa')
+            ->get(['kode_coa', 'nama_coa', 'kode_grup', 'jenis_saldo', 'status', 'klasifikasi_arus_kas'])->all();
 
         return [
             'accounts' => $accounts,
@@ -121,6 +134,7 @@ class ReportsService
 
     /**
      * Kelompokkan akun per grup langsung (Level 3) + subtotal + total.
+     *
      * @return array{groups:array,total:string}
      */
     private function groupAccounts(array $accts, array $ctx, callable $valueFn, callable $skipFn): array
@@ -194,6 +208,121 @@ class ReportsService
             'total_aset' => Money::of($aset['total']), 'total_liabilitas' => Money::of($liabilitas['total']), 'total_ekuitas' => Money::of($totalEkuitas),
             'balanced' => $balanced,
         ];
+    }
+
+    // ---- Neraca Saldo ----
+
+    /**
+     * Neraca saldo (trial balance): saldo awal, mutasi debet & kredit, saldo
+     * akhir — per akun, dalam bentuk dua kolom D/K seperti lazimnya.
+     *
+     * Gunanya BUKAN menyajikan posisi keuangan (itu tugas Neraca), melainkan
+     * MEMBUKTIKAN bukunya seimbang dan menjadi titik tolak menelusuri selisih:
+     * ketiga pasang total harus sama besar. Karena itu angka nolnya pun ikut
+     * dihitung dan ketidakseimbangannya ditampilkan, bukan disembunyikan.
+     *
+     * @param  ?string  $kodeUnit  saring per unit bisnis. Sama seperti bukuBesar(),
+     *                             saldo pembuka dari menu Saldo Awal SENGAJA tidak
+     *                             ikut saat menyaring unit: barisnya tak berdimensi
+     *                             unit, jadi membebankannya ke satu unit menyesatkan.
+     *                             Konsekuensinya laporan per unit WAJAR bila tak
+     *                             seimbang — `disaring_unit` dipakai halaman untuk
+     *                             mengatakannya, bukan untuk menutupinya.
+     */
+    public function neracaSaldo(string $from, string $to, ?string $kodeUnit = null): array
+    {
+        $ctx = $this->coaContext();
+
+        // Saldo awal = saldo pembuka + SELURUH mutasi sebelum tanggal `from`.
+        $sebelum = Carbon::parse($from)->subDay()->toDateString();
+        $opening = $kodeUnit ? [] : $this->openingDebitMap();
+        $awalMove = $this->movementDebitMap(null, $sebelum, $kodeUnit);
+        $periode = $this->movementDebetKreditMap($from, $to, $kodeUnit);
+
+        // Pecah satu nilai berorientasi debet jadi sepasang kolom D/K. Sisi yang
+        // kosong tetap lewat Money::of() supaya berskala sama ('0.00', bukan '0')
+        // — layar & unduhan membaca keduanya sebagai kolom angka yang sama.
+        $sisi = fn ($net) => Money::isNegative($net)
+            ? ['debet' => Money::of('0'), 'kredit' => Money::sub('0', $net)]
+            : ['debet' => Money::of($net), 'kredit' => Money::of('0')];
+
+        $rows = [];
+        $total = [
+            'awal_debet' => '0', 'awal_kredit' => '0',
+            'mutasi_debet' => '0', 'mutasi_kredit' => '0',
+            'akhir_debet' => '0', 'akhir_kredit' => '0',
+        ];
+
+        foreach ($ctx['accounts'] as $a) {
+            $awal = Money::add($opening[$a->kode_coa] ?? '0', $awalMove[$a->kode_coa] ?? '0');
+            $mutD = $periode[$a->kode_coa]['debet'] ?? '0';
+            $mutK = $periode[$a->kode_coa]['kredit'] ?? '0';
+            $akhir = Money::add($awal, Money::sub($mutD, $mutK));
+
+            // Akun yang sama sekali tak bergerak DAN tak bersaldo tidak dicetak:
+            // daftar COA di sini panjang, dan barisnya yang kosong menenggelamkan
+            // yang berisi. Akun bersaldo nol TAPI bermutasi tetap tampil — justru
+            // di situ kesalahan pasangan debet/kredit biasanya bersembunyi.
+            if ($this->roundedZero($awal) && $this->roundedZero($mutD)
+                && $this->roundedZero($mutK) && $this->roundedZero($akhir)) {
+                continue;
+            }
+
+            $sAwal = $sisi($awal);
+            $sAkhir = $sisi($akhir);
+
+            $rows[] = [
+                'kode_coa' => $a->kode_coa,
+                'nama_coa' => $a->nama_coa,
+                'kelompok' => self::KELOMPOK_LABEL[$this->rootOfAccount($ctx, $a)] ?? '',
+                'awal_debet' => $sAwal['debet'], 'awal_kredit' => $sAwal['kredit'],
+                'mutasi_debet' => Money::of($mutD), 'mutasi_kredit' => Money::of($mutK),
+                'akhir_debet' => $sAkhir['debet'], 'akhir_kredit' => $sAkhir['kredit'],
+            ];
+
+            $total['awal_debet'] = Money::add($total['awal_debet'], $sAwal['debet']);
+            $total['awal_kredit'] = Money::add($total['awal_kredit'], $sAwal['kredit']);
+            $total['mutasi_debet'] = Money::add($total['mutasi_debet'], $mutD);
+            $total['mutasi_kredit'] = Money::add($total['mutasi_kredit'], $mutK);
+            $total['akhir_debet'] = Money::add($total['akhir_debet'], $sAkhir['debet']);
+            $total['akhir_kredit'] = Money::add($total['akhir_kredit'], $sAkhir['kredit']);
+        }
+
+        return [
+            'from' => $from, 'to' => $to, 'kode_unit' => $kodeUnit,
+            'rows' => $rows,
+            'total' => array_map(fn ($v) => Money::of($v), $total),
+            'seimbang_awal' => Money::eq($total['awal_debet'], $total['awal_kredit']),
+            'seimbang_mutasi' => Money::eq($total['mutasi_debet'], $total['mutasi_kredit']),
+            'seimbang_akhir' => Money::eq($total['akhir_debet'], $total['akhir_kredit']),
+            'disaring_unit' => $kodeUnit !== null,
+        ];
+    }
+
+    /**
+     * Mutasi DEBET dan KREDIT terpisah per akun — beda dari movementDebitMap()
+     * yang memampatkan keduanya jadi satu selisih. Neraca saldo justru harus
+     * memperlihatkan kedua sisinya utuh.
+     *
+     * @return array<string,array{debet:string,kredit:string}>
+     */
+    private function movementDebetKreditMap(?string $gte, ?string $lte, ?string $kodeUnit = null): array
+    {
+        $rows = DB::table('journal_lines as jl')
+            ->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
+            ->when($gte, fn ($q) => $q->where('je.tanggal', '>=', $gte))
+            ->when($lte, fn ($q) => $q->where('je.tanggal', '<=', $lte))
+            ->when($kodeUnit, fn ($q) => $q->where('jl.kode_unit', $kodeUnit))
+            ->groupBy('jl.kode_coa')
+            ->selectRaw('jl.kode_coa as kode_coa, SUM(jl.debet) as d, SUM(jl.kredit) as k')
+            ->get();
+
+        $m = [];
+        foreach ($rows as $r) {
+            $m[$r->kode_coa] = ['debet' => Money::of($r->d), 'kredit' => Money::of($r->k)];
+        }
+
+        return $m;
     }
 
     // ---- Laba Rugi ----
@@ -299,44 +428,216 @@ class ReportsService
 
     // ---- Arus Kas ----
 
-    public function arusKas(string $from, string $to): array
+    /**
+     * LAPORAN ARUS KAS — dibangun dari `journal_lines`, bukan dari dokumen.
+     *
+     * Versi lama hanya membaca dokumen Kas Masuk & Kas Keluar. Akibatnya
+     * SELURUH penerimaan santri tak pernah muncul: `PembayaranSantriService`
+     * memposting jurnalnya sendiri dan tak pernah lewat Kas Masuk — padahal
+     * itu sumber kas terbesar pesantren. Ikut hilang pula Pindah Buku,
+     * pinjaman bank & karyawan, mutasi dompet, penyesuaian rekonsiliasi, dan
+     * jurnal umum yang menyentuh kas. "Kas bersih"-nya karena itu tak pernah
+     * sama dengan perubahan saldo kas di Neraca, dan tak ada yang memberi tahu.
+     *
+     * CARA KERJA. Akun kas dikenali dari tabel `bank_accounts` — sama seperti
+     * yang dipakai PostingService, supaya tak ada daftar kedua yang bisa
+     * menyimpang. Untuk tiap jurnal yang menyentuh kas, yang dibaca justru
+     * baris NON-kasnya: tiap baris menyumbang (kredit − debet) ke arus kas,
+     * dan akun baris itulah yang menentukan kelompoknya. Pembukuan berpasangan
+     * menjamin jumlah seluruh sumbangan sama dengan pergerakan kasnya — dan
+     * `selaras` membuktikannya di layar, bukan meminta pembaca percaya.
+     *
+     * Pindah buku antar rekening kas otomatis tak terhitung: kedua barisnya
+     * akun kas, jadi tak menyisakan baris non-kas sama sekali.
+     *
+     * @param  ?string  $kodeUnit  saring per unit bisnis. Penyaringnya dikenakan
+     *                             pada baris NON-kas — di situlah kegiatannya
+     *                             berada, sedangkan baris kas kerap dipindahkan
+     *                             ke unit penampung neraca oleh PostingService.
+     *                             Konsekuensinya saldo kas awal/akhir TIDAK ikut
+     *                             disaring, sehingga uji `selaras` sengaja
+     *                             dimatikan saat menyaring unit.
+     */
+    public function arusKas(string $from, string $to, ?string $kodeUnit = null): array
     {
-        $build = function ($records) {
-            $map = [];
-            $total = '0';
-            foreach ($records as $r) {
-                foreach ($r['details'] as $d) {
-                    if (! isset($map[$d['kode_coa']])) {
-                        $map[$d['kode_coa']] = ['kode_coa' => $d['kode_coa'], 'nama_coa' => $d['nama_coa'], 'total' => '0', 'transaksi' => []];
-                    }
-                    $map[$d['kode_coa']]['total'] = Money::add($map[$d['kode_coa']]['total'], $d['nominal']);
-                    $total = Money::add($total, $d['nominal']);
-                    $map[$d['kode_coa']]['transaksi'][] = ['tanggal' => $r['tanggal'], 'nomor' => $r['nomor_transaksi'], 'keterangan' => $d['keterangan'] ?? $r['keterangan'] ?? '', 'pihak' => $r['pihak'], 'unit' => $r['unit'], 'nominal' => Money::of($d['nominal'])];
-                }
+        $kasAkun = BankAccount::pluck('kode_coa')->all();
+        if ($kasAkun === []) {
+            return $this->arusKasKosong($from, $to, $kodeUnit);
+        }
+
+        // Baris non-kas dari jurnal yang menyentuh kas. (kredit − debet) = arus
+        // masuk: akun yang dikredit (mis. pendapatan) menambah kas.
+        $baris = DB::table('journal_lines as jl')
+            ->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
+            ->leftJoin('coa_detail as c', 'jl.kode_coa', '=', 'c.kode_coa')
+            ->whereIn('jl.entry_id', function ($q) use ($kasAkun, $from, $to) {
+                $q->select('jl2.entry_id')
+                    ->from('journal_lines as jl2')
+                    ->join('journal_entries as je2', 'jl2.entry_id', '=', 'je2.id')
+                    ->whereIn('jl2.kode_coa', $kasAkun)
+                    ->whereBetween('je2.tanggal', [$from, $to]);
+            })
+            ->whereBetween('je.tanggal', [$from, $to])
+            ->whereNotIn('jl.kode_coa', $kasAkun)
+            ->when($kodeUnit, fn ($q) => $q->where('jl.kode_unit', $kodeUnit))
+            ->groupBy('jl.kode_coa', 'c.nama_coa', 'c.klasifikasi_arus_kas')
+            ->selectRaw('jl.kode_coa as kode_coa, c.nama_coa as nama_coa,
+                         c.klasifikasi_arus_kas as klasifikasi,
+                         SUM(jl.kredit) - SUM(jl.debet) as arus')
+            ->get();
+
+        $kelompok = [];
+        foreach (self::KLASIFIKASI_ARUS as $kunci => $label) {
+            $kelompok[$kunci] = ['kunci' => $kunci, 'label' => $label, 'baris' => [], 'total' => '0'];
+        }
+
+        $bersih = '0';
+        foreach ($baris as $b) {
+            $arus = Money::of($b->arus);
+            if ($this->roundedZero($arus)) {
+                continue;
             }
-            ksort($map);
-            $groups = array_map(fn ($g) => ['kode_coa' => $g['kode_coa'], 'nama_coa' => $g['nama_coa'], 'total' => Money::of($g['total']), 'transaksi' => $g['transaksi']], array_values($map));
+            $kunci = $b->klasifikasi ?: 'belum';
+            $kelompok[$kunci]['baris'][] = [
+                'kode_coa' => $b->kode_coa,
+                'nama_coa' => $b->nama_coa ?? $b->kode_coa,
+                'arus' => $arus,
+            ];
+            $kelompok[$kunci]['total'] = Money::add($kelompok[$kunci]['total'], $arus);
+            $bersih = Money::add($bersih, $arus);
+        }
 
-            return ['groups' => $groups, 'total' => $total];
-        };
+        foreach ($kelompok as $k => $v) {
+            usort($kelompok[$k]['baris'], fn ($a, $b) => $a['kode_coa'] <=> $b['kode_coa']);
+            $kelompok[$k]['total'] = Money::of($v['total']);
+        }
 
-        $cashIns = CashIn::with(['details', 'customer', 'unit'])->where('status', 'aktif')->whereBetween('tanggal', [$from, $to])->get();
-        $cashOuts = CashOut::with(['details', 'vendor', 'unit'])->where('status', 'aktif')->whereBetween('tanggal', [$from, $to])->get();
-
-        $masuk = $build($cashIns->map(fn ($c) => [
-            'tanggal' => $c->tanggal, 'nomor_transaksi' => $c->nomor_transaksi, 'keterangan' => $c->keterangan,
-            'pihak' => $c->customer?->nama_customer ?? '', 'unit' => $c->unit?->nama_unit ?? $c->kode_unit,
-            'details' => $c->details->map(fn ($d) => ['kode_coa' => $d->kode_coa, 'nama_coa' => $d->nama_coa, 'nominal' => $d->nominal, 'keterangan' => $d->keterangan])->all(),
-        ])->all());
-        $keluar = $build($cashOuts->map(fn ($c) => [
-            'tanggal' => $c->tanggal, 'nomor_transaksi' => $c->nomor_transaksi, 'keterangan' => $c->keterangan,
-            'pihak' => $c->vendor?->nama_vendor ?? '', 'unit' => $c->unit?->nama_unit ?? $c->kode_unit,
-            'details' => $c->details->map(fn ($d) => ['kode_coa' => $d->kode_coa, 'nama_coa' => $d->nama_coa, 'nominal' => $d->nominal, 'keterangan' => $d->keterangan])->all(),
-        ])->all());
+        $saldoAwal = $this->saldoKas($kasAkun, null, Carbon::parse($from)->subDay()->toDateString());
+        $saldoAkhir = $this->saldoKas($kasAkun, null, $to);
 
         return [
-            'from' => $from, 'to' => $to, 'kas_masuk' => $masuk['groups'], 'kas_keluar' => $keluar['groups'],
-            'total_masuk' => Money::of($masuk['total']), 'total_keluar' => Money::of($keluar['total']), 'kas_bersih' => Money::sub($masuk['total'], $keluar['total']),
+            'from' => $from, 'to' => $to, 'kode_unit' => $kodeUnit,
+            'kelompok' => array_values($kelompok),
+            'arus_bersih' => Money::of($bersih),
+            'saldo_kas_awal' => Money::of($saldoAwal),
+            'saldo_kas_akhir' => Money::of($saldoAkhir),
+            // Uji-diri: saldo awal + arus bersih HARUS sama dengan saldo akhir.
+            'saldo_kas_hitung' => Money::add($saldoAwal, $bersih),
+            'selaras' => $kodeUnit === null && Money::eq(Money::add($saldoAwal, $bersih), $saldoAkhir),
+            'disaring_unit' => $kodeUnit !== null,
+            'jembatan' => $this->jembatanLabaKeKas($from, $to, $kodeUnit, $kasAkun, $kelompok['operasi']['total']),
+        ];
+    }
+
+    /**
+     * JEMBATAN LABA → KAS. Menjawab pertanyaan yang paling sering diajukan
+     * pengurus: "kenapa laporannya surplus tapi kasnya menipis?"
+     *
+     * Jawabannya hampir selalu piutang: tagihan santri diakui sebagai
+     * pendapatan sejak TERBIT, sedangkan uangnya menyusul — kadang tak pernah.
+     * Selisih antara laba dan kas itulah yang dirinci di sini.
+     *
+     * Baris terakhir adalah selisih penyeimbang, sehingga jembatannya SELALU
+     * bertemu dengan arus kas operasi. Makin lengkap klasifikasi akun neraca,
+     * makin kecil baris itu dan makin tajam rinciannya.
+     */
+    private function jembatanLabaKeKas(string $from, string $to, ?string $kodeUnit, array $kasAkun, string $arusOperasi): array
+    {
+        $ctx = $this->coaContext();
+        $laba = $this->labaRugi($from, $to, $kodeUnit)['laba_rugi_bersih'];
+
+        // Penyusutan: beban yang tak pernah mengeluarkan kas.
+        $penyusutan = Money::of(
+            DB::table('journal_lines as jl')
+                ->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
+                ->where('je.sumber_modul', 'Depresiasi')
+                ->whereBetween('je.tanggal', [$from, $to])
+                ->when($kodeUnit, fn ($q) => $q->where('jl.kode_unit', $kodeUnit))
+                ->sum('jl.debet')
+        );
+
+        // Akun neraca berklasifikasi operasi: piutang & persediaan di sisi aset,
+        // hutang & titipan di sisi liabilitas. Akun kas dikecualikan — ia yang
+        // sedang dijelaskan, bukan penjelasnya.
+        $akunOperasi = fn (string $akar) => array_values(array_diff(
+            array_map(fn ($a) => $a->kode_coa, array_filter(
+                $ctx['accounts'],
+                fn ($a) => $this->rootOfAccount($ctx, $a) === $akar && $a->klasifikasi_arus_kas === 'operasi',
+            )),
+            $kasAkun,
+        ));
+
+        $gerak = function (array $akun) use ($from, $to, $kodeUnit) {
+            if ($akun === []) {
+                return '0';
+            }
+
+            return Money::of(
+                DB::table('journal_lines as jl')
+                    ->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
+                    ->whereIn('jl.kode_coa', $akun)
+                    ->whereBetween('je.tanggal', [$from, $to])
+                    ->when($kodeUnit, fn ($q) => $q->where('jl.kode_unit', $kodeUnit))
+                    ->selectRaw('COALESCE(SUM(jl.debet) - SUM(jl.kredit), 0) as v')
+                    ->value('v')
+            );
+        };
+
+        // Aset naik → kas turun; liabilitas naik → kas naik.
+        $aset = Money::sub('0', $gerak($akunOperasi('1')));
+        $liabilitas = Money::sub('0', $gerak($akunOperasi('2')));
+
+        $dijelaskan = Money::add(Money::add($laba, $penyusutan), Money::add($aset, $liabilitas));
+        $lain = Money::sub($arusOperasi, $dijelaskan);
+
+        return [
+            'baris' => [
+                ['label' => 'Laba/Rugi Bersih periode ini', 'nilai' => Money::of($laba), 'tebal' => false],
+                ['label' => 'Penyusutan & amortisasi (beban tanpa kas)', 'nilai' => $penyusutan, 'tebal' => false],
+                ['label' => '(Kenaikan)/Penurunan aset operasi — piutang, persediaan, uang muka', 'nilai' => $aset, 'tebal' => false],
+                ['label' => 'Kenaikan/(Penurunan) liabilitas operasi — hutang, titipan', 'nilai' => $liabilitas, 'tebal' => false],
+                ['label' => 'Penyesuaian lain (selisih penyeimbang)', 'nilai' => $lain, 'tebal' => false],
+                ['label' => 'Arus Kas dari Aktivitas Operasi', 'nilai' => Money::of($arusOperasi), 'tebal' => true],
+            ],
+            // Dipakai layar untuk mengajak melengkapi klasifikasi: selisih
+            // penyeimbang yang besar berarti rinciannya masih tumpul.
+            'selisih_penyeimbang' => $lain,
+        ];
+    }
+
+    /** Saldo gabungan akun kas pada satu tanggal (kas = saldo normal debet). */
+    private function saldoKas(array $kasAkun, ?string $gte, ?string $lte): string
+    {
+        $pembuka = DB::table('opening_balances')->whereIn('kode_coa', $kasAkun)
+            ->selectRaw("COALESCE(SUM(CASE WHEN jenis_saldo = 'debet' THEN saldo ELSE -saldo END), 0) as v")
+            ->value('v');
+
+        $mutasi = DB::table('journal_lines as jl')
+            ->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
+            ->whereIn('jl.kode_coa', $kasAkun)
+            ->when($gte, fn ($q) => $q->where('je.tanggal', '>=', $gte))
+            ->when($lte, fn ($q) => $q->where('je.tanggal', '<=', $lte))
+            ->selectRaw('COALESCE(SUM(jl.debet) - SUM(jl.kredit), 0) as v')
+            ->value('v');
+
+        return Money::add($pembuka, $mutasi);
+    }
+
+    /** Belum ada satu pun rekening kas terdaftar — laporannya tak punya dasar. */
+    private function arusKasKosong(string $from, string $to, ?string $kodeUnit): array
+    {
+        $kelompok = [];
+        foreach (self::KLASIFIKASI_ARUS as $kunci => $label) {
+            $kelompok[] = ['kunci' => $kunci, 'label' => $label, 'baris' => [], 'total' => Money::of('0')];
+        }
+
+        return [
+            'from' => $from, 'to' => $to, 'kode_unit' => $kodeUnit,
+            'kelompok' => $kelompok, 'arus_bersih' => Money::of('0'),
+            'saldo_kas_awal' => Money::of('0'), 'saldo_kas_akhir' => Money::of('0'),
+            'saldo_kas_hitung' => Money::of('0'), 'selaras' => true,
+            'disaring_unit' => $kodeUnit !== null, 'jembatan' => null,
+            'tanpa_rekening_kas' => true,
         ];
     }
 
@@ -371,7 +672,7 @@ class ReportsService
             ->selectRaw('COALESCE(SUM(jl.debet),0) as d, COALESCE(SUM(jl.kredit),0) as k')->first();
         $saldoAwalDebit = Money::sub(Money::add($saldoAwalDebit, $before->d), $before->k);
 
-        $inRange = \App\Models\JournalLine::where('kode_coa', $kodeCoa)
+        $inRange = JournalLine::where('kode_coa', $kodeCoa)
             ->when($kodeUnit, fn ($q) => $q->where('journal_lines.kode_unit', $kodeUnit))
             ->whereHas('entry', fn ($q) => $q->whereBetween('tanggal', [$from, $to]))
             ->with(['entry:id,tanggal,referensi,keterangan,status,id_pengguna'])
@@ -439,7 +740,11 @@ class ReportsService
         $totalNilai = '0';
         foreach (Inventory::orderBy('kode_persediaan')->get() as $it) {
             $stok = Money::sub($it->stok_masuk, $it->stok_keluar, 4);
-            $nilai = Money::mul($stok, $it->harga_perolehan);
+            // Nilai diambil dari kolom turunan yang dijumlahkan PERSIS dari
+            // lapisan FIFO — bukan stok × harga rata-rata. Harga rata-rata sudah
+            // dibulatkan dua desimal, dan perkaliannya meleset beberapa rupiah,
+            // cukup untuk membuat rekonsiliasi berteriak tanpa sebab.
+            $nilai = Money::of($it->nilai_persediaan);
             $totalNilai = Money::add($totalNilai, $nilai);
             $rows[] = ['kode_persediaan' => $it->kode_persediaan, 'nama_persediaan' => $it->nama_persediaan, 'satuan' => $it->satuan ?? '', 'stok_masuk' => Money::of($it->stok_masuk, 4), 'stok_keluar' => Money::of($it->stok_keluar, 4), 'stok' => $stok, 'harga_perolehan' => Money::of($it->harga_perolehan), 'nilai_total' => Money::of($nilai)];
         }

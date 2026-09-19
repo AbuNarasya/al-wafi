@@ -2,12 +2,18 @@
 
 namespace App\Models;
 
+use App\Support\Audit\MencatatJejak;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** Anggaran per akun/bulan/unit. Realisasi dihitung dari journal_lines. */
 class Budget extends Model
 {
+    use MencatatJejak;
+
+    /** Kode modul hak akses — penyaring di layar Jejak Audit. */
+    protected $jejakModul = 'budget';
+
     protected $table = 'budgets';
 
     protected $fillable = [

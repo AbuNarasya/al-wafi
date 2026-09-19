@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Audit\MencatatJejak;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** Purchase Order (tidak menghasilkan jurnal). */
 class PurchaseOrder extends Model
 {
+    use MencatatJejak;
+
+    /** Kode modul hak akses — penyaring di layar Jejak Audit. */
+    protected $jejakModul = 'purchase-orders';
+
     protected $table = 'purchase_orders';
 
     protected $primaryKey = 'id_po';

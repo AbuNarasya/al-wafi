@@ -1,18 +1,87 @@
 <?php
 
+use App\Http\Controllers\AccrueController;
+use App\Http\Controllers\AdvanceSettlementController;
+use App\Http\Controllers\AngsuranUangPangkalController;
+use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\AssetController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BagianController;
 use App\Http\Controllers\BankAccountController;
+use App\Http\Controllers\BankLoanController;
+use App\Http\Controllers\BankReconciliationController;
+use App\Http\Controllers\BookTransferController;
+use App\Http\Controllers\BudgetController;
+use App\Http\Controllers\BudgetPengajuanController;
 use App\Http\Controllers\BusinessUnitController;
+use App\Http\Controllers\CashInController;
+use App\Http\Controllers\CashOutController;
+use App\Http\Controllers\CoaController;
 use App\Http\Controllers\CoaDetailController;
 use App\Http\Controllers\CoaGroupController;
 use App\Http\Controllers\CompanySettingsController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DokumenSantriController;
+use App\Http\Controllers\DompetController;
+use App\Http\Controllers\ExportController;
+use App\Http\Controllers\GelombangController;
 use App\Http\Controllers\HakAksesController;
+use App\Http\Controllers\ImporDataAwalController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\JalurPendaftaranController;
+use App\Http\Controllers\JejakAuditController;
+use App\Http\Controllers\JenisBiayaController;
+use App\Http\Controllers\JenjangController;
+use App\Http\Controllers\JournalController;
+use App\Http\Controllers\KaryawanController;
+use App\Http\Controllers\KenaikanTingkatController;
+use App\Http\Controllers\KepesertaanLainController;
+use App\Http\Controllers\KontrolController;
+use App\Http\Controllers\KoreksiTagihanController;
+use App\Http\Controllers\LampiranController;
 use App\Http\Controllers\LevelController;
 use App\Http\Controllers\LevelPengajuanController;
+use App\Http\Controllers\NisController;
+use App\Http\Controllers\NotifikasiController;
+use App\Http\Controllers\OpeningBalanceController;
+use App\Http\Controllers\OperationalAdvanceController;
+use App\Http\Controllers\OutstandingLainController;
+use App\Http\Controllers\OutstandingSppController;
+use App\Http\Controllers\PembayaranSantriController;
+use App\Http\Controllers\PendaftaranLanjutanController;
+use App\Http\Controllers\PenerimaanKesantrianController;
+use App\Http\Controllers\PengajuanController;
+use App\Http\Controllers\PengajuanSaldoAwalController;
+use App\Http\Controllers\PengaturanDanaBebasController;
+use App\Http\Controllers\PerintahPembayaranController;
+use App\Http\Controllers\PeriodCloseController;
+use App\Http\Controllers\PinjamanKaryawanController;
+use App\Http\Controllers\ProfilController;
+use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\RekapPembayaranController;
+use App\Http\Controllers\ReminderTagihanController;
+use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\SantriController;
+use App\Http\Controllers\SantriManualController;
+use App\Http\Controllers\SetoranPemakaianController;
+use App\Http\Controllers\SimpleMasterController;
+use App\Http\Controllers\SppController;
+use App\Http\Controllers\SumberInformasiController;
+use App\Http\Controllers\TagihanLainController;
+use App\Http\Controllers\TagihanMassalController;
+use App\Http\Controllers\TahunAjaranController;
+use App\Http\Controllers\TargetSantriController;
+use App\Http\Controllers\TarifController;
+use App\Http\Controllers\TerminFilterController;
+use App\Http\Controllers\TipeBiayaController;
+use App\Http\Controllers\TunggakanAwalController;
 use App\Http\Controllers\UnitDefaultController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\VendorController;
+use App\Http\Controllers\WaliController;
+use App\Http\Middleware\RequireAdmin;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -25,14 +94,14 @@ if (! function_exists('crudModul')) {
     {
         $nama = str_replace('-', '_', $kode);
 
-    Route::prefix($kode)->name("{$nama}.")->group(function () use ($controller, $kode, $param) {
-        Route::get('/', [$controller, 'index'])->name('index')->middleware("hakakses:{$kode},lihat");
-        Route::get('/create', [$controller, 'create'])->name('create')->middleware("hakakses:{$kode},buat");
-        Route::post('/', [$controller, 'store'])->name('store')->middleware("hakakses:{$kode},buat");
-        Route::get("/{{$param}}/edit", [$controller, 'edit'])->name('edit')->middleware("hakakses:{$kode},ubah");
-        Route::put("/{{$param}}", [$controller, 'update'])->name('update')->middleware("hakakses:{$kode},ubah");
-        Route::delete("/{{$param}}", [$controller, 'destroy'])->name('destroy')->middleware("hakakses:{$kode},hapus");
-    });
+        Route::prefix($kode)->name("{$nama}.")->group(function () use ($controller, $kode, $param) {
+            Route::get('/', [$controller, 'index'])->name('index')->middleware("hakakses:{$kode},lihat");
+            Route::get('/create', [$controller, 'create'])->name('create')->middleware("hakakses:{$kode},buat");
+            Route::post('/', [$controller, 'store'])->name('store')->middleware("hakakses:{$kode},buat");
+            Route::get("/{{$param}}/edit", [$controller, 'edit'])->name('edit')->middleware("hakakses:{$kode},ubah");
+            Route::put("/{{$param}}", [$controller, 'update'])->name('update')->middleware("hakakses:{$kode},ubah");
+            Route::delete("/{{$param}}", [$controller, 'destroy'])->name('destroy')->middleware("hakakses:{$kode},hapus");
+        });
     }
 }
 
@@ -76,7 +145,7 @@ Route::middleware('auth')->group(function () {
 
     // Master Jenjang — sumber tunggal daftar jenjang lintas modul.
     Route::prefix('jenjang')->name('jenjang.')->group(function () {
-        $j = \App\Http\Controllers\JenjangController::class;
+        $j = JenjangController::class;
         Route::get('/', [$j, 'index'])->name('index')->middleware('hakakses:jenjang,lihat');
         Route::get('/create', [$j, 'create'])->name('create')->middleware('hakakses:jenjang,buat');
         Route::post('/', [$j, 'store'])->name('store')->middleware('hakakses:jenjang,buat');
@@ -90,9 +159,9 @@ Route::middleware('auth')->group(function () {
 
     // Reminder Tagihan Jatuh Tempo — singleton setting + pratinjau + kirim manual.
     Route::prefix('reminder-tagihan')->name('reminder_tagihan.')->group(function () {
-        Route::get('/', [\App\Http\Controllers\ReminderTagihanController::class, 'index'])->name('index')->middleware('hakakses:reminder-tagihan,lihat');
-        Route::put('/', [\App\Http\Controllers\ReminderTagihanController::class, 'update'])->name('update')->middleware('hakakses:reminder-tagihan,ubah');
-        Route::post('/kirim', [\App\Http\Controllers\ReminderTagihanController::class, 'kirim'])->name('kirim')->middleware('hakakses:reminder-tagihan,ubah');
+        Route::get('/', [ReminderTagihanController::class, 'index'])->name('index')->middleware('hakakses:reminder-tagihan,lihat');
+        Route::put('/', [ReminderTagihanController::class, 'update'])->name('update')->middleware('hakakses:reminder-tagihan,ubah');
+        Route::post('/kirim', [ReminderTagihanController::class, 'kirim'])->name('kirim')->middleware('hakakses:reminder-tagihan,ubah');
     });
 
     crudModul('users', UserController::class, 'user');
@@ -100,13 +169,17 @@ Route::middleware('auth')->group(function () {
     // Profil sendiri — tanpa gerbang hak akses, tiap pengguna berhak mengganti
     // kata sandinya sendiri. Penggantian dibatasi agar tak bisa dijadikan
     // sarana menebak kata sandi lama.
-    Route::get('/profil', [\App\Http\Controllers\ProfilController::class, 'index'])->name('profil.index');
-    Route::put('/profil/kata-sandi', [\App\Http\Controllers\ProfilController::class, 'ubahKataSandi'])
+    Route::get('/profil', [ProfilController::class, 'index'])->name('profil.index');
+    Route::put('/profil/kata-sandi', [ProfilController::class, 'ubahKataSandi'])
         ->middleware('throttle:10,1')
         ->name('profil.kata_sandi');
 
     // Matriks hak akses per pengguna — KHUSUS ADMIN (di luar matriks modul).
-    Route::middleware(\App\Http\Middleware\RequireAdmin::class)->group(function () {
+    Route::middleware(RequireAdmin::class)->group(function () {
+        // Jejak Audit: BACA SAJA, khusus admin. Tak ada rute simpan/ubah/hapus
+        // — jejak yang bisa dihapus dari dalam aplikasi berhenti jadi jejak.
+        Route::get('/jejak-audit', [JejakAuditController::class, 'index'])->name('jejak_audit.index');
+
         Route::get('/hak-akses', [HakAksesController::class, 'index'])->name('hak_akses.index');
         Route::get('/hak-akses/{user}', [HakAksesController::class, 'edit'])->name('hak_akses.edit');
         Route::put('/hak-akses/{user}', [HakAksesController::class, 'update'])->name('hak_akses.update');
@@ -115,7 +188,7 @@ Route::middleware('auth')->group(function () {
         // berlebihan: santri lahir langsung AKTIF tanpa melewati PPSB, dan tiap
         // tagihannya memilih sendiri apakah menerbitkan jurnal. Dua wewenang yang
         // di alur biasa dipegang orang yang berbeda.
-        $sm = \App\Http\Controllers\SantriManualController::class;
+        $sm = SantriManualController::class;
         Route::get('/santri-manual', [$sm, 'create'])->name('santri_manual.create');
         Route::post('/santri-manual', [$sm, 'store'])->name('santri_manual.store');
         Route::delete('/santri-manual/{id}', [$sm, 'destroy'])->name('santri_manual.destroy')->whereNumber('id');
@@ -123,31 +196,32 @@ Route::middleware('auth')->group(function () {
 
     // ---- Keuangan: Kontrol / Master ----
     // Chart of Account terpadu (tab Struktur Pohon / Grup / Detail).
-    Route::get('/coa', [\App\Http\Controllers\CoaController::class, 'index'])->name('coa.index')->middleware('hakakses:coa-detail,lihat');
+    Route::get('/coa', [CoaController::class, 'index'])->name('coa.index')->middleware('hakakses:coa-detail,lihat');
     crudModul('coa-groups', CoaGroupController::class, 'coa_group');
     crudModul('coa-detail', CoaDetailController::class, 'coa_detail');
     crudModul('bank-accounts', BankAccountController::class, 'bank_account');
     crudModul('unit-default', UnitDefaultController::class, 'unit_default');
 
     // Master "jenis" sederhana (kode + nama + status) via controller generik.
-    crudModul('vendor-types', \App\Http\Controllers\SimpleMasterController::class, 'id');
-    crudModul('customer-types', \App\Http\Controllers\SimpleMasterController::class, 'id');
-    crudModul('asset-categories', \App\Http\Controllers\SimpleMasterController::class, 'id');
+    crudModul('vendor-types', SimpleMasterController::class, 'id');
+    crudModul('customer-types', SimpleMasterController::class, 'id');
+    crudModul('asset-categories', SimpleMasterController::class, 'id');
 
     // Aset Tetap (CRUD + jalankan depresiasi bulanan).
-    Route::post('/assets/run-depreciation', [\App\Http\Controllers\AssetController::class, 'runDepreciation'])->name('assets.run_depreciation')->middleware('hakakses:assets,ubah');
-    crudModul('assets', \App\Http\Controllers\AssetController::class, 'asset');
+    Route::post('/assets/run-depreciation', [AssetController::class, 'runDepreciation'])->name('assets.run_depreciation')->middleware('hakakses:assets,ubah');
+    crudModul('assets', AssetController::class, 'asset');
 
-    // Persediaan (CRUD + mutasi stok manual).
-    crudModul('inventory', \App\Http\Controllers\InventoryController::class, 'inventory');
-    Route::post('/inventory/{inventory}/mutasi', [\App\Http\Controllers\InventoryController::class, 'mutasi'])->name('inventory.mutasi')->middleware('hakakses:inventory,ubah');
+    // Persediaan (CRUD + pemakaian/opname berjurnal + kartu stok).
+    crudModul('inventory', InventoryController::class, 'inventory');
+    Route::post('/inventory/{inventory}/mutasi', [InventoryController::class, 'mutasi'])->name('inventory.mutasi')->middleware('hakakses:inventory,ubah');
+    Route::get('/inventory/{inventory}/kartu', [InventoryController::class, 'kartu'])->name('inventory.kartu')->middleware('hakakses:inventory,lihat');
 
-    crudModul('vendors', \App\Http\Controllers\VendorController::class, 'vendor');
-    crudModul('customers', \App\Http\Controllers\CustomerController::class, 'customer');
+    crudModul('vendors', VendorController::class, 'vendor');
+    crudModul('customers', CustomerController::class, 'customer');
 
     // ---- Saldo Awal (jurnal pembuka) ----
     Route::prefix('opening-balance')->name('opening_balance.')->group(function () {
-        $o = \App\Http\Controllers\OpeningBalanceController::class;
+        $o = OpeningBalanceController::class;
         Route::get('/', [$o, 'index'])->name('index')->middleware('hakakses:opening-balance,lihat');
         Route::post('/lines', [$o, 'addLine'])->name('add')->middleware('hakakses:opening-balance,ubah');
         Route::delete('/lines/{id}', [$o, 'removeLine'])->name('remove')->middleware('hakakses:opening-balance,ubah')->whereNumber('id');
@@ -157,17 +231,22 @@ Route::middleware('auth')->group(function () {
 
     // ---- Tutup Buku Periode ----
     Route::prefix('period-close')->name('period_close.')->group(function () {
-        $pc = \App\Http\Controllers\PeriodCloseController::class;
+        $pc = PeriodCloseController::class;
         Route::get('/', [$pc, 'index'])->name('index')->middleware('hakakses:period-close,lihat');
         Route::post('/tutup-bulan', [$pc, 'tutupBulan'])->name('tutup_bulan')->middleware('hakakses:period-close,ubah');
-        Route::post('/buka-bulan', [$pc, 'bukaBulan'])->name('buka_bulan')->middleware('hakakses:period-close,ubah');
         Route::post('/tutup-tahun', [$pc, 'tutupTahun'])->name('tutup_tahun')->middleware('hakakses:period-close,ubah');
-        Route::post('/buka-tahun', [$pc, 'bukaTahun'])->name('buka_tahun')->middleware('hakakses:period-close,ubah');
+
+        // Membuka kembali periode: DUA TANGAN. Rute `buka_bulan`/`buka_tahun`
+        // yang dulu langsung bekerja sengaja dihapus, bukan disembunyikan —
+        // rute yang masih hidup tapi tombolnya hilang bukanlah kontrol.
+        Route::post('/ajukan-buka', [$pc, 'ajukanBuka'])->name('ajukan_buka')->middleware('hakakses:buka-periode,buat');
+        Route::post('/permohonan/{id}/setujui', [$pc, 'setujuiBuka'])->name('setujui_buka')->middleware('hakakses:buka-periode,ubah')->whereNumber('id');
+        Route::post('/permohonan/{id}/tolak', [$pc, 'tolakBuka'])->name('tolak_buka')->middleware('hakakses:buka-periode,ubah')->whereNumber('id');
     });
 
     // ---- Export Data (CSV / Excel / PDF) ----
     Route::prefix('export')->name('export.')->group(function () {
-        $ex = \App\Http\Controllers\ExportController::class;
+        $ex = ExportController::class;
         Route::get('/', [$ex, 'index'])->name('index');
         Route::get('/jurnal-mentah', [$ex, 'jurnalMentah'])->name('jurnal_mentah');
         Route::get('/buku-besar', [$ex, 'bukuBesar'])->name('buku_besar');
@@ -177,12 +256,13 @@ Route::middleware('auth')->group(function () {
 
     // ---- Kontrol Outstanding (read-only lintas modul) ----
     Route::prefix('kontrol')->name('kontrol.')->group(function () {
-        $k = \App\Http\Controllers\KontrolController::class;
+        $k = KontrolController::class;
         Route::get('/ringkasan', [$k, 'ringkasan'])->name('ringkasan');
         Route::get('/aging-ap', [$k, 'agingAp'])->name('aging_ap');
         Route::get('/uang-muka-customer', [$k, 'uangMukaCustomer'])->name('uang_muka_customer');
         Route::get('/uang-muka-operasional', [$k, 'uangMukaOperasional'])->name('uang_muka_operasional');
         Route::get('/accrue-prepaid', [$k, 'accruePrepaid'])->name('accrue_prepaid');
+        Route::get('/rekonsiliasi', [$k, 'rekonsiliasi'])->name('rekonsiliasi');
         Route::get('/rekap-pembiayaan', [$k, 'rekapPembiayaan'])->name('rekap_pembiayaan');
         Route::get('/export/{type}', [$k, 'download'])->name('download');
     });
@@ -190,7 +270,7 @@ Route::middleware('auth')->group(function () {
     // ---- Karyawan & Pinjaman Karyawan ----
     // Master karyawan ringkas; kelak diambil alih HRD.
     Route::prefix('karyawan')->name('karyawan.')->group(function () {
-        $k = \App\Http\Controllers\KaryawanController::class;
+        $k = KaryawanController::class;
         Route::get('/', [$k, 'index'])->name('index')->middleware('hakakses:karyawan,lihat');
         Route::get('/create', [$k, 'create'])->name('create')->middleware('hakakses:karyawan,buat');
         Route::post('/', [$k, 'store'])->name('store')->middleware('hakakses:karyawan,buat');
@@ -200,7 +280,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::prefix('pinjaman-karyawan')->name('pinjaman_karyawan.')->group(function () {
-        $p = \App\Http\Controllers\PinjamanKaryawanController::class;
+        $p = PinjamanKaryawanController::class;
         Route::get('/', [$p, 'index'])->name('index')->middleware('hakakses:pinjaman-karyawan,lihat');
         Route::get('/buat', [$p, 'create'])->name('create')->middleware('hakakses:pinjaman-karyawan,buat');
         Route::post('/', [$p, 'store'])->name('store')->middleware('hakakses:pinjaman-karyawan,buat');
@@ -216,7 +296,7 @@ Route::middleware('auth')->group(function () {
     // langsung bisa dicairkan Kas Keluar. Itu wewenang pemindah sistem, bukan
     // wewenang setiap orang yang boleh mengajukan pembayaran.
     Route::prefix('pengajuan-saldo-awal')->name('pengajuan_saldo_awal.')->group(function () {
-        $psa = \App\Http\Controllers\PengajuanSaldoAwalController::class;
+        $psa = PengajuanSaldoAwalController::class;
         Route::get('/', [$psa, 'index'])->name('index')->middleware('hakakses:impor-data-awal,lihat');
         Route::post('/', [$psa, 'store'])->name('store')->middleware('hakakses:impor-data-awal,buat');
         Route::delete('/{id}', [$psa, 'destroy'])->name('destroy')->middleware('hakakses:impor-data-awal,buat')->whereNumber('id');
@@ -226,7 +306,7 @@ Route::middleware('auth')->group(function () {
     // Menulis dokumen TANPA jurnal; saldonya masuk lewat menu Saldo Awal.
     // 'lihat' cukup untuk melihat & memeriksa berkas; menulis butuh 'buat'.
     Route::prefix('impor-data-awal')->name('impor_data_awal.')->group(function () {
-        $i = \App\Http\Controllers\ImporDataAwalController::class;
+        $i = ImporDataAwalController::class;
         Route::get('/', [$i, 'index'])->name('index')->middleware('hakakses:impor-data-awal,lihat');
         Route::get('/template/{jenis}', [$i, 'template'])->name('template')->middleware('hakakses:impor-data-awal,lihat');
         Route::post('/pratinjau', [$i, 'pratinjau'])->name('pratinjau')->middleware('hakakses:impor-data-awal,buat');
@@ -239,7 +319,7 @@ Route::middleware('auth')->group(function () {
 
     // ---- Anggaran (Input & Realisasi) ----
     Route::prefix('budget')->name('budget.')->group(function () {
-        $b = \App\Http\Controllers\BudgetController::class;
+        $b = BudgetController::class;
         // Realisasi bebas matriks — gerbang bertingkat di service (admin |
         // Yayasan | Direktorat subtree | Mudir Bagian/Staff bagian sendiri).
         Route::get('/realisasi', [$b, 'realisasi'])->name('realisasi');
@@ -250,7 +330,7 @@ Route::middleware('auth')->group(function () {
         // Digerbangi hak modul 'budget' (sama seperti app lama): 'lihat' untuk
         // melihat status, 'buat' untuk mengajukan & membatalkan miliknya.
         // Diletakkan SEBELUM PUT '/' yang admin-only agar tak ikut tergerbang.
-        $bp = \App\Http\Controllers\BudgetPengajuanController::class;
+        $bp = BudgetPengajuanController::class;
         Route::get('/pengajuan', [$bp, 'index'])->name('pengajuan.index')->middleware('hakakses:budget,lihat');
         Route::get('/pengajuan/buat', [$bp, 'create'])->name('pengajuan.create')->middleware('hakakses:budget,buat');
         Route::post('/pengajuan', [$bp, 'store'])->name('pengajuan.store')->middleware('hakakses:budget,buat');
@@ -260,14 +340,14 @@ Route::middleware('auth')->group(function () {
         // ditegakkan di service.
         Route::post('/pengajuan/{id}/batal', [$bp, 'batal'])->name('pengajuan.batal')->middleware('hakakses:budget,buat')->whereNumber('id');
         // Tulis anggaran langsung + kunci/buka = KHUSUS ADMIN (jalur darurat).
-        Route::put('/', [$b, 'save'])->name('save')->middleware(\App\Http\Middleware\RequireAdmin::class);
-        Route::post('/lock', [$b, 'lock'])->name('lock')->middleware(\App\Http\Middleware\RequireAdmin::class);
-        Route::delete('/lock/{tahun}', [$b, 'unlock'])->name('unlock')->middleware(\App\Http\Middleware\RequireAdmin::class)->whereNumber('tahun');
+        Route::put('/', [$b, 'save'])->name('save')->middleware(RequireAdmin::class);
+        Route::post('/lock', [$b, 'lock'])->name('lock')->middleware(RequireAdmin::class);
+        Route::delete('/lock/{tahun}', [$b, 'unlock'])->name('unlock')->middleware(RequireAdmin::class)->whereNumber('tahun');
     });
 
     // ---- Pengajuan Pembayaran (§4) ----
     Route::prefix('pengajuan-pembayaran')->name('pengajuan.')->group(function () {
-        $p = \App\Http\Controllers\PengajuanController::class;
+        $p = PengajuanController::class;
         Route::get('/', [$p, 'index'])->name('index')->middleware('hakakses:pengajuan-pembayaran,lihat');
         Route::get('/buat', [$p, 'create'])->name('create')->middleware('hakakses:pengajuan-pembayaran,buat');
         Route::get('/buat/uang-muka', [$p, 'createUangMuka'])->name('create_uang_muka')->middleware('hakakses:pengajuan-pembayaran,buat');
@@ -290,7 +370,7 @@ Route::middleware('auth')->group(function () {
     // unduh sengaja TIDAK menyebut jenis: nomor lampirannya yang menentukan,
     // dan haknya diperiksa dari baris lampiran itu sendiri.
     Route::prefix('lampiran')->name('lampiran.')->group(function () {
-        $l = \App\Http\Controllers\LampiranController::class;
+        $l = LampiranController::class;
         Route::get('/berkas/{lampiran}', [$l, 'berkas'])->name('berkas')->whereNumber('lampiran');
         Route::get('/unduh/{lampiran}', [$l, 'unduh'])->name('unduh')->whereNumber('lampiran');
         Route::delete('/{lampiran}', [$l, 'destroy'])->name('destroy')->whereNumber('lampiran');
@@ -301,7 +381,7 @@ Route::middleware('auth')->group(function () {
     // Persetujuan Saya (approval inbox) — di luar matriks modul (wewenang dari
     // peringkat/fungsi), hanya wajib login.
     Route::prefix('approvals')->name('approvals.')->group(function () {
-        $a = \App\Http\Controllers\ApprovalController::class;
+        $a = ApprovalController::class;
         Route::get('/', [$a, 'inbox'])->name('inbox');
         Route::post('/{id}/approve', [$a, 'approve'])->name('approve')->whereNumber('id');
         Route::post('/{id}/reject', [$a, 'reject'])->name('reject')->whereNumber('id');
@@ -309,7 +389,7 @@ Route::middleware('auth')->group(function () {
 
     // Master Tipe Biaya (Setting Awal) — perilaku tiap tipe menentukan alurnya.
     Route::prefix('tipe-biaya')->name('tipe_biaya.')->group(function () {
-        $t = \App\Http\Controllers\TipeBiayaController::class;
+        $t = TipeBiayaController::class;
         Route::get('/', [$t, 'index'])->name('index')->middleware('hakakses:tipe-biaya,lihat');
         Route::get('/create', [$t, 'create'])->name('create')->middleware('hakakses:tipe-biaya,buat');
         Route::post('/', [$t, 'store'])->name('store')->middleware('hakakses:tipe-biaya,buat');
@@ -321,7 +401,7 @@ Route::middleware('auth')->group(function () {
 
     // Master Sumber Informasi (PPSB → Setting Awal).
     Route::prefix('ppsb/sumber-informasi')->name('sumber_informasi.')->group(function () {
-        $s = \App\Http\Controllers\SumberInformasiController::class;
+        $s = SumberInformasiController::class;
         Route::get('/', [$s, 'index'])->name('index')->middleware('hakakses:sumber-informasi,lihat');
         Route::get('/create', [$s, 'create'])->name('create')->middleware('hakakses:sumber-informasi,buat');
         Route::post('/', [$s, 'store'])->name('store')->middleware('hakakses:sumber-informasi,buat');
@@ -334,7 +414,7 @@ Route::middleware('auth')->group(function () {
     // Notifikasi pribadi — seperti approval inbox, di luar matriks modul: tiap
     // pengguna hanya melihat barisnya sendiri.
     Route::prefix('notifikasi')->name('notifikasi.')->group(function () {
-        $n = \App\Http\Controllers\NotifikasiController::class;
+        $n = NotifikasiController::class;
         Route::get('/', [$n, 'index'])->name('index');
         Route::post('/baca-semua', [$n, 'bacaSemua'])->name('baca_semua');
         Route::post('/{id}/baca', [$n, 'baca'])->name('baca')->whereNumber('id');
@@ -343,7 +423,7 @@ Route::middleware('auth')->group(function () {
     // ---- Keuangan: Transaksi ----
     // Kas Keluar (Debit rincian; Kredit Kas/Bank) — jenis "lainnya".
     Route::prefix('cash-out')->name('cash_out.')->group(function () {
-        $c = \App\Http\Controllers\CashOutController::class;
+        $c = CashOutController::class;
         Route::get('/', [$c, 'index'])->name('index')->middleware('hakakses:cash-out,lihat');
         Route::get('/create', [$c, 'create'])->name('create')->middleware('hakakses:cash-out,buat');
         Route::post('/', [$c, 'store'])->name('store')->middleware('hakakses:cash-out,buat');
@@ -359,7 +439,7 @@ Route::middleware('auth')->group(function () {
     // `otorisasi-pembayaran`, supaya empat mata bisa ditegakkan lewat pemberian
     // hak, bukan sekadar kesepakatan lisan.
     Route::prefix('perintah-pembayaran')->name('perintah_pembayaran.')->group(function () {
-        $p = \App\Http\Controllers\PerintahPembayaranController::class;
+        $p = PerintahPembayaranController::class;
         Route::get('/', [$p, 'index'])->name('index')->middleware('hakakses:perintah-pembayaran,lihat');
         Route::get('/create', [$p, 'create'])->name('create')->middleware('hakakses:perintah-pembayaran,buat');
         // Didaftarkan SEBELUM /{id} — kalau tidak, "kepatuhan" akan ditelan
@@ -381,14 +461,14 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::prefix('pengaturan/dana-bebas')->name('pengaturan_dana_bebas.')->group(function () {
-        $d = \App\Http\Controllers\PengaturanDanaBebasController::class;
+        $d = PengaturanDanaBebasController::class;
         Route::get('/', [$d, 'index'])->name('index')->middleware('hakakses:pengaturan-dana-bebas,lihat');
         Route::put('/', [$d, 'update'])->name('update')->middleware('hakakses:pengaturan-dana-bebas,ubah');
     });
 
     // Kas Masuk (Debit Kas/Bank; Kredit rincian).
     Route::prefix('cash-in')->name('cash_in.')->group(function () {
-        $c = \App\Http\Controllers\CashInController::class;
+        $c = CashInController::class;
         Route::get('/', [$c, 'index'])->name('index')->middleware('hakakses:cash-in,lihat');
         Route::get('/create', [$c, 'create'])->name('create')->middleware('hakakses:cash-in,buat');
         Route::post('/', [$c, 'store'])->name('store')->middleware('hakakses:cash-in,buat');
@@ -400,7 +480,7 @@ Route::middleware('auth')->group(function () {
 
     // Rekonsiliasi Bank (workflow: draft → cleared/penyesuaian → finalize).
     Route::prefix('bank-reconciliation')->name('bank_reconciliation.')->group(function () {
-        $b = \App\Http\Controllers\BankReconciliationController::class;
+        $b = BankReconciliationController::class;
         Route::get('/', [$b, 'index'])->name('index')->middleware('hakakses:bank-reconciliation,lihat');
         Route::get('/create', [$b, 'create'])->name('create')->middleware('hakakses:bank-reconciliation,buat');
         Route::post('/', [$b, 'store'])->name('store')->middleware('hakakses:bank-reconciliation,buat');
@@ -413,7 +493,7 @@ Route::middleware('auth')->group(function () {
 
     // Purchase Order (dokumen komitmen, tanpa jurnal) + batal.
     Route::prefix('purchase-orders')->name('purchase_orders.')->group(function () {
-        $p = \App\Http\Controllers\PurchaseOrderController::class;
+        $p = PurchaseOrderController::class;
         Route::get('/', [$p, 'index'])->name('index')->middleware('hakakses:purchase-orders,lihat');
         Route::get('/create', [$p, 'create'])->name('create')->middleware('hakakses:purchase-orders,buat');
         Route::post('/', [$p, 'store'])->name('store')->middleware('hakakses:purchase-orders,buat');
@@ -424,7 +504,7 @@ Route::middleware('auth')->group(function () {
 
     // Invoice Vendor (Debit rincian; Kredit hutang usaha).
     Route::prefix('invoices')->name('invoices.')->group(function () {
-        $i = \App\Http\Controllers\InvoiceController::class;
+        $i = InvoiceController::class;
         Route::get('/', [$i, 'index'])->name('index')->middleware('hakakses:invoices,lihat');
         Route::get('/create', [$i, 'create'])->name('create')->middleware('hakakses:invoices,buat');
         Route::post('/', [$i, 'store'])->name('store')->middleware('hakakses:invoices,buat');
@@ -434,7 +514,7 @@ Route::middleware('auth')->group(function () {
 
     // Penyelesaian Uang Muka (Kredit UM; Debit realisasi; selisih via kas).
     Route::prefix('advance-settlement')->name('advance_settlement.')->group(function () {
-        $s = \App\Http\Controllers\AdvanceSettlementController::class;
+        $s = AdvanceSettlementController::class;
         Route::get('/', [$s, 'index'])->name('index')->middleware('hakakses:advance-settlement,lihat');
         Route::get('/create', [$s, 'create'])->name('create')->middleware('hakakses:advance-settlement,buat');
         Route::post('/', [$s, 'store'])->name('store')->middleware('hakakses:advance-settlement,buat');
@@ -442,7 +522,7 @@ Route::middleware('auth')->group(function () {
 
     // Uang Muka Operasional (Debit akun uang muka; Kredit kas/bank).
     Route::prefix('operational-advance')->name('operational_advance.')->group(function () {
-        $u = \App\Http\Controllers\OperationalAdvanceController::class;
+        $u = OperationalAdvanceController::class;
         Route::get('/', [$u, 'index'])->name('index')->middleware('hakakses:operational-advance,lihat');
         Route::get('/create', [$u, 'create'])->name('create')->middleware('hakakses:operational-advance,buat');
         Route::post('/', [$u, 'store'])->name('store')->middleware('hakakses:operational-advance,buat');
@@ -451,7 +531,7 @@ Route::middleware('auth')->group(function () {
 
     // Accrue & Prepaid (jurnal penyesuaian) + reversal awal bulan.
     Route::prefix('accrue')->name('accrue.')->group(function () {
-        $a = \App\Http\Controllers\AccrueController::class;
+        $a = AccrueController::class;
         Route::get('/', [$a, 'index'])->name('index')->middleware('hakakses:accrue,lihat');
         Route::get('/create', [$a, 'create'])->name('create')->middleware('hakakses:accrue,buat');
         Route::post('/', [$a, 'store'])->name('store')->middleware('hakakses:accrue,buat');
@@ -460,7 +540,7 @@ Route::middleware('auth')->group(function () {
 
     // Pembiayaan Bank (syariah) — pencairan Debit Kas/Bank; Kredit hutang.
     Route::prefix('bank-loans')->name('bank_loans.')->group(function () {
-        $l = \App\Http\Controllers\BankLoanController::class;
+        $l = BankLoanController::class;
         Route::get('/', [$l, 'index'])->name('index')->middleware('hakakses:bank-loans,lihat');
         Route::get('/create', [$l, 'create'])->name('create')->middleware('hakakses:bank-loans,buat');
         Route::post('/', [$l, 'store'])->name('store')->middleware('hakakses:bank-loans,buat');
@@ -470,7 +550,7 @@ Route::middleware('auth')->group(function () {
 
     // Pindah Buku (Debit rekening tujuan; Kredit rekening asal).
     Route::prefix('book-transfer')->name('book_transfer.')->group(function () {
-        $b = \App\Http\Controllers\BookTransferController::class;
+        $b = BookTransferController::class;
         Route::get('/', [$b, 'index'])->name('index')->middleware('hakakses:book-transfer,lihat');
         Route::get('/create', [$b, 'create'])->name('create')->middleware('hakakses:book-transfer,buat');
         Route::post('/', [$b, 'store'])->name('store')->middleware('hakakses:book-transfer,buat');
@@ -479,7 +559,7 @@ Route::middleware('auth')->group(function () {
 
     // Jurnal Umum (template modul transaksi: controller tipis → service).
     Route::prefix('journal')->name('journal.')->group(function () {
-        $j = \App\Http\Controllers\JournalController::class;
+        $j = JournalController::class;
         Route::get('/', [$j, 'index'])->name('index')->middleware('hakakses:journal,lihat');
         Route::get('/create', [$j, 'create'])->name('create')->middleware('hakakses:journal,buat');
         Route::post('/', [$j, 'store'])->name('store')->middleware('hakakses:journal,buat');
@@ -490,7 +570,7 @@ Route::middleware('auth')->group(function () {
     // ---- PPSB & Kesantrian ----
     // Tahun Ajaran (master, CRUD) — rujukan master PPSB lain & registrasi.
     Route::prefix('ppsb/tahun-ajaran')->name('tahun_ajaran.')->group(function () {
-        $t = \App\Http\Controllers\TahunAjaranController::class;
+        $t = TahunAjaranController::class;
         Route::get('/', [$t, 'index'])->name('index')->middleware('hakakses:tahun-ajaran,lihat');
         Route::get('/create', [$t, 'create'])->name('create')->middleware('hakakses:tahun-ajaran,buat');
         Route::post('/', [$t, 'store'])->name('store')->middleware('hakakses:tahun-ajaran,buat');
@@ -501,7 +581,7 @@ Route::middleware('auth')->group(function () {
 
     // Jenis Biaya (registrasi/uang pangkal/SPP/lain).
     Route::prefix('ppsb/jenis-biaya')->name('jenis_biaya.')->group(function () {
-        $j = \App\Http\Controllers\JenisBiayaController::class;
+        $j = JenisBiayaController::class;
         Route::get('/', [$j, 'index'])->name('index')->middleware('hakakses:jenis-biaya,lihat');
         Route::get('/create', [$j, 'create'])->name('create')->middleware('hakakses:jenis-biaya,buat');
         // Mesin duplikat-ke-T.A-baru DIBUANG: jenis biaya tak lagi memuat tarif,
@@ -514,7 +594,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Tarif — grid besaran biaya per (T.A × jenjang × jalur).
-    Route::prefix('tarif')->name('tarif.')->controller(\App\Http\Controllers\TarifController::class)->group(function () {
+    Route::prefix('tarif')->name('tarif.')->controller(TarifController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:tarif,lihat');
         Route::put('/', 'simpan')->name('simpan')->middleware('hakakses:tarif,ubah');
         // Menonaktifkan jalur membuang sel tarif yang mungkin sudah diisi → hak UBAH.
@@ -525,7 +605,7 @@ Route::middleware('auth')->group(function () {
 
     // Kenaikan Tingkat & Kelulusan massal (dalam satu jenjang). Naik JENJANG
     // punya jalurnya sendiri lewat Pendaftaran Lanjutan di halaman santri.
-    Route::prefix('kesantrian/kenaikan-tingkat')->name('kenaikan_tingkat.')->controller(\App\Http\Controllers\KenaikanTingkatController::class)->group(function () {
+    Route::prefix('kesantrian/kenaikan-tingkat')->name('kenaikan_tingkat.')->controller(KenaikanTingkatController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:kenaikan-tingkat,lihat');
         Route::post('/pratinjau', 'pratinjau')->name('pratinjau')->middleware('hakakses:kenaikan-tingkat,lihat');
         // Namanya `tetapkan`, bukan `eksekusi`: yang terjadi adalah PENJADWALAN.
@@ -535,7 +615,7 @@ Route::middleware('auth')->group(function () {
 
     // Terbitkan Tagihan Massal — daftar ulang santri aktif, jadi KEPENDIDIKAN,
     // bukan PPSB (PPSB tidak punya penerbitan massal).
-    Route::prefix('kesantrian/tagihan-massal')->name('tagihan_massal.')->controller(\App\Http\Controllers\TagihanMassalController::class)->group(function () {
+    Route::prefix('kesantrian/tagihan-massal')->name('tagihan_massal.')->controller(TagihanMassalController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:tagihan-massal,lihat');
         Route::post('/pratinjau', 'pratinjau')->name('pratinjau')->middleware('hakakses:tagihan-massal,lihat');
         Route::post('/terbitkan', 'terbitkan')->name('terbitkan')->middleware('hakakses:tagihan-massal,buat');
@@ -545,7 +625,7 @@ Route::middleware('auth')->group(function () {
     // digerbangi modul yang sama — memisahkan haknya hanya akan melahirkan
     // keadaan aneh: boleh mengisi potongan tapi tak boleh melihat gelombangnya.
     Route::prefix('ppsb/gelombang')->name('gelombang.')->group(function () {
-        $g = \App\Http\Controllers\GelombangController::class;
+        $g = GelombangController::class;
         // Matriks didaftarkan SEBELUM /{id} — kalau tidak, "potongan" akan
         // ditelan parameter id (yang whereNumber-nya justru menolaknya → 404).
         Route::get('/potongan', [$g, 'potongan'])->name('potongan')->middleware('hakakses:potongan-gelombang,lihat');
@@ -559,7 +639,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Angsuran Uang Pangkal (rencana termin + reminder).
-    Route::prefix('ppsb/angsuran-uang-pangkal')->name('angsuran_uang_pangkal.')->controller(\App\Http\Controllers\AngsuranUangPangkalController::class)->group(function () {
+    Route::prefix('ppsb/angsuran-uang-pangkal')->name('angsuran_uang_pangkal.')->controller(AngsuranUangPangkalController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:angsuran-uang-pangkal,lihat');
         Route::get('/create', 'create')->name('create')->middleware('hakakses:angsuran-uang-pangkal,buat');
         Route::post('/', 'store')->name('store')->middleware('hakakses:angsuran-uang-pangkal,buat');
@@ -574,14 +654,14 @@ Route::middleware('auth')->group(function () {
 
     // Setting Filter Termin Jatuh Tempo — singleton, edit-only.
     Route::prefix('ppsb/termin-filter')->name('termin_filter.')->group(function () {
-        $t = \App\Http\Controllers\TerminFilterController::class;
+        $t = TerminFilterController::class;
         Route::get('/', [$t, 'edit'])->name('edit')->middleware('hakakses:termin-filter,lihat');
         Route::put('/', [$t, 'update'])->name('update')->middleware('hakakses:termin-filter,ubah');
     });
 
     // Jalur Pendaftaran (master, CRUD).
     Route::prefix('ppsb/jalur-pendaftaran')->name('jalur_pendaftaran.')->group(function () {
-        $j = \App\Http\Controllers\JalurPendaftaranController::class;
+        $j = JalurPendaftaranController::class;
         Route::get('/', [$j, 'index'])->name('index')->middleware('hakakses:jalur-pendaftaran,lihat');
         Route::get('/create', [$j, 'create'])->name('create')->middleware('hakakses:jalur-pendaftaran,buat');
         Route::post('/', [$j, 'store'])->name('store')->middleware('hakakses:jalur-pendaftaran,buat');
@@ -593,7 +673,7 @@ Route::middleware('auth')->group(function () {
 
     // Target Santri (CRUD).
     Route::prefix('ppsb/target-santri')->name('target_santri.')->group(function () {
-        $t = \App\Http\Controllers\TargetSantriController::class;
+        $t = TargetSantriController::class;
         Route::get('/', [$t, 'index'])->name('index')->middleware('hakakses:target-santri,lihat');
         Route::get('/create', [$t, 'create'])->name('create')->middleware('hakakses:target-santri,buat');
         Route::post('/', [$t, 'store'])->name('store')->middleware('hakakses:target-santri,buat');
@@ -608,7 +688,7 @@ Route::middleware('auth')->group(function () {
     // milik alumni tetap bisa ditagih & dibayar, dan riwayat serta dokumennya
     // tetap menempel pada orang yang sama. Keempatnya memakai modul hak akses
     // `santri` — tak ada hak akses baru yang perlu diberikan.
-    Route::controller(\App\Http\Controllers\SantriController::class)->group(function () {
+    Route::controller(SantriController::class)->group(function () {
         Route::get('/ppsb/calon-santri', 'index')->name('santri.calon')->defaults('lingkup', 'calon')->middleware('hakakses:santri,lihat');
         // Calon yang mundur berdaftar sendiri — arsip PPSB, bukan pekerjaan berjalan.
         Route::get('/ppsb/calon-mundur', 'index')->name('santri.mundur')->defaults('lingkup', 'mundur')->middleware('hakakses:santri,lihat');
@@ -637,7 +717,7 @@ Route::middleware('auth')->group(function () {
         // piutang yang sudah dibukukan dan menerbitkan jurnal penyesuaian, jadi
         // wewenangnya milik kepala keuangan, bukan siapa pun yang boleh
         // menyunting data santri.
-        Route::post('/tagihan/{id}/koreksi', [\App\Http\Controllers\KoreksiTagihanController::class, 'koreksi'])
+        Route::post('/tagihan/{id}/koreksi', [KoreksiTagihanController::class, 'koreksi'])
             ->name('tagihan.koreksi')->middleware('hakakses:koreksi-tagihan,ubah')->whereNumber('id');
 
         // Tunggakan awal — pintu KEDUA saldo awal, di samping Impor Data Awal.
@@ -645,17 +725,17 @@ Route::middleware('auth')->group(function () {
         // pekerjaannya sama (memasukkan keadaan pindahan), orangnya pun sama.
         // `buat` juga untuk hapus — yang dibuang adalah barisnya sendiri yang
         // belum tersentuh, setara membatalkan batch impor.
-        Route::post('/santri/{id}/tunggakan-awal', [\App\Http\Controllers\TunggakanAwalController::class, 'store'])
+        Route::post('/santri/{id}/tunggakan-awal', [TunggakanAwalController::class, 'store'])
             ->name('tunggakan_awal.store')->middleware('hakakses:impor-data-awal,buat')->whereNumber('id');
-        Route::put('/tunggakan-awal/{id}', [\App\Http\Controllers\TunggakanAwalController::class, 'update'])
+        Route::put('/tunggakan-awal/{id}', [TunggakanAwalController::class, 'update'])
             ->name('tunggakan_awal.update')->middleware('hakakses:impor-data-awal,buat')->whereNumber('id');
-        Route::delete('/tunggakan-awal/{id}', [\App\Http\Controllers\TunggakanAwalController::class, 'destroy'])
+        Route::delete('/tunggakan-awal/{id}', [TunggakanAwalController::class, 'destroy'])
             ->name('tunggakan_awal.destroy')->middleware('hakakses:impor-data-awal,buat')->whereNumber('id');
     });
 
     // Pendaftaran lanjutan (kenaikan jenjang internal lewat proses PPSB) —
     // dijalankan dari halaman detail santri, tanpa menu sidebar sendiri.
-    Route::controller(\App\Http\Controllers\PendaftaranLanjutanController::class)->group(function () {
+    Route::controller(PendaftaranLanjutanController::class)->group(function () {
         Route::post('/santri/{id}/pendaftaran-lanjutan', 'store')
             ->name('pendaftaran_lanjutan.store')->middleware('hakakses:santri,ubah')->whereNumber('id');
         Route::post('/santri/{id}/pendaftaran-lanjutan/{pendaftaran}/aksi/{aksi}', 'aksi')
@@ -663,7 +743,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Berkas Santri (dari detail santri; tanpa menu sidebar sendiri).
-    Route::controller(\App\Http\Controllers\DokumenSantriController::class)->group(function () {
+    Route::controller(DokumenSantriController::class)->group(function () {
         Route::get('/santri/{id}/dokumen', 'index')->name('dokumen_santri.index')->middleware('hakakses:dokumen-santri,lihat')->whereNumber('id');
         Route::post('/santri/{id}/dokumen', 'store')->name('dokumen_santri.store')->middleware('hakakses:dokumen-santri,buat')->whereNumber('id');
         Route::put('/santri/{id}/dokumen/wali-kelas', 'waliKelas')->name('dokumen_santri.wali_kelas')->middleware('hakakses:dokumen-santri,buat')->whereNumber('id');
@@ -677,7 +757,7 @@ Route::middleware('auth')->group(function () {
         ['ppsb', '/ppsb/pembayaran', 'pembayaran_ppsb', 'pembayaran-ppsb'],
         ['kesantrian', '/kesantrian/pembayaran', 'pembayaran_kesantrian', 'pembayaran-kesantrian'],
     ] as [$lingkup, $prefix, $name, $kode]) {
-        Route::prefix($prefix)->name($name . '.')->controller(\App\Http\Controllers\PembayaranSantriController::class)
+        Route::prefix($prefix)->name($name.'.')->controller(PembayaranSantriController::class)
             ->group(function () use ($kode, $lingkup) {
                 Route::get('/', 'index')->name('index')->defaults('lingkup', $lingkup)->middleware("hakakses:{$kode},lihat");
                 Route::get('/create', 'create')->name('create')->defaults('lingkup', $lingkup)->middleware("hakakses:{$kode},buat");
@@ -691,7 +771,7 @@ Route::middleware('auth')->group(function () {
     }
 
     // Rekap Pembayaran Santri (riwayat tagihan + pembayaran per santri, + cetak).
-    Route::prefix('rekap-pembayaran')->name('rekap_pembayaran.')->controller(\App\Http\Controllers\RekapPembayaranController::class)->group(function () {
+    Route::prefix('rekap-pembayaran')->name('rekap_pembayaran.')->controller(RekapPembayaranController::class)->group(function () {
         Route::get('/', 'index')->name('index')->defaults('lingkup', 'semua')->middleware('hakakses:rekap-pembayaran,lihat');
         Route::get('/{idSantri}/cetak', 'cetak')->name('cetak')->middleware('hakakses:rekap-pembayaran,lihat')->whereNumber('idSantri');
         Route::get('/{idSantri}', 'show')->name('show')->middleware('hakakses:rekap-pembayaran,lihat')->whereNumber('idSantri');
@@ -700,12 +780,12 @@ Route::middleware('auth')->group(function () {
     // Lingkup PPSB dari halaman yang sama: hanya santri yang MASIH punya kewajiban
     // uang pangkal / perlengkapan. Rutenya terpisah (bukan query string) supaya
     // menunya bisa menyala dengan benar dan tautannya bisa dibagikan apa adanya.
-    Route::get('ppsb/rekap-pembayaran', [\App\Http\Controllers\RekapPembayaranController::class, 'index'])
+    Route::get('ppsb/rekap-pembayaran', [RekapPembayaranController::class, 'index'])
         ->name('rekap_pembayaran.ppsb')->defaults('lingkup', 'ppsb')
         ->middleware('hakakses:rekap-pembayaran,lihat');
 
     // Tagihan Lain-lain — kini bergrup sidebar sendiri (lihat Navigation).
-    Route::prefix('kesantrian/tagihan-lain')->name('tagihan_lain.')->controller(\App\Http\Controllers\TagihanLainController::class)->group(function () {
+    Route::prefix('kesantrian/tagihan-lain')->name('tagihan_lain.')->controller(TagihanLainController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:tagihan-lain,lihat');
         Route::get('/create', 'create')->name('create')->middleware('hakakses:tagihan-lain,buat');
         Route::post('/', 'store')->name('store')->middleware('hakakses:tagihan-lain,buat');
@@ -716,7 +796,7 @@ Route::middleware('auth')->group(function () {
     // Hak aksesnya menumpang modul `tagihan-lain`: memisahkannya hanya melahirkan
     // keadaan aneh — boleh menerbitkan tagihan tapi tak boleh melihat tarif yang
     // menentukan nominalnya.
-    Route::prefix('kesantrian/tagihan-lain')->name('tagihan_lain.')->controller(\App\Http\Controllers\KepesertaanLainController::class)->group(function () {
+    Route::prefix('kesantrian/tagihan-lain')->name('tagihan_lain.')->controller(KepesertaanLainController::class)->group(function () {
         // Modul tersendiri, dibedakan dari matriks tarif LAYANAN: yang satu
         // besaran per jenjang untuk kegiatan berpeserta, yang lain besaran per
         // satuan untuk layanan bersatuan.
@@ -734,7 +814,7 @@ Route::middleware('auth')->group(function () {
     // Keluarga A — setoran pemakaian (laundry). Haknya TERPISAH: petugas laundry
     // mencatat timbangan, bukan menerbitkan uang. Penerbitan periodenya tetap
     // menuntut hak `tagihan-lain`.
-    Route::prefix('kesantrian/setoran-pemakaian')->name('setoran_pemakaian.')->controller(\App\Http\Controllers\SetoranPemakaianController::class)->group(function () {
+    Route::prefix('kesantrian/setoran-pemakaian')->name('setoran_pemakaian.')->controller(SetoranPemakaianController::class)->group(function () {
         Route::get('/tarif', 'tarif')->name('tarif')->middleware('hakakses:tarif-pemakaian,lihat');
         Route::put('/tarif', 'simpanTarif')->name('tarif.simpan')->middleware('hakakses:tarif-pemakaian,ubah');
 
@@ -745,7 +825,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Dompet & Tabungan Santri (wadi'ah).
-    Route::prefix('kesantrian/dompet')->name('dompet.')->controller(\App\Http\Controllers\DompetController::class)->group(function () {
+    Route::prefix('kesantrian/dompet')->name('dompet.')->controller(DompetController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:dompet,lihat');
         Route::post('/topup', 'topUp')->name('topup')->middleware('hakakses:dompet,buat');
         Route::post('/topup-santri', 'topUpSantri')->name('topup_santri')->middleware('hakakses:dompet,buat');
@@ -758,7 +838,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // SPP — tarif + generate tagihan per periode.
-    Route::prefix('kesantrian/spp')->name('spp.')->controller(\App\Http\Controllers\SppController::class)->group(function () {
+    Route::prefix('kesantrian/spp')->name('spp.')->controller(SppController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:spp,lihat');
         Route::post('/generate', 'generate')->name('generate')->middleware('hakakses:spp,ubah');
         // Santri dikirim di BADAN kiriman, bukan di path: dropdown santrinya kini
@@ -771,7 +851,7 @@ Route::middleware('auth')->group(function () {
     // NIS — format & penerbitan massal. Diterbitkan MANUAL karena nomornya
     // berurut menurut abjad satu angkatan jenjang, bukan urutan kedatangan.
     Route::prefix('kesantrian/nis')->name('nis.')
-        ->controller(\App\Http\Controllers\NisController::class)->group(function () {
+        ->controller(NisController::class)->group(function () {
             Route::get('/', 'index')->name('index')->middleware('hakakses:nis,lihat');
             Route::put('/format', 'simpanFormat')->name('format')->middleware('hakakses:nis,ubah');
             Route::post('/terbitkan', 'terbitkan')->name('terbitkan')->middleware('hakakses:nis,buat');
@@ -780,8 +860,17 @@ Route::middleware('auth')->group(function () {
     // Outstanding SPP — kontrol tunggakan + koreksi nominal yang salah ketik.
     // Modulnya SENDIRI (bukan `spp`): memeriksa tunggakan pekerjaan harian,
     // menerbitkan tagihan tidak — dan keduanya tak selalu di tangan orang yang sama.
+    // Laporan penerimaan kesantrian. Memakai modul `rekap-pembayaran` yang sudah
+    // ada: pekerjaannya sama — melihat uang santri yang sudah masuk — hanya
+    // satuannya berbeda (per periode, bukan per santri).
+    Route::prefix('kesantrian/penerimaan')->name('penerimaan_kesantrian.')
+        ->controller(PenerimaanKesantrianController::class)->group(function () {
+            Route::get('/', 'index')->name('index')->middleware('hakakses:rekap-pembayaran,lihat');
+            Route::get('/unduh', 'download')->name('unduh')->middleware('hakakses:rekap-pembayaran,lihat');
+        });
+
     Route::prefix('kesantrian/outstanding-spp')->name('outstanding_spp.')
-        ->controller(\App\Http\Controllers\OutstandingSppController::class)->group(function () {
+        ->controller(OutstandingSppController::class)->group(function () {
             Route::get('/', 'index')->name('index')->middleware('hakakses:outstanding-spp,lihat');
             Route::put('/{idTagihan}', 'koreksi')->name('koreksi')->middleware('hakakses:outstanding-spp,ubah')->whereNumber('idTagihan');
         });
@@ -791,14 +880,14 @@ Route::middleware('auth')->group(function () {
     // selama ini tak punya layar untuk menelusuri siapa & berapa. Modulnya
     // sendiri, sejalan dengan `outstanding-spp`.
     Route::prefix('kesantrian/outstanding-lain')->name('outstanding_lain.')
-        ->controller(\App\Http\Controllers\OutstandingLainController::class)->group(function () {
+        ->controller(OutstandingLainController::class)->group(function () {
             Route::get('/', 'index')->name('index')->middleware('hakakses:outstanding-lain,lihat');
             Route::put('/{idTagihan}', 'koreksi')->name('koreksi')->middleware('hakakses:outstanding-lain,ubah')->whereNumber('idTagihan');
         });
 
     // Wali / Keluarga Santri.
     Route::prefix('wali')->name('wali.')->group(function () {
-        $w = \App\Http\Controllers\WaliController::class;
+        $w = WaliController::class;
         Route::get('/', [$w, 'index'])->name('index')->middleware('hakakses:wali,lihat');
         Route::get('/create', [$w, 'create'])->name('create')->middleware('hakakses:wali,buat');
         Route::post('/', [$w, 'store'])->name('store')->middleware('hakakses:wali,buat');
@@ -809,12 +898,13 @@ Route::middleware('auth')->group(function () {
 
     // ---- Laporan (read-only) ----
     Route::prefix('reports')->name('reports.')->middleware('hakakses:reports,lihat')->group(function () {
-        $r = \App\Http\Controllers\ReportsController::class;
+        $r = ReportsController::class;
         Route::get('/', [$r, 'index'])->name('index');
         Route::get('/neraca', [$r, 'neraca'])->name('neraca');
         Route::get('/laba-rugi', [$r, 'labaRugi'])->name('laba_rugi');
         Route::get('/perubahan-modal', [$r, 'perubahanModal'])->name('perubahan_modal');
         Route::get('/arus-kas', [$r, 'arusKas'])->name('arus_kas');
+        Route::get('/neraca-saldo', [$r, 'neracaSaldo'])->name('neraca_saldo');
         Route::get('/buku-besar', [$r, 'bukuBesar'])->name('buku_besar');
         Route::get('/aset', [$r, 'aset'])->name('aset');
         Route::get('/persediaan', [$r, 'persediaan'])->name('persediaan');

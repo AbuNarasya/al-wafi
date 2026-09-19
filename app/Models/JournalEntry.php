@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Audit\MencatatJejak;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,6 +13,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class JournalEntry extends Model
 {
+    use MencatatJejak;
+
+    /** Kode modul hak akses — penyaring di layar Jejak Audit. */
+    protected $jejakModul = 'journal';
+
     protected $table = 'journal_entries';
 
     // Tabel hanya punya created_at; matikan updated_at.

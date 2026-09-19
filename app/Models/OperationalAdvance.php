@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Audit\MencatatJejak;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -9,6 +10,11 @@ use Illuminate\Database\Eloquent\Model;
 /** Uang Muka Belanja Operasional. Sisa = nominal - nominal_diselesaikan. */
 class OperationalAdvance extends Model
 {
+    use MencatatJejak;
+
+    /** Kode modul hak akses — penyaring di layar Jejak Audit. */
+    protected $jejakModul = 'operational-advance';
+
     protected $table = 'operational_advances';
 
     protected $appends = ['sisa'];

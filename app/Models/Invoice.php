@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Audit\MencatatJejak;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** Invoice vendor (pengakuan hutang). status: belum_bayar | sebagian | lunas. */
 class Invoice extends Model
 {
+    use MencatatJejak;
+
+    /** Kode modul hak akses — penyaring di layar Jejak Audit. */
+    protected $jejakModul = 'invoices';
+
     protected $table = 'invoices';
 
     protected $primaryKey = 'id_invoice';

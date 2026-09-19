@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
 use App\Services\Reports\ReportsService;
 use App\Support\Export\Exporter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -41,7 +44,20 @@ class ReportsController extends Controller
         return view('reports.laba-rugi', [
             'data' => $this->reports->labaRugi($from, $to, $unit),
             'from' => $from, 'to' => $to, 'unit' => $unit,
-            'unitOptions' => \App\Models\BusinessUnit::where('status', 'aktif')
+            'unitOptions' => BusinessUnit::where('status', 'aktif')
+                ->orderBy('kode_unit')->pluck('nama_unit', 'kode_unit')->all(),
+        ]);
+    }
+
+    public function neracaSaldo(Request $request): View
+    {
+        [$from, $to] = $this->rentang($request);
+        $unit = $this->unitDipilih($request);
+
+        return view('reports.neraca-saldo', [
+            'data' => $this->reports->neracaSaldo($from, $to, $unit),
+            'from' => $from, 'to' => $to, 'unit' => $unit,
+            'unitOptions' => BusinessUnit::where('status', 'aktif')
                 ->orderBy('kode_unit')->pluck('nama_unit', 'kode_unit')->all(),
         ]);
     }
@@ -51,7 +67,7 @@ class ReportsController extends Controller
     {
         $unit = trim((string) $request->query('kode_unit', ''));
 
-        return $unit !== '' && \App\Models\BusinessUnit::whereKey($unit)->exists() ? $unit : null;
+        return $unit !== '' && BusinessUnit::whereKey($unit)->exists() ? $unit : null;
     }
 
     public function perubahanModal(Request $request): View
@@ -64,8 +80,14 @@ class ReportsController extends Controller
     public function arusKas(Request $request): View
     {
         [$from, $to] = $this->rentang($request);
+        $unit = $this->unitDipilih($request);
 
-        return view('reports.arus-kas', ['data' => $this->reports->arusKas($from, $to), 'from' => $from, 'to' => $to]);
+        return view('reports.arus-kas', [
+            'data' => $this->reports->arusKas($from, $to, $unit),
+            'from' => $from, 'to' => $to, 'unit' => $unit,
+            'unitOptions' => BusinessUnit::where('status', 'aktif')
+                ->orderBy('kode_unit')->pluck('nama_unit', 'kode_unit')->all(),
+        ]);
     }
 
     public function bukuBesar(Request $request): View
@@ -77,7 +99,7 @@ class ReportsController extends Controller
 
         $akunList = CoaDetail::orderBy('kode_coa')->get()
             ->mapWithKeys(fn ($a) => [$a->kode_coa => "{$a->kode_coa} — {$a->nama_coa}"])->all();
-        $unitOptions = \App\Models\BusinessUnit::where('status', 'aktif')
+        $unitOptions = BusinessUnit::where('status', 'aktif')
             ->orderBy('kode_unit')->pluck('nama_unit', 'kode_unit')->all();
 
         return view('reports.buku-besar', compact('data', 'akunList', 'kodeCoa', 'from', 'to', 'unit', 'unitOptions'));
@@ -124,7 +146,7 @@ class ReportsController extends Controller
     {
         $fmt = $request->query('format', 'csv');
         [$from, $to] = $this->rentang($request);
-        $tgl = fn ($v) => $v ? \Illuminate\Support\Carbon::parse($v)->format('d/m/Y') : '';
+        $tgl = fn ($v) => $v ? Carbon::parse($v)->format('d/m/Y') : '';
 
         [$rows, $file, $title] = match ($type) {
             'neraca' => (function () use ($request) {
@@ -154,8 +176,8 @@ class ReportsController extends Controller
 
                 // Unit ikut ke nama berkas & judul: unduhan per unit yang tak
                 // bertanda mudah tertukar dengan laporan seluruh unit.
-                $namaUnit = $unit ? (\App\Models\BusinessUnit::find($unit)?->nama_unit ?? $unit) : null;
-                $berkas = 'laba_rugi_'.($unit ? \Illuminate\Support\Str::slug($unit).'_' : '')."{$from}_{$to}";
+                $namaUnit = $unit ? (BusinessUnit::find($unit)?->nama_unit ?? $unit) : null;
+                $berkas = 'laba_rugi_'.($unit ? Str::slug($unit).'_' : '')."{$from}_{$to}";
                 $judul = "Laba Rugi {$from} s.d. {$to}".($namaUnit ? " — Unit {$namaUnit}" : '');
 
                 return [$rows, $berkas, $judul];
@@ -172,19 +194,57 @@ class ReportsController extends Controller
 
                 return [$rows, "perubahan_modal_{$from}_{$to}", "Perubahan Modal {$from} s.d. {$to}"];
             })(),
-            'arus-kas' => (function () use ($from, $to) {
-                $d = $this->reports->arusKas($from, $to);
+            'arus-kas' => (function () use ($request, $from, $to) {
+                $unit = $this->unitDipilih($request);
+                $d = $this->reports->arusKas($from, $to, $unit);
+
                 $rows = [];
-                foreach (['Kas Masuk' => 'kas_masuk', 'Kas Keluar' => 'kas_keluar'] as $arah => $key) {
-                    foreach ($d[$key] as $g) {
-                        $rows[] = ['Arah' => $arah, 'Kode COA' => $g['kode_coa'], 'Akun' => $g['nama_coa'], 'Nominal' => $g['total']];
+                foreach ($d['kelompok'] as $k) {
+                    foreach ($k['baris'] as $b) {
+                        $rows[] = ['Kelompok' => $k['label'], 'Kode COA' => $b['kode_coa'], 'Akun' => $b['nama_coa'], 'Arus Kas' => $b['arus']];
+                    }
+                    if ($k['baris'] !== []) {
+                        $rows[] = ['Kelompok' => $k['label'], 'Kode COA' => '', 'Akun' => 'Subtotal '.$k['label'], 'Arus Kas' => $k['total']];
                     }
                 }
-                $rows[] = ['Arah' => 'RINGKASAN', 'Kode COA' => '', 'Akun' => 'Total Masuk', 'Nominal' => $d['total_masuk']];
-                $rows[] = ['Arah' => 'RINGKASAN', 'Kode COA' => '', 'Akun' => 'Total Keluar', 'Nominal' => $d['total_keluar']];
-                $rows[] = ['Arah' => 'RINGKASAN', 'Kode COA' => '', 'Akun' => 'Kas Bersih', 'Nominal' => $d['kas_bersih']];
+                $rows[] = ['Kelompok' => 'RINGKASAN', 'Kode COA' => '', 'Akun' => 'Saldo Kas Awal', 'Arus Kas' => $d['saldo_kas_awal']];
+                $rows[] = ['Kelompok' => 'RINGKASAN', 'Kode COA' => '', 'Akun' => 'Arus Kas Bersih', 'Arus Kas' => $d['arus_bersih']];
+                $rows[] = ['Kelompok' => 'RINGKASAN', 'Kode COA' => '', 'Akun' => 'Saldo Kas Akhir', 'Arus Kas' => $d['saldo_kas_akhir']];
 
-                return [$rows, "arus_kas_{$from}_{$to}", "Arus Kas {$from} s.d. {$to}"];
+                // Jembatan laba → kas ikut terbawa: tanpa itu, unduhan tak bisa
+                // menjawab pertanyaan yang justru paling sering diajukan atasnya.
+                foreach ($d['jembatan']['baris'] ?? [] as $b) {
+                    $rows[] = ['Kelompok' => 'JEMBATAN LABA → KAS', 'Kode COA' => '', 'Akun' => $b['label'], 'Arus Kas' => $b['nilai']];
+                }
+
+                $namaUnit = $unit ? (BusinessUnit::find($unit)?->nama_unit ?? $unit) : null;
+                $berkas = 'arus_kas_'.($unit ? Str::slug($unit).'_' : '')."{$from}_{$to}";
+                $judul = "Arus Kas {$from} s.d. {$to}".($namaUnit ? " — Unit {$namaUnit}" : '');
+
+                return [$rows, $berkas, $judul];
+            })(),
+            'neraca-saldo' => (function () use ($request, $from, $to) {
+                $unit = $this->unitDipilih($request);
+                $d = $this->reports->neracaSaldo($from, $to, $unit);
+                $rows = array_map(fn ($r) => [
+                    'Kode COA' => $r['kode_coa'], 'Akun' => $r['nama_coa'], 'Kelompok' => $r['kelompok'],
+                    'Saldo Awal (D)' => $r['awal_debet'], 'Saldo Awal (K)' => $r['awal_kredit'],
+                    'Mutasi (D)' => $r['mutasi_debet'], 'Mutasi (K)' => $r['mutasi_kredit'],
+                    'Saldo Akhir (D)' => $r['akhir_debet'], 'Saldo Akhir (K)' => $r['akhir_kredit'],
+                ], $d['rows']);
+                $t = $d['total'];
+                $rows[] = [
+                    'Kode COA' => '', 'Akun' => 'TOTAL', 'Kelompok' => '',
+                    'Saldo Awal (D)' => $t['awal_debet'], 'Saldo Awal (K)' => $t['awal_kredit'],
+                    'Mutasi (D)' => $t['mutasi_debet'], 'Mutasi (K)' => $t['mutasi_kredit'],
+                    'Saldo Akhir (D)' => $t['akhir_debet'], 'Saldo Akhir (K)' => $t['akhir_kredit'],
+                ];
+
+                $namaUnit = $unit ? (BusinessUnit::find($unit)?->nama_unit ?? $unit) : null;
+                $berkas = 'neraca_saldo_'.($unit ? Str::slug($unit).'_' : '')."{$from}_{$to}";
+                $judul = "Neraca Saldo {$from} s.d. {$to}".($namaUnit ? " — Unit {$namaUnit}" : '');
+
+                return [$rows, $berkas, $judul];
             })(),
             'buku-besar' => (function () use ($request, $from, $to, $tgl) {
                 $kode = $request->query('kode_coa');

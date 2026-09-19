@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Audit\MencatatJejak;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +11,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** Master pembiayaan/pinjaman bank. Sisa pokok = pokok_awal - pokok_terbayar. */
 class BankLoan extends Model
 {
+    use MencatatJejak;
+
+    /** Kode modul hak akses — penyaring di layar Jejak Audit. */
+    protected $jejakModul = 'bank-loans';
+
     protected $table = 'bank_loans';
 
     protected $appends = ['sisa_pokok'];

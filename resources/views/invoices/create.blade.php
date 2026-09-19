@@ -4,13 +4,13 @@
 
 @php
     $toList = fn ($arr) => collect($arr)->map(fn ($l, $v) => is_array($l) && isset($l['v']) ? $l : ['v' => (string) $v, 'l' => (string) $l])->values()->all();
-    $kosong = ['kode_coa' => '', 'keterangan' => '', 'kode_bagian' => '', 'kuantiti' => '1', 'harga_satuan' => '', 'aset_pilih' => ''];
+    $kosong = ['kode_coa' => '', 'keterangan' => '', 'kode_bagian' => '', 'kuantiti' => '1', 'harga_satuan' => '', 'kode_persediaan' => '', 'aset_pilih' => ''];
     $initRows = array_values(old('details', [$kosong]));
     $opts = [
         'coa' => $toList($coaOptions), 'bagian' => $toList($bagianOptions),
         'vendor' => $toList($vendorOptions), 'unit' => $toList($unitOptions),
         'hutang' => $toList($hutangOptions), 'po' => $toList($poOptions),
-        'aset' => $toList($asetOptions),
+        'aset' => $toList($asetOptions), 'persediaan' => $toList($persediaanOptions),
     ];
 @endphp
 
@@ -123,6 +123,12 @@
                                 <label class="mb-1 block text-xs font-medium text-gray-600">Perlakuan Aset <span class="font-normal text-gray-400">(kapitalisasi)</span></label>
                                 <x-search-cell name="`details[${i}][aset_pilih]`" model="row.aset_pilih" options="asetOpts" placeholder="— bukan aset —" />
                             </div>
+                            {{-- Barang yang dipilih DI SINI-lah yang stoknya bertambah. Kosongkan
+                                 untuk baris yang bukan pembelian persediaan. --}}
+                            <div class="col-span-12 sm:col-span-6">
+                                <label class="mb-1 block text-xs font-medium text-gray-600">Item Persediaan <span class="font-normal text-gray-400">(stok bertambah)</span></label>
+                                <x-search-cell name="`details[${i}][kode_persediaan]`" model="row.kode_persediaan" options="persediaanOpts" placeholder="— bukan persediaan —" />
+                            </div>
                         </div>
                     </div>
                 </template>
@@ -151,6 +157,7 @@
                 idPo: '',
                 coaOpts: opts.coa || [], bagianOpts: opts.bagian || [], vendorOpts: opts.vendor || [],
                 unitOpts: opts.unit || [], hutangOpts: opts.hutang || [], poOpts: opts.po || [], asetOpts: opts.aset || [],
+                persediaanOpts: opts.persediaan || [],
                 headerVendor: headerInit.vendor || '', headerUnit: headerInit.unit || '', headerHutang: headerInit.hutang || '',
                 tglInvoice: headerInit.tglInvoice || '', tglJatuhTempo: headerInit.tglJatuhTempo || '',
                 vendorTermin: vendorTermin || {},
@@ -169,14 +176,14 @@
                     this.tglJatuhTempo = d.toISOString().slice(0, 10);
                     this.terminInfo = hari > 0 ? `Otomatis: termin ${hari} hari dari tanggal invoice.` : 'Vendor tunai (jatuh tempo = tanggal invoice).';
                 },
-                tambah() { this.rows.push({ kode_coa: '', keterangan: '', kode_bagian: '', kuantiti: '1', harga_satuan: '', aset_pilih: '' }); },
+                tambah() { this.rows.push({ kode_coa: '', keterangan: '', kode_bagian: '', kuantiti: '1', harga_satuan: '', kode_persediaan: '', aset_pilih: '' }); },
                 hapus(i) { if (this.rows.length > 1) this.rows.splice(i, 1); },
                 muatDariPo() {
                     const po = this.poData.find((p) => String(p.id_po) === String(this.idPo));
                     if (!po) return;
                     this.headerVendor = po.kode_vendor;
                     this.headerUnit = po.kode_unit;
-                    this.rows = po.details.length ? po.details.map((d) => ({ ...d })) : [{ kode_coa: '', keterangan: '', kode_bagian: '', kuantiti: '1', harga_satuan: '', aset_pilih: '' }];
+                    this.rows = po.details.length ? po.details.map((d) => ({ ...d })) : [{ kode_coa: '', keterangan: '', kode_bagian: '', kuantiti: '1', harga_satuan: '', kode_persediaan: '', aset_pilih: '' }];
                 },
                 get total() { return this.rows.reduce((s, r) => s + (parseFloat(r.kuantiti) || 0) * (parseFloat(r.harga_satuan) || 0), 0); },
                 fmt(n) { return 'Rp ' + (n || 0).toLocaleString('id-ID'); },

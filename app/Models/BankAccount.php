@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Audit\MencatatJejak;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,6 +11,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class BankAccount extends Model
 {
+    use MencatatJejak;
+
+    /** Kode modul hak akses — penyaring di layar Jejak Audit. */
+    protected $jejakModul = 'bank-accounts';
+
     protected $table = 'bank_accounts';
 
     protected $primaryKey = 'kode_coa';

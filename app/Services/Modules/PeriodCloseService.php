@@ -8,10 +8,9 @@ use App\Models\CoaDetail;
 use App\Models\CoaGroup;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
-use App\Models\Level;
-use App\Models\User;
 use App\Services\Ledger\PostingService;
 use App\Services\Ledger\ReversalService;
+use App\Support\Audit\Jejak;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
 
@@ -45,19 +44,6 @@ class PeriodCloseService
         };
 
         return [$acctMap, $rootOf];
-    }
-
-    /** Hanya level otorisasi tertinggi (max_transaksi null) boleh membuka periode. */
-    private function requireTopLevel(?int $idPengguna): void
-    {
-        if (! $idPengguna) {
-            throw new AppException(403, 'Sesi tidak valid.');
-        }
-        $user = User::find($idPengguna);
-        $level = $user ? Level::find($user->kode_level) : null;
-        if (! $level || $level->max_transaksi !== null) {
-            throw new AppException(403, 'Hanya level otorisasi tertinggi (tanpa batas nominal) yang boleh membuka periode.');
-        }
     }
 
     public function statusTahun(int $tahun): array
@@ -94,19 +80,54 @@ class PeriodCloseService
             AccountingPeriod::create(array_merge(['tahun' => $tahun, 'bulan' => $bulan], $data));
         }
 
+        Jejak::catat('tutup_bulan', [
+            'modul' => 'period-close',
+            'ref_jenis' => 'AccountingPeriod',
+            'ref_id' => "{$tahun}-{$bulan}",
+            'detail' => ['tahun' => $tahun, 'bulan' => $bulan, 'keterangan' => $keterangan],
+            'id_pengguna' => $idPengguna,
+        ]);
+
         return $this->statusTahun($tahun);
     }
 
-    public function bukaBulan(int $tahun, int $bulan, ?int $idPengguna): array
+    /**
+     * Buka kembali satu bulan. HANYA boleh lewat permohonan yang disetujui —
+     * lihat [[BukaPeriodeService]]. Dulu cukup sekali klik oleh seorang
+     * pemegang level tertinggi, tanpa alasan dan tanpa jejak.
+     */
+    public function bukaBulan(int $tahun, int $bulan, ?int $idPengguna, bool $lewatPersetujuan = false): array
     {
-        $this->requireTopLevel($idPengguna);
+        $this->pastikanLewatPersetujuan($lewatPersetujuan);
         $existing = AccountingPeriod::where('tahun', $tahun)->where('bulan', $bulan)->first();
         if (! $existing || $existing->status !== 'closed') {
             throw new AppException(409, 'Periode belum ditutup.');
         }
         $existing->update(['status' => 'open', 'reopened_at' => now()]);
 
+        Jejak::catat('buka_bulan', [
+            'modul' => 'period-close',
+            'ref_jenis' => 'AccountingPeriod',
+            'ref_id' => $existing->id ?? "{$tahun}-{$bulan}",
+            'detail' => ['tahun' => $tahun, 'bulan' => $bulan],
+            'id_pengguna' => $idPengguna,
+        ]);
+
         return $this->statusTahun($tahun);
+    }
+
+    /**
+     * Penjaga terakhir. Pemanggilan langsung (mis. rute lama yang tertinggal,
+     * atau perintah artisan) ditolak di sini — bukan hanya disembunyikan
+     * tombolnya, karena tombol yang hilang bukanlah kontrol.
+     */
+    private function pastikanLewatPersetujuan(bool $lewatPersetujuan): void
+    {
+        if (! $lewatPersetujuan) {
+            throw new AppException(403,
+                'Periode yang sudah ditutup hanya bisa dibuka lewat permohonan yang disetujui direktur keuangan. '
+                .'Ajukan lebih dulu dari menu Tutup Buku Periode.');
+        }
     }
 
     /** Tutup buku tahunan: nol-kan Pendapatan(4)/Beban(5), net → Laba Ditahan. */
@@ -178,15 +199,24 @@ class PeriodCloseService
         return ['ok' => true, 'referensi' => $entry->referensi, 'laba_rugi' => Money::of($laba), 'jumlah_baris' => count($lines)];
     }
 
-    public function bukaTahun(int $tahun, ?int $idPengguna): array
+    /** Batalkan tutup buku tahunan. Sama seperti bukaBulan: lewat permohonan saja. */
+    public function bukaTahun(int $tahun, ?int $idPengguna, bool $lewatPersetujuan = false): array
     {
-        $this->requireTopLevel($idPengguna);
+        $this->pastikanLewatPersetujuan($lewatPersetujuan);
         $entry = JournalEntry::where('sumber_modul', self::SUMBER)
             ->where('referensi', $this->refTahun($tahun))->where('status', 'aktif')->first();
         if (! $entry) {
             throw new AppException(409, 'Tahun ini belum ditutup buku.');
         }
         ReversalService::reverseJournalEntry($entry->id, ['id_pengguna' => $idPengguna, 'keteranganPrefix' => 'Buka tutup buku — ']);
+
+        Jejak::catat('buka_tahun', [
+            'modul' => 'period-close',
+            'ref_jenis' => 'JournalEntry',
+            'ref_id' => $entry->id,
+            'detail' => ['tahun' => $tahun],
+            'id_pengguna' => $idPengguna,
+        ]);
 
         return ['ok' => true];
     }

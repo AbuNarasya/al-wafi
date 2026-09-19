@@ -17,7 +17,11 @@ use Illuminate\Support\Facades\DB;
 /**
  * Modul Jurnal Umum (manual). Melengkapi nama_coa, cek akun aktif, memberi nomor
  * JU-YYMM-NNNN, lalu posting (validasi balance). Baris ber-persediaan
- * menggerakkan stok (debit=masuk weighted-avg, kredit=keluar).
+ * menggerakkan stok lewat [[InventoryMovement]] (debit = masuk, kredit = keluar).
+ *
+ * Sejak persediaan memakai FIFO, baris KREDIT ber-persediaan harus bernominal
+ * sama persis dengan harga pokok FIFO-nya — kalau tidak, jurnalnya ditolak.
+ * Buku besar dan kartu stok tak boleh berpisah lewat pintu manual.
  */
 class JournalService
 {
@@ -56,15 +60,37 @@ class JournalService
                 'lines' => $lines,
             ]);
 
-            // #6: gerakan stok — debit=stok masuk (weighted avg), kredit=keluar.
+            // Gerakan stok — debit = masuk (melahirkan lapisan FIFO), kredit = keluar.
             foreach ($lines as $l) {
                 if (empty($l['kode_persediaan']) || empty($l['kuantiti'])) {
                     continue;
                 }
+                $umum = [
+                    'kode_persediaan' => $l['kode_persediaan'],
+                    'kuantiti' => $l['kuantiti'],
+                    'tanggal' => $input['tanggal'],
+                    'sumber_modul' => 'JurnalUmum',
+                    'sumber_ref' => $referensi,
+                    'journal_entry_id' => $entry->id,
+                    'keterangan' => $l['keterangan'] ?? ($input['keterangan'] ?? null),
+                    'id_pengguna' => $input['id_pengguna'] ?? null,
+                ];
+
                 if (Money::gtZero($l['debet'] ?? 0)) {
-                    InventoryMovement::applyStockIn($l['kode_persediaan'], $l['kuantiti'], $l['debet']);
+                    InventoryMovement::masuk([...$umum, 'nilai' => $l['debet'], 'alasan' => 'pembelian']);
                 } elseif (Money::gtZero($l['kredit'] ?? 0)) {
-                    InventoryMovement::applyStockOut($l['kode_persediaan'], $l['kuantiti']);
+                    $mutasi = InventoryMovement::keluar([...$umum, 'alasan' => 'pemakaian']);
+
+                    // Di bawah FIFO harga pokok DIHITUNG dari lapisan, bukan
+                    // diketik. Kalau angka kreditnya berbeda, buku besar dan
+                    // kartu stok akan berpisah diam-diam — jadi jurnalnya
+                    // ditolak, lengkap dengan angka yang benar.
+                    if (! Money::eq($mutasi->nilai, $l['kredit'])) {
+                        throw new AppException(422,
+                            "Baris persediaan {$l['kode_persediaan']}: harga pokok FIFO untuk {$l['kuantiti']} unit "
+                            ."adalah {$mutasi->nilai}, sedangkan kredit yang diisi {$l['kredit']}. "
+                            .'Samakan nominalnya, atau catat pengeluaran ini lewat menu Persediaan → Mutasi Stok.');
+                    }
                 }
             }
 
@@ -87,16 +113,9 @@ class JournalService
         return DB::transaction(function () use ($entry, $id, $input, $totalDebet) {
             Authorization::authorizeByUser($input['id_pengguna'] ?? null, $totalDebet);
 
-            foreach ($entry->lines as $l) {
-                if (! $l->kode_persediaan || ! $l->kuantiti) {
-                    continue;
-                }
-                if (Money::gtZero($l->debet)) {
-                    InventoryMovement::rollbackStockIn($l->kode_persediaan, $l->kuantiti);
-                } elseif (Money::gtZero($l->kredit)) {
-                    InventoryMovement::rollbackStockOut($l->kode_persediaan, $l->kuantiti);
-                }
-            }
+            // Seluruh pergerakan stok milik jurnal ini dibatalkan sekaligus &
+            // mundur, supaya lapisan FIFO pulih ke keadaan sebelum jurnalnya ada.
+            InventoryMovement::batalkanDokumen('JurnalUmum', $entry->referensi, $input['id_pengguna'] ?? null);
 
             return ReversalService::reverseJournalEntry($id, [
                 'tanggal' => $input['tanggal'] ?? null,

@@ -16,6 +16,7 @@ use App\Models\Vendor;
 use App\Services\Ledger\AssetDraft;
 use App\Services\Ledger\Authorization;
 use App\Services\Ledger\DocNumber;
+use App\Services\Ledger\InventoryMovement;
 use App\Services\Ledger\PostingService;
 use App\Services\Ledger\ReversalService;
 use App\Support\Money;
@@ -259,7 +260,7 @@ class CashOutService
                 $ket = $l['keterangan'] ?? "Pembelian {$item->nama_persediaan}";
                 $details[] = ['tipe' => 'inventory', 'kode_persediaan' => $item->kode_persediaan, 'kuantiti' => $qty, 'harga_satuan' => $harga, 'kode_coa' => $item->kode_coa, 'nama_coa' => $persCoa?->nama_coa ?? $item->kode_coa, 'nominal' => $nominal, 'keterangan' => $ket];
                 $jLines[] = ['kode_coa' => $item->kode_coa, 'nama_coa' => $persCoa?->nama_coa, 'debet' => $nominal, 'kredit' => '0', 'keterangan' => $ket, 'kode_bagian' => $l['kode_bagian'] ?? null];
-                $inventoryBuys[] = ['kode_persediaan' => $item->kode_persediaan, 'kuantiti' => $qty, 'nominal' => $nominal];
+                $inventoryBuys[] = ['kode_persediaan' => $item->kode_persediaan, 'kuantiti' => $qty, 'nominal' => $nominal, 'keterangan' => $ket];
             } else {
                 if (empty($l['kode_coa'])) {
                     throw new AppException(400, 'Pilih Akun COA pada baris beban/lainnya.');
@@ -321,7 +322,7 @@ class CashOutService
                 $rec->details()->create($d);
             }
 
-            PostingService::postJournal([
+            $entry = PostingService::postJournal([
                 'referensi' => $nomor, 'tanggal' => $input['tanggal'], 'kode_unit' => $input['kode_unit'] ?? null,
                 'keterangan' => $input['keterangan'], 'sumber_modul' => self::SUMBER,
                 'id_sumber' => (string) $rec->kode_transaksi, 'id_pengguna' => $idPengguna, 'lines' => $jLines,
@@ -358,18 +359,19 @@ class CashOutService
                 $pengajuanSvc->applyUangMukaPayment($pbId, ['kode_rekening' => $input['kode_rekening'], 'tanggal' => $input['tanggal']]);
             }
 
+            // Pembelian tunai → satu lapisan FIFO + satu baris kartu stok per item.
             foreach ($inventoryBuys as $b) {
-                $item = Inventory::find($b['kode_persediaan']);
-                if (! $item) {
-                    continue;
-                }
-                $oldQty = Money::sub($item->stok_masuk, $item->stok_keluar, 4);
-                $oldVal = Money::mul($oldQty, $item->harga_perolehan);
-                $newQty = Money::add($oldQty, $b['kuantiti'], 4);
-                $newVal = Money::add($oldVal, $b['nominal']);
-                $item->update([
-                    'harga_perolehan' => Money::gtZero($newQty, 4) ? Money::div($newVal, $newQty) : Money::of($item->harga_perolehan),
-                    'stok_masuk' => Money::add($item->stok_masuk, $b['kuantiti'], 4),
+                InventoryMovement::masuk([
+                    'kode_persediaan' => $b['kode_persediaan'],
+                    'kuantiti' => $b['kuantiti'],
+                    'nilai' => $b['nominal'],
+                    'tanggal' => $input['tanggal'],
+                    'alasan' => 'pembelian',
+                    'sumber_modul' => self::SUMBER,
+                    'sumber_ref' => $rec->nomor_transaksi,
+                    'journal_entry_id' => $entry->id ?? null,
+                    'keterangan' => $b['keterangan'] ?? null,
+                    'id_pengguna' => $input['id_pengguna'] ?? null,
                 ]);
             }
 
@@ -433,15 +435,6 @@ class CashOutService
                     } else {
                         $pengajuanSvc->reversePayment($d->id_pengajuan, (string) $d->nominal);
                     }
-                } elseif ($d->tipe === 'inventory' && $d->kode_persediaan) {
-                    $item = Inventory::find($d->kode_persediaan);
-                    if ($item) {
-                        $masuk = Money::sub($item->stok_masuk, $d->kuantiti ?? 0, 4);
-                        if (Money::isNegative($masuk, 4)) {
-                            $masuk = '0';
-                        }
-                        $item->update(['stok_masuk' => $masuk]);
-                    }
                 }
             }
 
@@ -455,6 +448,11 @@ class CashOutService
 
             AssetDraft::deleteDraftAssets($rec->nomor_transaksi);
             AssetDraft::reverseAssetMovements($rec->nomor_transaksi);
+
+            // Lapisan FIFO ditarik kembali. Bila barangnya sudah terlanjur
+            // dipakai, di sinilah void-nya berhenti dengan pesan yang terang —
+            // dulu stoknya diam-diam dikurangi dan harga rata-ratanya rusak.
+            InventoryMovement::batalkanDokumen(self::SUMBER, $rec->nomor_transaksi, $idPengguna);
 
             $entry = JournalEntry::where('sumber_modul', self::SUMBER)->where('id_sumber', (string) $kodeTransaksi)->where('status', 'aktif')->first();
             if ($entry) {

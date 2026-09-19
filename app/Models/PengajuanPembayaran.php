@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\Audit\MencatatJejak;
 use App\Support\LingkupBagian;
+use App\Support\Money;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +16,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class PengajuanPembayaran extends Model
 {
+    use MencatatJejak;
+
+    /** Kode modul hak akses — penyaring di layar Jejak Audit. */
+    protected $jejakModul = 'pengajuan-pembayaran';
+
     protected $table = 'pengajuan_pembayaran';
 
     protected $fillable = [
@@ -35,7 +42,7 @@ class PengajuanPembayaran extends Model
      */
     public function sisaTagihan(): string
     {
-        return \App\Support\Money::of(
+        return Money::of(
             $this->jenis === 'penyelesaian_uang_muka' ? $this->sisa_kurang_bayar : $this->sisa_hutang
         );
     }

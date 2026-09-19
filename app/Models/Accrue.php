@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Audit\MencatatJejak;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -11,6 +12,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class Accrue extends Model
 {
+    use MencatatJejak;
+
+    /** Kode modul hak akses — penyaring di layar Jejak Audit. */
+    protected $jejakModul = 'accrue';
+
     protected $table = 'accrues';
 
     protected $primaryKey = 'id_accrue';

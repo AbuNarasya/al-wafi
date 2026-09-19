@@ -9,12 +9,19 @@ use Illuminate\Support\Carbon;
 
 /**
  * Kebijakan tutup buku: kapan sebuah tanggal boleh dijurnal.
+ *
+ * TUTUP BUKU MENGIKAT. Dulu di sini ada `GRACE_DAYS = 30`: periode yang SUDAH
+ * ditutup tetap boleh dijurnal oleh siapa pun selama 30 hari sesudahnya.
+ * Artinya laporan yang sudah dicetak dan disampaikan ke yayasan bisa berubah
+ * angkanya setelah itu — tanpa jejak, tanpa pemberitahuan, dan tanpa seorang
+ * pun perlu meminta izin. Toleransi itu dicabut.
+ *
+ * Periode tertutup kini menolak SEMUA jurnal. Membukanya kembali lewat
+ * permohonan: admin keuangan mengajukan beserta alasannya, direktur keuangan
+ * memutuskan — lihat [[App\Services\Modules\BukaPeriodeService]].
  */
 final class PeriodService
 {
-    /** Toleransi backdate ke periode tertutup: 30 hari sejak closed_at. */
-    public const GRACE_DAYS = 30;
-
     /** (tahun, bulan) dari sebuah tanggal jurnal. */
     public static function periodOf(string|CarbonInterface $tanggal): array
     {
@@ -26,8 +33,7 @@ final class PeriodService
     /**
      * Pastikan sebuah tanggal boleh dijurnal:
      *  - periode open / belum pernah ditutup → boleh.
-     *  - periode closed tapi ≤ 30 hari sejak closed_at → boleh (toleransi backdate).
-     *  - periode closed & > 30 hari sejak closed_at → DITOLAK (422).
+     *  - periode closed → DITOLAK (422), tanpa kecuali dan tanpa toleransi hari.
      */
     public static function assertPeriodPostable(string|CarbonInterface $tanggal): void
     {
@@ -38,15 +44,13 @@ final class PeriodService
             return;
         }
 
-        $closedAt = $period->closed_at?->getTimestamp() ?? 0;
-        $lewatHari = (Carbon::now()->getTimestamp() - $closedAt) / 86400;
+        $periode = str_pad((string) $bulan, 2, '0', STR_PAD_LEFT)."/{$tahun}";
+        $ditutup = $period->closed_at ? ' (ditutup '.Carbon::parse($period->closed_at)->format('d/m/Y').')' : '';
 
-        if ($lewatHari > self::GRACE_DAYS) {
-            throw new AppException(
-                422,
-                'Periode '.str_pad((string) $bulan, 2, '0', STR_PAD_LEFT)."/{$tahun} sudah ditutup lebih dari "
-                .self::GRACE_DAYS.' hari (backdate tidak diizinkan). Minta pembukaan periode ke level tertinggi.'
-            );
-        }
+        throw new AppException(422,
+            "Periode {$periode} sudah ditutup{$ditutup}, jadi tak bisa dijurnal lagi. "
+            .'Bila transaksi ini memang milik periode tersebut, ajukan pembukaan periode lewat menu '
+            .'Tutup Buku Periode — permohonan diajukan admin keuangan dan diputuskan direktur keuangan.'
+        );
     }
 }

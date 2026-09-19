@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Audit\MencatatJejak;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** Kas Keluar (Payment Voucher). */
 class CashOut extends Model
 {
+    use MencatatJejak;
+
+    /** Kode modul hak akses — penyaring di layar Jejak Audit. */
+    protected $jejakModul = 'cash-out';
+
     protected $table = 'cash_out';
 
     protected $primaryKey = 'kode_transaksi';

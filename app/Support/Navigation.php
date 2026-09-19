@@ -35,6 +35,9 @@ final class Navigation
         ['url' => '/levels', 'label' => 'Level Otorisasi Keuangan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'levels'],
         ['url' => '/level-pengajuan', 'label' => 'Level Pengajuan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'level-pengajuan'],
         ['url' => '/hak-akses', 'label' => 'Hak Akses Modul', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'adminOnly' => true],
+        // Sekelompok dengan Hak Akses: keduanya soal SIAPA — yang satu menentukan
+        // siapa boleh apa, yang satu merekam siapa melakukan apa.
+        ['url' => '/jejak-audit', 'label' => 'Jejak Audit', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'adminOnly' => true],
         // Khusus admin, sekelompok dengan Impor Data Awal: sama-sama alat
         // pindahan sistem, bedanya satu berkas vs satu orang.
         ['url' => '/santri-manual', 'label' => 'Input Manual Santri Aktif', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'adminOnly' => true],
@@ -97,10 +100,20 @@ final class Navigation
         ['url' => '/reports/laba-rugi', 'label' => 'Laba Rugi', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
         ['url' => '/reports/perubahan-modal', 'label' => 'Perubahan Modal', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
         ['url' => '/reports/arus-kas', 'label' => 'Arus Kas', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
+        // Neraca Saldo mendahului Buku Besar: ia yang memperlihatkan ADA selisih,
+        // buku besar yang memperlihatkan DI MANA — jadi urutan menunya mengikuti
+        // urutan orang menelusurinya.
+        ['url' => '/reports/neraca-saldo', 'label' => 'Neraca Saldo', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
         ['url' => '/reports/buku-besar', 'label' => 'Buku Besar', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
         ['url' => '/reports/aset', 'label' => 'Aset & Depresiasi', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
         ['url' => '/reports/persediaan', 'label' => 'Persediaan', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
 
+        // Paling atas di Kontrol: ia yang menjawab "apakah bukunya masih bisa
+        // dipercaya" — pertanyaan yang mendahului semua rincian di bawahnya.
+        // Memakai modul `outstanding` yang sudah ada, bukan kode modul baru:
+        // kode baru berarti tak seorang pun punya haknya sampai dicentang satu
+        // per satu, dan layar sepenting ini tak boleh lahir tak terlihat.
+        ['url' => '/kontrol/rekonsiliasi', 'label' => 'Rekonsiliasi Buku Pembantu', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'outstanding'],
         ['url' => '/kontrol/ringkasan', 'label' => 'Ringkasan Outstanding', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'outstanding'],
         ['url' => '/kontrol/aging-ap', 'label' => 'Aging AP', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'outstanding'],
         ['url' => '/kontrol/uang-muka-customer', 'label' => 'Uang Muka Customer', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'outstanding'],
@@ -193,6 +206,10 @@ final class Navigation
         // Kontrol = memeriksa yang MASIH menggantung, bukan menerbitkan yang baru.
         // Sejajar dengan sub "Kontrol" di KEUANGAN, dan sengaja dipisah dari menu
         // Penagihan SPP: yang satu pekerjaan bulanan, yang ini pekerjaan harian.
+        // Penerimaan mendahului dua daftar outstanding: yang pertama ditanyakan
+        // pengurus adalah "bulan ini masuk berapa", baru sesudahnya "siapa yang
+        // belum bayar".
+        ['url' => '/kesantrian/penerimaan', 'label' => 'Laporan Penerimaan per Periode', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'rekap-pembayaran'],
         ['url' => '/kesantrian/outstanding-spp', 'label' => 'Daftar Outstanding SPP', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'outstanding-spp'],
         ['url' => '/kesantrian/outstanding-lain', 'label' => 'Daftar Outstanding Tagihan Lain', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'outstanding-lain'],
 

@@ -2,12 +2,18 @@
 
 namespace App\Models;
 
+use App\Support\Audit\MencatatJejak;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** Penyelesaian Uang Muka (bisa memicu multi-entry jurnal). */
 class AdvanceSettlement extends Model
 {
+    use MencatatJejak;
+
+    /** Kode modul hak akses — penyaring di layar Jejak Audit. */
+    protected $jejakModul = 'advance-settlement';
+
     protected $table = 'advance_settlements';
 
     protected $fillable = [

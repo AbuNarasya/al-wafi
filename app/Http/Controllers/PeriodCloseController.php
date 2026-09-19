@@ -4,14 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
 use App\Models\CoaDetail;
+use App\Services\Modules\BukaPeriodeService;
 use App\Services\Modules\PeriodCloseService;
+use App\Support\Akses;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * Tutup Buku Periode (port period-close dev): tutup/buka bulan + tutup/buka
- * buku tahunan.
+ * Tutup Buku Periode: menutup bulan & tahun, serta PERMOHONAN membukanya
+ * kembali.
+ *
+ * Tombol "buka" yang dulu langsung bekerja sudah tidak ada. Periode yang sudah
+ * ditutup hanya bisa dibuka lewat permohonan beralasan dari admin keuangan yang
+ * diputuskan direktur keuangan — lihat [[BukaPeriodeService]].
  */
 class PeriodCloseController extends Controller
 {
@@ -28,9 +34,15 @@ class PeriodCloseController extends Controller
     {
         $tahun = $this->tahun($request);
 
+        $bukaPeriode = new BukaPeriodeService;
+
         return view('period-close.index', [
             'status' => $this->service->statusTahun($tahun),
             'tahun' => $tahun,
+            'permohonan' => $bukaPeriode->daftar(),
+            'bolehAjukan' => Akses::boleh(BukaPeriodeService::MODUL, 'buat'),
+            'bolehPutuskan' => Akses::boleh(BukaPeriodeService::MODUL, 'ubah'),
+            'idSaya' => $request->user()->id_pengguna,
             'coaOptions' => ['' => '— pilih akun laba ditahan —'] + CoaDetail::where('status', 'aktif')
                 ->where('kode_coa', 'like', '3%')->orderBy('kode_coa')->get()
                 ->mapWithKeys(fn ($c) => [$c->kode_coa => "{$c->kode_coa} — {$c->nama_coa}"])->all(),
@@ -52,16 +64,56 @@ class PeriodCloseController extends Controller
         return redirect()->route('period_close.index', ['tahun' => $d['tahun']])->with('status', "Bulan {$d['bulan']}/{$d['tahun']} ditutup.");
     }
 
-    public function bukaBulan(Request $request): RedirectResponse
+    /**
+     * Ajukan pembukaan periode. Menggantikan tombol "buka" yang dulu langsung
+     * bekerja — kini ia hanya melahirkan permohonan beralasan yang menunggu
+     * keputusan direktur keuangan.
+     */
+    public function ajukanBuka(Request $request): RedirectResponse
     {
-        $d = $request->validate(['tahun' => ['required', 'integer'], 'bulan' => ['required', 'integer', 'between:1,12']]);
+        $d = $request->validate([
+            'lingkup' => ['required', 'in:bulan,tahun'],
+            'tahun' => ['required', 'integer'],
+            'bulan' => ['required_if:lingkup,bulan', 'nullable', 'integer', 'between:1,12'],
+            'alasan' => ['required', 'string', 'max:1000'],
+        ]);
+
         try {
-            $this->service->bukaBulan($d['tahun'], $d['bulan'], $request->user()->id_pengguna);
+            $p = (new BukaPeriodeService)->ajukan($d, $request->user());
+        } catch (AppException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('period_close.index', ['tahun' => $d['tahun']])
+            ->with('status', "Permohonan pembukaan {$p->labelPeriode()} diajukan. Menunggu keputusan direktur keuangan.");
+    }
+
+    public function setujuiBuka(Request $request, int $id): RedirectResponse
+    {
+        $d = $request->validate(['catatan_keputusan' => ['nullable', 'string', 'max:1000']]);
+
+        try {
+            $p = (new BukaPeriodeService)->setujui($id, $request->user(), $d['catatan_keputusan'] ?? null);
         } catch (AppException $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('period_close.index', ['tahun' => $d['tahun']])->with('status', "Bulan {$d['bulan']}/{$d['tahun']} dibuka kembali.");
+        return redirect()->route('period_close.index', ['tahun' => $p->tahun])
+            ->with('status', "Permohonan disetujui — {$p->labelPeriode()} dibuka kembali.");
+    }
+
+    public function tolakBuka(Request $request, int $id): RedirectResponse
+    {
+        $d = $request->validate(['catatan_keputusan' => ['required', 'string', 'max:1000']]);
+
+        try {
+            $p = (new BukaPeriodeService)->tolak($id, $request->user(), $d['catatan_keputusan']);
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('period_close.index', ['tahun' => $p->tahun])
+            ->with('status', "Permohonan pembukaan {$p->labelPeriode()} ditolak.");
     }
 
     public function tutupTahun(Request $request): RedirectResponse
@@ -74,17 +126,5 @@ class PeriodCloseController extends Controller
         }
 
         return redirect()->route('period_close.index', ['tahun' => $d['tahun']])->with('status', "Tutup buku {$d['tahun']} selesai ({$r['referensi']}, laba/rugi @rp {$r['laba_rugi']}).");
-    }
-
-    public function bukaTahun(Request $request): RedirectResponse
-    {
-        $d = $request->validate(['tahun' => ['required', 'integer']]);
-        try {
-            $this->service->bukaTahun($d['tahun'], $request->user()->id_pengguna);
-        } catch (AppException $e) {
-            return back()->with('error', $e->getMessage());
-        }
-
-        return redirect()->route('period_close.index', ['tahun' => $d['tahun']])->with('status', "Tutup buku tahunan {$d['tahun']} dibuka.");
     }
 }

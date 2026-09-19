@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CoaDetail;
+use App\Services\Modules\BankLoanService;
 use App\Services\Modules\OutstandingService;
+use App\Services\Reports\RekonsiliasiService;
+use App\Support\Akses;
 use App\Support\Export\Exporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -30,9 +34,9 @@ class KontrolController extends Controller
     {
         return view('kontrol.uang-muka-customer', [
             'rows' => $this->service->uangMukaCustomer(),
-            'coaOptions' => ['' => '— pilih akun Pendapatan —'] + \App\Models\CoaDetail::where('status', 'aktif')->orderBy('kode_coa')
+            'coaOptions' => ['' => '— pilih akun Pendapatan —'] + CoaDetail::where('status', 'aktif')->orderBy('kode_coa')
                 ->get()->mapWithKeys(fn ($c) => [$c->kode_coa => "{$c->kode_coa} — {$c->nama_coa}"])->all(),
-            'bolehAkui' => \App\Support\Akses::boleh('cash-in', 'buat'),
+            'bolehAkui' => Akses::boleh('cash-in', 'buat'),
         ]);
     }
 
@@ -46,9 +50,26 @@ class KontrolController extends Controller
         return view('kontrol.accrue-prepaid', ['rows' => $this->service->accrue()]);
     }
 
+    /**
+     * Rekonsiliasi buku pembantu ↔ buku besar. Tanggalnya bisa dimundurkan:
+     * selisih paling sering baru terlihat saat dibandingkan pada akhir bulan
+     * yang laporannya sudah terlanjur dikirim.
+     */
+    public function rekonsiliasi(Request $request): View
+    {
+        $asOf = $request->query('as_of', now()->toDateString());
+        $service = new RekonsiliasiService;
+
+        return view('kontrol.rekonsiliasi', [
+            'data' => $service->ringkasan($asOf),
+            'asOf' => $asOf,
+            'service' => $service,
+        ]);
+    }
+
     public function rekapPembiayaan(): View
     {
-        return view('kontrol.rekap-pembiayaan', ['rows' => (new \App\Services\Modules\BankLoanService)->rekap()]);
+        return view('kontrol.rekap-pembiayaan', ['rows' => (new BankLoanService)->rekap()]);
     }
 
     /** Unduh tabel kontrol (CSV/XLSX/PDF). */
@@ -80,7 +101,7 @@ class KontrolController extends Controller
                 'No. Ref' => $g($r, 'nomor_referensi'), 'Tanggal' => $tgl($g($r, 'tanggal')), 'Periode' => $g($r, 'periode'),
                 'Debet' => $g($r, 'nama_coa_debet'), 'Kredit' => $g($r, 'nama_coa_kredit'), 'Nominal' => $g($r, 'nominal'),
             ])->all(), 'accrue_prepaid', 'Accrue & Prepaid Aktif'],
-            'rekap-pembiayaan' => [collect((new \App\Services\Modules\BankLoanService)->rekap())->map(fn ($r) => [
+            'rekap-pembiayaan' => [collect((new BankLoanService)->rekap())->map(fn ($r) => [
                 'Bank' => $g($r, 'nama_bank'), 'Jumlah Pembiayaan' => $g($r, 'jumlah_pinjaman'), 'Pokok Awal' => $g($r, 'pokok_awal'),
                 'Terbayar' => $g($r, 'pokok_terbayar'), 'Sisa Pokok' => $g($r, 'sisa_pokok'), 'Margin Dibayar' => $g($r, 'margin_dibayar'),
             ])->all(), 'rekap_pembiayaan_per_bank', 'Rekap Pembiayaan per Bank'],

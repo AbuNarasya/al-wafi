@@ -21,6 +21,9 @@ class CoaDetailRequest extends FormRequest
             'nama_coa' => ['required', 'string', 'max:255'],
             'kode_grup' => ['required', 'string', Rule::exists('coa_groups', 'kode_grup')],
             'jenis_saldo' => ['required', Rule::in(['debet', 'kredit'])],
+            // Kosong = belum ditentukan; Laporan Arus Kas menampilkannya
+            // sebagai kelompok tersendiri, bukan menebak kamarnya.
+            'klasifikasi_arus_kas' => ['nullable', Rule::in(['operasi', 'investasi', 'pendanaan'])],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
             'keterangan' => ['nullable', 'string'],
         ];
@@ -33,12 +36,12 @@ class CoaDetailRequest extends FormRequest
 
     public function attributes(): array
     {
-        return ['kode_coa' => 'kode akun', 'nama_coa' => 'nama akun', 'kode_grup' => 'grup COA'];
+        return ['kode_coa' => 'kode akun', 'nama_coa' => 'nama akun', 'kode_grup' => 'grup COA', 'klasifikasi_arus_kas' => 'klasifikasi arus kas'];
     }
 
     public function tersimpan(): array
     {
-        $data = $this->safe()->only(['nama_coa', 'kode_grup', 'jenis_saldo', 'status', 'keterangan']);
+        $data = $this->safe()->only(['nama_coa', 'kode_grup', 'jenis_saldo', 'klasifikasi_arus_kas', 'status', 'keterangan']);
         if ($this->isMethod('post')) {
             $data['kode_coa'] = $this->input('kode_coa');
         }

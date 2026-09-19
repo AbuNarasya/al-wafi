@@ -61,7 +61,7 @@ class CashInService
                 $kodePersediaan = $item->kode_persediaan;
                 $qty = Money::of($l['kuantiti'], 4);
                 $hargaSatuan = Money::div($l['nominal'], $l['kuantiti'], 2);
-                $sales[] = ['kode_persediaan' => $kodePersediaan, 'kuantiti' => $qty];
+                $sales[] = ['kode_persediaan' => $kodePersediaan, 'kuantiti' => $qty, 'keterangan' => $l['keterangan'] ?? null];
             }
 
             $details[] = [
@@ -127,8 +127,29 @@ class CashInService
                 'lines' => $jLines,
             ]);
 
+            // Penjualan barang: stok keluar FIFO + JURNAL HARGA POKOKNYA.
+            //
+            // Sebelum ini hanya stoknya yang berkurang — harga pokok tak pernah
+            // dijurnal sama sekali, sehingga akun Persediaan di buku besar tak
+            // ikut turun dan pendapatannya tercatat tanpa beban lawannya. Laba
+            // jadi terlalu besar, persis sebesar barang yang terjual.
             foreach ($sales as $s) {
-                InventoryMovement::applyStockOut($s['kode_persediaan'], $s['kuantiti']);
+                $mutasi = InventoryMovement::keluar([
+                    'kode_persediaan' => $s['kode_persediaan'],
+                    'kuantiti' => $s['kuantiti'],
+                    'tanggal' => $input['tanggal'],
+                    'alasan' => 'pemakaian',
+                    'sumber_modul' => 'KasMasuk',
+                    'sumber_ref' => $rec->nomor_transaksi,
+                    'keterangan' => $s['keterangan'] ?? null,
+                    'id_pengguna' => $idPengguna,
+                ]);
+
+                (new PersediaanService)->jurnalkan($mutasi, [
+                    'id_pengguna' => $idPengguna,
+                    'kode_unit' => $input['kode_unit'] ?? null,
+                    'keterangan' => "Harga pokok penjualan — {$rec->nomor_transaksi}",
+                ]);
             }
 
             return $rec->load('details');
@@ -257,10 +278,13 @@ class CashInService
                 if ($d->jenis_kas_masuk === 'uang_muka' && $d->status_pengakuan === 'sudah_diakui') {
                     $d->update(['status_pengakuan' => 'belum_diakui']);
                 }
-                if ($d->kode_persediaan && $d->kuantiti) {
-                    InventoryMovement::rollbackStockOut($d->kode_persediaan, $d->kuantiti);
-                }
             }
+
+            // Stok yang terjual dikembalikan ke lapisannya semula, berikut
+            // jurnal harga pokoknya — keduanya harus batal bersama, kalau tidak
+            // persediaan di buku besar dan di kartu stok langsung berpisah.
+            InventoryMovement::batalkanDokumen('KasMasuk', $rec->nomor_transaksi, $idPengguna);
+            (new PersediaanService)->batalkanJurnal('KasMasuk', $rec->nomor_transaksi, $idPengguna);
 
             $entry = JournalEntry::where('sumber_modul', 'KasMasuk')
                 ->where('id_sumber', (string) $kodeTransaksi)

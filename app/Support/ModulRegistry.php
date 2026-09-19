@@ -92,6 +92,13 @@ final class ModulRegistry
         ['kode' => 'bank-accounts', 'nama' => 'Kas & Rekening', 'grup' => 'KEUANGAN', 'sub' => 'Kontrol'],
         ['kode' => 'opening-balance', 'nama' => 'Saldo Awal', 'grup' => 'KEUANGAN', 'sub' => 'Kontrol'],
         ['kode' => 'period-close', 'nama' => 'Tutup Buku Periode', 'grup' => 'KEUANGAN', 'sub' => 'Kontrol'],
+        // Dua tangan membuka kembali periode yang sudah ditutup:
+        //   `buat` = mengajukan  → admin keuangan
+        //   `ubah` = memutuskan  → direktur keuangan
+        // Sengaja modul TERPISAH dari `period-close`: yang boleh menutup buku
+        // (pekerjaan rutin akhir bulan) bukan orang yang sama dengan yang boleh
+        // membatalkannya.
+        ['kode' => 'buka-periode', 'nama' => 'Buka Periode (ajukan = admin keuangan, setujui = direktur keuangan)', 'grup' => 'KEUANGAN', 'sub' => 'Kontrol'],
 
         // ---- Data Siswa/Santri ----
         // Sekelompok dengan grup sidebar bernama sama. Satu modul `santri`

@@ -13,6 +13,7 @@ use App\Models\Vendor;
 use App\Services\Ledger\AssetDraft;
 use App\Services\Ledger\Authorization;
 use App\Services\Ledger\DocNumber;
+use App\Services\Ledger\InventoryMovement;
 use App\Services\Ledger\PostingService;
 use App\Services\Ledger\ReversalService;
 use App\Support\Money;
@@ -50,6 +51,16 @@ class InvoiceService
             }
             $lineTotal = Money::mul($l['kuantiti'], $l['harga_satuan']);
             $total = Money::add($total, $lineTotal);
+            // `kode_persediaan` AKHIRNYA ditulis. Sebelum ini kolomnya ada di
+            // tabel, terbawa dari baris PO, lalu mati di sini — dan pencocokan
+            // barangnya dilakukan lewat `kode_coa` yang lazim dipakai BANYAK
+            // barang sekaligus, sehingga beras yang dibeli bisa menambah stok
+            // minyak tanpa seorang pun melihatnya.
+            $kodePersediaan = $l['kode_persediaan'] ?? null;
+            if ($kodePersediaan && ! Inventory::find($kodePersediaan)) {
+                throw new AppException(400, "Item persediaan {$kodePersediaan} tidak ditemukan.");
+            }
+
             $details[] = [
                 'kode_coa' => $l['kode_coa'],
                 'nama_coa' => $coa->nama_coa,
@@ -57,6 +68,7 @@ class InvoiceService
                 'kuantiti' => Money::of($l['kuantiti'], 4),
                 'harga_satuan' => Money::of($l['harga_satuan']),
                 'total' => $lineTotal,
+                'kode_persediaan' => $kodePersediaan,
             ];
             $jLines[] = [
                 'kode_coa' => $l['kode_coa'],
@@ -111,7 +123,7 @@ class InvoiceService
                 $inv->details()->create($d);
             }
 
-            PostingService::postJournal([
+            $entry = PostingService::postJournal([
                 'referensi' => $ref,
                 'tanggal' => $input['tanggal_invoice'],
                 'kode_unit' => $input['kode_unit'],
@@ -122,21 +134,24 @@ class InvoiceService
                 'lines' => $jLines,
             ]);
 
-            // Auto-update stok persediaan (weighted-average) untuk item yang akunnya
-            // terhubung ke master Persediaan.
+            // Stok bertambah untuk baris yang MENYEBUT itemnya. Barang yang
+            // dipilih petugaslah yang bertambah — bukan barang pertama yang
+            // kebetulan berbagi akun COA yang sama.
             foreach ($inv->details as $d) {
-                $item = Inventory::where('kode_coa', $d->kode_coa)->first();
-                if (! $item) {
+                if (! $d->kode_persediaan || ! Money::gtZero($d->kuantiti ?? 0, 4)) {
                     continue;
                 }
-                $oldQty = Money::sub($item->stok_masuk, $item->stok_keluar, 4);
-                $oldVal = Money::mul($oldQty, $item->harga_perolehan);
-                $addQty = Money::of($d->kuantiti ?? 0, 4);
-                $newQty = Money::add($oldQty, $addQty, 4);
-                $newVal = Money::add($oldVal, $d->total);
-                $item->update([
-                    'harga_perolehan' => Money::gtZero($newQty, 4) ? Money::div($newVal, $newQty) : Money::of($item->harga_perolehan),
-                    'stok_masuk' => Money::add($item->stok_masuk, $addQty, 4),
+                InventoryMovement::masuk([
+                    'kode_persediaan' => $d->kode_persediaan,
+                    'kuantiti' => $d->kuantiti,
+                    'nilai' => $d->total,
+                    'tanggal' => $input['tanggal_invoice'],
+                    'alasan' => 'pembelian',
+                    'sumber_modul' => 'Invoice',
+                    'sumber_ref' => $ref,
+                    'journal_entry_id' => $entry->id ?? null,
+                    'keterangan' => $d->keterangan,
+                    'id_pengguna' => $idPengguna,
                 ]);
             }
 
@@ -209,20 +224,10 @@ class InvoiceService
                 ]);
             }
 
-            foreach ($inv->details as $d) {
-                if (! $d->kuantiti) {
-                    continue;
-                }
-                $item = Inventory::where('kode_coa', $d->kode_coa)->first();
-                if (! $item) {
-                    continue;
-                }
-                $masuk = Money::sub($item->stok_masuk, $d->kuantiti, 4);
-                if (Money::isNegative($masuk, 4)) {
-                    $masuk = '0';
-                }
-                $item->update(['stok_masuk' => $masuk]);
-            }
+            // Lapisan FIFO yang lahir dari invoice ini ditarik kembali; kalau
+            // barangnya sudah terlanjur dipakai, void-nya berhenti di sini
+            // dengan pesan yang terang alih-alih merusak harga pokok diam-diam.
+            InventoryMovement::batalkanDokumen('Invoice', $inv->nomor_ref_internal, $idPengguna);
 
             if ($inv->nomor_ref_internal) {
                 AssetDraft::deleteDraftAssets($inv->nomor_ref_internal);

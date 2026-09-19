@@ -23,15 +23,30 @@
                 <x-field name="satuan" label="Satuan" :value="old('satuan', $item->satuan)" required placeholder="pcs / kg / box" />
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-field name="harga_perolehan" label="Harga Perolehan" type="number" :value="old('harga_perolehan', $item->harga_perolehan)" required />
-                <x-field name="kode_coa" label="Akun Persediaan (opsional)" :value="old('kode_coa', $item->kode_coa)" :options="$coaOptions" />
+            <x-field name="harga_perolehan" label="Harga Perolehan Awal" type="number" :value="old('harga_perolehan', $item->harga_perolehan)" required
+                     hint="Dipakai sebagai harga acuan saat opname menemukan stok lebih. Harga sesungguhnya mengikuti lapisan FIFO tiap pembelian." />
+
+            <div class="rounded-lg border border-brand/30 bg-brand-soft/40 p-4">
+                <div class="mb-1 text-sm font-semibold text-gray-800">Akun Akuntansi</div>
+                <p class="mb-3 text-xs text-gray-600">
+                    Diisi <b>bagian keuangan</b>, sekali saja. Petugas gudang kelak hanya mencatat pemakaian &amp; opname
+                    berikut bagian yang memakainya — akun lawannya diambil dari sini, jadi mereka tak perlu memilih akun sama sekali.
+                </p>
+                <div class="grid gap-4 sm:grid-cols-3">
+                    <x-field name="kode_coa" label="Akun Persediaan" :value="old('kode_coa', $item->kode_coa)" :options="$coaOptions" required
+                             hint="Aset — nilai barang di gudang." />
+                    <x-field name="kode_coa_beban" label="Akun Beban Pemakaian" :value="old('kode_coa_beban', $item->kode_coa_beban)" :options="$coaOptions" required
+                             hint="Didebet saat barang dipakai atau terjual." />
+                    <x-field name="kode_coa_selisih" label="Akun Selisih Persediaan" :value="old('kode_coa_selisih', $item->kode_coa_selisih)" :options="$coaOptions" required
+                             hint="Dipakai saat opname menemukan selisih." />
+                </div>
             </div>
 
             @unless ($item->exists)
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <x-field name="stok_masuk" label="Stok Awal (Masuk)" type="number" :value="old('stok_masuk', 0)" hint="Stok pembukaan; setelahnya pakai Mutasi Stok." />
-                    <x-field name="stok_keluar" label="Stok Keluar Awal" type="number" :value="old('stok_keluar', 0)" />
+                <div class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    Stok awal tidak diisi di sini. Setelah barang tersimpan, catat stok pembukaannya lewat
+                    <b>Opname</b> di daftar persediaan — supaya ia punya baris kartu stok dan jurnalnya sendiri,
+                    sama seperti pergerakan lainnya.
                 </div>
             @endunless
 

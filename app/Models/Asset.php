@@ -2,12 +2,18 @@
 
 namespace App\Models;
 
+use App\Support\Audit\MencatatJejak;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /** Aset tetap. metode_depresiasi: garis_lurus | saldo_menurun. */
 class Asset extends Model
 {
+    use MencatatJejak;
+
+    /** Kode modul hak akses — penyaring di layar Jejak Audit. */
+    protected $jejakModul = 'assets';
+
     protected $table = 'assets';
 
     protected $primaryKey = 'kode_aset';
