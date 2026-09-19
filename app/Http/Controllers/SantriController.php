@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
+use App\Models\Gelombang;
 use App\Models\JadwalPerubahanSantri;
 use App\Models\JalurNonaktif;
 use App\Models\JalurPendaftaran;
@@ -13,6 +14,7 @@ use App\Models\Pendaftaran;
 use App\Models\PotonganUangPangkal;
 use App\Models\RencanaAngsuranUangPangkal;
 use App\Models\Santri;
+use App\Models\TagihanSantri;
 use App\Models\TahunAjaran;
 use App\Models\TipeBiaya;
 use App\Models\Wali;
@@ -229,7 +231,7 @@ class SantriController extends Controller
      */
     private function saringStatusBayar($query, string $status)
     {
-        $aktif = fn ($q) => $q->whereNotIn('status', \App\Models\TagihanSantri::TIDAK_BERLAKU);
+        $aktif = fn ($q) => $q->whereNotIn('status', TagihanSantri::TIDAK_BERLAKU);
         $adaSisa = fn ($q) => $q->whereHas('tagihan', fn ($t) => $aktif($t)->where('sisa', '>', 0));
         $adaTerbayar = fn ($q) => $q->whereHas('tagihan', fn ($t) => $aktif($t)->whereColumn('sisa', '<', 'nominal'));
         $idMenunggu = PembayaranSantri::where('status', 'menunggu_verifikasi')
@@ -381,7 +383,7 @@ class SantriController extends Controller
             // potongan. Hanya yang periodenya sedang berjalan yang ditawarkan.
             // Seluruh T.A dirender server lalu disaring Alpine, agar isinya bisa
             // diperiksa test & tetap tampil saat JavaScript mati.
-            'gelombangOptions' => \App\Models\Gelombang::where('status', 'aktif')
+            'gelombangOptions' => Gelombang::where('status', 'aktif')
                 ->orderBy('kode')->get()
                 ->filter(fn ($g) => $g->keadaan() === 'berlaku')
                 ->groupBy('tahun_ajaran')
@@ -827,6 +829,7 @@ class SantriController extends Controller
         $pesan = "{$hasil['diterapkan']} santri diaktifkan.";
         if ($hasil['gagal'] !== []) {
             $nama = Santri::whereIn('id', array_column($hasil['gagal'], 'id_santri'))->pluck('nama')->join(', ');
+
             return back()->with('error', $pesan." GAGAL: {$nama} — ".$hasil['gagal'][0]['pesan']);
         }
 
@@ -896,10 +899,18 @@ class SantriController extends Controller
                 // Tombol manual per santri — untuk yang masuk di tengah tahun
                 // ajaran, menunggu 1 Juli berikutnya menahannya setahun penuh.
                 'aktifkan-sekarang' => $this->aktifkanSekarang($id),
+                // `abaikan_tanggungan` = melepas santri yang belum bebas
+                // tanggungan. Boleh, tetapi alasannya (kolom yang sama) jadi
+                // alasan tertulisnya — dan itulah yang akan dibaca saat
+                // piutangnya dipersoalkan.
                 'undur-diri' => $this->service->mengundurkanDiri(
                     $id,
-                    $request->validate(['alasan' => ['required', 'string', 'max:255']])['alasan'],
+                    $request->validate([
+                        'alasan' => ['required', 'string', 'max:255'],
+                        'abaikan_tanggungan' => ['nullable', 'boolean'],
+                    ])['alasan'],
                     $request->user()->id_pengguna,
+                    (bool) $request->boolean('abaikan_tanggungan'),
                 ),
                 default => abort(404),
             };

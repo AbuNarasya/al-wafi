@@ -10,6 +10,7 @@ use App\Http\Controllers\BagianController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BankLoanController;
 use App\Http\Controllers\BankReconciliationController;
+use App\Http\Controllers\BebasTanggunganController;
 use App\Http\Controllers\BookTransferController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\BudgetPengajuanController;
@@ -852,6 +853,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/topup/{id}/verifikasi', 'verifikasiTopUp')->name('topup.verifikasi')->middleware('hakakses:dompet,ubah')->whereNumber('id');
         Route::post('/topup/{id}/tolak', 'tolakTopUp')->name('topup.tolak')->middleware('hakakses:dompet,hapus')->whereNumber('id');
         Route::post('/pindah', 'pindah')->name('pindah')->middleware('hakakses:dompet,ubah');
+        Route::post('/tarik', 'tarik')->name('tarik')->middleware('hakakses:dompet,ubah');
         Route::post('/kunci/{idSantri}', 'kunci')->name('kunci')->middleware('hakakses:dompet,ubah')->whereNumber('idSantri');
         Route::get('/mutasi/{mutasi}/bukti', 'bukti')->name('mutasi.bukti')->middleware('hakakses:dompet,lihat')->whereNumber('mutasi');
     });
@@ -891,6 +893,12 @@ Route::middleware('auth')->group(function () {
     // Kebijakan Khusus santri (keringanan, potongan, beasiswa). Dua surat wajib
     // terlampir sebelum boleh disetujui — ditegakkan service, bukan hanya
     // diingatkan di layar.
+    // Bebas Tanggungan: dua arah — yang santri hutang, dan yang dititipkan
+    // padanya. Menumpang modul `rekap-pembayaran`: pekerjaannya sama-sama
+    // memeriksa keadaan uang santri, hanya sudutnya berbeda.
+    Route::get('/kesantrian/bebas-tanggungan', [BebasTanggunganController::class, 'index'])
+        ->name('bebas_tanggungan.index')->middleware('hakakses:rekap-pembayaran,lihat');
+
     Route::prefix('kesantrian/kebijakan-khusus')->name('kebijakan_khusus.')
         ->controller(KebijakanKhususController::class)->group(function () {
             Route::get('/', 'index')->name('index')->middleware('hakakses:kebijakan-khusus,lihat');

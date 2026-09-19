@@ -82,9 +82,53 @@
                     </div>
                 @endif
 
+                {{-- Penarikan / pengembalian titipan. Satu-satunya jalan KELUAR
+                     saldo dompet; sebelum ada ini, saldo santri yang sudah lulus
+                     menggantung di neraca selamanya sebagai liabilitas yang tak
+                     pernah bisa diselesaikan. --}}
+                @if ($bolehUbah && $wali?->dompet)
+                    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm" x-data="{ pemilik: 'wali' }">
+                        <div class="text-sm font-semibold text-gray-700">Tarik / Kembalikan Titipan</div>
+                        <p class="mt-1 text-xs text-gray-500">Berjurnal seketika: Titipan (D) / Kas (K). Uangnya keluar saat ini juga.</p>
+                        <form method="POST" action="{{ route('dompet.tarik') }}" class="mt-3 space-y-2"
+                              onsubmit="return confirm('Tarik titipan? Jurnalnya terbit seketika dan uangnya dianggap sudah diserahkan.')">
+                            @csrf <input type="hidden" name="tanggal" value="{{ now()->toDateString() }}">
+
+                            <label class="block text-xs text-gray-500">Dari dompet</label>
+                            <select name="pemilik" x-model="pemilik" class="w-full rounded border-gray-300 text-sm">
+                                <option value="wali">Dompet Wali</option>
+                                <option value="santri">Dompet Santri</option>
+                                <option value="tabungan">Tabungan Santri</option>
+                            </select>
+
+                            <label class="block text-xs text-gray-500">Dompet</label>
+                            <select name="id_dompet" required class="w-full rounded border-gray-300 text-sm">
+                                <option value="{{ $wali->dompet->id }}" x-show="pemilik === 'wali'">Dompet Wali — {{ $wali->nama_ayah ?: $wali->nama_ibu }}</option>
+                                @foreach ($wali->santri as $s)
+                                    @if ($s->dompet)
+                                        <option value="{{ $s->dompet->id }}" x-show="pemilik === 'santri'">{{ $s->nama }} — dompet</option>
+                                    @endif
+                                    @if ($s->tabungan)
+                                        <option value="{{ $s->tabungan->id }}" x-show="pemilik === 'tabungan'">{{ $s->nama }} — tabungan</option>
+                                    @endif
+                                @endforeach
+                            </select>
+
+                            <label class="block text-xs text-gray-500">Kas/rekening sumber</label>
+                            <select name="kode_rekening" required class="w-full rounded border-gray-300 text-sm">@foreach ($rekeningOptions as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select>
+
+                            <x-input-rupiah name="nominal" required placeholder="Nominal" />
+                            <input type="text" name="penerima" placeholder="Nama penerima (untuk bukti)" class="w-full rounded border-gray-300 text-sm">
+                            <input type="text" name="keterangan" placeholder="Keterangan (opsional)" class="w-full rounded border-gray-300 text-sm">
+
+                            <button class="w-full rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-700">Tarik Titipan</button>
+                        </form>
+                    </div>
+                @endif
+
                 {{-- Info --}}
                 <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-5 text-xs text-gray-500">
-                    Semua dompet adalah <strong>titipan (wadi'ah)</strong> — liabilitas yayasan. Top-up menambah Kas &amp; Titipan; pemindahan hanya menggeser antar akun titipan. Arah sah: Wali→Santri, Wali→Tabungan, Santri→Tabungan.
+                    Semua dompet adalah <strong>titipan (wadi'ah)</strong> — liabilitas yayasan. Top-up menambah Kas &amp; Titipan; pemindahan hanya menggeser antar akun titipan. Arah sah: Wali→Santri, Wali→Tabungan, Santri→Tabungan. Penarikan mengurangi Kas &amp; Titipan sekaligus.
                 </div>
             </div>
 

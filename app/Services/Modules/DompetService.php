@@ -15,6 +15,7 @@ use App\Models\Wali;
 use App\Services\Ledger\DocNumber;
 use App\Services\Ledger\PostingService;
 use App\Services\Ppsb\DompetPolicy;
+use App\Support\Audit\Jejak;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -112,7 +113,7 @@ class DompetService
         }
         $nominal = Money::of($mutasi->nominal);
 
-        $mutasi = DB::transaction(function () use ($mutasi, $nominal, $idPengguna, $id) {
+        $mutasi = DB::transaction(function () use ($mutasi, $nominal, $idPengguna) {
             $saldo = $this->tambahSaldo($mutasi->pemilik, $mutasi->id_dompet, $nominal);
             $entry = PostingService::postJournal([
                 'referensi' => $mutasi->nomor, 'tanggal' => $mutasi->tanggal, 'sumber_modul' => self::SUMBER,
@@ -275,6 +276,113 @@ class DompetService
         }
 
         return $pemilik === 'santri' ? $this->ambilDompetSantri($idSantri) : $this->ambilTabungan($idSantri);
+    }
+
+    /**
+     * PENARIKAN / PENGEMBALIAN saldo dompet — kebalikan top-up.
+     *
+     *   D  Titipan (liabilitas)     K  Kas/Rekening
+     *
+     * Sebelum ini modul dompet hanya bisa DIISI: ada `topUp`, `pindah`, dan
+     * `setKunciTarik` — tetapi tak ada satu pun jalan keluar. Akibatnya saldo
+     * santri yang sudah lulus atau keluar menggantung di neraca selamanya
+     * sebagai liabilitas yang tak pernah bisa diselesaikan. Bahkan kolom
+     * `kunci_tarik` dan nilai enum `tarik` sudah disiapkan sejak awal —
+     * pintunya ada, kodenya yang tak pernah ditulis.
+     *
+     * Berjurnal seketika (tanpa antre verifikasi): uangnya keluar saat itu juga
+     * dan bukti tanda tangan penerimanya dicetak dari sini, berbeda dari top-up
+     * yang baru berjurnal setelah keuangan melihat bukti transfernya.
+     *
+     * @param  array{pemilik:string,id_dompet:int,nominal:string|int|float,tanggal:string,kode_rekening:string,keterangan?:?string,penerima?:?string}  $data
+     */
+    public function tarik(array $data, int $idPengguna): MutasiDompet
+    {
+        $this->assertTimKeuangan($idPengguna);
+
+        $pemilik = $data['pemilik'];
+        if (! isset(DompetPolicy::COA_TITIPAN[$pemilik])) {
+            throw new AppException(422, 'Jenis dompet tidak dikenal.');
+        }
+
+        $nominal = Money::of($data['nominal'] ?? 0);
+        if (! Money::gtZero($nominal)) {
+            throw new AppException(422, 'Nominal penarikan harus lebih besar dari nol.');
+        }
+
+        $rekening = BankAccount::find($data['kode_rekening'] ?? '');
+        if (! $rekening) {
+            throw new AppException(422, 'Pilih kas/rekening sumber penarikan.');
+        }
+
+        $model = match ($pemilik) {
+            'wali' => DompetWali::find($data['id_dompet']),
+            'santri' => DompetSantri::find($data['id_dompet']),
+            default => TabunganSantri::find($data['id_dompet']),
+        };
+        if (! $model) {
+            throw new AppException(404, DompetPolicy::labelDompet($pemilik).' tidak ditemukan.');
+        }
+
+        // Kunci tarik dihormati — kolomnya sudah ada sejak awal justru untuk ini.
+        if ($pemilik === 'santri' && $model->kunci_tarik) {
+            throw new AppException(422,
+                'Dompet santri ini sedang dikunci dari penarikan. Buka kuncinya dulu lewat menu Dompet & Tabungan.');
+        }
+
+        if (Money::gt($nominal, $model->saldo)) {
+            throw new AppException(422,
+                'Saldo '.DompetPolicy::labelDompet($pemilik).' tidak cukup: diminta '
+                .Money::of($nominal).', tersedia '.Money::of($model->saldo).'.');
+        }
+
+        return DB::transaction(function () use ($data, $pemilik, $nominal, $rekening, $model, $idPengguna) {
+            $nomor = $this->nomorMutasi($data['tanggal']);
+            $saldo = $this->kurangiSaldo($pemilik, $model->getKey(), $nominal);
+            $penerima = trim((string) ($data['penerima'] ?? ''));
+            $ket = ($data['keterangan'] ?? '') ?: 'Penarikan '.DompetPolicy::labelDompet($pemilik)
+                .($penerima !== '' ? " — diterima {$penerima}" : '');
+
+            $entry = PostingService::postJournal([
+                'referensi' => $nomor, 'tanggal' => $data['tanggal'], 'sumber_modul' => self::SUMBER,
+                'id_sumber' => $nomor, 'id_pengguna' => $idPengguna, 'keterangan' => $ket,
+                'lines' => [
+                    ['kode_coa' => DompetPolicy::COA_TITIPAN[$pemilik], 'debet' => $nominal, 'kredit' => '0'],
+                    ['kode_coa' => $rekening->kode_coa, 'debet' => '0', 'kredit' => $nominal],
+                ],
+            ]);
+
+            $mutasi = MutasiDompet::create([
+                'nomor' => $nomor,
+                'pemilik' => $pemilik,
+                'id_dompet' => $model->getKey(),
+                'jenis' => 'tarik',
+                'nominal' => $nominal,
+                'saldo_setelah' => $saldo,
+                'tanggal' => $data['tanggal'],
+                'keterangan' => $ket,
+                // Penarikan tak mengantre verifikasi: uangnya sudah keluar.
+                'status' => 'terverifikasi',
+                'kode_rekening' => $rekening->kode_coa,
+                'dicatat_oleh' => $idPengguna,
+                'diverifikasi_oleh' => $idPengguna,
+                'diverifikasi_pada' => Carbon::now(),
+                'journal_entry_id' => $entry->id,
+            ]);
+
+            Jejak::catat('tarik_dompet', [
+                'modul' => 'dompet',
+                'ref_jenis' => 'MutasiDompet',
+                'ref_id' => $mutasi->id,
+                'detail' => [
+                    'pemilik' => $pemilik, 'nominal' => $nominal,
+                    'penerima' => $data['penerima'] ?? null, 'saldo_setelah' => $saldo,
+                ],
+                'id_pengguna' => $idPengguna,
+            ]);
+
+            return $mutasi;
+        });
     }
 
     private function tambahSaldo(string $pemilik, int $id, string $nominal): string

@@ -222,6 +222,9 @@ final class Navigation
         // belum bayar".
         // Kebijakan khusus mendahului daftar outstanding: keringanan yang belum
         // diputuskan mempengaruhi angka yang akan muncul di sana.
+        // Bebas Tanggungan sekelompok dengan kontrol kesantrian lain: sama-sama
+        // memeriksa yang masih menggantung, bukan menerbitkan yang baru.
+        ['url' => '/kesantrian/bebas-tanggungan', 'label' => 'Bebas Tanggungan', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'rekap-pembayaran'],
         ['url' => '/kesantrian/kebijakan-khusus', 'label' => 'Kebijakan Khusus Santri', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'kebijakan-khusus'],
         ['url' => '/kesantrian/penerimaan', 'label' => 'Laporan Penerimaan per Periode', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'rekap-pembayaran'],
         ['url' => '/kesantrian/outstanding-spp', 'label' => 'Daftar Outstanding SPP', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'outstanding-spp'],

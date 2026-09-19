@@ -299,7 +299,7 @@ class SantriService
         }
         $efektif = Money::sub($nominalNormal, $potongan);
 
-        return DB::transaction(function () use ($id, $data, $jenis, $santri, $taTagihan, $jenjangTagihan, $nominalNormal, $potongan, $potonganRow, $efektif, $jenisPerlengkapan, $nominalPerlengkapan) {
+        return DB::transaction(function () use ($id, $data, $jenis, $santri, $taTagihan, $jenjangTagihan, $nominalNormal, $potongan, $efektif, $jenisPerlengkapan, $nominalPerlengkapan) {
             $tagihan = $jenis === null ? null : TagihanSantri::create([
                 'id_santri' => $id, 'kode_jenis' => $jenis->kode,
                 'perilaku' => 'uang_pangkal', 'kode_jenjang' => $jenjangTagihan, 'tahun_ajaran' => $taTagihan,
@@ -790,7 +790,14 @@ class SantriService
     private const PERILAKU_DITUTUP_SAAT_MUNDUR = ['registrasi', 'uang_pangkal', 'perlengkapan'];
 
     /** Pengunduran diri — boleh kapan saja sebelum proses berakhir. */
-    public function mengundurkanDiri(int $id, string $alasan, ?int $idPengguna = null): Santri
+    /**
+     * @param  bool  $abaikanTanggungan  lepaskan santri walau belum bebas
+     *                                   tanggungan — `$alasan` jadi alasan
+     *                                   tertulisnya. Hanya berlaku untuk santri
+     *                                   AKTIF; calon yang mundur memang belum
+     *                                   punya titipan maupun tagihan berjalan.
+     */
+    public function mengundurkanDiri(int $id, string $alasan, ?int $idPengguna = null, bool $abaikanTanggungan = false): Santri
     {
         $santri = Santri::find($id);
         if (! $santri) {
@@ -800,6 +807,18 @@ class SantriService
 
         // Santri AKTIF: sisa uang pangkal dihapuskan & akrualnya dibalik.
         if ($santri->status === 'aktif') {
+            // GERBANG TITIPAN. Hanya titipan yang ditahan, BUKAN tagihan —
+            // sisa uang pangkal & perlengkapan memang sudah dibalik akrualnya
+            // beberapa baris di bawah, dan menahan kepergian karena tagihan
+            // berarti menahan santri yang justru keluar karena tak sanggup
+            // membayar. Titipan tak punya jalan keluar lain; kalau ditinggalkan
+            // ia menggantung di neraca selamanya.
+            (new BebasTanggunganService)->assertTitipanDikembalikan(
+                $santri->id,
+                $abaikanTanggungan,
+                $abaikanTanggungan ? $alasan : null,
+            );
+
             return $this->keluarkanSantriAktif($santri, $alasan, $idPengguna);
         }
 

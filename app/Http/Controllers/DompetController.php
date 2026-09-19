@@ -181,6 +181,34 @@ class DompetController extends Controller
         return redirect()->route('dompet.index', ['id_wali' => $data['id_wali']])->with('status', 'Pemindahan dana berhasil.');
     }
 
+    /**
+     * Penarikan / pengembalian saldo dompet — kebalikan top-up, berjurnal
+     * seketika. Inilah satu-satunya jalan keluar saldo titipan; sebelum ada ini
+     * saldo santri yang sudah lulus menggantung di neraca selamanya.
+     */
+    public function tarik(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'pemilik' => ['required', Rule::in(['wali', 'santri', 'tabungan'])],
+            'id_dompet' => ['required', 'integer'],
+            'nominal' => ['required', 'numeric', 'gt:0'],
+            'tanggal' => ['required', 'date'],
+            'kode_rekening' => ['required', 'string', 'exists:bank_accounts,kode_coa'],
+            'penerima' => ['nullable', 'string', 'max:255'],
+            'keterangan' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        try {
+            $mutasi = $this->service->tarik($data, $request->user()->id_pengguna);
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('status',
+            "Penarikan {$mutasi->nomor} tercatat & berjurnal. Sisa saldo Rp "
+            .number_format((float) $mutasi->saldo_setelah, 0, ',', '.').'.');
+    }
+
     public function kunci(Request $request, string $idSantri): RedirectResponse
     {
         try {
