@@ -146,8 +146,13 @@ $cetak = '<!doctype html><html lang="id"><head><meta charset="utf-8">'
 file_put_contents($sementara, $cetak);
 
 $perintah = sprintf(
+    // `--print-to-pdf-no-header` sudah tak dikenali Chrome baru (di mesin ini 153),
+    // dan diamnya menipu: PDF tetap jadi, hanya tiap halaman membawa tanggal,
+    // judul jendela, dan ALAMAT BERKAS LOKAL di kakinya. `--no-pdf-header-footer`
+    // penggantinya; keduanya disebut supaya Chrome lama pun tetap terlayani.
     '"%s" --headless --disable-gpu --no-sandbox --run-all-compositor-stages-before-draw '
-    .'--virtual-time-budget=6000 --print-to-pdf-no-header --print-to-pdf="%s" "%s"',
+    .'--virtual-time-budget=6000 --no-pdf-header-footer --print-to-pdf-no-header '
+    .'--print-to-pdf="%s" "%s"',
     $chrome, $keluar, 'file:///'.str_replace('\\', '/', $sementara),
 );
 

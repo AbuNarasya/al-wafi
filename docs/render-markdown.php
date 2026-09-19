@@ -124,7 +124,20 @@ body {
 
 /* ---- Tipografi ---- */
 h1, h2, h3, h4 { color: #0e3168; line-height: 1.25; break-after: avoid; }
-h1 { font-size: 21pt; margin: 0 0 4pt; letter-spacing: -.01em; }
+
+/* Tiap H1 memulai halaman baru: dokumen kerja begini dibaca sambil tangan
+   sibuk, dan bagian yang dimulai di kaki halaman membuat orang kehilangan
+   jejak sudah sampai mana. Judul dokumen sendiri dikecualikan — ia duduk
+   tepat sesudah kop, jadi cukup dikenali lewat pemilih itu. */
+h1 {
+  font-size: 21pt;
+  margin: 0 0 4pt;
+  letter-spacing: -.01em;
+  break-before: page;
+  padding-bottom: 5pt;
+  border-bottom: 1.6pt solid #164a9e;
+}
+.kop + h1 { break-before: avoid; border-bottom: 0; padding-bottom: 0; }
 h2 {
   font-size: 14pt; margin: 20pt 0 7pt;
   padding-bottom: 3pt; border-bottom: .8pt solid #d8dde5;
@@ -234,9 +247,20 @@ $halaman = '<!doctype html><html lang="id"><head><meta charset="utf-8">'
 
 file_put_contents($sementara, $halaman);
 
+/**
+ * DUA bendera untuk menekan kepala & kaki cetak, bukan satu.
+ *
+ * `--print-to-pdf-no-header` sudah tak dikenali Chrome baru (di mesin ini 153),
+ * dan akibatnya tak kentara: PDF-nya tetap jadi, hanya saja tiap halaman
+ * membawa tanggal, judul jendela, dan ALAMAT BERKAS LOKAL di kakinya — ikut
+ * tercetak dan ikut tersebar. Penggantinya `--no-pdf-header-footer`. Keduanya
+ * disebut sekaligus supaya skrip ini tetap benar di Chrome lama maupun baru;
+ * bendera yang tak dikenal diabaikan begitu saja.
+ */
 $perintah = sprintf(
     '"%s" --headless --disable-gpu --no-sandbox --run-all-compositor-stages-before-draw '
-    .'--virtual-time-budget=6000 --print-to-pdf-no-header --print-to-pdf="%s" "%s"',
+    .'--virtual-time-budget=6000 --no-pdf-header-footer --print-to-pdf-no-header '
+    .'--print-to-pdf="%s" "%s"',
     $chrome,
     $keluar,
     'file:///'.str_replace('\\', '/', $sementara),
