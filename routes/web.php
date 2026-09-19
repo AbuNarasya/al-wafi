@@ -37,6 +37,7 @@ use App\Http\Controllers\JenisBiayaController;
 use App\Http\Controllers\JenjangController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\KaryawanController;
+use App\Http\Controllers\KebijakanKhususController;
 use App\Http\Controllers\KenaikanTingkatController;
 use App\Http\Controllers\KepesertaanLainController;
 use App\Http\Controllers\KontrolController;
@@ -885,6 +886,18 @@ Route::middleware('auth')->group(function () {
         ->controller(PenerimaanKesantrianController::class)->group(function () {
             Route::get('/', 'index')->name('index')->middleware('hakakses:rekap-pembayaran,lihat');
             Route::get('/unduh', 'download')->name('unduh')->middleware('hakakses:rekap-pembayaran,lihat');
+        });
+
+    // Kebijakan Khusus santri (keringanan, potongan, beasiswa). Dua surat wajib
+    // terlampir sebelum boleh disetujui — ditegakkan service, bukan hanya
+    // diingatkan di layar.
+    Route::prefix('kesantrian/kebijakan-khusus')->name('kebijakan_khusus.')
+        ->controller(KebijakanKhususController::class)->group(function () {
+            Route::get('/', 'index')->name('index')->middleware('hakakses:kebijakan-khusus,lihat');
+            Route::post('/', 'store')->name('store')->middleware('hakakses:kebijakan-khusus,buat');
+            Route::post('/{id}/setujui', 'setujui')->name('setujui')->middleware('hakakses:kebijakan-khusus,ubah')->whereNumber('id');
+            Route::post('/{id}/tolak', 'tolak')->name('tolak')->middleware('hakakses:kebijakan-khusus,ubah')->whereNumber('id');
+            Route::post('/{id}/akhiri', 'akhiri')->name('akhiri')->middleware('hakakses:kebijakan-khusus,ubah')->whereNumber('id');
         });
 
     Route::prefix('kesantrian/outstanding-spp')->name('outstanding_spp.')

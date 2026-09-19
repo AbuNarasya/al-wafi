@@ -165,6 +165,7 @@ final class ModulRegistry
         // 'ubah' = boleh mengoreksi nominal tagihan yang salah ketik. Dipisahkan
         // dari modul `spp` (yang menerbitkan): memeriksa tunggakan adalah pekerjaan
         // harian, menerbitkan tagihan tidak.
+        ['kode' => 'kebijakan-khusus', 'nama' => 'Kebijakan Khusus Santri (keringanan, potongan, beasiswa)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Kontrol'],
         ['kode' => 'outstanding-spp', 'nama' => 'Outstanding SPP (tunggakan & koreksi nominal)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Kontrol'],
         ['kode' => 'outstanding-lain', 'nama' => 'Outstanding Tagihan Lain (lain-lain & daftar ulang)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Kontrol'],
 

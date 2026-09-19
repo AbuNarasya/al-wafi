@@ -220,6 +220,9 @@ final class Navigation
         // Penerimaan mendahului dua daftar outstanding: yang pertama ditanyakan
         // pengurus adalah "bulan ini masuk berapa", baru sesudahnya "siapa yang
         // belum bayar".
+        // Kebijakan khusus mendahului daftar outstanding: keringanan yang belum
+        // diputuskan mempengaruhi angka yang akan muncul di sana.
+        ['url' => '/kesantrian/kebijakan-khusus', 'label' => 'Kebijakan Khusus Santri', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'kebijakan-khusus'],
         ['url' => '/kesantrian/penerimaan', 'label' => 'Laporan Penerimaan per Periode', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'rekap-pembayaran'],
         ['url' => '/kesantrian/outstanding-spp', 'label' => 'Daftar Outstanding SPP', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'outstanding-spp'],
         ['url' => '/kesantrian/outstanding-lain', 'label' => 'Daftar Outstanding Tagihan Lain', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'outstanding-lain'],

@@ -9,6 +9,7 @@ use App\Models\DompetWali;
 use App\Models\JenisBiaya;
 use App\Models\Jenjang;
 use App\Models\JournalEntry;
+use App\Models\KebijakanKhusus;
 use App\Models\MutasiDompet;
 use App\Models\PrabayarSpp;
 use App\Models\Santri;
@@ -60,14 +61,35 @@ class SppService
         ['jenis' => $jenis, 'tarif' => $tarif] = (new SantriService)
             ->komponen('spp', $ta, $jenjang, $santri->jalur);
 
-        // Nominal khusus per santri menang atas grid — dan sengaja diperiksa
-        // SEBELUM status tarif: santri bertarif khusus tetap bisa ditagih walau
-        // sel grid jenjangnya belum diisi.
-        if ($santri->nominal_spp !== null) {
+        // KEBIJAKAN KHUSUS menang atas grid — dan sengaja diperiksa SEBELUM
+        // status tarif: santri berkebijakan khusus tetap bisa ditagih walau sel
+        // grid jenjangnya belum diisi.
+        //
+        // Menggantikan `santri.nominal_spp` yang dulu ditimpa begitu saja tanpa
+        // alasan, tanpa penyetuju, dan tanpa masa berlaku. Yang bercara
+        // `nominal_khusus` berperilaku persis seperti dulu; yang bercara
+        // potongan butuh tarif gridnya, jadi hanya berlaku bila selnya terisi.
+        $kebijakan = (new KebijakanKhususService)->berlaku($santri->id, 'spp', $ta);
+        if ($kebijakan && ($kebijakan->cara === 'nominal_khusus' || $tarif['status'] === 'ada')) {
+            $asli = $kebijakan->cara === 'nominal_khusus' ? '0' : $tarif['nominal'];
+            $hasil = (new KebijakanKhususService)->terapkan($santri->id, 'spp', $ta, $asli);
+
             // `asal_bagian` null: kalimatnya bukan kalimat asal tarif, jadi tak
             // ada nama jenjang/jalur yang bisa ditebalkan <x-asal-tarif>.
+            return ['nominal' => $hasil['nominal'], 'asal' => 'khusus',
+                'kode_jenis' => $jenis->kode,
+                'asal_label' => $kebijakan->labelJenis().' — '.$kebijakan->ringkas(),
+                'asal_bagian' => null, 'keterangan' => $kebijakan->alasan];
+        }
+
+        // WARISAN: `santri.nominal_spp`, pintu lama yang digantikan modul
+        // Kebijakan Khusus. Dipertahankan sebagai cadangan selama masa
+        // peralihan — mencabutnya sekaligus akan membuat keringanan yang sudah
+        // dijanjikan ke wali hilang diam-diam pada penagihan berikutnya.
+        // Kebijakan Khusus selalu menang bila keduanya ada.
+        if ($santri->nominal_spp !== null) {
             return ['nominal' => Money::of($santri->nominal_spp), 'asal' => 'khusus',
-                'kode_jenis' => $jenis->kode, 'asal_label' => 'Nominal khusus santri',
+                'kode_jenis' => $jenis->kode, 'asal_label' => 'Nominal khusus santri (cara lama)',
                 'asal_bagian' => null, 'keterangan' => $santri->keterangan_spp];
         }
         if ($tarif['status'] === 'bebas') {
@@ -118,11 +140,30 @@ class SppService
             ->get()
             ->groupBy(fn ($t) => $t->tahun_ajaran.'|'.$t->kode_jenjang);
 
+        // Kebijakan khusus yang berlaku untuk seluruh santri di halaman ini,
+        // diambil SEKALI — sama alasannya dengan sel tarif di atas: dipanggil
+        // sebaris-sebaris berarti ratusan kueri per halaman.
+        $kebijakan = KebijakanKhusus::whereIn('id_santri', $baris->pluck('id'))
+            ->where('perilaku', 'spp')->where('status', 'disetujui')
+            ->orderByRaw('CASE WHEN tahun_ajaran IS NULL THEN 1 ELSE 0 END')->orderByDesc('id')
+            ->get()->keyBy('id_santri');
+
+        $svcKebijakan = new KebijakanKhususService;
+
         $hasil = [];
         foreach ($baris as $s) {
+            $k = $kebijakan->get($s->id);
+            if ($k && $k->cara === 'nominal_khusus') {
+                $hasil[$s->id] = ['status' => 'khusus', 'nominal' => Money::of($k->besaran),
+                    'label' => $k->labelJenis().' — '.$k->ringkas(), 'keterangan' => $k->alasan];
+
+                continue;
+            }
+
+            // WARISAN — lihat catatan di nominalSppSantri().
             if ($s->nominal_spp !== null) {
                 $hasil[$s->id] = ['status' => 'khusus', 'nominal' => Money::of($s->nominal_spp),
-                    'label' => 'Nominal khusus santri', 'keterangan' => $s->keterangan_spp];
+                    'label' => 'Nominal khusus santri (cara lama)', 'keterangan' => $s->keterangan_spp];
 
                 continue;
             }
@@ -140,6 +181,17 @@ class SppService
                     'label' => 'Tarif '.($pilih->kode_jalur ? "jalur {$pilih->kode_jalur}" : 'baris Umum')." T.A {$s->taBerjalan()}",
                     'keterangan' => null],
             };
+
+            // Kebijakan bercara POTONGAN butuh tarif gridnya lebih dulu, jadi
+            // ia dikenakan sesudah tarifnya ketemu — bukan menggantikannya.
+            if ($k && $hasil[$s->id]['status'] === 'tarif') {
+                $hasil[$s->id] = [
+                    'status' => 'khusus',
+                    'nominal' => $svcKebijakan->terapkan($s->id, 'spp', $s->taBerjalan(), $hasil[$s->id]['nominal'])['nominal'],
+                    'label' => $k->labelJenis().' — '.$k->ringkas(),
+                    'keterangan' => $k->alasan,
+                ];
+            }
         }
 
         return $hasil;

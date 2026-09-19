@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\AdvanceSettlement;
+use App\Models\KebijakanKhusus;
 use App\Models\LampiranDokumen;
 use App\Models\OperationalAdvance;
 use App\Models\PelepasanAset;
@@ -33,6 +34,16 @@ final class SumberLampiran
     public const PENYELESAIAN = 'advance_settlement';
 
     public const PELEPASAN_ASET = 'pelepasan_aset';
+
+    /**
+     * Dua surat wajib pada Kebijakan Khusus. Sengaja DUA jenis dokumen yang
+     * berbeda meski menunjuk baris yang sama: hanya dengan begitu sistem bisa
+     * tahu mana yang sudah ada dan mana yang belum — kalau digabung jadi satu
+     * jenis, dua permohonan tanpa persetujuan pun akan terbaca lengkap.
+     */
+    public const KEBIJAKAN_PERMOHONAN = 'kebijakan_permohonan';
+
+    public const KEBIJAKAN_PERSETUJUAN = 'kebijakan_persetujuan';
 
     /**
      * @var array<string,array{label:string,model:class-string<Model>,modul:string,status_terbuka:list<string>,kolom_nomor:string}>
@@ -69,6 +80,22 @@ final class SumberLampiran
             // tapi tak bisa ditukar lagi.
             'status_terbuka' => ['aktif'],
             'kolom_nomor' => 'nomor_ref',
+        ],
+        self::KEBIJAKAN_PERMOHONAN => [
+            'label' => 'Surat Permohonan Wali',
+            'model' => KebijakanKhusus::class,
+            'modul' => 'kebijakan-khusus',
+            // Masih boleh diganti selama belum diputuskan. Sesudah disetujui,
+            // surat itu sudah jadi dasar keputusan dan tak boleh ditukar.
+            'status_terbuka' => ['diajukan'],
+            'kolom_nomor' => 'id',
+        ],
+        self::KEBIJAKAN_PERSETUJUAN => [
+            'label' => 'Surat Persetujuan Yayasan',
+            'model' => KebijakanKhusus::class,
+            'modul' => 'kebijakan-khusus',
+            'status_terbuka' => ['diajukan'],
+            'kolom_nomor' => 'id',
         ],
     ];
 
@@ -133,6 +160,7 @@ final class SumberLampiran
             self::UANG_MUKA => route('operational_advance.index'),
             self::PENYELESAIAN => route('advance_settlement.index'),
             self::PELEPASAN_ASET => route('assets.pelepasan'),
+            self::KEBIJAKAN_PERMOHONAN, self::KEBIJAKAN_PERSETUJUAN => route('kebijakan_khusus.index'),
         };
     }
 
