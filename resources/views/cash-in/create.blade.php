@@ -43,6 +43,12 @@
                     <label class="mb-1 block text-sm font-medium text-gray-700">Customer</label>
                     <x-search-select name="kode_customer" :options="$customerOptions" :value="old('kode_customer')" placeholder="— tanpa customer —" />
                 </div>
+                {{-- Pintu masuk donasi & wakaf. Tanpa tanda ini, laporan
+                     pertanggungjawaban dana tak akan pernah melihat uangnya. --}}
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Dana <span class="font-normal text-gray-400">(donasi / wakaf)</span></label>
+                    <x-search-select name="kode_dana" :options="['' => '— tanpa dana —'] + $danaOptions" :value="old('kode_dana')" placeholder="— tanpa dana —" />
+                </div>
                 <x-field name="referensi" label="Referensi" :value="old('referensi')" />
             </div>
             <x-field name="keterangan" label="Keterangan Voucher" :value="old('keterangan')" required />

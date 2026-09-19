@@ -9,7 +9,11 @@ use App\Models\BankAccount;
 use App\Models\BusinessUnit;
 use App\Models\CashIn;
 use App\Models\CoaDetail;
+use App\Models\CompanySettings;
 use App\Models\Customer;
+use App\Models\Dana;
+use App\Models\Inventory;
+use App\Services\Ledger\DocNumber;
 use App\Services\Modules\CashInService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,7 +46,7 @@ class CashInController extends Controller
             'rows' => $rows,
             'q' => $q,
             'filter' => ['customer' => $fCustomer, 'status' => $fStatus],
-            'opsiCustomer' => \App\Models\Customer::orderBy('nama_customer')->pluck('nama_customer', 'kode_customer')->all(),
+            'opsiCustomer' => Customer::orderBy('nama_customer')->pluck('nama_customer', 'kode_customer')->all(),
             'opsiStatus' => ['aktif' => 'Aktif', 'void' => 'Void'],
         ]);
     }
@@ -60,6 +64,7 @@ class CashInController extends Controller
                 'kode_unit' => $request->input('kode_unit'),
                 'kode_rekening' => $request->input('kode_rekening'),
                 'kode_customer' => $request->input('kode_customer') ?: null,
+                'kode_dana' => $request->input('kode_dana') ?: null,
                 'referensi' => $request->input('referensi'),
                 'keterangan' => $request->input('keterangan'),
                 'details' => $request->details(),
@@ -86,7 +91,7 @@ class CashInController extends Controller
         return view('cash.print', [
             'rec' => $cash_in,
             'jenis' => 'masuk',
-            'company' => \App\Models\CompanySettings::find(1),
+            'company' => CompanySettings::find(1),
         ]);
     }
 
@@ -130,12 +135,16 @@ class CashInController extends Controller
     {
         // Preview nomor RV (KM-YYMM-NNNN) berikutnya — indikatif; nomor final
         // ditetapkan saat posting.
-        $base = \App\Services\Ledger\DocNumber::docBase('KM', now());
-        $last = \App\Models\CashIn::where('nomor_transaksi', 'like', $base.'%')
+        $base = DocNumber::docBase('KM', now());
+        $last = CashIn::where('nomor_transaksi', 'like', $base.'%')
             ->orderByDesc('nomor_transaksi')->value('nomor_transaksi');
 
         return [
-            'nomorPreview' => \App\Services\Ledger\DocNumber::nextDocNumber($base, $last),
+            'nomorPreview' => DocNumber::nextDocNumber($base, $last),
+            // Hanya dana AKTIF: yang nonaktif ditolak PostingService, dan
+            // menawarkannya hanya mengundang pesan galat.
+            'danaOptions' => Dana::where('status', 'aktif')->orderBy('urutan')->orderBy('kode_dana')->get()
+                ->mapWithKeys(fn ($d) => [$d->kode_dana => "{$d->kode_dana} — {$d->nama_dana}"])->all(),
             'unitOptions' => BusinessUnit::where('status', 'aktif')->orderBy('kode_unit')->get()
                 ->mapWithKeys(fn ($u) => [$u->kode_unit => "{$u->kode_unit} — {$u->nama_unit}"])->all(),
             'rekeningOptions' => BankAccount::where('status', 'aktif')->with('coa')->orderBy('kode_coa')->get()
@@ -146,7 +155,7 @@ class CashInController extends Controller
                 ->map(fn ($c) => ['v' => $c->kode_coa, 'l' => "{$c->kode_coa} — {$c->nama_coa}"])->values()->all(),
             'bagianOptions' => Bagian::where('status', 'aktif')->orderBy('kode_bagian')->get()
                 ->map(fn ($b) => ['v' => $b->kode_bagian, 'l' => "{$b->kode_bagian} — {$b->nama_bagian}"])->values()->all(),
-            'inventoryOptions' => \App\Models\Inventory::orderBy('nama_persediaan')->get()
+            'inventoryOptions' => Inventory::orderBy('nama_persediaan')->get()
                 ->map(fn ($it) => [
                     'v' => $it->kode_persediaan,
                     'l' => "{$it->nama_persediaan} (stok ".rtrim(rtrim((string) ($it->stok_masuk - $it->stok_keluar), '0'), '.').')',

@@ -24,6 +24,8 @@ class CoaDetailRequest extends FormRequest
             // Kosong = belum ditentukan; Laporan Arus Kas menampilkannya
             // sebagai kelompok tersendiri, bukan menebak kamarnya.
             'klasifikasi_arus_kas' => ['nullable', Rule::in(['operasi', 'investasi', 'pendanaan'])],
+            // Hanya bermakna untuk Pendapatan & Ekuitas; kosong = tidak berlaku.
+            'sifat_pembatasan' => ['nullable', Rule::in(['tanpa_pembatasan', 'dengan_pembatasan'])],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
             'keterangan' => ['nullable', 'string'],
         ];
@@ -41,7 +43,7 @@ class CoaDetailRequest extends FormRequest
 
     public function tersimpan(): array
     {
-        $data = $this->safe()->only(['nama_coa', 'kode_grup', 'jenis_saldo', 'klasifikasi_arus_kas', 'status', 'keterangan']);
+        $data = $this->safe()->only(['nama_coa', 'kode_grup', 'jenis_saldo', 'klasifikasi_arus_kas', 'sifat_pembatasan', 'status', 'keterangan']);
         if ($this->isMethod('post')) {
             $data['kode_coa'] = $this->input('kode_coa');
         }

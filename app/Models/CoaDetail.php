@@ -34,6 +34,10 @@ class CoaDetail extends Model
         // Kas. Kosong = belum ditentukan; laporannya menampilkannya terpisah,
         // bukan menebak.
         'klasifikasi_arus_kas',
+        // tanpa_pembatasan | dengan_pembatasan — kolom mana akun ini masuk pada
+        // Laporan Perubahan Aset Neto. Hanya bermakna untuk Pendapatan (4) &
+        // Ekuitas/Aset Neto (3).
+        'sifat_pembatasan',
         'status',
         'keterangan',
     ];
@@ -62,6 +66,18 @@ class CoaDetail extends Model
                 '3' => 'pendanaan',
                 default => null,
             };
+        });
+
+        // Sifat pembatasan bawaan — alasan yang sama: migrasi hanya menyentuh
+        // akun yang ada saat itu. Akun Pendapatan & Aset Neto lahir TANPA
+        // pembatasan; yang terikat ditandai sendiri oleh penggunanya.
+        static::creating(function (self $akun) {
+            if ($akun->sifat_pembatasan !== null) {
+                return;
+            }
+            if (in_array(self::akarKelompok($akun->kode_grup), ['3', '4'], true)) {
+                $akun->sifat_pembatasan = 'tanpa_pembatasan';
+            }
         });
     }
 

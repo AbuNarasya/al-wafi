@@ -7,6 +7,8 @@ use App\Http\Requests\JournalRequest;
 use App\Models\Bagian;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
+use App\Models\Dana;
+use App\Models\Inventory;
 use App\Models\JournalEntry;
 use App\Services\Modules\JournalService;
 use Illuminate\Http\RedirectResponse;
@@ -70,6 +72,7 @@ class JournalController extends Controller
             $entry = $this->service->create([
                 'tanggal' => $request->input('tanggal'),
                 'kode_unit' => $request->input('kode_unit') ?: null,
+                'kode_dana' => $request->input('kode_dana') ?: null,
                 'keterangan' => $request->input('keterangan'),
                 'id_pengguna' => $request->user()->id_pengguna,
                 'lines' => $request->lines(),
@@ -115,7 +118,11 @@ class JournalController extends Controller
                 ->map(fn ($b) => ['v' => $b->kode_bagian, 'l' => "{$b->kode_bagian} — {$b->nama_bagian}"])->values()->all(),
             'unitOptions' => BusinessUnit::where('status', 'aktif')->orderBy('kode_unit')->get()
                 ->mapWithKeys(fn ($u) => [$u->kode_unit => "{$u->kode_unit} — {$u->nama_unit}"])->all(),
-            'inventoryOptions' => \App\Models\Inventory::orderBy('nama_persediaan')->get()
+            // Hanya dana AKTIF yang ditawarkan: yang nonaktif memang ditolak
+            // PostingService, dan menawarkannya hanya mengundang pesan galat.
+            'danaOptions' => Dana::where('status', 'aktif')->orderBy('urutan')->orderBy('kode_dana')->get()
+                ->mapWithKeys(fn ($d) => [$d->kode_dana => "{$d->kode_dana} — {$d->nama_dana}"])->all(),
+            'inventoryOptions' => Inventory::orderBy('nama_persediaan')->get()
                 ->map(fn ($it) => [
                     'v' => $it->kode_persediaan,
                     'l' => "{$it->nama_persediaan} (stok ".rtrim(rtrim((string) ($it->stok_masuk - $it->stok_keluar), '0'), '.').')',

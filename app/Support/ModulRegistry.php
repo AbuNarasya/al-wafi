@@ -91,6 +91,7 @@ final class ModulRegistry
         ['kode' => 'unit-default', 'nama' => 'Default Unit Bisnis', 'grup' => 'KEUANGAN', 'sub' => 'Kontrol'],
         ['kode' => 'bank-accounts', 'nama' => 'Kas & Rekening', 'grup' => 'KEUANGAN', 'sub' => 'Kontrol'],
         ['kode' => 'opening-balance', 'nama' => 'Saldo Awal', 'grup' => 'KEUANGAN', 'sub' => 'Kontrol'],
+        ['kode' => 'dana', 'nama' => 'Dana Terikat (wakaf, donasi, beasiswa, bantuan)', 'grup' => 'KEUANGAN', 'sub' => 'Kontrol'],
         ['kode' => 'period-close', 'nama' => 'Tutup Buku Periode', 'grup' => 'KEUANGAN', 'sub' => 'Kontrol'],
         // Dua tangan membuka kembali periode yang sudah ditutup:
         //   `buat` = mengajukan  → admin keuangan

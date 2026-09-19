@@ -325,7 +325,12 @@ class CashOutService
             $entry = PostingService::postJournal([
                 'referensi' => $nomor, 'tanggal' => $input['tanggal'], 'kode_unit' => $input['kode_unit'] ?? null,
                 'keterangan' => $input['keterangan'], 'sumber_modul' => self::SUMBER,
-                'id_sumber' => (string) $rec->kode_transaksi, 'id_pengguna' => $idPengguna, 'lines' => $jLines,
+                'id_sumber' => (string) $rec->kode_transaksi, 'id_pengguna' => $idPengguna,
+                // Belanja yang dibiayai dana terikat ditandai di sini. Penjaga
+                // peruntukan di PostingService yang menolak bila akun bebannya
+                // di luar daftar yang diizinkan.
+                'kode_dana' => $input['kode_dana'] ?? null,
+                'lines' => $jLines,
             ]);
 
             // Angsuran pinjaman: pokok = Σ baris ke akun Hutang Bank pinjaman.

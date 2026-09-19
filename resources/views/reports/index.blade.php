@@ -5,9 +5,10 @@
 @section('content')
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         @foreach ([
-            ['neraca', 'Neraca', 'Posisi keuangan pada satu tanggal.'],
-            ['laba-rugi', 'Laba Rugi', 'Pendapatan & beban dalam satu periode.'],
-            ['perubahan-modal', 'Perubahan Modal', 'Mutasi ekuitas & laba berjalan.'],
+            ['neraca', 'Laporan Posisi Keuangan', 'Dulu bernama Neraca — posisi keuangan pada satu tanggal.'],
+            ['laba-rugi', 'Penghasilan Komprehensif', 'Dulu bernama Laba Rugi — pendapatan & beban satu periode.'],
+            ['perubahan-aset-neto', 'Perubahan Aset Neto', 'Format nirlaba (ISAK 35): terikat vs tidak terikat.'],
+            ['perubahan-modal', 'Perubahan Modal', 'Format perusahaan — mutasi ekuitas & laba berjalan.'],
             ['arus-kas', 'Arus Kas', 'Operasi, investasi, pendanaan + jembatan laba → kas.'],
             ['neraca-saldo', 'Neraca Saldo', 'Saldo awal, mutasi D/K, saldo akhir — uji keseimbangan buku.'],
             ['buku-besar', 'Buku Besar', 'Mutasi & saldo berjalan satu akun.'],

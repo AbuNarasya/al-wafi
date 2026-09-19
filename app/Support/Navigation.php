@@ -99,9 +99,14 @@ final class Navigation
         ['url' => '/bank-reconciliation', 'label' => 'Rekonsiliasi Bank', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'bank-reconciliation'],
         ['url' => '/journal', 'label' => 'Jurnal Umum', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'journal'],
 
-        ['url' => '/reports/neraca', 'label' => 'Neraca', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
-        ['url' => '/reports/laba-rugi', 'label' => 'Laba Rugi', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
-        ['url' => '/reports/perubahan-modal', 'label' => 'Perubahan Modal', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
+        ['url' => '/reports/neraca', 'label' => 'Laporan Posisi Keuangan', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
+        ['url' => '/reports/laba-rugi', 'label' => 'Penghasilan Komprehensif', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
+        // Format nirlaba (ISAK 35) mendahului format perusahaan: yayasan yang
+        // memakainya membacanya lebih dulu. Yang lama DIPERTAHANKAN selama masa
+        // peralihan — mencabutnya sekaligus membuat pengguna kehilangan laporan
+        // yang dikenalnya.
+        ['url' => '/reports/perubahan-aset-neto', 'label' => 'Perubahan Aset Neto', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
+        ['url' => '/reports/perubahan-modal', 'label' => 'Perubahan Modal (format perusahaan)', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
         ['url' => '/reports/arus-kas', 'label' => 'Arus Kas', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
         // Neraca Saldo mendahului Buku Besar: ia yang memperlihatkan ADA selisih,
         // buku besar yang memperlihatkan DI MANA — jadi urutan menunya mengikuti
@@ -128,6 +133,9 @@ final class Navigation
         ['url' => '/unit-default', 'label' => 'Default Unit Bisnis', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'unit-default'],
         ['url' => '/bank-accounts', 'label' => 'Kas & Rekening', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'bank-accounts'],
         ['url' => '/opening-balance', 'label' => 'Saldo Awal', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'opening-balance'],
+        // Master dulu, laporannya menyusul — urutan pengisiannya memang begitu.
+        ['url' => '/dana', 'label' => 'Dana Terikat', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'dana'],
+        ['url' => '/dana/laporan', 'label' => 'Laporan Pertanggungjawaban Dana', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'dana'],
         ['url' => '/period-close', 'label' => 'Tutup Buku Periode', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'period-close'],
         ['url' => '/export', 'label' => 'Export Data', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'reports'],
 

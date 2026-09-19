@@ -63,7 +63,7 @@ class ReportsService
             $rootOf($g->kode_grup);
         }
         $accounts = CoaDetail::orderBy('kode_coa')
-            ->get(['kode_coa', 'nama_coa', 'kode_grup', 'jenis_saldo', 'status', 'klasifikasi_arus_kas'])->all();
+            ->get(['kode_coa', 'nama_coa', 'kode_grup', 'jenis_saldo', 'status', 'klasifikasi_arus_kas', 'sifat_pembatasan'])->all();
 
         return [
             'accounts' => $accounts,
@@ -639,6 +639,148 @@ class ReportsService
             'disaring_unit' => $kodeUnit !== null, 'jembatan' => null,
             'tanpa_rekening_kas' => true,
         ];
+    }
+
+    // ---- Laporan Perubahan Aset Neto (ISAK 35) ----
+
+    /**
+     * LAPORAN PERUBAHAN ASET NETO — laporan paling khas entitas nirlaba, dan
+     * satu-satunya yang tak punya padanan di format perusahaan.
+     *
+     * Ia memisahkan aset neto DENGAN pembatasan dari yang TANPA pembatasan,
+     * lalu memperlihatkan perpindahan di antara keduanya. Neraca & Laba Rugi
+     * hanya menjawab "berapa"; laporan ini menjawab "berapa yang boleh dipakai
+     * bebas" — pertanyaan yang sesungguhnya dihadapi pengurus yayasan.
+     *
+     * PELEPASAN PEMBATASAN dihitung dari belanja dana terikat pada periode itu.
+     * Dasarnya: pembatasan gugur justru ketika dananya dipakai sesuai
+     * peruntukannya. Karena tiap belanja dana sudah bertanda `kode_dana` (lihat
+     * [[App\Services\Ledger\DanaPolicy]]), angkanya tak perlu diketik siapa pun
+     * — ia turunan dari jurnal yang sudah ada.
+     *
+     * Beban seluruhnya masuk kolom TANPA pembatasan; itulah sebabnya pelepasan
+     * pembatasan harus ada, kalau tidak kolom tanpa-pembatasan akan tampak
+     * menanggung belanja yang sebetulnya dibiayai dana terikat.
+     */
+    public function perubahanAsetNeto(string $from, string $to): array
+    {
+        $ctx = $this->coaContext();
+        $sebelum = Carbon::parse($from)->subDay()->toDateString();
+
+        $opening = $this->openingDebitMap();
+        $sampaiAwal = $this->movementDebitMap(null, $sebelum);
+        $periode = $this->movementDebitMap($from, $to);
+
+        $sifat = fn ($a) => $a->sifat_pembatasan === 'dengan_pembatasan' ? 'dengan' : 'tanpa';
+        $akarOf = fn ($a) => $this->rootOfAccount($ctx, $a);
+
+        // 1. Aset neto awal — saldo akun ekuitas sebelum periode, per sifat.
+        $awal = ['tanpa' => '0', 'dengan' => '0'];
+        foreach ($ctx['accounts'] as $a) {
+            if ($akarOf($a) !== '3') {
+                continue;
+            }
+            $saldo = $this->applySign(
+                Money::add($opening[$a->kode_coa] ?? '0', $sampaiAwal[$a->kode_coa] ?? '0'),
+                $a->jenis_saldo,
+            );
+            $awal[$sifat($a)] = Money::add($awal[$sifat($a)], $saldo);
+        }
+
+        // 2. Pendapatan periode, per sifat pembatasan akunnya.
+        $pendapatan = ['tanpa' => '0', 'dengan' => '0'];
+        $beban = '0';
+        $rincianPendapatan = ['tanpa' => [], 'dengan' => []];
+        $rincianBeban = [];
+
+        foreach ($ctx['accounts'] as $a) {
+            $akar = $akarOf($a);
+            if ($akar !== '4' && $akar !== '5') {
+                continue;
+            }
+            $nilai = $this->applySign($periode[$a->kode_coa] ?? '0', $a->jenis_saldo);
+            if ($this->roundedZero($nilai)) {
+                continue;
+            }
+
+            if ($akar === '4') {
+                $k = $sifat($a);
+                $pendapatan[$k] = Money::add($pendapatan[$k], $nilai);
+                $rincianPendapatan[$k][] = ['kode_coa' => $a->kode_coa, 'nama_coa' => $a->nama_coa, 'nilai' => Money::of($nilai)];
+            } else {
+                // Beban SELURUHNYA ke kolom tanpa pembatasan — lihat catatan
+                // metode ini. Pelepasan pembatasan yang menyeimbangkannya.
+                $beban = Money::add($beban, $nilai);
+                $rincianBeban[] = ['kode_coa' => $a->kode_coa, 'nama_coa' => $a->nama_coa, 'nilai' => Money::of($nilai)];
+            }
+        }
+
+        $pelepasan = $this->pelepasanPembatasan($from, $to);
+
+        // 3. Perubahan bersih per kolom.
+        $naikTanpa = Money::add(Money::sub($pendapatan['tanpa'], $beban), $pelepasan);
+        $naikDengan = Money::sub($pendapatan['dengan'], $pelepasan);
+
+        $akhir = [
+            'tanpa' => Money::add($awal['tanpa'], $naikTanpa),
+            'dengan' => Money::add($awal['dengan'], $naikDengan),
+        ];
+
+        $jml = fn (array $k) => Money::add($k['tanpa'], $k['dengan']);
+
+        return [
+            'from' => $from, 'to' => $to,
+            'awal' => array_map(fn ($v) => Money::of($v), $awal + ['jumlah' => $jml($awal)]),
+            'pendapatan' => array_map(fn ($v) => Money::of($v), $pendapatan + ['jumlah' => $jml($pendapatan)]),
+            'beban' => Money::of($beban),
+            'pelepasan' => Money::of($pelepasan),
+            'kenaikan' => [
+                'tanpa' => Money::of($naikTanpa),
+                'dengan' => Money::of($naikDengan),
+                'jumlah' => Money::of(Money::add($naikTanpa, $naikDengan)),
+            ],
+            'akhir' => array_map(fn ($v) => Money::of($v), $akhir + ['jumlah' => $jml($akhir)]),
+            'rincian_pendapatan' => $rincianPendapatan,
+            'rincian_beban' => $rincianBeban,
+            // Dipakai layar untuk mengajak menandai akun: selama tak ada satu
+            // pun akun berpembatasan, laporan ini hanya berisi satu kolom dan
+            // tak lebih berguna dari Laba Rugi biasa.
+            'ada_pembatasan' => collect($ctx['accounts'])
+                ->contains(fn ($a) => $a->sifat_pembatasan === 'dengan_pembatasan'),
+        ];
+    }
+
+    /**
+     * Pelepasan pembatasan periode ini = belanja yang dibiayai DANA TERIKAT.
+     *
+     * Pembatasan gugur justru ketika dananya terpakai sesuai peruntukannya,
+     * jadi angkanya tak perlu diketik siapa pun — ia turunan dari baris beban
+     * bertanda dana terikat yang sudah ada di jurnal.
+     */
+    private function pelepasanPembatasan(string $from, string $to): string
+    {
+        $terikat = DB::table('dana')->where('jenis', '!=', 'tidak_terikat')->pluck('kode_dana')->all();
+        if ($terikat === []) {
+            return '0';
+        }
+
+        $rows = DB::table('journal_lines as jl')
+            ->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
+            ->join('coa_detail as c', 'jl.kode_coa', '=', 'c.kode_coa')
+            ->whereIn('jl.kode_dana', $terikat)
+            ->whereBetween('je.tanggal', [$from, $to])
+            ->groupBy('c.kode_coa', 'c.kode_grup')
+            ->selectRaw('c.kode_coa as kode_coa, c.kode_grup as kode_grup, SUM(jl.debet) - SUM(jl.kredit) as v')
+            ->get();
+
+        $total = '0';
+        foreach ($rows as $r) {
+            if (CoaDetail::akarKelompok($r->kode_grup) === '5') {
+                $total = Money::add($total, $r->v);
+            }
+        }
+
+        return $total;
     }
 
     // ---- Buku Besar (satu akun) ----

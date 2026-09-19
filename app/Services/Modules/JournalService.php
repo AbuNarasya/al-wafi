@@ -53,6 +53,7 @@ class JournalService
                 'referensi' => $referensi,
                 'tanggal' => $input['tanggal'],
                 'kode_unit' => $input['kode_unit'] ?? null,
+                'kode_dana' => $input['kode_dana'] ?? null,
                 'keterangan' => $input['keterangan'] ?? null,
                 'sumber_modul' => 'JurnalUmum',
                 'id_sumber' => $referensi,

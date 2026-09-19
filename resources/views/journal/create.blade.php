@@ -19,11 +19,17 @@
 
             <p class="rounded bg-gray-50 px-3 py-2 text-xs text-gray-500">Setiap jurnal manual wajib balance (total debet = total kredit) sebelum disimpan. Baris ber-persediaan menggerakkan stok: debit = stok masuk (harga = nilai debit), kredit = stok keluar.</p>
 
-            <div class="grid gap-4 sm:grid-cols-3">
+            <div class="grid gap-4 sm:grid-cols-4">
                 <x-field name="tanggal" label="Tanggal" type="date" :value="old('tanggal', now()->toDateString())" required />
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Unit Bisnis</label>
                     <x-search-select name="kode_unit" :options="['' => '— Default modul —'] + $unitOptions" :value="old('kode_unit')" placeholder="— Default modul —" />
+                </div>
+                {{-- Dana melekat ke seluruh baris jurnal ini. Bila dananya terikat,
+                     baris beban yang di luar peruntukannya akan DITOLAK. --}}
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Dana <span class="font-normal text-gray-400">(opsional)</span></label>
+                    <x-search-select name="kode_dana" :options="['' => '— tanpa dana —'] + $danaOptions" :value="old('kode_dana')" placeholder="— tanpa dana —" />
                 </div>
                 <x-field name="keterangan" label="Keterangan" :value="old('keterangan')" />
             </div>

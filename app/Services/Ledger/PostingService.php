@@ -148,6 +148,18 @@ final class PostingService
         self::validateBagian($input['lines'], $input['sumber_modul']);
         PeriodService::assertPeriodPostable($input['tanggal']);
 
+        // Dana boleh disebut di kepala dokumen (semua baris mewarisi) atau per
+        // baris — satu kas keluar bisa membebani dua dana sekaligus. Penjaga
+        // peruntukan dijalankan SETELAH pewarisan, supaya baris yang mewarisi
+        // dana dari kepala ikut diperiksa.
+        $danaDokumen = $input['kode_dana'] ?? null;
+        if ($danaDokumen !== null) {
+            foreach ($input['lines'] as $i => $l) {
+                $input['lines'][$i]['kode_dana'] = $l['kode_dana'] ?? $danaDokumen;
+            }
+        }
+        DanaPolicy::assertPeruntukan($input['lines']);
+
         $unitDokumen = $input['kode_unit'] ?? self::resolveDefaultUnit($input['sumber_modul']);
         $neraca = self::konteksNeraca();
 
@@ -173,6 +185,7 @@ final class PostingService
                         ? Money::of($l['kuantiti'], 4)
                         : null,
                     'kode_bagian' => $l['kode_bagian'] ?? null,
+                    'kode_dana' => $l['kode_dana'] ?? null,
                     'kode_unit' => ($neraca['unit'] !== null && self::barisNeraca($l['kode_coa'], $neraca))
                         ? $neraca['unit']
                         : ($l['kode_unit'] ?? $unitDokumen),

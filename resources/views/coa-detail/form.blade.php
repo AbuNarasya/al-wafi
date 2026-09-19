@@ -25,6 +25,9 @@
             <x-field name="klasifikasi_arus_kas" label="Klasifikasi Arus Kas" :value="$akun->klasifikasi_arus_kas"
                      :options="['' => '— belum ditentukan —', 'operasi' => 'Aktivitas Operasi', 'investasi' => 'Aktivitas Investasi', 'pendanaan' => 'Aktivitas Pendanaan']"
                      hint="Kelompok akun ini di Laporan Arus Kas. Piutang & hutang usaha = operasi; aset tetap = investasi; pinjaman & modal = pendanaan. Dibiarkan kosong pun aman — laporannya menampilkannya terpisah, bukan menebak." />
+            <x-field name="sifat_pembatasan" label="Sifat Pembatasan (Aset Neto)" :value="$akun->sifat_pembatasan"
+                     :options="['' => '— tidak berlaku —', 'tanpa_pembatasan' => 'Tanpa Pembatasan', 'dengan_pembatasan' => 'Dengan Pembatasan']"
+                     hint="Hanya untuk akun Pendapatan & Ekuitas/Aset Neto. Menentukan kolom mana akun ini masuk pada Laporan Perubahan Aset Neto (ISAK 35). Pendapatan wakaf & donasi berperuntukan → dengan pembatasan." />
             <x-field name="status" label="Status" :value="$akun->status ?? 'aktif'"
                      :options="['aktif' => 'Aktif', 'nonaktif' => 'Nonaktif']" />
             <x-field name="keterangan" label="Keterangan" :value="$akun->keterangan" textarea />

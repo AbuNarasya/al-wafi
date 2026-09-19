@@ -27,6 +27,9 @@ class CashOutRequest extends FormRequest
             // Unit WAJIB kecuali semua baris pengajuan (bawa unit sendiri) → service enforces.
             'kode_unit' => ['nullable', 'string', 'exists:business_units,kode_unit'],
             'kode_vendor' => ['nullable', 'string', 'exists:vendors,kode_vendor'],
+            // Belanja yang dibiayai dana terikat. Penjaga peruntukan di
+            // PostingService menolak bila akun bebannya di luar daftar.
+            'kode_dana' => ['nullable', 'string', 'exists:dana,kode_dana'],
             'referensi' => ['nullable', 'string', 'max:255'],
             'keterangan' => ['required', 'string'],
             'id_bank_loan' => ['nullable', 'integer', 'exists:bank_loans,id'],

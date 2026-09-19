@@ -7,7 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * BARIS jurnal. debet/kredit Decimal(18,2), kuantiti Decimal(18,4). Tanpa
- * timestamps. Dimensi kode_bagian & kode_unit melekat di baris.
+ * timestamps. Dimensi kode_bagian, kode_unit & kode_dana melekat di baris —
+ * satu dokumen bisa membebani dua bagian, dua unit, atau dua dana sekaligus.
  */
 class JournalLine extends Model
 {
@@ -26,6 +27,7 @@ class JournalLine extends Model
         'kuantiti',
         'kode_bagian',
         'kode_unit',
+        'kode_dana',
     ];
 
     protected function casts(): array

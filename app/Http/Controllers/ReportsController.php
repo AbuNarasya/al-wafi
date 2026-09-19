@@ -77,6 +77,17 @@ class ReportsController extends Controller
         return view('reports.perubahan-modal', ['data' => $this->reports->perubahanModal($from, $to), 'from' => $from, 'to' => $to]);
     }
 
+    /** Laporan Perubahan Aset Neto (ISAK 35) — laporan khas entitas nirlaba. */
+    public function perubahanAsetNeto(Request $request): View
+    {
+        [$from, $to] = $this->rentang($request);
+
+        return view('reports.perubahan-aset-neto', [
+            'data' => $this->reports->perubahanAsetNeto($from, $to),
+            'from' => $from, 'to' => $to,
+        ]);
+    }
+
     public function arusKas(Request $request): View
     {
         [$from, $to] = $this->rentang($request);

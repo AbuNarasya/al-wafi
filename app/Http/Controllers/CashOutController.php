@@ -4,13 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
 use App\Http\Requests\CashOutRequest;
+use App\Models\Asset;
 use App\Models\Bagian;
 use App\Models\BankAccount;
+use App\Models\BankLoan;
 use App\Models\BusinessUnit;
 use App\Models\CashOut;
 use App\Models\CoaDetail;
+use App\Models\CompanySettings;
+use App\Models\Dana;
+use App\Models\Inventory;
+use App\Models\Invoice;
+use App\Models\PengajuanPembayaran;
+use App\Models\PerintahPembayaran;
 use App\Models\Vendor;
+use App\Services\Ledger\DocNumber;
 use App\Services\Modules\CashOutService;
+use App\Support\Money;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -42,7 +52,7 @@ class CashOutController extends Controller
             'rows' => $rows,
             'q' => $q,
             'filter' => ['vendor' => $fVendor, 'status' => $fStatus],
-            'opsiVendor' => \App\Models\Vendor::orderBy('nama_vendor')->pluck('nama_vendor', 'kode_vendor')->all(),
+            'opsiVendor' => Vendor::orderBy('nama_vendor')->pluck('nama_vendor', 'kode_vendor')->all(),
             'opsiStatus' => ['aktif' => 'Aktif', 'void' => 'Void'],
         ]);
     }
@@ -63,7 +73,7 @@ class CashOutController extends Controller
 
         $idPerintah = (int) $request->query('perintah', 0);
         if ($idPerintah > 0) {
-            $pp = \App\Models\PerintahPembayaran::with('detail')->find($idPerintah);
+            $pp = PerintahPembayaran::with('detail')->find($idPerintah);
             if ($pp && $pp->bolehDibayar()) {
                 $data['perintah'] = $pp;
                 $data['prefill'] = $this->barisDariPerintah($pp);
@@ -82,17 +92,17 @@ class CashOutController extends Controller
      *
      * @return list<array<string,mixed>>
      */
-    private function barisDariPerintah(\App\Models\PerintahPembayaran $pp): array
+    private function barisDariPerintah(PerintahPembayaran $pp): array
     {
         $baris = [];
         foreach ($pp->detail as $d) {
-            if ($d->status_baris !== 'disetujui' || ! \App\Support\Money::gtZero($d->sisa)) {
+            if ($d->status_baris !== 'disetujui' || ! Money::gtZero($d->sisa)) {
                 continue;
             }
             $row = [
                 'tipe' => 'lainnya', 'kode_coa' => '', 'id_invoice' => '', 'id_pengajuan' => '',
                 'kode_persediaan' => '', 'kuantiti' => '', 'harga_satuan' => '',
-                'nominal' => (string) \App\Support\Money::of($d->sisa),
+                'nominal' => (string) Money::of($d->sisa),
                 'keterangan' => $d->keterangan ?: $d->nomor_dokumen,
                 'kode_bagian' => '', 'aset_pilih' => '',
                 'id_perintah_detail' => $d->id,
@@ -106,7 +116,7 @@ class CashOutController extends Controller
                 $row['tipe'] = 'pengajuan';
                 $row['id_pengajuan'] = (string) $d->id_dokumen;
             } elseif ($d->sumber === 'bank_loan') {
-                $loan = \App\Models\BankLoan::find($d->id_dokumen);
+                $loan = BankLoan::find($d->id_dokumen);
                 $row['kode_coa'] = $loan?->kode_coa_hutang ?? '';
             }
 
@@ -124,6 +134,7 @@ class CashOutController extends Controller
                 'kode_unit' => $request->input('kode_unit') ?: null,
                 'kode_rekening' => $request->input('kode_rekening'),
                 'kode_vendor' => $request->input('kode_vendor') ?: null,
+                'kode_dana' => $request->input('kode_dana') ?: null,
                 'referensi' => $request->input('referensi'),
                 'keterangan' => $request->input('keterangan'),
                 'id_bank_loan' => $request->input('id_bank_loan') ?: null,
@@ -153,7 +164,7 @@ class CashOutController extends Controller
         return view('cash.print', [
             'rec' => $cash_out,
             'jenis' => 'keluar',
-            'company' => \App\Models\CompanySettings::find(1),
+            'company' => CompanySettings::find(1),
         ]);
     }
 
@@ -178,12 +189,16 @@ class CashOutController extends Controller
     private function opsi(): array
     {
         // Preview nomor PV (KK-YYMM-NNNN) berikutnya — indikatif.
-        $base = \App\Services\Ledger\DocNumber::docBase('KK', now());
-        $last = \App\Models\CashOut::where('nomor_transaksi', 'like', $base.'%')
+        $base = DocNumber::docBase('KK', now());
+        $last = CashOut::where('nomor_transaksi', 'like', $base.'%')
             ->orderByDesc('nomor_transaksi')->value('nomor_transaksi');
 
         return [
-            'nomorPreview' => \App\Services\Ledger\DocNumber::nextDocNumber($base, $last),
+            'nomorPreview' => DocNumber::nextDocNumber($base, $last),
+            // Hanya dana AKTIF: yang nonaktif ditolak PostingService, dan
+            // menawarkannya hanya mengundang pesan galat.
+            'danaOptions' => Dana::where('status', 'aktif')->orderBy('urutan')->orderBy('kode_dana')->get()
+                ->mapWithKeys(fn ($d) => [$d->kode_dana => "{$d->kode_dana} — {$d->nama_dana}"])->all(),
             'unitOptions' => BusinessUnit::where('status', 'aktif')->orderBy('kode_unit')->get()
                 ->mapWithKeys(fn ($u) => [$u->kode_unit => "{$u->kode_unit} — {$u->nama_unit}"])->all(),
             'rekeningOptions' => BankAccount::where('status', 'aktif')->with('coa')->orderBy('kode_coa')->get()
@@ -196,12 +211,12 @@ class CashOutController extends Controller
                 ->map(fn ($b) => ['v' => $b->kode_bagian, 'l' => "{$b->kode_bagian} — {$b->nama_bagian}"])->values()->all(),
 
             // Invoice belum lunas (utk baris tipe invoice) — id/nomor/vendor/sisa.
-            'invoiceData' => \App\Models\Invoice::where('status', '!=', 'void')->where('sisa_hutang', '>', 0)
+            'invoiceData' => Invoice::where('status', '!=', 'void')->where('sisa_hutang', '>', 0)
                 ->orderByDesc('id_invoice')->get(['id_invoice', 'nomor_invoice', 'kode_vendor', 'sisa_hutang'])
-                ->map(fn ($i) => ['id' => $i->id_invoice, 'nomor' => $i->nomor_invoice, 'vendor' => $i->kode_vendor, 'sisa' => \App\Support\Money::of($i->sisa_hutang)])->all(),
+                ->map(fn ($i) => ['id' => $i->id_invoice, 'nomor' => $i->nomor_invoice, 'vendor' => $i->kode_vendor, 'sisa' => Money::of($i->sisa_hutang)])->all(),
 
             // Persediaan (utk baris tipe inventory) — hanya yg punya akun COA.
-            'inventoryOptions' => \App\Models\Inventory::where('status', 'aktif')->whereNotNull('kode_coa')
+            'inventoryOptions' => Inventory::where('status', 'aktif')->whereNotNull('kode_coa')
                 ->orderBy('nama_persediaan')->get(['kode_persediaan', 'nama_persediaan'])
                 ->map(fn ($it) => ['v' => $it->kode_persediaan, 'l' => "{$it->nama_persediaan} ({$it->kode_persediaan})"])->all(),
 
@@ -212,20 +227,20 @@ class CashOutController extends Controller
             // Salah di sini bukan sekadar salah tulis — angkanya ikut mengisi
             // isian Nominal, dan servicenya menolak karena menuntut pelunasan
             // penuh sebesar kekurangan yang sebenarnya.
-            'pengajuanData' => \App\Models\PengajuanPembayaran::whereIn('status', ['diposting', 'diverifikasi'])
+            'pengajuanData' => PengajuanPembayaran::whereIn('status', ['diposting', 'diverifikasi'])
                 ->orderByDesc('id')->get(['id', 'nomor', 'jenis', 'nominal', 'sisa_hutang', 'sisa_kurang_bayar'])
-                ->map(fn ($p) => ['id' => $p->id, 'nomor' => $p->nomor, 'jenis' => $p->jenis, 'nominal' => \App\Support\Money::of($p->nominal), 'sisa' => $p->sisaTagihan()])->all(),
+                ->map(fn ($p) => ['id' => $p->id, 'nomor' => $p->nomor, 'jenis' => $p->jenis, 'nominal' => Money::of($p->nominal), 'sisa' => $p->sisaTagihan()])->all(),
 
             // Pembiayaan aktif (Angsuran) + data prefill baris.
-            'loanOptions' => ['' => '— bukan angsuran pembiayaan —'] + \App\Models\BankLoan::where('status', 'aktif')
-                ->orderBy('nama_bank')->get()->mapWithKeys(fn ($l) => [$l->id => "{$l->nama_bank} — sisa pokok ".\App\Support\Money::of($l->sisa_pokok)])->all(),
-            'loanData' => \App\Models\BankLoan::where('status', 'aktif')->get()
+            'loanOptions' => ['' => '— bukan angsuran pembiayaan —'] + BankLoan::where('status', 'aktif')
+                ->orderBy('nama_bank')->get()->mapWithKeys(fn ($l) => [$l->id => "{$l->nama_bank} — sisa pokok ".Money::of($l->sisa_pokok)])->all(),
+            'loanData' => BankLoan::where('status', 'aktif')->get()
                 ->map(fn ($l) => ['id' => $l->id, 'kode_coa_hutang' => $l->kode_coa_hutang, 'kode_coa_beban' => $l->kode_coa_beban_bunga])->all(),
 
             // Perlakuan aset per baris "lainnya": buat draft baru atau tambah nilai ke aset yang ada.
             'asetOptions' => array_merge(
                 [['v' => '__new__', 'l' => '➕ Buat aset baru (draft)']],
-                \App\Models\Asset::orderBy('kode_aset')->get()
+                Asset::orderBy('kode_aset')->get()
                     ->map(fn ($a) => ['v' => $a->kode_aset, 'l' => "{$a->kode_aset} — {$a->nama_aset}"])->values()->all(),
             ),
         ];

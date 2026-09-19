@@ -23,6 +23,10 @@ class CashInRequest extends FormRequest
             'kode_unit' => ['required', 'string', 'exists:business_units,kode_unit'],
             'kode_rekening' => ['required', 'string', 'exists:bank_accounts,kode_coa'],
             'kode_customer' => ['nullable', 'string', 'exists:customers,kode_customer'],
+            // Penerimaan donasi/wakaf ditandai dananya di sini — inilah pintu
+            // masuknya, dan tanpa tanda ini laporan pertanggungjawaban dana
+            // tak akan pernah melihat uangnya.
+            'kode_dana' => ['nullable', 'string', 'exists:dana,kode_dana'],
             'referensi' => ['nullable', 'string', 'max:255'],
             'keterangan' => ['required', 'string'],
             'details' => ['required', 'array', 'min:1'],

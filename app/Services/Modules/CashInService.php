@@ -124,6 +124,7 @@ class CashInService
                 'sumber_modul' => 'KasMasuk',
                 'id_sumber' => (string) $rec->kode_transaksi,
                 'id_pengguna' => $idPengguna,
+                'kode_dana' => $input['kode_dana'] ?? null,
                 'lines' => $jLines,
             ]);
 

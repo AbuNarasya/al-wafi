@@ -21,6 +21,7 @@ use App\Http\Controllers\CoaDetailController;
 use App\Http\Controllers\CoaGroupController;
 use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DanaController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DokumenSantriController;
 use App\Http\Controllers\DompetController;
@@ -225,6 +226,13 @@ Route::middleware('auth')->group(function () {
     crudModul('inventory', InventoryController::class, 'inventory');
     Route::post('/inventory/{inventory}/mutasi', [InventoryController::class, 'mutasi'])->name('inventory.mutasi')->middleware('hakakses:inventory,ubah');
     Route::get('/inventory/{inventory}/kartu', [InventoryController::class, 'kartu'])->name('inventory.kartu')->middleware('hakakses:inventory,lihat');
+
+    // Dana terikat (wakaf, donasi berperuntukan, beasiswa, bantuan).
+    // Laporannya didaftarkan SEBELUM crudModul supaya `/dana/laporan` tak
+    // tertangkap sebagai `/dana/{kode}`.
+    Route::get('/dana/laporan', [DanaController::class, 'laporan'])
+        ->name('dana.laporan')->middleware('hakakses:dana,lihat');
+    crudModul('dana', DanaController::class, 'kode');
 
     crudModul('vendors', VendorController::class, 'vendor');
     crudModul('customers', CustomerController::class, 'customer');
@@ -914,6 +922,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/laba-rugi', [$r, 'labaRugi'])->name('laba_rugi');
         Route::get('/perubahan-modal', [$r, 'perubahanModal'])->name('perubahan_modal');
         Route::get('/arus-kas', [$r, 'arusKas'])->name('arus_kas');
+        // Laporan khas entitas nirlaba (ISAK 35). Perubahan Modal yang lama
+        // SENGAJA dipertahankan: format perusahaan masih dipakai sebagian
+        // pihak, dan mencabutnya sekaligus akan membuat pengguna kehilangan
+        // laporan yang dikenalnya di tengah masa peralihan.
+        Route::get('/perubahan-aset-neto', [$r, 'perubahanAsetNeto'])->name('perubahan_aset_neto');
         Route::get('/neraca-saldo', [$r, 'neracaSaldo'])->name('neraca_saldo');
         Route::get('/buku-besar', [$r, 'bukuBesar'])->name('buku_besar');
         Route::get('/aset', [$r, 'aset'])->name('aset');

@@ -60,6 +60,12 @@
                     <x-search-select name="kode_unit" :options="$unitOptions" :value="old('kode_unit')" placeholder="— pilih unit —" />
                     <p class="mt-1 text-xs text-gray-400" x-show="!perluUnitHeader" x-cloak>Tak wajib: semua baris pelunasan pengajuan membawa unitnya sendiri.</p>
                 </div>
+                {{-- Belanja yang dibiayai dana terikat. Bila akun bebannya di
+                     luar peruntukan dana itu, penyimpanannya akan ditolak. --}}
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Dana <span class="font-normal text-gray-400">(opsional)</span></label>
+                    <x-search-select name="kode_dana" :options="['' => '— tanpa dana —'] + $danaOptions" :value="old('kode_dana')" placeholder="— tanpa dana —" />
+                </div>
             </div>
             <div class="grid gap-4 sm:grid-cols-3">
                 <div>

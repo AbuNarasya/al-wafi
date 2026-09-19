@@ -21,6 +21,10 @@ class JournalRequest extends FormRequest
         return [
             'tanggal' => ['required', 'date'],
             'kode_unit' => ['nullable', 'string', 'exists:business_units,kode_unit'],
+            // Dana disebut di KEPALA dokumen: satu jurnal umum lazimnya milik
+            // satu dana. Basis datanya tetap menyimpannya per baris, jadi
+            // pemecahan per baris bisa menyusul tanpa migrasi.
+            'kode_dana' => ['nullable', 'string', 'exists:dana,kode_dana'],
             'keterangan' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:2'],
             'lines.*.kode_coa' => ['required', 'string', 'exists:coa_detail,kode_coa'],
