@@ -777,8 +777,8 @@ DB_USERNAME=
 DB_PASSWORD=
 DB_SSLMODE=require
 
-SESSION_DRIVER=database
-CACHE_STORE=database
+SESSION_DRIVER=file
+CACHE_STORE=file
 QUEUE_CONNECTION=database
 FILESYSTEM_DISK=local
 LAMPIRAN_DISK=local
@@ -847,6 +847,42 @@ chmod 600 .env
 | `DB_SSLMODE=require` | Neon menolak sambungan tanpa pengaman → aplikasi tak bisa membaca database sama sekali |
 | `APP_ENV=production` | Aplikasi menganggap dirinya masih dalam pengembangan, dan menolak sebagian perintah |
 | `LAMPIRAN_DISK=local` | Berkas lampiran (nota, bukti transfer) tak ketemu tempat simpan |
+| `SESSION_DRIVER=file` · `CACHE_STORE=file` | Diisi `database` → **tiap halaman jadi ±3× lebih lambat**. Lihat di bawah |
+
+### ⚠️ Sesi & cache JANGAN ditaruh di database
+
+Bawaan Laravel adalah `database`, dan di Render dulu itu tak terasa karena server &
+database sama-sama di Amerika. Di sini database ada di **Singapura** sementara server di
+Indonesia — jadi tiap kali halaman apa pun dibuka, PHP membuka sambungan **baru** ke Neon
+hanya untuk membaca lalu menulis sesi: TCP → TLS → otentikasi PostgreSQL → baca → tulis.
+Lima sampai enam kali perjalanan pulang-pergi, **sebelum** halaman mulai digambar.
+
+Terukur di produksi 20 Sep 2026, halaman login:
+
+| | `database` | `file` |
+|---|---:|---:|
+| tercepat | 461 ms | **186 ms** |
+| lazimnya | 630 ms | **227 ms** |
+| biaya database per halaman | **460 ms** | **4 ms** |
+
+Shared hosting punya disk permanen, jadi `file` aman di sini — berbeda dengan Render dulu
+yang kehilangan berkasnya tiap restart.
+
+Kalau `.env` terlanjur memakai `database`, perbaikannya:
+
+```bash
+cp .env .env.cadangan
+```
+
+```bash
+sed -i 's/^SESSION_DRIVER=database$/SESSION_DRIVER=file/; s/^CACHE_STORE=database$/CACHE_STORE=file/' .env
+```
+
+```bash
+chmod -R 775 storage/framework && php artisan config:cache
+```
+
+`QUEUE_CONNECTION` **tetap** `database` — antrean memang butuh tempat yang dibagi bersama.
 
 Kabar baik soal lampiran: di sini berkas unggahan disimpan di disk permanen, jadi **tidak
 hilang** saat server dinyalakan ulang — berbeda dengan server lama.
