@@ -6,8 +6,12 @@ ditulis untuk orang yang belum pernah memakai terminal.
 Menggantikan `DEPLOY-RENDER.md`, yang kini usang. Berkas Docker (`Dockerfile`, `docker/`,
 `render.yaml`) **tidak dipakai di sini** — shared hosting tak menjalankan container.
 
-> **BELUM PERNAH DIJALANKAN.** Disusun dari fakta panel & mesin lokal yang sudah diperiksa,
-> bukan dari deploy yang berhasil. Simpan keluaran tiap perintah, dan catat yang meleset.
+> **SUDAH DIJALANKAN & BERHASIL — 20 September 2026.** Aplikasi hidup di
+> <https://erp.al-wafi.sch.id>. Seluruh langkah di bawah sudah dilalui sungguhan, dan tiga
+> temuan lapangan yang tak terduga sudah dimasukkan ke tempatnya masing-masing:
+> **Jalan A (pintasan) DITERIMA** Hostinger · **`proc_open` dimatikan** sehingga
+> `composer install` selalu berakhir dengan satu galat yang harus diabaikan lalu
+> ditambal manual · **Neon menolak sambungan** sampai endpoint ID dititipkan di depan sandi.
 
 # Bagian 0 — Bekal sebelum mulai
 
@@ -514,6 +518,44 @@ GitHub. `--no-dev` membuang yang hanya dipakai untuk pengujian — di server ia 
 **Yang akan Anda lihat:** daftar nama paket berjalan selama **1–3 menit**, diakhiri
 `Generating optimized autoload files`.
 
+### ⚠️ Dua galat yang SELALU muncul di sini — dan memang harus diabaikan
+
+Hostinger mematikan `proc_open`, fungsi PHP untuk menjalankan program lain. Composer
+membutuhkannya, aplikasi ini **tidak** (sudah diperiksa: `app/`, `routes/`, dan `database/`
+tak memakainya sama sekali). Akibatnya dua pesan ini muncul tiap kali:
+
+**Peringatan kuning di awal:**
+
+```
+proc_open is disabled so 'unzip' and '7z' commands cannot be used,
+zip files are being unpacked using the PHP zip extension.
+... any UNIX permissions (e.g. executable) defined in the archives will be lost.
+```
+
+Tak berdampak. Berkas yang kehilangan tanda "boleh dijalankan" hanya ada di `vendor/bin/`
+— alat pengujian yang tak pernah dipakai di server, dan `--no-dev` sudah membuang
+sebagian besarnya.
+
+**Galat merah di akhir:**
+
+```
+In Process.php line 147:
+The Process class relies on proc_open, which is not available on your PHP installation.
+```
+
+Ini muncul **sesudah** `Generating optimized autoload files`, jadi pemasangannya sendiri
+sudah tuntas. Yang gagal hanya langkah pendataan paket yang hendak dipanggil Composer.
+**Kerjakan sendiri langkah itu:**
+
+```bash
+php artisan package:discover
+```
+
+Harus muncul beberapa nama paket bertanda `DONE`. Setelah itu tak ada sisa masalah.
+
+**Ingat: setiap `composer install` di server akan mengulang galat ini, dan obatnya selalu
+`php artisan package:discover`.**
+
 **Kalau berhenti dengan kata `memory`**, ulangi dengan:
 
 ```bash
@@ -603,7 +645,11 @@ alamat `.env` di browser dan **mengunduh sandi database Anda**.
 
 Ada dua cara menyambungkannya. Coba Jalan A dulu; kalau ditolak, pakai Jalan B.
 
-## 6.2 Jalan A — pintasan (coba ini dulu)
+## 6.2 Jalan A — pintasan (INI YANG BERHASIL, 20 Sep 2026)
+
+> Dokumentasi Hostinger menyatakan document root paket Web/Cloud tak bisa dipindah, dan
+> karena itu panduan ini semula menyiapkan Jalan B sebagai keharusan. **Ternyata keliru:
+> pintasan diterima.** Jalan B di bawah disimpan hanya sebagai cadangan.
 
 Di jendela SSH, **ketik satu per satu:**
 
@@ -745,6 +791,41 @@ Lalu **isi tiga baris yang kosong** dengan data dari dashboard Neon (proyek **ER
 - `DB_PASSWORD=` → sandi database
 
 **Tanpa spasi di kiri-kanan tanda `=`.** `DB_DATABASE = neondb` (pakai spasi) tidak terbaca.
+
+### ⚠️ WAJIB: endpoint Neon dititipkan di depan sandi
+
+Tanpa ini, sambungan **pasti ditolak**:
+
+```
+SQLSTATE[08006] ERROR: Endpoint ID is not specified. Either please upgrade the
+postgres client library (libpq) for SNI support or pass the endpoint ID ...
+```
+
+Neon menaruh ribuan database di balik satu alamat, dan mengenali tujuan lewat teknik
+bernama **SNI** — nama tujuan dikirim saat sambungan dibuka. Pustaka PostgreSQL di server
+Hostinger terlalu tua untuk mengirimnya, jadi Neon tak tahu harus menyambung ke mana.
+
+Laravel tak punya tempat untuk menitipkan keterangan itu: penyambung PostgreSQL-nya
+(`PostgresConnector::getDsn`) hanya mengenal `host`, `dbname`, `port`, `client_encoding`,
+`application_name`, dan empat pengaturan SSL — **tidak ada `options`**. Karena itu dipakai
+jalur resmi Neon: endpoint ID ditempel **di depan sandi**, dipisah `$`.
+
+Endpoint ID = bagian depan alamat, **tanpa** `-pooler`:
+
+```
+ep-polished-star-az0669lt-pooler.c-3.ap-southeast-1.aws.neon.tech
+└──────── endpoint ID ────────┘
+```
+
+Maka baris sandinya ditulis begini:
+
+```
+DB_PASSWORD='endpoint=ep-polished-star-az0669lt$npg_SANDIASLI'
+```
+
+⚠️ **Kutip tunggal `'` di awal & akhir WAJIB.** Tanpa itu `$` bisa dibaca sebagai awal nama
+variabel, dan sebagian sandi hilang diam-diam — gejalanya menyamar jadi
+`password authentication failed`, sehingga orang mencari di tempat yang salah.
 
 `APP_KEY=` dibiarkan kosong — akan diisi otomatis di Bagian 8.
 
@@ -905,6 +986,27 @@ tail -f /home/u607494788/domains/erp.al-wafi.sch.id/app-laravel/storage/logs/lar
 Layar akan menampilkan catatan galat **saat itu juga** ketika Anda mengeklik di browser.
 Biarkan terbuka sambil menguji. Tekan **`Ctrl+C`** untuk berhenti.
 
+### Cara membaca yang jauh lebih berguna
+
+`tail` biasa hampir selalu mengecewakan: satu galat Laravel menghasilkan **50–60 baris
+jejak langkah** (daftar jalur yang dilalui galat), sedangkan **pesan sebenarnya ada di
+baris paling ATAS** entri itu — dan justru itulah yang tergulung hilang.
+
+Pakai ini untuk mengambil pesannya saja:
+
+```bash
+grep -a "production.ERROR" storage/logs/laravel.log | tail -n 3
+```
+
+Hasilnya tiga galat terakhir, masing-masing satu baris:
+
+```
+[2026-09-20 09:03:20] production.ERROR: Vite manifest not found at: ... {"exception":...
+```
+
+Bagian sesudah `production.ERROR:` sampai sebelum `{"exception"` — itulah sebabnya.
+Sisanya jarang diperlukan.
+
 # Bagian 11 — Kalau ada yang rusak
 
 | Yang terlihat | Hampir selalu berarti | Yang dilakukan |
@@ -913,7 +1015,9 @@ Biarkan terbuka sambil menguji. Tekan **`Ctrl+C`** untuk berhenti.
 | `500` seketika, log kosong | Folder tak bisa ditulis | `chmod -R 775 storage bootstrap/cache` |
 | `could not find driver` | `pdo_pgsql` belum dicentang | Ulangi Bagian 4 |
 | `SSL required` | `DB_SSLMODE=require` belum ada | Betulkan `.env`, lalu `config:cache` lagi |
-| Halaman **tanpa warna & tata letak** | Hasil perakitan tampilan tak terkirim | Ulangi 1.4 lalu kirim ulang (5a) |
+| `500` di `/login`, log berkata **`Vite manifest not found`** | Hasil perakitan tampilan belum terkirim | Ulangi 1.4 lalu kirim ulang (5a) |
+| `Endpoint ID is not specified` | Endpoint Neon belum dititipkan di sandi | Lihat Bagian 7 |
+| `The Process class relies on proc_open` | Normal di sini — hanya Composer | `php artisan package:discover` |
 | Perubahan `.env` tak berpengaruh | Pengaturan masih beku | `php artisan config:cache` |
 | `No application encryption key` | Kunci belum dibuat | `php artisan key:generate --force` |
 | Daftar berkas tampil, bukan aplikasi | Alamat web salah arah | Ulangi Bagian 6 |
