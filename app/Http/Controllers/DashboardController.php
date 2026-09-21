@@ -40,6 +40,14 @@ class DashboardController extends Controller
 
     public function index(Request $request): View
     {
+        // Pemicu cadangan rilis batch tagihan. Ditaruh di dashboard karena inilah
+        // halaman yang paling pasti dibuka orang tiap hari — dan jaring pengaman
+        // hanya berguna bila digantung di jalan yang memang dilewati.
+        //
+        // Ongkosnya satu kueri berindeks saat tak ada batch jatuh tempo; kalau ada,
+        // penerbitannya dikunci supaya tak dikerjakan dua permintaan sekaligus.
+        (new \App\Services\Modules\BatchTagihanService)->pemicuCadangan();
+
         $tabs = array_filter([
             'keuangan' => Akses::boleh('dashboard', 'lihat') ? 'Keuangan' : null,
             'anggaran' => Akses::boleh('dashboard-anggaran', 'lihat') ? 'Anggaran & Pengajuan' : null,

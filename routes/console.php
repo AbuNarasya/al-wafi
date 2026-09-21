@@ -40,3 +40,21 @@ Artisan::command('santri:terapkan-jadwal', function (KenaikanTingkatService $ser
 // Kenaikan Tingkat & daftar santri ikut memanggilnya (lihat controllernya).
 // Penerapnya idempoten, jadi dipanggil dari kedua arah pun aman.
 Schedule::command('santri:terapkan-jadwal')->dailyAt('00:30');
+
+// Batch tagihan yang waktu rilisnya sudah lewat. Tiap 5 menit — bukan harian:
+// petugas menetapkan waktu rilis sampai ke menitnya, dan menjanjikan "terbit
+// pukul 07:00" lalu baru menerbitkannya tengah malam adalah janji yang ingkar.
+//
+// withoutOverlapping: satu batch bisa berisi ratusan santri dan menulis jurnal.
+// Dua proses yang mengerjakannya berbarengan akan saling menimpa.
+//
+// TIDAK BOLEH jadi satu-satunya pemicu — alasannya sama seperti kenaikan tingkat
+// di atas, dan di sini taruhannya lebih besar. BatchTagihanService::pemicuCadangan()
+// dipanggil juga dari dalam aplikasi. Penerapnya idempoten.
+Schedule::command('tagihan:rilis-terjadwal')->everyFiveMinutes()->withoutOverlapping();
+
+// Pengingat menyusun draft tagihan. Harian, dan SENGAJA tanpa jam yang bisa
+// disetel: notifikasi di aplikasi ini hanya terlihat dari dalam aplikasi, jadi
+// jam kirim tak membuatnya sampai lebih cepat — yang menentukan tetap kapan
+// petugasnya masuk. 05:00 supaya sudah menunggu sebelum jam kerja.
+Schedule::command('pengingat:terbit-tagihan')->dailyAt('05:00');

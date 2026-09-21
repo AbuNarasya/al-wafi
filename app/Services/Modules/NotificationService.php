@@ -26,6 +26,10 @@ class NotificationService
         'verifikasi_menunggu',
         'pembayaran_santri_menunggu',
         'topup_dompet_menunggu',
+        // Pengingat menyusun draft tagihan. Satu-satunya tugas di daftar ini yang
+        // redanya bisa dinyatakan MANUSIA ("sudah saya kerjakan"), bukan semata
+        // disimpulkan dari keadaan dokumen — memang begitu permintaannya.
+        PengingatTerbitService::JENIS_NOTIF,
     ];
 
     /**
@@ -171,6 +175,10 @@ class NotificationService
             'PembayaranSantri' => in_array((int) $n->ref_id, $idPembayaranPpsb, true)
                 ? '/ppsb/pembayaran' : '/kesantrian/pembayaran',
             'MutasiDompet' => '/kesantrian/dompet',
+            'BatchTagihan' => '/kesantrian/batch-tagihan/'.$n->ref_id,
+            // Pengingat menunjuk DAFTAR batch, bukan sebuah batch: yang diminta
+            // justru menyusun yang belum ada.
+            'JadwalPengingatTerbit' => '/kesantrian/batch-tagihan',
             PengajuanPembayaranService::SUMBER => $n->jenis === 'approval_menunggu'
                 ? '/approvals' : '/pengajuan-pembayaran/'.$n->ref_id,
             default => $n->jenis === 'approval_menunggu' ? '/approvals' : null,
@@ -218,6 +226,11 @@ class NotificationService
 
             'topup_dompet_menunggu' => MutasiDompet::where('id', (int) $n->ref_id)
                 ->where('status', 'menunggu_verifikasi')->exists(),
+
+            // Logikanya ditaruh di servicenya sendiri: ia memeriksa dua hal yang
+            // tak ada urusannya dengan notifikasi (konfirmasi petugas & batch
+            // yang sudah diotorisasi), dan berkas ini tak perlu tahu keduanya.
+            PengingatTerbitService::JENIS_NOTIF => (new PengingatTerbitService)->masihMenunggu((string) $n->ref_id),
 
             default => true,
         };

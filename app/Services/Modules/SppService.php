@@ -346,8 +346,17 @@ class SppService
         return $hasil;
     }
 
-    /** Terbitkan tagihan SPP satu periode untuk seluruh santri aktif (satu jurnal per jenis). */
-    public function generate(array $data, int $idPengguna): array
+    /**
+     * Terbitkan tagihan SPP satu periode untuk seluruh santri aktif (satu jurnal
+     * per jenis).
+     *
+     * `$rencana` yang diisi = daftar yang SUDAH ditetapkan di luar, dipakai Batch
+     * Tagihan: nominalnya dikunci sejak draft diotorisasi, jadi tak boleh dihitung
+     * ulang di sini — yang diperiksa petugas itulah yang harus terbit. Bentuknya
+     * sama dengan keluaran pratinjau() yang berstatus `siap`. Dibiarkan null
+     * untuk penerbitan biasa, yang memang menyusun rencananya sendiri.
+     */
+    public function generate(array $data, int $idPengguna, ?array $rencana = null): array
     {
         // PENJAGA LINTAS TAHUN AJARAN. Menerbitkan periode di luar tahun berjalan
         // tetap BOLEH — bulan yang terlewat memang terjadi, dan memaksanya lewat
@@ -361,7 +370,7 @@ class SppService
                 .'Penerbitan lintas tahun ajaran boleh dilakukan, tetapi alasannya wajib diisi lebih dulu.');
         }
 
-        $rencana = array_values(array_filter($this->pratinjau($data['periode']), fn ($r) => $r['status'] === 'siap'));
+        $rencana ??= array_values(array_filter($this->pratinjau($data['periode']), fn ($r) => $r['status'] === 'siap'));
         if (count($rencana) === 0) {
             throw new AppException(422, "Tidak ada tagihan SPP yang bisa diterbitkan untuk periode {$data['periode']}.");
         }

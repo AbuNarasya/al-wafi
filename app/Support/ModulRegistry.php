@@ -132,6 +132,10 @@ final class ModulRegistry
         // ---- Kependidikan (kode modulnya tetap `…-kesantrian`, lihat Navigation) ----
         ['kode' => 'spp', 'nama' => 'Penagihan SPP (Penerbitan Tagihan, Prabayar, Auto-debet)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Administrasi'],
         ['kode' => 'tagihan-massal', 'nama' => 'Penagihan Daftar Ulang (massal)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Administrasi'],
+        // Membuka LAYAR batch saja. Menyusun & merilis batch sebuah modul tetap
+        // menuntut hak modul itu sendiri (spp / tagihan-massal / tagihan-lain),
+        // ditegakkan di BatchTagihanController — lihat catatan di sana.
+        ['kode' => 'batch-tagihan', 'nama' => 'Batch Tagihan (draft, otorisasi, rilis terjadwal)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Administrasi'],
         // 'buat' = boleh MENJALANKAN/MENERBITKAN; 'lihat' cukup untuk menyusun
         // pratinjau, sehingga petugas bisa memeriksa dulu tanpa bisa mengeksekusi.
         ['kode' => 'kenaikan-tingkat', 'nama' => 'Kenaikan Tingkat & Kelulusan', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Administrasi'],

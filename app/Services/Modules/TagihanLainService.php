@@ -66,6 +66,25 @@ class TagihanLainService
      */
     public function terbitkanUntukPemakaian(JenisBiaya $jenis, array $nominalPerSantri, array $data, int $idPengguna): array
     {
+        return $this->terbitkanSnapshot($jenis, $nominalPerSantri, $data, $idPengguna);
+    }
+
+    /**
+     * Penerbitan dari nominal yang SUDAH DITETAPKAN di tempat lain.
+     *
+     * Dipakai jalur pemakaian (nominalnya hasil hitungan kuantitas) dan Batch
+     * Tagihan (nominalnya dikunci sejak draft diotorisasi). Namanya sengaja
+     * netral: keduanya sama-sama "ini angkanya, tinggal tuliskan", dan
+     * membedakannya jadi dua method hanya melahirkan dua salinan yang harus
+     * selalu sama.
+     *
+     * Penjaganya tetap berjalan di sini — santri tak aktif dan yang sudah punya
+     * tagihan ini tetap dilewati, bukan diterbitkan dua kali.
+     *
+     * @param  array<int,string>  $nominalPerSantri
+     */
+    public function terbitkanSnapshot(JenisBiaya $jenis, array $nominalPerSantri, array $data, int $idPengguna): array
+    {
         $this->pastikanBisaDitagih($jenis);
 
         return $this->terbitkanUntuk($jenis, $nominalPerSantri, $data, $idPengguna);

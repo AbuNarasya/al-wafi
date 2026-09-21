@@ -10,6 +10,7 @@ use App\Http\Controllers\BagianController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BankLoanController;
 use App\Http\Controllers\BankReconciliationController;
+use App\Http\Controllers\BatchTagihanController;
 use App\Http\Controllers\BebasTanggunganController;
 use App\Http\Controllers\BookTransferController;
 use App\Http\Controllers\BudgetController;
@@ -58,6 +59,7 @@ use App\Http\Controllers\PenerimaanKesantrianController;
 use App\Http\Controllers\PengajuanController;
 use App\Http\Controllers\PengajuanSaldoAwalController;
 use App\Http\Controllers\PengaturanDanaBebasController;
+use App\Http\Controllers\PengingatTerbitController;
 use App\Http\Controllers\PerintahPembayaranController;
 use App\Http\Controllers\PeriodCloseController;
 use App\Http\Controllers\PinjamanKaryawanController;
@@ -639,6 +641,32 @@ Route::middleware('auth')->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:tagihan-massal,lihat');
         Route::post('/pratinjau', 'pratinjau')->name('pratinjau')->middleware('hakakses:tagihan-massal,lihat');
         Route::post('/terbitkan', 'terbitkan')->name('terbitkan')->middleware('hakakses:tagihan-massal,buat');
+    });
+
+    // Batch Tagihan — penerbitan yang disusun & diotorisasi lebih dulu, lalu
+    // dirilis kemudian. Berdiri di atas ketiga modul penerbit (SPP, daftar ulang,
+    // tagihan lain), jadi haknya BERLAPIS: `batch-tagihan` membuka layarnya,
+    // sedangkan hak modul aslinya tetap dituntut di controller. Tanpa lapis itu,
+    // satu hak baru diam-diam memberi kuasa menerbitkan SPP seluruh pesantren.
+    Route::prefix('kesantrian/batch-tagihan')->name('batch_tagihan.')->controller(BatchTagihanController::class)->group(function () {
+        Route::get('/', 'index')->name('index')->middleware('hakakses:batch-tagihan,lihat');
+        Route::get('/susun', 'susun')->name('susun')->middleware('hakakses:batch-tagihan,buat');
+        Route::post('/', 'store')->name('store')->middleware('hakakses:batch-tagihan,buat');
+        Route::get('/{id}', 'show')->name('show')->middleware('hakakses:batch-tagihan,lihat')->whereNumber('id');
+        Route::post('/{id}/otorisasi', 'otorisasi')->name('otorisasi')->middleware('hakakses:batch-tagihan,ubah')->whereNumber('id');
+        Route::post('/{id}/rilis', 'rilis')->name('rilis')->middleware('hakakses:batch-tagihan,ubah')->whereNumber('id');
+        Route::delete('/{id}', 'batalkan')->name('batalkan')->middleware('hakakses:batch-tagihan,hapus')->whereNumber('id');
+    });
+
+    // Jadwal pengingat penerbitan. MENUMPANG hak `batch-tagihan` — menyetel
+    // pengingat adalah bagian dari mengurus batch, dan tiap modul hak baru
+    // menambah satu baris yang harus dicentang manual di produksi.
+    Route::prefix('kesantrian/pengingat-terbit')->name('pengingat_terbit.')->controller(PengingatTerbitController::class)->group(function () {
+        Route::get('/', 'index')->name('index')->middleware('hakakses:batch-tagihan,lihat');
+        Route::post('/', 'store')->name('store')->middleware('hakakses:batch-tagihan,ubah');
+        Route::post('/konfirmasi', 'konfirmasi')->name('konfirmasi')->middleware('hakakses:batch-tagihan,ubah');
+        Route::put('/{id}', 'update')->name('update')->middleware('hakakses:batch-tagihan,ubah')->whereNumber('id');
+        Route::delete('/{id}', 'destroy')->name('destroy')->middleware('hakakses:batch-tagihan,hapus')->whereNumber('id');
     });
 
     // Gelombang: master (identitas & waktu) + MATRIKS potongannya. Keduanya
