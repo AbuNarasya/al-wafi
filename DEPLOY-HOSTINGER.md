@@ -1068,19 +1068,65 @@ php artisan config:clear && php artisan cache:clear && php artisan view:clear
 
 # Bagian 12 — Memperbarui aplikasi nanti
 
-Kalau ada perbaikan baru yang ingin dinaikkan ke server:
+## 12.1 Cara biasa: satu perintah
 
-**Di komputer sendiri**, kalau tampilan berubah:
+Sejak 21 September 2026 seluruh langkah di bawah sudah dibungkus jadi satu skrip,
+`deploy/hostinger.sh`, yang ikut tersimpan di dalam repo.
+
+**Di komputer sendiri** — hanya bila tampilan berubah:
 
 ```bash
 npm run build
 ```
 
 ```bash
-scp -P 65002 -r public/build u607494788@153.92.13.252:/home/u607494788/domains/erp.al-wafi.sch.id/app-laravel/public/
+scp -r public/build alwafi:/home/u607494788/domains/erp.al-wafi.sch.id/app-laravel/public/
 ```
 
-**Di server:**
+**Lalu, satu baris ini saja:**
+
+```bash
+ssh alwafi 'bash /home/u607494788/domains/erp.al-wafi.sch.id/app-laravel/deploy/hostinger.sh'
+```
+
+Skrip itu memeriksa dulu, baru bekerja. Kalau tak ada commit baru, ia berhenti tanpa
+menutup aplikasi sedetik pun — jadi **aman dijalankan kapan saja**, termasuk sekadar
+untuk memastikan server sudah mutakhir.
+
+### Yang dijaga skrip, dan yang dulu sering meleset
+
+| Dulu mudah terlewat | Sekarang |
+|---|---|
+| Lupa `artisan up` → aplikasi tertutup untuk semua orang | dijamin `trap`, bahkan bila skrip mati di tengah |
+| Lupa `npm run build` → **galat 500 keras** | deploy dibatalkan sebelum aplikasi disentuh |
+| Urutan tertukar | tak mungkin lagi |
+| Migrasi gagal di tengah lalu dilanjutkan | berhenti, dan aplikasi **sengaja dibiarkan tertutup** |
+
+⚠️ **Satu-satunya keadaan aplikasi dibiarkan tertutup** adalah kegagalan yang terjadi
+*sesudah* kode berubah. Itu disengaja: membukanya berarti menyajikan kode baru di atas
+skema yang mungkin setengah termigrasi — pada aplikasi yang memegang uang, itu bukan
+gangguan layanan melainkan risiko data rusak. Pesannya menyebutkan perintah untuk
+membuka kembali setelah diperiksa:
+
+```bash
+ssh alwafi 'cd /home/u607494788/domains/erp.al-wafi.sch.id/app-laravel && php artisan up'
+```
+
+Catatan tiap deploy tersimpan di server pada `storage/logs/deploy.log`.
+
+## 12.2 Kenapa `npm run build` tetap di komputer sendiri
+
+**`node` dan `npm` TIDAK terpasang di server ini** (diperiksa 21 Sep 2026 — yang ada hanya
+`composer`, `git`, dan kebetulan Go). Sementara `public/build` ada di `.gitignore`, jadi ia
+**tak pernah ikut `git pull`**.
+
+Skripnya karena itu membandingkan waktu tulis `public/build/manifest.json` dengan waktu
+commit terakhir yang menyentuh `resources/js`, `resources/css`, `vite.config.js`, atau
+`package*.json`. Manifest yang lebih tua berarti aset basi, dan deploy dibatalkan.
+
+## 12.3 Cara lama, kalau skripnya tak bisa dipakai
+
+Delapan perintah ini yang dibungkus skrip di atas. Urutannya tak boleh ditukar:
 
 ```bash
 cd /home/u607494788/domains/erp.al-wafi.sch.id/app-laravel
