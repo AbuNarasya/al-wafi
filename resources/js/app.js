@@ -730,6 +730,11 @@ window.pushLangganan = function ({ kunciPublik = '', url = '' } = {}) {
         async nyalakan() {
             this.sibuk = true;
             this.pesan = '';
+            // Dicatat tiap langkah supaya pesan galatnya bisa menyebut DI MANA ia
+            // berhenti. Tanpa ini yang sampai ke layar cuma "gagal", dan satu-
+            // satunya cara mengetahui sebabnya adalah menyambungkan ponsel ke
+            // komputer — yang tak akan pernah dilakukan staf mana pun.
+            let langkah = 'meminta izin';
 
             try {
                 const izin = await Notification.requestPermission();
@@ -739,12 +744,16 @@ window.pushLangganan = function ({ kunciPublik = '', url = '' } = {}) {
                     return;
                 }
 
+                langkah = 'menunggu pekerja layanan siap';
                 const reg = await navigator.serviceWorker.ready;
+
+                langkah = 'mendaftar ke layanan push';
                 const langganan = await reg.pushManager.subscribe({
                     userVisibleOnly: true,
                     applicationServerKey: this.keBiner(kunciPublik),
                 });
 
+                langkah = 'menyimpan langganan ke server';
                 const r = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.token() },
@@ -767,7 +776,14 @@ window.pushLangganan = function ({ kunciPublik = '', url = '' } = {}) {
                 this.halangan = '';
                 this.pesan = 'Notifikasi dinyalakan untuk perangkat ini (' + (j.perangkat || 'perangkat ini') + ').';
             } catch (e) {
-                this.pesan = 'Gagal menyalakan notifikasi di perangkat ini.';
+                // Nama DAN kalimat galatnya ikut ditampilkan. Keduanya berbeda
+                // guna: `AbortError` menunjuk layanan push yang tak terjangkau
+                // (lazim di Android tanpa layanan Google), sedangkan kalimatnya
+                // sering menyebut hal yang lebih tepat lagi.
+                const nama = e && e.name ? e.name : 'Galat';
+                const isi = e && e.message ? e.message : 'tanpa keterangan';
+                this.pesan = `Gagal saat ${langkah} — ${nama}: ${isi}`;
+                console.error('pushLangganan gagal saat', langkah, e);
             } finally {
                 this.sibuk = false;
             }
