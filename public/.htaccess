@@ -1,3 +1,23 @@
+# PEKERJA LAYANAN TIDAK BOLEH DI-CACHE.
+#
+# Hostinger menyajikan berkas statis dengan `Cache-Control: public,
+# max-age=604800` — tujuh hari. Untuk aset ber-hash di `/build/` itu justru
+# bagus, tetapi `sw.js` adalah berkas yang MENENTUKAN kapan versi baru
+# terpasang. Kalau ia sendiri tersimpan seminggu, perangkat bisa terus
+# menjalankan pekerja layanan lama selama itu — dan gejalanya senyap: push
+# diterima, pengiriman dilaporkan sukses, tetapi yang muncul di ponsel hanya
+# kalimat cadangan Chrome "This site has been updated in the background".
+#
+# `manifest.json` ikut, dengan alasan serupa: ia menentukan nama, ikon, dan
+# perilaku aplikasi yang sudah terpasang di layar utama.
+<IfModule mod_headers.c>
+    <FilesMatch "^(sw\.js|manifest\.json)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes
