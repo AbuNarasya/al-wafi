@@ -206,6 +206,7 @@ final class Navigation
         // tarif daftar ulang mengikuti tingkat yang BARU.
         ['url' => '/kesantrian/spp', 'label' => 'Penagihan SPP', 'group' => 'KEPENDIDIKAN', 'sub' => 'Administrasi', 'modul' => 'spp'],
         ['url' => '/kesantrian/tagihan-massal', 'label' => 'Penagihan Daftar Ulang', 'group' => 'KEPENDIDIKAN', 'sub' => 'Administrasi', 'modul' => 'tagihan-massal'],
+        ['url' => '/kesantrian/batch-tagihan', 'label' => 'Batch Tagihan', 'group' => 'KEPENDIDIKAN', 'sub' => 'Administrasi', 'modul' => 'batch-tagihan'],
         ['url' => '/kesantrian/kenaikan-tingkat', 'label' => 'Kenaikan Tingkat & Kelulusan', 'group' => 'KEPENDIDIKAN', 'sub' => 'Administrasi', 'modul' => 'kenaikan-tingkat'],
         // Penerbitan NIS: sengaja manual & massal, karena nomornya berurut
         // menurut abjad satu angkatan jenjang — bukan urutan kedatangan.

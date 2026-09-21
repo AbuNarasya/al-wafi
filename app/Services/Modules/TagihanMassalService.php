@@ -104,6 +104,9 @@ class TagihanMassalService
                 // dilihat petugas saat memeriksa pratinjau.
                 'tingkat' => $di['tingkat'], 'angkatan' => $s->tahun_ajaran,
                 'tingkat_sekarang' => $s->tingkat,
+                // Jenjang yang BERLAKU pada T.A tagihan — penentu jenis biayanya.
+                // Dipakai Batch Tagihan untuk menjepret jenisnya saat draft disusun.
+                'kode_jenjang' => $di['kode_jenjang'],
                 'daftar_ulang' => $keputusan,
                 'ada_yang_terbit' => $keputusan['keputusan'] === self::TERBIT,
             ];
