@@ -284,11 +284,17 @@ class PushService
         }
 
         $webPush = $this->webPush();
+        // Penandanya SELALU BARU tiap kali diuji, tidak tetap `uji-coba`.
+        // Penanda yang sama membuat notifikasi uji berikutnya sekadar MENGGANTI
+        // isi yang masih tergeletak di bilah notifikasi — dan sebagian versi
+        // Android melakukan penggantian itu tanpa bunyi maupun getar. Alat uji
+        // yang diam-diam tak membunyikan apa pun adalah alat uji yang menipu
+        // orang yang sedang mencari sebab notifikasinya tak berbunyi.
         $muatan = json_encode([
             'judul' => 'Uji coba notifikasi',
-            'pesan' => 'Kalau ini muncul, notifikasi di perangkat ini sudah berfungsi.',
+            'pesan' => 'Kalau ini muncul, notifikasi di perangkat ini sudah berfungsi. ('.now()->format('H:i:s').')',
             'tautan' => '/profil',
-            'tag' => 'uji-coba',
+            'tag' => 'uji-'.now()->timestamp,
         ], JSON_UNESCAPED_UNICODE);
 
         $peta = [];
