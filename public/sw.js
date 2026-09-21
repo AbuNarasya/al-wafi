@@ -28,6 +28,7 @@
 // berhasil, tetapi notifikasinya tak pernah muncul di mana pun.
 //
 // v4 — getaran pada notifikasi.
+// v5 — kegagalan menyimpan halaman luring tak lagi membatalkan pemasangan.
 //
 // ⚠️ TIAP KENAIKAN NOMOR MEMAKSA SETIAP PERANGKAT MEMASANG ULANG pekerja
 // layanannya, dan sampai itu terjadi ia masih menjalankan versi lama. Untuk dua
@@ -35,11 +36,28 @@
 // puluh orang yang notifikasinya tertinggal sampai aplikasinya ditutup total.
 // Jadi kumpulkan perubahan `sw.js` dan naikkan nomornya sekali, bukan sekali
 // per perubahan kecil.
-const VERSI = 'alwafi-v4';
+const VERSI = 'alwafi-v5';
 const LURING = '/luring.html';
 
 self.addEventListener('install', (e) => {
-    e.waitUntil(caches.open(VERSI).then((c) => c.add(LURING)).then(() => self.skipWaiting()));
+    // Menyimpan halaman luring BOLEH GAGAL tanpa membatalkan pemasangan.
+    //
+    // Versi sebelumnya merangkai keduanya: `c.add(LURING)` yang gagal — jaringan
+    // putus sesaat, berkasnya sempat 404, apa pun — membuat SELURUH pemasangan
+    // gagal, sehingga perangkat tetap memakai pekerja layanan LAMA. Pada v2 itu
+    // cuma berarti tak ada halaman luring. Sejak v3 akibatnya jauh lebih besar:
+    // penangan `push` ikut tak pernah terpasang, dan gejalanya menyesatkan —
+    // langganan berhasil, pengiriman dilaporkan sukses, tetapi yang muncul di
+    // ponsel adalah notifikasi cadangan Chrome "This site has been updated in
+    // the background".
+    //
+    // Menyimpan halaman luring adalah kemewahan; memasang penangan push tidak.
+    e.waitUntil(
+        caches.open(VERSI)
+            .then((c) => c.add(LURING))
+            .catch(() => {})
+            .then(() => self.skipWaiting()),
+    );
 });
 
 self.addEventListener('activate', (e) => {
@@ -134,14 +152,14 @@ self.addEventListener('push', (e) => {
         // dokumen yang statusnya berubah tiga kali tak perlu jadi tiga baris.
         tag: d.tag,
         renotify: true,
-        // NADA DERING TIDAK BISA DIATUR DARI SINI — ia ditentukan "importance"
-        // saluran notifikasi di Android. Saluran yang disetel senyap membuat
-        // notifikasi muncul tanpa suara, dan tak ada opsi di Web Push yang bisa
-        // membantahnya. Getaran adalah satu-satunya isyarat fisik yang memang
-        // bisa diminta, jadi ia dipasang supaya tetap terasa di ponsel yang
-        // salurannya senyap atau sedang dalam mode getar.
+        // BUNYI MAUPUN GETAR TIDAK DITENTUKAN DI SINI. Sejak Android 8, setelan
+        // saluran notifikasi MENGALAHKAN permintaan aplikasi: saluran yang
+        // disetel senyap mengabaikan `vibrate` ini begitu saja, dan aplikasi
+        // tak punya cara menaikkannya — hanya pengguna, lewat Setelan.
         //
-        // Diabaikan diam-diam di iOS dan di desktop; tak ada ruginya di sana.
+        // Jadi baris ini bukan jaminan, melainkan permintaan yang dihormati
+        // hanya bila salurannya mengizinkan. Diabaikan diam-diam di iOS dan di
+        // desktop; tak ada ruginya di sana.
         vibrate: [200, 100, 200],
         // Nilai bawaannya memang false. Disebut eksplisit supaya tak ada
         // peramban yang menebak lain.
