@@ -86,7 +86,12 @@ main() {
     # ── Satu deploy pada satu waktu ────────────────────────────────────────
     # Dua deploy yang berjalan berbarengan akan saling menimpa di tengah
     # composer maupun migrasi. flock memastikan yang kedua menyerah, bukan ikut.
-    exec 9>"$APP_DIR/storage/framework/deploy.lock"
+    #
+    # Berkas kuncinya sengaja DI LUAR folder repo. Versi pertama menaruhnya di
+    # storage/framework, dan ia langsung muncul sebagai berkas tak terlacak di
+    # `git status` — mengotori pemeriksaan kebersihan yang dijalankan skrip ini
+    # sendiri, tepat satu baris di bawahnya.
+    exec 9>"${HOME}/.deploy-alwafi.lock"
     flock -n 9 || gagal "Deploy lain sedang berjalan."
 
     catat "──────── Deploy dimulai ────────"
