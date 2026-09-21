@@ -20,7 +20,13 @@
 // Naikkan nomornya setiap kali isi `/ikon/` diganti: `activate` membuang semua
 // simpanan bernama lain, dan itu satu-satunya cara memaksa perangkat yang sudah
 // terlanjur menyimpan lambang lama untuk mengambilnya lagi SEKETIKA.
-const VERSI = 'alwafi-v2';
+//
+// v3 — penangan `push` & `notificationclick` ditambahkan. Menaikkan nomornya di
+// sini BUKAN soal cache: berkas ini sendiri baru benar-benar menggantikan yang
+// lama setelah `activate`, dan tanpa itu perangkat yang sudah memasang v2 akan
+// terus memakai pekerja layanan tanpa penangan push — mendaftar langganan pun
+// berhasil, tetapi notifikasinya tak pernah muncul di mana pun.
+const VERSI = 'alwafi-v3';
 const LURING = '/luring.html';
 
 self.addEventListener('install', (e) => {
@@ -92,4 +98,51 @@ self.addEventListener('fetch', (e) => {
     if (req.mode === 'navigate') {
         e.respondWith(fetch(req).catch(() => caches.match(LURING)));
     }
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   PUSH NOTIFICATION
+
+   Hanya notifikasi berjenis TUGAS yang sampai ke sini — penyaringannya di
+   server (PushService), bukan di berkas ini. Pekerja layanan tak tahu apa-apa
+   soal aturan itu, dan memang tak perlu tahu.
+   ══════════════════════════════════════════════════════════════════════ */
+
+self.addEventListener('push', (e) => {
+    // Muatan yang tak bisa dibaca TETAP dimunculkan sebagai notifikasi kosong,
+    // bukan diabaikan: sebagian peramban MENCABUT izin push dari aplikasi yang
+    // menerima pesan lalu tidak menampilkan apa pun.
+    let d = { judul: 'Al Wafi ERP', pesan: 'Ada tugas baru menunggu.', tautan: '/', tag: 'alwafi' };
+    try {
+        if (e.data) d = Object.assign(d, e.data.json());
+    } catch (_) { /* biarkan nilai bawaan */ }
+
+    e.waitUntil(self.registration.showNotification(d.judul, {
+        body: d.pesan,
+        icon: '/ikon/ikon-192.png',
+        badge: '/ikon/ikon-192.png',
+        // Notifikasi untuk dokumen yang sama saling MENGGANTI, tidak menumpuk:
+        // dokumen yang statusnya berubah tiga kali tak perlu jadi tiga baris.
+        tag: d.tag,
+        renotify: true,
+        data: { tautan: d.tautan },
+    }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+    e.notification.close();
+    const tujuan = (e.notification.data && e.notification.data.tautan) || '/';
+
+    // Kalau aplikasinya sudah terbuka di suatu tempat, JANGAN buka jendela baru
+    // — arahkan yang sudah ada. Staf yang menekan lima notifikasi tak boleh
+    // berakhir dengan lima tab aplikasi yang sama.
+    e.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((daftar) => {
+            for (const c of daftar) {
+                if ('focus' in c) return c.navigate(tujuan).then(() => c.focus()).catch(() => c.focus());
+            }
+
+            return self.clients.openWindow(tujuan);
+        }),
+    );
 });

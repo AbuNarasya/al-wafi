@@ -62,5 +62,44 @@
                 </button>
             </div>
         </form>
+
+        {{-- Notifikasi perangkat. Sengaja PER PERANGKAT, bukan per akun: izinnya
+             memang melekat pada peramban di ponsel/laptop ini, bukan pada akun. --}}
+        <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
+             x-data="pushLangganan({ kunciPublik: @js($pushKunci), url: @js(route('profil.push.langganan')) })">
+            <h2 class="mb-1 text-sm font-semibold text-gray-900">Notifikasi di Perangkat Ini</h2>
+            <p class="mb-4 text-xs text-gray-500">
+                Kalau dinyalakan, tugas yang menunggu Anda &mdash; persetujuan, verifikasi pembayaran,
+                pengingat menyusun tagihan &mdash; akan muncul di perangkat ini walau aplikasinya sedang tertutup.
+                Kabar biasa tetap hanya di lonceng.
+            </p>
+
+            <template x-if="halangan">
+                <div class="mb-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800" x-text="halangan"></div>
+            </template>
+
+            <template x-if="pesan">
+                <div class="mb-3 rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-700" x-text="pesan"></div>
+            </template>
+
+            <template x-if="didukung">
+                <div class="flex flex-wrap items-center gap-3">
+                    <button type="button" x-show="! aktif" :disabled="sibuk" @click="nyalakan()"
+                            class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50">
+                        Nyalakan Notifikasi
+                    </button>
+                    <button type="button" x-show="aktif" x-cloak :disabled="sibuk" @click="matikan()"
+                            class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                        Matikan Notifikasi
+                    </button>
+                    <span x-show="aktif" x-cloak class="text-sm text-emerald-700">Aktif di perangkat ini.</span>
+                </div>
+            </template>
+
+            <p class="mt-4 border-t border-gray-100 pt-3 text-xs text-gray-400">
+                Pengaturan ini hanya berlaku untuk perangkat yang sedang Anda pakai. Nyalakan sendiri di
+                ponsel dan di komputer bila ingin keduanya berbunyi.
+            </p>
+        </div>
     </div>
 @endsection

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Modules\PushService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,6 +24,10 @@ class ProfilController extends Controller
     {
         return view('profil.index', [
             'user' => Auth::user()->loadMissing(['level', 'bagian', 'levelPengajuan']),
+            // Kunci PUBLIK VAPID — memang untuk disiarkan ke peramban; tanpa ia,
+            // perangkat tak bisa mendaftar ke layanan push. Kosong bila fiturnya
+            // belum disiapkan di lingkungan ini, dan tombolnya ikut diam.
+            'pushKunci' => (new PushService)->kunciPublik() ?? '',
         ]);
     }
 

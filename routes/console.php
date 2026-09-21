@@ -58,3 +58,14 @@ Schedule::command('tagihan:rilis-terjadwal')->everyFiveMinutes()->withoutOverlap
 // jam kirim tak membuatnya sampai lebih cepat — yang menentukan tetap kapan
 // petugasnya masuk. 05:00 supaya sudah menunggu sebelum jam kerja.
 Schedule::command('pengingat:terbit-tagihan')->dailyAt('05:00');
+
+// Dorong notifikasi TUGAS ke perangkat staf. Tiap menit — inilah yang membuat
+// jedanya paling lama semenit, dan itu batas yang masih terasa seketika bagi
+// orang yang menunggu persetujuan.
+//
+// SENGAJA tidak dipanggil dari tengah permintaan web: mendorong ke sepuluh
+// perangkat berarti sepuluh panggilan HTTPS keluar, dan layar staf akan
+// menggantung beberapa detik tiap kali ia menyetujui sesuatu.
+//
+// Diam sendiri bila kunci VAPID belum diisi di lingkungan ini.
+Schedule::command('push:kirim')->everyMinute()->withoutOverlapping();

@@ -674,10 +674,150 @@ window.inputRupiah = function ({ value = '' } = {}) {
     };
 };
 
+/**
+ * pushLangganan — tombol "Nyalakan notifikasi di perangkat ini" pada /profil.
+ *
+ * ══ KENAPA BERTELE-TELE MENJELASKAN KEGAGALAN ══
+ * Push notification punya banyak sekali cara gagal yang TIDAK terlihat sebagai
+ * galat: peramban lama, iPhone yang belum ditambahkan ke Layar Utama, izin yang
+ * pernah ditolak. Tanpa penjelasan, staf akan menekan tombolnya, tak terjadi
+ * apa-apa, lalu menyimpulkan aplikasinya rusak — dan tak pernah mencoba lagi.
+ *
+ * ══ IZIN HANYA BOLEH DIMINTA DARI KETUKAN ══
+ * Peramban menolak permintaan izin yang datang sendiri saat halaman dimuat, dan
+ * di sebagian peramban penolakan semacam itu dihitung sebagai "ditolak pengguna"
+ * — sekali terjadi, tombolnya tak akan pernah berhasil lagi.
+ */
+window.pushLangganan = function ({ kunciPublik = '', url = '' } = {}) {
+    return {
+        didukung: false,
+        aktif: false,
+        sibuk: false,
+        pesan: '',
+        halangan: '',
+
+        async init() {
+            this.didukung = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+            if (! this.didukung) {
+                // Ciri iOS: satu-satunya kasus lazim yang bisa DIPERBAIKI sendiri
+                // oleh pengguna, jadi ia pantas mendapat kalimatnya sendiri.
+                const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                const terpasang = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+
+                this.halangan = iOS && ! terpasang
+                    ? 'Di iPhone/iPad, notifikasi hanya bisa dinyalakan setelah aplikasi ini ditambahkan ke Layar Utama. Buka menu Bagikan → Tambahkan ke Layar Utama, lalu buka aplikasinya dari sana.'
+                    : 'Peramban di perangkat ini belum mendukung notifikasi. Coba lewat Chrome di Android, atau iPhone dengan iOS 16.4 ke atas.';
+
+                return;
+            }
+
+            if (! kunciPublik) {
+                this.halangan = 'Push notification belum disiapkan di server ini.';
+                this.didukung = false;
+
+                return;
+            }
+
+            if (Notification.permission === 'denied') {
+                this.halangan = 'Izin notifikasi pernah ditolak di perangkat ini. Pulihkan lewat pengaturan situs di peramban — dari dalam aplikasi tak bisa.';
+            }
+
+            const reg = await navigator.serviceWorker.ready.catch(() => null);
+            this.aktif = !! (reg && await reg.pushManager.getSubscription());
+        },
+
+        async nyalakan() {
+            this.sibuk = true;
+            this.pesan = '';
+
+            try {
+                const izin = await Notification.requestPermission();
+                if (izin !== 'granted') {
+                    this.halangan = 'Izinnya belum diberikan, jadi notifikasi tak bisa dikirim ke perangkat ini.';
+
+                    return;
+                }
+
+                const reg = await navigator.serviceWorker.ready;
+                const langganan = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: this.keBiner(kunciPublik),
+                });
+
+                const r = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.token() },
+                    body: JSON.stringify(langganan.toJSON()),
+                });
+                const j = await r.json().catch(() => ({}));
+
+                if (! r.ok || ! j.ok) {
+                    // Langganan di peramban DIBATALKAN lagi kalau server menolak.
+                    // Kalau dibiarkan, perangkat ini akan menerima push yang tak
+                    // pernah bisa dikirim server — dan pengguna melihat tombol
+                    // "aktif" untuk sesuatu yang tak pernah bekerja.
+                    await langganan.unsubscribe().catch(() => {});
+                    this.pesan = j.pesan || 'Server menolak langganan ini.';
+
+                    return;
+                }
+
+                this.aktif = true;
+                this.halangan = '';
+                this.pesan = 'Notifikasi dinyalakan untuk perangkat ini (' + (j.perangkat || 'perangkat ini') + ').';
+            } catch (e) {
+                this.pesan = 'Gagal menyalakan notifikasi di perangkat ini.';
+            } finally {
+                this.sibuk = false;
+            }
+        },
+
+        async matikan() {
+            this.sibuk = true;
+            this.pesan = '';
+
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                const langganan = await reg.pushManager.getSubscription();
+
+                if (langganan) {
+                    await fetch(url, {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.token() },
+                        body: JSON.stringify({ endpoint: langganan.endpoint }),
+                    }).catch(() => {});
+                    await langganan.unsubscribe().catch(() => {});
+                }
+
+                this.aktif = false;
+                this.pesan = 'Notifikasi dimatikan untuk perangkat ini.';
+            } finally {
+                this.sibuk = false;
+            }
+        },
+
+        token() {
+            return document.querySelector('meta[name="csrf-token"]')?.content || '';
+        },
+
+        /** Kunci VAPID dikirim server sebagai base64url; PushManager menuntut Uint8Array. */
+        keBiner(base64url) {
+            const pad = '='.repeat((4 - (base64url.length % 4)) % 4);
+            const mentah = atob((base64url + pad).replace(/-/g, '+').replace(/_/g, '/'));
+
+            return Uint8Array.from([...mentah].map((c) => c.charCodeAt(0)));
+        },
+    };
+};
 // SETELAH semua pembantu `window.*` di atas terdefinisi, bukan sebelumnya:
 // Alpine.start() langsung menyisir DOM, dan ekspresi `x-data="inputRupiah(…)"`
 // yang pembantunya belum ada hanya menghasilkan peringatan di konsol —
 // isiannya diam-diam jadi tak berfungsi.
+//
+// `pushLangganan` sempat ditaruh di bawah sini dan gejalanya persis seperti yang
+// diperingatkan: kartunya tampil, tetapi tombol maupun pesan halangannya tak
+// pernah muncul — seluruh `x-if` di dalamnya tak sempat dievaluasi.
 Alpine.start();
 
 /**
@@ -1039,3 +1179,4 @@ Alpine.start();
         el.setSelectionRange?.(n, n); // kursor kembali ke ujung ketikan
     });
 })();
+

@@ -65,6 +65,7 @@ use App\Http\Controllers\PeriodCloseController;
 use App\Http\Controllers\PinjamanKaryawanController;
 use App\Http\Controllers\ProfilController;
 use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\PushController;
 use App\Http\Controllers\RekapPembayaranController;
 use App\Http\Controllers\ReminderTagihanController;
 use App\Http\Controllers\ReportsController;
@@ -179,6 +180,13 @@ Route::middleware('auth')->group(function () {
     Route::put('/profil/kata-sandi', [ProfilController::class, 'ubahKataSandi'])
         ->middleware('throttle:10,1')
         ->name('profil.kata_sandi');
+
+    // Langganan push notification milik sendiri — alasannya sama dengan di atas:
+    // memutuskan apakah ponsel sendiri berbunyi bukan kewenangan modul mana pun.
+    // Keduanya memakai $request->user(), jadi tak ada jalan menyentuh perangkat
+    // milik orang lain.
+    Route::post('/profil/push', [PushController::class, 'langganan'])->name('profil.push.langganan');
+    Route::delete('/profil/push', [PushController::class, 'berhenti'])->name('profil.push.berhenti');
 
     // Matriks hak akses per pengguna — KHUSUS ADMIN (di luar matriks modul).
     Route::middleware(RequireAdmin::class)->group(function () {

@@ -14,11 +14,14 @@ class Notification extends Model
 
     protected $fillable = [
         'id_pengguna', 'judul', 'pesan', 'jenis', 'ref_jenis', 'ref_id', 'dibaca',
+        // NULL = belum pernah didorong ke perangkat. Penanda inilah yang disapu
+        // `push:kirim`; lihat PushService.
+        'didorong_pada',
     ];
 
     protected function casts(): array
     {
-        return ['dibaca' => 'boolean'];
+        return ['dibaca' => 'boolean', 'didorong_pada' => 'datetime'];
     }
 
     public function user(): BelongsTo
