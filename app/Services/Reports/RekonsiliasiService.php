@@ -105,7 +105,11 @@ class RekonsiliasiService
                 Money::of(DB::table($tabel)->sum('saldo')),
                 $asOf,
                 'Jumlah saldo seluruh '.strtolower($label),
-                route('dompet.index'),
+                // Menunjuk DAFTAR saldo per pemilik, bukan layar transaksi
+                // dompet: orang sampai di baris ini justru karena angkanya
+                // selisih, dan yang ia butuhkan adalah rincian siapa punya
+                // berapa — bukan tombol yang mengubah saldo.
+                route('saldo_dompet.index'),
             );
         }
 

@@ -68,6 +68,7 @@ use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\RekapPembayaranController;
 use App\Http\Controllers\ReminderTagihanController;
 use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\SaldoDompetController;
 use App\Http\Controllers\SantriController;
 use App\Http\Controllers\SantriManualController;
 use App\Http\Controllers\SetoranPemakaianController;
@@ -870,6 +871,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/', 'catat')->name('catat')->middleware('hakakses:setoran-laundry,buat');
         Route::delete('/{id}', 'hapus')->name('hapus')->middleware('hakakses:setoran-laundry,buat')->whereNumber('id');
         Route::post('/terbitkan', 'terbitkan')->name('terbitkan')->middleware('hakakses:tagihan-lain,buat');
+    });
+
+    // Saldo Dompet — daftar saldo seluruh wali & santri, BACA SAJA. Menumpang
+    // hak modul `dompet`; ia rincian di balik angka Rekonsiliasi Buku Pembantu,
+    // yang selama ini hanya bisa menunjukkan totalnya.
+    Route::prefix('kesantrian/saldo-dompet')->name('saldo_dompet.')->controller(SaldoDompetController::class)->group(function () {
+        Route::get('/', 'index')->name('index')->middleware('hakakses:dompet,lihat');
+        Route::get('/unduh/{lingkup}', 'unduh')->name('unduh')->middleware('hakakses:dompet,lihat');
     });
 
     // Dompet & Tabungan Santri (wadi'ah).

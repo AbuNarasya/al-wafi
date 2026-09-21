@@ -230,6 +230,9 @@ final class Navigation
         ['url' => '/kesantrian/penerimaan', 'label' => 'Laporan Penerimaan per Periode', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'rekap-pembayaran'],
         ['url' => '/kesantrian/outstanding-spp', 'label' => 'Daftar Outstanding SPP', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'outstanding-spp'],
         ['url' => '/kesantrian/outstanding-lain', 'label' => 'Daftar Outstanding Tagihan Lain', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'outstanding-lain'],
+        // Baca saja, dan MENUMPANG hak `dompet` — tetangganya di Transaksi yang
+        // menggerakkan saldo, sedangkan yang ini hanya mencocokkan angkanya.
+        ['url' => '/kesantrian/saldo-dompet', 'label' => 'Daftar Saldo Dompet', 'group' => 'KEPENDIDIKAN', 'sub' => 'Kontrol', 'modul' => 'dompet'],
 
         // ---- 7. Tagihan Lain-lain ----
         // Sampai sekarang modul ini SAMA SEKALI tak punya item sidebar — satu-
