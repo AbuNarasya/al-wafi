@@ -26,7 +26,16 @@
 // lama setelah `activate`, dan tanpa itu perangkat yang sudah memasang v2 akan
 // terus memakai pekerja layanan tanpa penangan push — mendaftar langganan pun
 // berhasil, tetapi notifikasinya tak pernah muncul di mana pun.
-const VERSI = 'alwafi-v3';
+//
+// v4 — getaran pada notifikasi.
+//
+// ⚠️ TIAP KENAIKAN NOMOR MEMAKSA SETIAP PERANGKAT MEMASANG ULANG pekerja
+// layanannya, dan sampai itu terjadi ia masih menjalankan versi lama. Untuk dua
+// perangkat ongkosnya tak terasa; untuk dua puluh, tiap kenaikan berarti dua
+// puluh orang yang notifikasinya tertinggal sampai aplikasinya ditutup total.
+// Jadi kumpulkan perubahan `sw.js` dan naikkan nomornya sekali, bukan sekali
+// per perubahan kecil.
+const VERSI = 'alwafi-v4';
 const LURING = '/luring.html';
 
 self.addEventListener('install', (e) => {
@@ -125,6 +134,18 @@ self.addEventListener('push', (e) => {
         // dokumen yang statusnya berubah tiga kali tak perlu jadi tiga baris.
         tag: d.tag,
         renotify: true,
+        // NADA DERING TIDAK BISA DIATUR DARI SINI — ia ditentukan "importance"
+        // saluran notifikasi di Android. Saluran yang disetel senyap membuat
+        // notifikasi muncul tanpa suara, dan tak ada opsi di Web Push yang bisa
+        // membantahnya. Getaran adalah satu-satunya isyarat fisik yang memang
+        // bisa diminta, jadi ia dipasang supaya tetap terasa di ponsel yang
+        // salurannya senyap atau sedang dalam mode getar.
+        //
+        // Diabaikan diam-diam di iOS dan di desktop; tak ada ruginya di sana.
+        vibrate: [200, 100, 200],
+        // Nilai bawaannya memang false. Disebut eksplisit supaya tak ada
+        // peramban yang menebak lain.
+        silent: false,
         data: { tautan: d.tautan },
     }));
 });
