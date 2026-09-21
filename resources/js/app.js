@@ -957,7 +957,20 @@ Alpine.start();
     }
 
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
+        // ?sw=5 — BUKAN nomor versi, melainkan JALAN MEMUTARI CDN.
+        //
+        // CDN Hostinger (`hcdn`) menyimpan `/sw.js` polos dengan TTL tujuh hari,
+        // dari sebelum `.htaccess` menyetelnya `no-cache`. Selama salinan basi
+        // itu masih hidup di simpul-simpul edge, perangkat mengambil pekerja
+        // layanan LAMA — bukan yang ada di disk server. Gejalanya menyesatkan:
+        // deploy berhasil, `curl` kadang menjawab versi baru (tergantung simpul
+        // mana yang melayani), tetapi ponsel terus menjalankan yang lama.
+        //
+        // Alamat berquery belum pernah di-cache, jadi ia diambil segar dan sejak
+        // itu ikut aturan `no-cache` yang baru. Angkanya dinaikkan HANYA bila
+        // kelak ada salinan basi lagi yang perlu dilangkahi — bukan tiap deploy,
+        // karena `no-cache` sudah menjaga kesegarannya.
+        navigator.serviceWorker.register('/sw.js?sw=5').catch(() => {});
     });
 
     // Ajakan memasang. Peramban menahan tawarannya sampai syaratnya terpenuhi,
