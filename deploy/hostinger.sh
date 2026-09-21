@@ -168,7 +168,12 @@ main() {
 periksaAset() {
     local sasaran="$1"
     local manifest="$APP_DIR/public/build/manifest.json"
-    local sumber=(resources/js resources/css vite.config.js package-lock.json package.json)
+    # `resources/views` IKUT DIAWASI, dan itu bukan kelebihan hati-hati: Tailwind
+    # merakit CSS dari kelas yang ia TEMUKAN di Blade, jadi menambah satu layar
+    # baru sudah mengubah isi CSS walau tak ada satu pun berkas .css disentuh.
+    # Versi pertama daftar ini melewatkannya, dan akibatnya persis jenis yang
+    # paling sulit dilacak: layar baru tampil berantakan di server, tanpa galat.
+    local sumber=(resources/views resources/js resources/css vite.config.js package-lock.json package.json)
 
     [ -f "$manifest" ] || gagal "Aset tampilan belum pernah dikirim ($manifest tak ada).
   Di laptop:  npm run build
