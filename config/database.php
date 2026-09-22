@@ -117,6 +117,33 @@ return [
             'sslmode' => 'require',
         ],
 
+        /*
+         * NEON LANGSUNG — endpoint yang sama, TANPA pooler.
+         *
+         * Alamat `…-pooler…` milik PgBouncer, dan ia TIDAK SANGGUP MENAHAN
+         * TRANSAKSI: `BEGIN` diterima, satu `select` pertama lolos, lalu
+         * perintah berikutnya menjawab "current transaction is aborted,
+         * commands ignored" — tanpa pernah menyebut apa yang gagal. Diuji
+         * 22 Sep 2026: lewat pooler gagal di perintah kedua, lewat alamat
+         * langsung seluruh rangkaian (hitung, savepoint, rollback) mulus.
+         *
+         * Dipakai untuk pekerjaan BERTRANSAKSI dari lokal — pembersihan data,
+         * pemulihan, migrasi manual. Untuk pemakaian aplikasi biasa, pooler
+         * justru yang benar: ia dirancang untuk banyak sambungan pendek.
+         *
+         * Alamatnya diturunkan dari `NEON_URL` yang sama supaya tak ada
+         * kredensial kedua yang harus ikut diputar setiap kali sandinya ganti.
+         */
+        'neon_langsung' => [
+            'driver' => 'pgsql',
+            'url' => str_replace('-pooler', '', (string) env('NEON_URL')) ?: null,
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'require',
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),
