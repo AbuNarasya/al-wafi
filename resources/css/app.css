@@ -318,11 +318,15 @@ input.border-gray-300, select.border-gray-300, textarea.border-gray-300 {
    bahkan dari sudut mata: lingkaran samar sebagai jalur, busur tebal berputar
    searah jarum jam, dan busur tipis berlawanan arah.
 
-   WARNANYA PALET APLIKASI, bukan hitam-putih: latar biru brand-dark (#0e3168,
-   sama dengan halaman Masuk & sidebar) dengan busur emas accent (#f8c400) —
-   pasangan yang sudah dipakai di seluruh aplikasi, dan yang sama dengan bilah
-   kemajuan di puncak layar. Tirai kelabu di atas aplikasi yang biru akan
-   terlihat seperti galat peramban, bukan seperti bagian dari aplikasinya. */
+   LATARNYA TAK BERWARNA — putih tembus pandang, bukan biru. Yang membawa warna
+   aplikasi adalah cincin & tulisannya (brand #164a9e + accent #f8c400), bukan
+   bidang selayar penuh di belakangnya: warna sebesar itu menenggelamkan halaman
+   yang justru sedang ditunggu orang, dan membuat jeda sedetik terasa seperti
+   berpindah ke tempat lain.
+
+   Tetap diberi lapisan putih 0.82, bukan dibiarkan bening: tirai ini MENGHALANGI
+   KLIK, dan halaman yang tampak normal tetapi tak menanggapi apa pun jauh lebih
+   membingungkan daripada halaman yang jelas sedang diredupkan. */
 .tirai-muat {
     position: fixed;
     inset: 0;
@@ -330,7 +334,7 @@ input.border-gray-300, select.border-gray-300, textarea.border-gray-300 {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(14, 49, 104, .96); /* brand-dark #0e3168 */
+    background: rgba(255, 255, 255, .82);
     backdrop-filter: blur(3px);
     opacity: 0;
     transition: opacity .18s ease-out;
@@ -353,7 +357,7 @@ input.border-gray-300, select.border-gray-300, textarea.border-gray-300 {
     content: '';
     position: absolute;
     inset: 6px;
-    border: 1px solid rgba(255, 255, 255, .18);
+    border: 1px solid rgba(17, 24, 39, .12);
     border-radius: 9999px;
 }
 
@@ -364,24 +368,24 @@ input.border-gray-300, select.border-gray-300, textarea.border-gray-300 {
     border-color: transparent;
 }
 
-/* Busur LUAR tebal, searah jarum jam. Emas accent — warna sorotan aplikasi,
-   dan satu-satunya warna yang benar-benar menonjol di atas biru brand-dark. */
+/* Busur LUAR tebal, searah jarum jam. Biru brand — di atas latar terang, emas
+   terlalu pucat untuk memikul busur setebal ini. */
 .cincin-muat i:nth-child(1) {
     inset: 0;
     border-width: 7px;
-    border-top-color: #f8c400;
-    border-bottom-color: #f8c400;
+    border-top-color: #164a9e;
+    border-bottom-color: #164a9e;
     animation: putar 1.5s linear infinite;
 }
 
 /* Busur DALAM tipis, berlawanan arah & lebih lambat — perbedaan arah inilah
-   yang membuat geraknya tak terbaca sebagai gambar diam yang miring. Biru
-   brand-soft, bukan emas kedua: dua busur berwarna sama saling menyamarkan. */
+   yang membuat geraknya tak terbaca sebagai gambar diam yang miring. Emas
+   accent, bukan biru kedua: dua busur berwarna sama saling menyamarkan. */
 .cincin-muat i:nth-child(2) {
     inset: 20px;
     border-width: 4px;
-    border-left-color: rgba(232, 237, 246, .7); /* brand-soft #e8edf6 */
-    border-right-color: rgba(232, 237, 246, .7);
+    border-left-color: #f8c400;
+    border-right-color: #f8c400;
     animation: putar 2.2s linear infinite reverse;
 }
 
@@ -390,7 +394,7 @@ input.border-gray-300, select.border-gray-300, textarea.border-gray-300 {
    bagian yang terlewat. */
 .tirai-muat span {
     position: absolute;
-    color: #e8edf6; /* brand-soft — putih murni terlalu keras di atas biru tua */
+    color: #0e3168; /* brand-dark — terbaca di atas latar terang */
     font-size: .78rem;
     font-weight: 600;
     letter-spacing: .18em;
