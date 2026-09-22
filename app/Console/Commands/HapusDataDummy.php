@@ -166,13 +166,31 @@ class HapusDataDummy extends Command
             return self::SUCCESS;
         }
 
-        $db->transaction(function () use ($db, $isi) {
+        // Tabel mana yang PUNYA kolom `id`, ditanyakan SEKALI di muka.
+        //
+        // `pg_get_serial_sequence` MELEMPAR GALAT bila kolomnya tak ada — ia
+        // hanya mengembalikan null bila kolomnya ada tetapi bukan serial.
+        // Belasan tabel di sini ber-PK string (`kode_transaksi`), dan
+        // memanggilnya membabi buta membatalkan seluruh transaksi di tengah
+        // penghapusan. Dulu tak pernah terlihat karena daftar tabelnya
+        // kebetulan hanya memuat yang ber-`id`.
+        $punyaId = array_column($db->select(
+            'select table_name from information_schema.columns
+             where table_schema = ? and column_name = ?',
+            ['public', 'id'],
+        ), 'table_name');
+        $punyaId = array_flip($punyaId);
+
+        $db->transaction(function () use ($db, $isi, $punyaId) {
             foreach (array_keys($isi) as $t) {
                 $db->table($t)->delete();
 
-                // Setel ulang urutan id kalau tabelnya memang ber-serial. Tabel
-                // ber-PK string tak punya sequence — pg_get_serial_sequence
-                // mengembalikan null, dan itu bukan galat.
+                if (! isset($punyaId[$t])) {
+                    continue;
+                }
+
+                // Null di sini berarti kolomnya ada tetapi bukan serial —
+                // itu memang bukan galat.
                 $seq = $db->selectOne('select pg_get_serial_sequence(?, ?) as s', [$t, 'id'])->s ?? null;
                 if ($seq) {
                     $db->statement('select setval(?, 1, false)', [$seq]);
