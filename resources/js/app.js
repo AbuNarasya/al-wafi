@@ -837,6 +837,248 @@ window.pushLangganan = function ({ kunciPublik = '', url = '' } = {}) {
 Alpine.start();
 
 /**
+ * TANDA "SEDANG DIPROSES" — bilah kemajuan & tombol yang mengunci diri.
+ *
+ * Aplikasi ini memuat HALAMAN PENUH setiap kali orang membuka modul, menyimpan
+ * isian, atau berpindah halaman daftar. Di antara klik dan halaman berikutnya
+ * selalu ada jeda diam, dan pada koneksi pesantren jeda itu bisa beberapa detik.
+ * Tanpa tanda apa pun layar tampak tidak bereaksi — lalu yang terjadi bukan
+ * orang menunggu, melainkan orang menekan tombolnya sekali lagi. Pada aplikasi
+ * yang memegang uang, tekanan kedua itu berarti dua pembayaran.
+ *
+ * Dipasang SEKALI di sini, bukan di 142 layar satu per satu: tak ada satu pun
+ * halaman yang perlu diubah, dan layar yang dibuat kelak ikut tertangani.
+ *
+ * Tiga hal yang mudah salah dan sengaja ditangani:
+ *
+ *  • TOMBOL TIDAK DI-`disabled`. Tombol submit yang dimatikan pada saat submit
+ *    membuat `name`/`value`-nya TIDAK ikut terkirim — dan form bertombol jamak
+ *    ("Simpan" vs "Simpan & Terbitkan") jadi salah aksi tanpa satu pun galat.
+ *    Penguncian dilakukan lewat penanda di form + pointer-events, bukan disabled.
+ *
+ *  • KEMBALI (Back) memulihkan halaman dari bfcache APA ADANYA — termasuk tombol
+ *    yang masih bertanda sibuk. Tanpa pembersihan di `pageshow`, orang yang
+ *    menekan Back mendapati formnya mati selamanya sampai halaman dimuat ulang.
+ *
+ *  • UNDUHAN tidak pernah mengganti halaman, jadi bilahnya takkan pernah
+ *    diselesaikan oleh apa pun. Karena itu ada batas waktu yang menyelesaikannya
+ *    sendiri; bilah yang menggantung selamanya lebih buruk daripada tak ada.
+ */
+(function () {
+    const JEDA_TAMPIL = 150;   // ms — halaman cepat tak perlu berkedip
+    const BATAS_WAKTU = 15000; // ms — jaring pengaman untuk unduhan & tab baru
+
+    /**
+     * Ambang TIRAI SELAYAR PENUH — sengaja lebih lambat daripada bilahnya.
+     *
+     * Tiga tingkat, bukan satu: di bawah 150 ms tak ada tanda apa pun (halaman
+     * memang sudah datang); di atas itu bilah tipis di puncak layar; dan hanya
+     * bila benar-benar lama, tirai yang menutupi layar.
+     *
+     * Menutupi seluruh layar untuk proses yang selesai dalam sekejap bukan
+     * membuat aplikasi terasa responsif melainkan gugup — layar berkedip gelap
+     * di tiap klik, dan yang dikerjakan orang justru jadi sulit diikuti.
+     */
+    const JEDA_TIRAI = 400;
+
+    /**
+     * Batas waktu KUNCI FORM — sengaja jauh lebih panjang daripada batas bilah.
+     *
+     * Pengiriman yang tak jadi mengganti halaman (orang menekan Esc di tengah
+     * jalan, atau jaringan putus sebelum jawaban datang) meninggalkan formnya
+     * terkunci, dan tanpa pelepas ini satu-satunya jalan keluar adalah memuat
+     * ulang halaman — beserta seluruh isian yang sudah diketik.
+     *
+     * Satu menit, bukan lima belas detik seperti bilahnya: melepas kunci selagi
+     * pengirimannya MASIH berjalan mengembalikan persis bahaya yang hendak
+     * dicegah, yaitu tekanan kedua yang menerbitkan dokumen kedua. Menunggu
+     * terlalu lama itu menjengkelkan; melepas terlalu cepat itu menagih dua kali.
+     */
+    const BATAS_KUNCI = 60000;
+
+    let bilah = null;
+    let tirai = null;
+    let timerTampil = null;
+    let timerRayap = null;
+    let timerBatas = null;
+    let timerTirai = null;
+    let lebar = 0;
+
+    function buatBilah() {
+        if (bilah) return bilah;
+        bilah = document.createElement('div');
+        bilah.className = 'bilah-muat';
+        bilah.setAttribute('role', 'progressbar');
+        bilah.setAttribute('aria-label', 'Memuat halaman');
+        document.body.appendChild(bilah);
+
+        return bilah;
+    }
+
+    function setLebar(persen) {
+        lebar = persen;
+        if (bilah) bilah.style.width = persen + '%';
+    }
+
+    /**
+     * Tirai selayar penuh untuk proses yang benar-benar lama.
+     *
+     * `role="status"` + `aria-live`: pembaca layar mengumumkan "Sedang memproses"
+     * begitu ia muncul. Tanpa itu, yang terjadi bagi penggunanya hanyalah semua
+     * tombol tiba-tiba berhenti menanggapi tanpa sebab yang bisa didengar.
+     */
+    function pasangTirai() {
+        if (tirai) return;
+        tirai = document.createElement('div');
+        tirai.className = 'tirai-muat';
+        tirai.setAttribute('role', 'status');
+        tirai.setAttribute('aria-live', 'polite');
+        tirai.innerHTML = '<div class="cincin-muat"><i></i><i></i><span>Memuat</span></div>';
+        document.body.appendChild(tirai);
+        // Dipaksa reflow dulu supaya transisi opacity benar-benar berjalan;
+        // atribut yang dipasang di frame yang sama dengan penyisipan tak
+        // menghasilkan transisi apa pun, hanya kemunculan mendadak.
+        void tirai.offsetWidth;
+        tirai.setAttribute('data-tampil', '');
+    }
+
+    function lepasTirai() {
+        if (! tirai) return;
+        const t = tirai;
+        tirai = null;
+        t.removeAttribute('data-tampil');
+        setTimeout(() => t.remove(), 200);
+    }
+
+    /**
+     * Merayap ke 90% lalu berhenti menunggu. Tak pernah sampai 100% sendiri:
+     * bilah yang penuh padahal halamannya belum datang adalah kebohongan kecil
+     * yang justru membuat orang mengira aplikasinya macet.
+     */
+    function mulaiBilah() {
+        if (timerTampil || timerRayap) return; // sudah berjalan
+
+        timerTampil = setTimeout(() => {
+            timerTampil = null;
+            buatBilah();
+            bilah.removeAttribute('data-selesai');
+            setLebar(8);
+            timerRayap = setInterval(() => setLebar(lebar + (90 - lebar) * 0.12), 250);
+        }, JEDA_TAMPIL);
+
+        timerTirai = setTimeout(pasangTirai, JEDA_TIRAI);
+        timerBatas = setTimeout(selesaikanBilah, BATAS_WAKTU);
+    }
+
+    function selesaikanBilah() {
+        clearTimeout(timerTampil);
+        clearInterval(timerRayap);
+        clearTimeout(timerBatas);
+        clearTimeout(timerTirai);
+        timerTampil = timerRayap = timerBatas = timerTirai = null;
+        lepasTirai();
+
+        if (! bilah) return;
+        setLebar(100);
+        bilah.setAttribute('data-selesai', '');
+        setTimeout(() => {
+            if (bilah && bilah.hasAttribute('data-selesai')) {
+                bilah.remove();
+                bilah = null;
+                lebar = 0;
+            }
+        }, 350);
+    }
+
+    /**
+     * Tandai form & tombolnya sedang bekerja. Dipanggil juga dari interseptor
+     * konfirmasi di bawah: `form.submit()` programatik TIDAK memicu event
+     * submit, jadi pendengar biasa takkan pernah tahu form itu terkirim.
+     */
+    window.mulaiProses = function (form, submitter) {
+        if (! form || form.dataset.sibuk) return;
+        form.dataset.sibuk = '1';
+
+        const tombol = submitter
+            || form.querySelector('button[type="submit"], button:not([type]), input[type="submit"]');
+        if (tombol) {
+            tombol.classList.add('tombol-sibuk');
+            tombol.setAttribute('aria-busy', 'true');
+        }
+
+        setTimeout(() => lepasKunci(form), BATAS_KUNCI);
+        // Form bertarget tab baru tidak mengganti halaman ini — bilahnya akan
+        // menggantung sampai batas waktu, jadi lebih baik tak dinyalakan.
+        if (! form.target || form.target === '_self') mulaiBilah();
+    };
+
+    /** Lepas kunci satu form beserta tanda pada tombolnya. */
+    function lepasKunci(form) {
+        if (! form || ! form.dataset.sibuk) return;
+        delete form.dataset.sibuk;
+        form.querySelectorAll('.tombol-sibuk').forEach((t) => {
+            t.classList.remove('tombol-sibuk');
+            t.removeAttribute('aria-busy');
+        });
+    }
+
+    /** Kebalikannya, untuk seisi halaman — saat dipulihkan dari bfcache. */
+    function bersihkan() {
+        document.querySelectorAll('form[data-sibuk]').forEach(lepasKunci);
+        document.querySelectorAll('.tombol-sibuk').forEach((t) => {
+            t.classList.remove('tombol-sibuk');
+            t.removeAttribute('aria-busy');
+        });
+        selesaikanBilah();
+    }
+
+    // ── Perpindahan halaman lewat tautan ────────────────────────────────────
+    document.addEventListener('click', (e) => {
+        if (e.defaultPrevented || e.button !== 0) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // buka di tab baru
+
+        const a = e.target.closest?.('a[href]');
+        if (! a || a.hasAttribute('download') || a.dataset.tanpaMuat !== undefined) return;
+        if (a.target && a.target !== '_self') return;
+
+        const href = a.getAttribute('href') || '';
+        // Jangkar dalam halaman, tautan semu, dan protokol non-web tak memuat
+        // apa pun — bilahnya akan menyala tanpa ada yang menyelesaikannya.
+        if (href === '' || href.startsWith('#') || /^(javascript|mailto|tel):/i.test(href)) return;
+
+        let tujuan;
+        try {
+            tujuan = new URL(a.href, location.href);
+        } catch {
+            return;
+        }
+        if (tujuan.origin !== location.origin) return;
+        if (tujuan.pathname === location.pathname && tujuan.search === location.search && tujuan.hash) return;
+
+        mulaiBilah();
+    });
+
+    // ── Pengiriman form ────────────────────────────────────────────────────
+    // Form yang DICEGAT dialog konfirmasi ditangani dari sana (lihat blok
+    // berikutnya). Yang sampai ke sini: form GET (cari/filter/paginasi) dan
+    // form ber-`data-no-confirm` seperti masuk & keluar.
+    document.addEventListener('submit', (e) => {
+        const form = e.target;
+        if (! (form instanceof HTMLFormElement) || e.defaultPrevented) return;
+        if (form.dataset.tanpaMuat !== undefined) return;
+
+        window.mulaiProses(form, e.submitter);
+    });
+
+    // Halaman dipulihkan dari bfcache (tombol Kembali): tanda sibuk yang ikut
+    // tersimpan harus dilepas, kalau tidak formnya mati sampai dimuat ulang.
+    window.addEventListener('pageshow', (e) => {
+        if (e.persisted) bersihkan();
+    });
+    window.addEventListener('pagehide', selesaikanBilah);
+})();
+
+/**
  * Konfirmasi global — dialog box untuk SETIAP tombol pengambilan keputusan.
  *
  * Semua form yang MENGUBAH data (method != GET) dicegat di fase CAPTURE lalu
@@ -903,6 +1145,16 @@ Alpine.start();
         if ((form.getAttribute('method') || 'get').toLowerCase() === 'get') return;
         if (form.hasAttribute('data-no-confirm')) return;
 
+        // Sudah terkirim sekali. Menghentikannya DI SINI, di fase capture,
+        // adalah satu-satunya tempat yang menangkap semua jalan masuk — termasuk
+        // Enter di isian teks, yang tak melewati tombol mana pun.
+        if (form.dataset.sibuk) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            return;
+        }
+
         e.preventDefault();
         e.stopPropagation(); // capture: hentikan sebelum target → onsubmit inline tak jalan
 
@@ -923,6 +1175,10 @@ Alpine.start();
                 h.value = submitter.value ?? '';
                 form.appendChild(h);
             }
+            // Tanda sibuk dinyalakan dari SINI, bukan dari pendengar submit:
+            // `form.submit()` programatik tidak memicu event submit sama sekali,
+            // jadi pendengar mana pun takkan pernah tahu form ini terkirim.
+            window.mulaiProses?.(form, submitter);
             form.submit(); // programatik → tidak memicu interseptor ini lagi
         });
     }, true); // fase capture

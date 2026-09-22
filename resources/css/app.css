@@ -220,6 +220,211 @@ input.border-gray-300, select.border-gray-300, textarea.border-gray-300 {
     }
 }
 
+/* ══ TANDA "SEDANG DIPROSES" ══════════════════════════════════════════════
+   Aplikasi ini memuat halaman PENUH di tiap perpindahan, jadi antara klik dan
+   halaman berikutnya selalu ada jeda diam. Tanpa tanda apa pun, layar tampak
+   tidak bereaksi — dan yang terjadi berikutnya bukan orang menunggu, melainkan
+   orang menekan tombolnya lagi.
+
+   Ditulis sebagai CSS biasa, BUKAN utilitas Tailwind: kelas-kelas ini dipasang
+   dari JavaScript, dan Tailwind hanya memindai Blade — kelas yang dirakit di JS
+   akan hilang saat build tanpa satu pun pesan.
+
+   Warnanya emas (accent), bukan biru brand: bilahnya melintas di atas kepala
+   menu yang biru, dan biru di atas biru praktis tak terlihat. */
+.bilah-muat {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 10000;
+    height: 3px;
+    width: 0;
+    background: linear-gradient(90deg, #f8c400, #d9a900);
+    box-shadow: 0 0 8px rgba(248, 196, 0, .7);
+    transition: width .2s ease-out, opacity .3s ease-in;
+    opacity: 1;
+    pointer-events: none;
+}
+
+.bilah-muat[data-selesai] {
+    opacity: 0;
+}
+
+/* Tombol yang sedang memproses: lingkaran berputar menggantikan isinya digeser,
+   supaya lebar tombol TIDAK berubah. Tombol yang tiba-tiba melebar saat ditekan
+   menggeser tombol Batal di sebelahnya, dan jari yang sudah bergerak ke sana
+   akan mendarat di tempat yang salah. */
+.tombol-sibuk {
+    position: relative;
+    color: transparent !important;
+    pointer-events: none;
+    cursor: progress;
+}
+
+.tombol-sibuk::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 1em;
+    height: 1em;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 9999px;
+    color: #fff;
+    animation: putar .6s linear infinite;
+}
+
+/* Tombol bertulisan gelap di atas latar terang (mis. "Batal", tautan aksi)
+   butuh lingkaran gelap; putih di atas putih tak terlihat sama sekali. */
+.tombol-sibuk:not([class*='bg-brand']):not([class*='bg-red']):not([class*='bg-emerald'])::after {
+    color: #4b5563;
+}
+
+@keyframes putar {
+    to { transform: rotate(360deg); }
+}
+
+/* Yang memilih "kurangi gerak" tetap harus TAHU ada proses berjalan — yang
+   dihilangkan geraknya, bukan tandanya. Lingkarannya berdenyut pelan alih-alih
+   berputar; blok prefers-reduced-motion di atas sudah memangkas durasi animasi
+   secara umum, jadi tanpa aturan ini lingkarannya diam total dan tampak seperti
+   tombol rusak. */
+@media (prefers-reduced-motion: reduce) {
+    .tombol-sibuk::after {
+        animation: denyut 1.4s ease-in-out infinite !important;
+        animation-duration: 1.4s !important;
+        animation-iteration-count: infinite !important;
+    }
+    .bilah-muat { transition: none; }
+}
+
+@keyframes denyut {
+    0%, 100% { opacity: .35; }
+    50% { opacity: 1; }
+}
+
+/* ══ TIRAI "SEDANG DIPROSES" SELAYAR PENUH ════════════════════════════════
+   Untuk proses yang benar-benar lama. Bilah tipis di puncak layar cukup untuk
+   perpindahan biasa, tetapi pada penyimpanan yang makan beberapa detik ia
+   terlalu mudah tak tersadari — dan orang yang tak menyadarinya akan menekan
+   tombolnya lagi.
+
+   Tirainya juga MENGHALANGI KLIK, dan itu disengaja: selama ia terpasang, tak
+   ada tombol lain yang bisa tersenggol. Satu-satunya cara ia hilang adalah
+   halaman berikutnya datang, atau batas waktu di app.js menyerah.
+
+   Tiga cincin sekaligus, bukan satu, supaya terbaca sebagai "sedang bekerja"
+   bahkan dari sudut mata: lingkaran samar sebagai jalur, busur tebal berputar
+   searah jarum jam, dan busur tipis berlawanan arah.
+
+   WARNANYA PALET APLIKASI, bukan hitam-putih: latar biru brand-dark (#0e3168,
+   sama dengan halaman Masuk & sidebar) dengan busur emas accent (#f8c400) —
+   pasangan yang sudah dipakai di seluruh aplikasi, dan yang sama dengan bilah
+   kemajuan di puncak layar. Tirai kelabu di atas aplikasi yang biru akan
+   terlihat seperti galat peramban, bukan seperti bagian dari aplikasinya. */
+.tirai-muat {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(14, 49, 104, .96); /* brand-dark #0e3168 */
+    backdrop-filter: blur(3px);
+    opacity: 0;
+    transition: opacity .18s ease-out;
+}
+
+.tirai-muat[data-tampil] { opacity: 1; }
+
+.cincin-muat {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 150px;
+    height: 150px;
+}
+
+/* Jalur samar — yang membuat busur di atasnya terbaca sebagai bagian lingkaran,
+   bukan potongan yang melayang sendiri. */
+.cincin-muat::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border: 1px solid rgba(255, 255, 255, .18);
+    border-radius: 9999px;
+}
+
+.cincin-muat i {
+    position: absolute;
+    border-radius: 9999px;
+    border-style: solid;
+    border-color: transparent;
+}
+
+/* Busur LUAR tebal, searah jarum jam. Emas accent — warna sorotan aplikasi,
+   dan satu-satunya warna yang benar-benar menonjol di atas biru brand-dark. */
+.cincin-muat i:nth-child(1) {
+    inset: 0;
+    border-width: 7px;
+    border-top-color: #f8c400;
+    border-bottom-color: #f8c400;
+    animation: putar 1.5s linear infinite;
+}
+
+/* Busur DALAM tipis, berlawanan arah & lebih lambat — perbedaan arah inilah
+   yang membuat geraknya tak terbaca sebagai gambar diam yang miring. Biru
+   brand-soft, bukan emas kedua: dua busur berwarna sama saling menyamarkan. */
+.cincin-muat i:nth-child(2) {
+    inset: 20px;
+    border-width: 4px;
+    border-left-color: rgba(232, 237, 246, .7); /* brand-soft #e8edf6 */
+    border-right-color: rgba(232, 237, 246, .7);
+    animation: putar 2.2s linear infinite reverse;
+}
+
+/* Tulisan DI DALAM cincin, bukan di bawahnya: mata sudah tertuju ke pusat
+   lingkaran yang berputar, dan keterangan yang diletakkan di luar justru jadi
+   bagian yang terlewat. */
+.tirai-muat span {
+    position: absolute;
+    color: #e8edf6; /* brand-soft — putih murni terlalu keras di atas biru tua */
+    font-size: .78rem;
+    font-weight: 600;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    /* Titik-titiknya beranimasi, jadi lebarnya berubah; lebar tetap & rata kiri
+       menahan tulisannya supaya tidak bergeser-geser mengikuti titik. */
+    width: 9ch;
+    text-align: left;
+    padding-left: .6ch;
+}
+
+.tirai-muat span::after {
+    content: '';
+    animation: titik 1.2s steps(4, end) infinite;
+}
+
+@keyframes titik {
+    0%   { content: ''; }
+    25%  { content: '.'; }
+    50%  { content: '..'; }
+    75%  { content: '...'; }
+}
+
+/* Berputar memicu pusing & mual bagi sebagian orang. Yang dihilangkan
+   GERAKNYA, bukan tandanya: cincinnya diam, denyut yang menggantikannya. */
+@media (prefers-reduced-motion: reduce) {
+    .cincin-muat i {
+        animation: denyut 1.4s ease-in-out infinite !important;
+        animation-duration: 1.4s !important;
+        animation-iteration-count: infinite !important;
+    }
+    .tirai-muat span::after { content: '…'; animation: none; }
+}
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 

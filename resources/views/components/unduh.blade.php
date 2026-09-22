@@ -21,7 +21,11 @@
     @unless ($form)
         <span class="text-xs text-gray-400">{{ $label }}</span>
         @foreach (['csv' => 'CSV', 'xlsx' => 'Excel', 'pdf' => 'PDF'] as $f => $lbl)
-            <a :href="tautan(@js($f))"
+            {{-- `data-tanpa-muat`: unduhan TIDAK mengganti halaman, jadi bilah
+                 kemajuan yang menyala karenanya takkan pernah diselesaikan oleh
+                 apa pun — ia menggantung sampai batas waktu dan membuat aplikasi
+                 tampak macet padahal berkasnya sudah turun. --}}
+            <a :href="tautan(@js($f))" data-tanpa-muat
                class="rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">{{ $lbl }}</a>
         @endforeach
     @endunless
