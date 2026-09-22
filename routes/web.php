@@ -41,6 +41,7 @@ use App\Http\Controllers\JournalController;
 use App\Http\Controllers\KaryawanController;
 use App\Http\Controllers\KebijakanKhususController;
 use App\Http\Controllers\KenaikanTingkatController;
+use App\Http\Controllers\KlasifikasiArusKasController;
 use App\Http\Controllers\KepesertaanLainController;
 use App\Http\Controllers\KontrolController;
 use App\Http\Controllers\KoreksiTagihanController;
@@ -215,6 +216,13 @@ Route::middleware('auth')->group(function () {
     // ---- Keuangan: Kontrol / Master ----
     // Chart of Account terpadu (tab Struktur Pohon / Grup / Detail).
     Route::get('/coa', [CoaController::class, 'index'])->name('coa.index')->middleware('hakakses:coa-detail,lihat');
+    // Matriks klasifikasi arus kas — seluruh akun neraca sekaligus. Menumpang
+    // modul `coa-detail`: yang disunting memang kolom pada akun, dan modul baru
+    // hanya menambah satu kotak lagi yang harus dicentangi admin lebih dulu.
+    Route::get('/coa/klasifikasi-arus-kas', [KlasifikasiArusKasController::class, 'index'])
+        ->name('coa.klasifikasi.index')->middleware('hakakses:coa-detail,lihat');
+    Route::put('/coa/klasifikasi-arus-kas', [KlasifikasiArusKasController::class, 'simpan'])
+        ->name('coa.klasifikasi.simpan')->middleware('hakakses:coa-detail,ubah');
     crudModul('coa-groups', CoaGroupController::class, 'coa_group');
     crudModul('coa-detail', CoaDetailController::class, 'coa_detail');
     crudModul('bank-accounts', BankAccountController::class, 'bank_account');

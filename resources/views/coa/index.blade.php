@@ -11,6 +11,21 @@
 @endphp
 
 @section('content')
+    {{-- Pintu ke matriks klasifikasi arus kas. Ditaruh di sini, bukan jadi menu
+         tersendiri: yang disunting memang kolom pada akun, dan halaman inilah
+         tempat orang mencarinya. --}}
+    @php($belumArusKas = $details->filter(fn ($a) => $a->klasifikasi_arus_kas === null
+        && in_array(\App\Models\CoaDetail::akarKelompok($a->kode_grup), ['1', '2', '3'], true))->count())
+    <div class="mb-4 flex flex-wrap items-center justify-end gap-3">
+        @if ($belumArusKas > 0)
+            <span class="text-sm text-amber-700">{{ $belumArusKas }} akun neraca belum punya klasifikasi arus kas.</span>
+        @endif
+        <a href="{{ route('coa.klasifikasi.index') }}"
+           class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Atur Klasifikasi Arus Kas &rarr;
+        </a>
+    </div>
+
     <div x-data="{ tab: 'tree' }">
         {{-- Tab header --}}
         <div class="mb-4 flex flex-wrap gap-1 border-b border-gray-200">
