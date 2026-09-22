@@ -166,6 +166,12 @@ final class ModulRegistry
         // PIUTANG YANG SUDAH DIBUKUKAN, jadi tak boleh ikut hak `ubah` biasa.
         // Diberikan hanya kepada kepala keuangan lewat matriks hak akses.
         ['kode' => 'koreksi-tagihan', 'nama' => 'Koreksi Nominal Tagihan', 'grup' => 'TANPA MENU'],
+        // TANPA MENU: centangnya menempel di form input santri. 'buat' = boleh
+        // MEMBEBASKAN biaya registrasi seorang calon. Dipisahkan dari hak `buat`
+        // modul santri karena keduanya pekerjaan yang berbeda derajatnya:
+        // memasukkan data anak itu tugas harian panitia, membatalkan pemasukan
+        // bukan. Tanpa hak ini centangnya tidak muncul sama sekali.
+        ['kode' => 'pembebasan-registrasi', 'nama' => 'Pembebasan Biaya Registrasi (per santri)', 'grup' => 'TANPA MENU'],
         // 'ubah' = boleh mengoreksi nominal tagihan yang salah ketik. Dipisahkan
         // dari modul `spp` (yang menerbitkan): memeriksa tunggakan adalah pekerjaan
         // harian, menerbitkan tagihan tidak.

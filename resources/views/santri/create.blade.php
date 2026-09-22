@@ -8,7 +8,7 @@
 
         @if (empty($waliOptions))
             <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-                Belum ada wali aktif. Tambahkan <a href="{{ route('wali.create') }}" class="underline">Wali</a> terlebih dahulu.
+                Belum ada wali aktif — pilih <strong>Wali baru</strong> di bawah dan isi keluarganya sekalian di sini.
             </div>
         @endif
 
@@ -24,6 +24,8 @@
              oleh isian jalur di bawahnya. --}}
         <form method="POST" action="{{ route('santri.store') }}" class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
               x-data="{
+                  modeWali: @js(old('mode_wali', 'pilih')),
+                  gratisReg: @js((bool) old('gratis_registrasi', false)),
                   jenjang: @js(old('kode_jenjang', '')),
                   tingkat: @js((string) old('tingkat', '')),
                   ta: @js(old('tahun_ajaran', $taDefault ?? '')),
@@ -37,7 +39,69 @@
               x-init="$watch('jenjang', () => { if (!tingkatOpsi.includes(Number(tingkat))) tingkat = '' })">
             @csrf
 
-            <x-field name="id_wali" label="Wali / Keluarga" :value="old('id_wali')" :options="['' => '— pilih wali —'] + $waliOptions" required />
+            {{-- WALI: dipilih dari yang sudah terdaftar, ATAU ditulis sekalian di
+                 sini. Sebelumnya petugas harus meninggalkan form ini, membuat
+                 walinya di modul lain, lalu mengetik ulang seluruh isian santri.
+
+                 Modenya radio sungguhan, bukan sekadar keadaan Alpine: tanpa
+                 JavaScript kedua panel tampil bersamaan, dan server harus tetap
+                 tahu yang mana yang dimaksud. --}}
+            <fieldset class="rounded-lg border border-gray-200 p-4">
+                <legend class="px-2 text-sm font-semibold text-gray-700">Wali / Keluarga <span class="text-red-500">*</span></legend>
+
+                <div class="mb-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                    <label class="flex items-center gap-2">
+                        <input type="radio" name="mode_wali" value="pilih" x-model="modeWali"
+                               class="border-gray-300 text-brand focus:ring-brand">
+                        <span>Wali sudah terdaftar</span>
+                    </label>
+                    <label class="flex items-center gap-2">
+                        <input type="radio" name="mode_wali" value="baru" x-model="modeWali"
+                               class="border-gray-300 text-brand focus:ring-brand">
+                        <span>Wali baru — isi di sini</span>
+                    </label>
+                </div>
+
+                <div x-show="modeWali === 'pilih'">
+                    <x-field name="id_wali" label="Cari wali" :value="old('id_wali')"
+                             :options="['' => '— pilih wali —'] + $waliOptions"
+                             hint="Kakak-adik memakai SATU wali yang sama — cari dulu sebelum membuat yang baru." />
+                </div>
+
+                <div x-show="modeWali === 'baru'" x-cloak class="space-y-4">
+                    @php $pendapatanOpts = ['' => '—'] + \App\Models\Wali::PENDAPATAN; @endphp
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <x-field name="wali_kontak_utama" label="Kontak Utama" :value="old('wali_kontak_utama', 'ayah')"
+                                 :options="\App\Models\Wali::PERAN"
+                                 hint="Nama & telepon wali diambil dari kontak utama ini — isian peran itu wajib terisi." />
+                        <x-field name="wali_nik" label="NIK" :value="old('wali_nik')" />
+                    </div>
+
+                    @foreach (['ayah' => 'Data Ayah', 'ibu' => 'Data Ibu', 'wali' => 'Data Wali (bila bukan orang tua)'] as $peran => $judul)
+                        <fieldset class="rounded-lg border border-gray-200 p-4">
+                            <legend class="px-2 text-sm font-semibold text-gray-700">{{ $judul }}</legend>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <x-field :name="'wali_nama_' . $peran" label="Nama" :value="old('wali_nama_' . $peran)" />
+                                <x-field :name="'wali_telepon_' . $peran" label="Telepon" :value="old('wali_telepon_' . $peran)" />
+                                <x-field :name="'wali_email_' . $peran" label="Email" type="email" :value="old('wali_email_' . $peran)" />
+                                <x-field :name="'wali_pekerjaan_' . $peran" label="Pekerjaan" :value="old('wali_pekerjaan_' . $peran)" />
+                                <x-field :name="'wali_pendapatan_' . $peran" label="Range Pendapatan" :value="old('wali_pendapatan_' . $peran)" :options="$pendapatanOpts" />
+                            </div>
+                        </fieldset>
+                    @endforeach
+
+                    <label class="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50/60 p-3 text-sm text-gray-700">
+                        <input type="checkbox" name="wali_auto_debet" value="1" @checked(old('wali_auto_debet'))
+                               class="mt-0.5 rounded border-gray-300 text-brand focus:ring-brand">
+                        <span>
+                            Izinkan auto-debet Dompet Wali
+                            <span class="mt-0.5 block text-xs font-normal text-gray-400">Atas PERMINTAAN WALI. Bila aktif, tagihan SPP &amp; tagihan lain otomatis dipotong dari saldo Dompet Wali begitu terbit. Jangan dinyalakan tanpa persetujuan walinya.</span>
+                        </span>
+                    </label>
+
+                    <x-field name="wali_alamat" label="Alamat Keluarga" :value="old('wali_alamat')" textarea />
+                </div>
+            </fieldset>
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-field name="nama" label="Nama Calon Santri" :value="old('nama', $santri->nama)" required />
@@ -182,6 +246,28 @@
                     </div>
                 </div>
             </div>
+
+            @if (\App\Support\Akses::boleh('pembebasan-registrasi', 'buat'))
+                {{-- Pembebasan PER ANAK, berbeda dari tarif bertanda "bebas" yang
+                     membebaskan seluruh pendaftar satu jalur. Hanya muncul bagi
+                     pemegang hak `pembebasan-registrasi`; kirimannya diperiksa
+                     lagi di controller. --}}
+                <div class="rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+                    <label class="flex items-start gap-2 text-sm text-gray-800">
+                        <input type="checkbox" name="gratis_registrasi" value="1" x-model="gratisReg"
+                               class="mt-0.5 rounded border-gray-300 text-brand focus:ring-brand">
+                        <span>
+                            Gratiskan biaya registrasi calon santri ini
+                            <span class="mt-0.5 block text-xs font-normal text-gray-500">Tagihan registrasi tidak diterbitkan sama sekali, dan tahap registrasinya langsung terlewati. Potongan gelombang tetap diperhitungkan dari tanggal pendaftarannya.</span>
+                        </span>
+                    </label>
+                    <div x-show="gratisReg" x-cloak class="mt-3">
+                        <x-field name="alasan_gratis_registrasi" label="Alasan pembebasan" textarea
+                                 :value="old('alasan_gratis_registrasi')" required
+                                 hint="Wajib diisi & tersimpan bersama nama pembebasnya — inilah satu-satunya keterangan yang tersisa saat angka pemasukan ditanyakan kembali." />
+                    </div>
+                </div>
+            @endif
 
             <p class="text-xs text-gray-400">Tagihan registrasi otomatis diterbitkan dari master Jenis Biaya (tipe registrasi) sesuai tahun ajaran &amp; jenjang yang dipilih.</p>
 

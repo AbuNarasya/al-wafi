@@ -86,6 +86,24 @@
                 </div>
             @endif
             <div><div class="text-xs text-gray-400">Gelombang</div><div>{{ $santri->gelombang ?? 'Tanpa Gelombang' }}</div></div>
+            {{-- Pembebasan registrasi ditampilkan DI SINI, bukan hanya tersimpan:
+                 tanpa barisnya, satu-satunya jejak yang terlihat adalah ketiadaan
+                 tagihan — dan "tak ada tagihan" tak bisa dibedakan dari lupa. --}}
+            @if ($santri->gratis_registrasi)
+                <div>
+                    <div class="text-xs text-gray-400">Biaya Registrasi</div>
+                    <div class="font-medium text-amber-700">Dibebaskan</div>
+                    <div class="mt-0.5 text-xs text-gray-500">
+                        {{ $santri->alasan_gratis_registrasi }}
+                        @if ($santri->gratis_registrasi_pada)
+                            <span class="text-gray-400">
+                                — {{ $santri->pembebasRegistrasi?->nama ?? 'pengguna terhapus' }},
+                                {{ $santri->gratis_registrasi_pada->format('d/m/Y H:i') }}
+                            </span>
+                        @endif
+                    </div>
+                </div>
+            @endif
             {{-- Tanggal lulus hanya bermakna bagi alumni. Dulu kolomnya terisi saat
                  kelulusan tapi TAK PERNAH ditampilkan di layar mana pun — tanggal
                  ijazah tersimpan diam-diam. --}}

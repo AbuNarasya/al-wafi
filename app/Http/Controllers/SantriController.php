@@ -37,6 +37,7 @@ use App\Support\Referensi;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -392,10 +393,97 @@ class SantriController extends Controller
         ]);
     }
 
+    /**
+     * Aturan isian wali yang ditulis sekalian dari form santri.
+     *
+     * Namanya DATAR & berawalan `wali_` (bukan `wali_baru[...]` bersarang):
+     * komponen isian memakai satu nama yang sama untuk atribut HTML, `old()`, dan
+     * kunci galat — dan nama bersarang membuat ketiganya tak lagi cocok, sehingga
+     * isian yang gagal tervalidasi kembali kosong tanpa pesan.
+     *
+     * Kelengkapan kontak utama (nama & telepon peran terpilih) TIDAK diperiksa di
+     * sini melainkan oleh WaliService — aturannya bergantung pada peran yang
+     * dipilih, dan menyalinnya ke dua tempat berarti suatu saat keduanya berbeda.
+     *
+     * @return array<string,array<int,mixed>>
+     */
+    private function aturanWaliBaru(): array
+    {
+        $aturan = [
+            'wali_kontak_utama' => ['required', Rule::in(array_keys(Wali::PERAN))],
+            'wali_nik' => ['nullable', 'string', 'max:255'],
+            'wali_alamat' => ['nullable', 'string'],
+            'wali_auto_debet' => ['nullable', 'boolean'],
+        ];
+        foreach (array_keys(Wali::PERAN) as $peran) {
+            $aturan["wali_nama_{$peran}"] = ['nullable', 'string', 'max:255'];
+            $aturan["wali_telepon_{$peran}"] = ['nullable', 'string', 'max:255'];
+            $aturan["wali_email_{$peran}"] = ['nullable', 'email', 'max:255'];
+            $aturan["wali_pekerjaan_{$peran}"] = ['nullable', 'string', 'max:255'];
+            $aturan["wali_pendapatan_{$peran}"] = ['nullable', Rule::in(array_keys(Wali::PENDAPATAN))];
+        }
+
+        return $aturan;
+    }
+
+    /**
+     * Pindahkan isian ber-awalan `wali_` menjadi satu larik `wali_baru`.
+     *
+     * Kuncinya diambil dari daftar aturan, bukan dari "semua yang berawalan
+     * wali_": santri sendiri punya kolom `wali_kelas_asal`, dan pemindahan
+     * berdasarkan awalan akan menyeretnya ikut jadi data wali.
+     */
+    private function pisahkanIsianWali(array $data): array
+    {
+        $wali = ['status' => 'aktif']; // wali yang baru ditulis selalu aktif
+        foreach (array_keys($this->aturanWaliBaru()) as $kunci) {
+            $wali[substr($kunci, 5)] = $data[$kunci] ?? null;
+            unset($data[$kunci]);
+        }
+        $wali['auto_debet'] = (bool) $wali['auto_debet'];
+        $data['wali_baru'] = $wali;
+        $data['id_wali'] = null;
+
+        return $data;
+    }
+
+    /**
+     * Tegakkan wewenang pembebasan registrasi, lalu cap pelakunya.
+     *
+     * Gerbangnya ada DI SINI, bukan hanya di layar: centangnya memang tak
+     * dirender bagi yang tak berhak, tetapi kiriman form bisa disusun sendiri,
+     * dan yang dibatalkan olehnya adalah pemasukan.
+     */
+    private function terapkanPembebasanRegistrasi(array $data): array
+    {
+        $boleh = Akses::boleh('pembebasan-registrasi', 'buat');
+        $diminta = (bool) ($data['gratis_registrasi'] ?? false);
+
+        if (! $diminta || ! $boleh) {
+            return array_merge($data, [
+                'gratis_registrasi' => false,
+                'alasan_gratis_registrasi' => null,
+                'gratis_registrasi_oleh' => null,
+            ]);
+        }
+
+        return array_merge($data, [
+            'gratis_registrasi' => true,
+            'gratis_registrasi_oleh' => Auth::id(),
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
+        // Dua cara menyebut walinya: memilih yang sudah terdaftar, atau menulis
+        // keluarga baru di form yang sama. Modenya dikirim eksplisit — bukan
+        // ditebak dari isian mana yang terisi — supaya isian sisa yang tertinggal
+        // di layar tak diam-diam membuat wali kedua.
+        $waliBaru = $request->input('mode_wali') === 'baru';
+
         $data = $request->validate([
-            'id_wali' => ['required', 'integer', 'exists:wali,id'],
+            'mode_wali' => ['nullable', Rule::in(['pilih', 'baru'])],
+            'id_wali' => [Rule::requiredIf(! $waliBaru), 'nullable', 'integer', 'exists:wali,id'],
             'nama' => ['required', 'string', 'max:255'],
             'jenis_kelamin' => ['required', 'in:L,P'],
             'tempat_lahir' => ['nullable', 'string', 'max:255'],
@@ -418,7 +506,12 @@ class SantriController extends Controller
             // Pilihannya kini master (PPSB → Sumber Informasi), bukan daftar tetap.
             'sumber_informasi' => ['nullable', Rule::exists('sumber_informasi', 'kode')->where('status', 'aktif')],
             'sumber_informasi_lain' => ['nullable', 'string', 'max:255'],
-        ]);
+            // Pembebasan biaya registrasi seorang calon. Alasannya WAJIB — inilah
+            // satu-satunya keterangan yang tersisa saat angka pemasukan ditanyakan
+            // setahun kemudian.
+            'gratis_registrasi' => ['nullable', 'boolean'],
+            'alasan_gratis_registrasi' => ['nullable', 'required_with:gratis_registrasi', 'string', 'max:1000'],
+        ] + ($waliBaru ? $this->aturanWaliBaru() : []));
 
         // "Tanpa Gelombang" disimpan sebagai NULL, bukan kode sentinel — supaya
         // pencarian potongan berhenti sejak awal, bukan mencari kode yang tak
@@ -426,6 +519,12 @@ class SantriController extends Controller
         if ($data['gelombang'] === self::TANPA_GELOMBANG) {
             $data['gelombang'] = null;
         }
+        unset($data['mode_wali']);
+        if ($waliBaru) {
+            $data = $this->pisahkanIsianWali($data);
+        }
+
+        $data = $this->terapkanPembebasanRegistrasi($data);
 
         try {
             $santri = $this->service->create($data);
@@ -433,7 +532,15 @@ class SantriController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('santri.show', $santri->id)->with('status', "Calon santri {$santri->nama} terdaftar ({$santri->no_pendaftaran}).");
+        $pesan = "Calon santri {$santri->nama} terdaftar ({$santri->no_pendaftaran}).";
+        if ($waliBaru) {
+            $pesan .= " Wali \"{$santri->wali->nama}\" ikut dibuat.";
+        }
+        if ($santri->gratis_registrasi) {
+            $pesan .= ' Biaya registrasinya DIBEBASKAN — tagihan registrasi tidak diterbitkan.';
+        }
+
+        return redirect()->route('santri.show', $santri->id)->with('status', $pesan);
     }
 
     public function show(int $id): View

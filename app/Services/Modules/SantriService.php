@@ -47,14 +47,28 @@ class SantriService
         return $row;
     }
 
+    /**
+     * Daftarkan calon santri.
+     *
+     * `wali_baru` (opsional) = isian wali yang ditulis sekalian dari form santri,
+     * untuk keluarga yang memang belum pernah terdaftar. Barisnya dibuat DI DALAM
+     * transaksi yang sama: santri yang gagal tersimpan — NISN kembar, tarif
+     * registrasi belum diisi — tak boleh meninggalkan wali tanpa seorang anak pun
+     * yang kemudian mengotori pencarian wali selamanya.
+     */
     public function create(array $data): Santri
     {
-        $wali = Wali::find($data['id_wali']);
-        if (! $wali) {
-            throw new AppException(400, 'Wali tidak ditemukan.');
-        }
-        if ($wali->status !== 'aktif') {
-            throw new AppException(422, "Wali \"{$wali->nama}\" berstatus nonaktif.");
+        $waliBaru = $data['wali_baru'] ?? null;
+        unset($data['wali_baru']);
+
+        if ($waliBaru === null) {
+            $wali = Wali::find($data['id_wali'] ?? null);
+            if (! $wali) {
+                throw new AppException(400, 'Wali tidak ditemukan.');
+            }
+            if ($wali->status !== 'aktif') {
+                throw new AppException(422, "Wali \"{$wali->nama}\" berstatus nonaktif.");
+            }
         }
         if (empty($data['tahun_ajaran'])) {
             throw new AppException(422, 'Tahun ajaran wajib dipilih saat mendaftarkan calon santri.');
@@ -75,9 +89,16 @@ class SantriService
             $this->pastikanTingkatSah((string) ($data['kode_jenjang'] ?? ''), $data['tingkat']);
         }
         $this->periksaCalonKembar($data);
+        $data = $this->capPembebasanRegistrasi($data);
 
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $waliBaru) {
             $now = Carbon::now();
+            // Wali baru ditulis lebih dulu — santri butuh id-nya. Telepon kembar
+            // ditolak WaliService dengan pesan yang mengarahkan ke wali yang sudah
+            // ada, jadi kakak-adik tak berujung punya dua wali.
+            if ($waliBaru !== null) {
+                $data['id_wali'] = (new WaliService)->create($waliBaru)->id;
+            }
             $base = DocNumber::docBase('PSB', $now);
             $last = Santri::where('no_pendaftaran', 'like', $base.'%')->orderByDesc('no_pendaftaran')->value('no_pendaftaran');
 
@@ -96,7 +117,14 @@ class SantriService
             ]);
 
             // Tagihan registrasi otomatis (cash basis — belum berjurnal).
-            $registrasi = $this->pilihRegistrasi($santri->kode_jenjang, $santri->tahun_ajaran, $santri->jalur);
+            //
+            // Calon yang DIBEBASKAN tak usah dicarikan tarifnya sama sekali:
+            // `pilihRegistrasi()` menolak sel tarif yang belum diisi, dan menolak
+            // pendaftaran anak yang memang tidak ditagih hanya karena tarif jalur
+            // itu belum dilengkapi adalah penolakan yang tak masuk akal.
+            $registrasi = $santri->gratis_registrasi
+                ? null
+                : $this->pilihRegistrasi($santri->kode_jenjang, $santri->tahun_ajaran, $santri->jalur);
             if ($registrasi) {
                 $santri->tagihan()->create([
                     'kode_jenis' => $registrasi['jenis']->kode,
@@ -338,9 +366,26 @@ class SantriService
      * NULL bila registrasinya belum lunas ATAU belum pernah ditagihkan sama
      * sekali. Keduanya sengaja diperlakukan sama: potongan adalah imbalan atas
      * pembayaran registrasi, jadi tanpa pembayaran itu tak ada yang diimbali.
+     *
+     * SATU PENGECUALIAN: calon yang registrasinya DIBEBASKAN per orang. Ia tak
+     * punya tagihan untuk dilunasi, tetapi pembebasan diberikan justru kepada
+     * keluarga yang paling tak sanggup — mencabut potongan gelombangnya berarti
+     * uang pangkalnya JUSTRU lebih mahal daripada tetangga sebangkunya yang
+     * mampu membayar registrasi. Yang dipakai tanggal pendaftarannya, karena
+     * itulah saat ia benar-benar mendaftar pada gelombang tersebut.
+     *
+     * Jalur yang tarifnya bertanda BEBAS tidak ikut: itu keputusan HARGA bagi
+     * seluruh pendaftar satu jalur, bukan keringanan bagi seorang anak, dan
+     * mengubahnya akan menggeser nominal uang pangkal yang sudah berjalan.
      */
     private function tanggalLunasRegistrasi(int $idSantri): ?string
     {
+        $santri = Santri::find($idSantri);
+        if ($santri?->gratis_registrasi) {
+            return Pendaftaran::where('id_santri', $idSantri)->orderBy('id')->value('tanggal')
+                ?? $santri->created_at?->toDateString();
+        }
+
         $tagihan = TagihanSantri::where('id_santri', $idSantri)
             ->where('perilaku', 'registrasi')
             ->orderByDesc('id')->first();
@@ -1104,6 +1149,41 @@ class SantriService
      * melempar galat di sini, jadi pemanggil boleh memperlakukan null sebagai
      * "tahap registrasi tak perlu dilalui" tanpa memeriksa apa pun lagi.
      */
+    /**
+     * Rapikan tanda pembebasan registrasi sebelum disimpan.
+     *
+     * Cap waktunya ditulis DI SINI, bukan diterima dari kiriman: tanggal
+     * pembebasan adalah bagian dari pertanggungjawabannya, dan apa pun yang boleh
+     * dititipkan dari luar akan suatu saat dititipi tanggal yang enak dibaca.
+     *
+     * Tanda yang mati membersihkan ketiga kolom penyertanya, supaya tak tertinggal
+     * alasan menggantung dari isian yang batal dicentang.
+     *
+     * Kewajiban mengisi alasan ditegakkan di CONTROLLER, bukan di sini — jalur
+     * impor data lama tak pernah menyentuh kolom ini, dan menuntutnya di service
+     * akan menghentikan impor yang sama sekali tak berurusan dengan pembebasan.
+     */
+    private function capPembebasanRegistrasi(array $data): array
+    {
+        if (! array_key_exists('gratis_registrasi', $data)) {
+            return $data;
+        }
+
+        if (! $data['gratis_registrasi']) {
+            return array_merge($data, [
+                'gratis_registrasi' => false,
+                'alasan_gratis_registrasi' => null,
+                'gratis_registrasi_oleh' => null,
+                'gratis_registrasi_pada' => null,
+            ]);
+        }
+
+        return array_merge($data, [
+            'gratis_registrasi' => true,
+            'gratis_registrasi_pada' => Carbon::now(),
+        ]);
+    }
+
     private function pilihRegistrasi(?string $kodeJenjang, ?string $tahunAjaran, ?string $kodeJalur = null): ?array
     {
         ['jenis' => $jenis, 'tarif' => $tarif] = $this->komponen('registrasi', $tahunAjaran, $kodeJenjang, $kodeJalur);

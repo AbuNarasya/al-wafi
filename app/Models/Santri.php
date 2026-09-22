@@ -94,12 +94,20 @@ class Santri extends Model
             'tanggal_lulus' => 'date',
             'tingkat' => 'integer',
             'nominal_spp' => 'decimal:2',
+            'gratis_registrasi' => 'boolean',
+            'gratis_registrasi_pada' => 'datetime',
         ];
     }
 
     public function wali(): BelongsTo
     {
         return $this->belongsTo(Wali::class, 'id_wali', 'id');
+    }
+
+    /** Pengguna yang membebaskan biaya registrasi santri ini (bila dibebaskan). */
+    public function pembebasRegistrasi(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'gratis_registrasi_oleh', 'id_pengguna');
     }
 
     /**
