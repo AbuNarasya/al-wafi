@@ -81,6 +81,46 @@ class CoaDetail extends Model
         });
     }
 
+    /**
+     * Peta `kode_grup => akar kelompok (1..5)` untuk SELURUH grup, satu kueri.
+     *
+     * `akarKelompok()` menelusuri ke atas dengan satu `find()` per tingkat, dan
+     * itu memadai untuk satu-dua akun. Untuk seluruh daftar akun ia berubah jadi
+     * ratusan kueri: sebuah layar berisi 109 akun pernah menghabiskan 461 kueri,
+     * yang di laptop tak terasa (Postgres sebelah) tetapi dari Hostinger ke Neon
+     * Singapura menjadi belasan detik — dan halamannya kehabisan waktu, bukan
+     * melambat. Pakai peta ini kapan pun akar dibutuhkan untuk BANYAK akun.
+     *
+     * Sengaja TIDAK disimpan di variabel statis: cache statis hidup melewati
+     * batas test dalam satu proses, dan grup yang dibuat fixture sesudahnya tak
+     * akan pernah terlihat.
+     *
+     * @return array<string,string>
+     */
+    public static function petaAkarKelompok(): array
+    {
+        $induk = CoaGroup::pluck('kode_induk', 'kode_grup')->all();
+
+        // Pemaksaan ke string BUKAN kerapian: PHP mengubah kunci larik yang
+        // berupa angka menjadi integer, sehingga `array_keys()` mengembalikan
+        // int 1 untuk grup bernama "1" — dan pemanggilnya membandingkan hasil
+        // ini secara KETAT dengan ['1','2','3']. Tanpa pemaksaan ini, akun yang
+        // menggantung langsung pada kelompok utama hilang dari daftar tanpa satu
+        // pun galat, sementara akun di grup bersarang tetap muncul.
+        $peta = [];
+        foreach (array_keys($induk) as $kode) {
+            $cur = (string) $kode;
+            $lihat = [];
+            while (! empty($induk[$cur]) && ! isset($lihat[$cur])) {
+                $lihat[$cur] = true;
+                $cur = (string) $induk[$cur];
+            }
+            $peta[(string) $kode] = $cur;
+        }
+
+        return $peta;
+    }
+
     /** Telusuri grup ke atas sampai akar kelompoknya (1..5). */
     public static function akarKelompok(?string $kodeGrup): ?string
     {

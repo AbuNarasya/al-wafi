@@ -14,8 +14,6 @@
     {{-- Pintu ke matriks klasifikasi arus kas. Ditaruh di sini, bukan jadi menu
          tersendiri: yang disunting memang kolom pada akun, dan halaman inilah
          tempat orang mencarinya. --}}
-    @php($belumArusKas = $details->filter(fn ($a) => $a->klasifikasi_arus_kas === null
-        && in_array(\App\Models\CoaDetail::akarKelompok($a->kode_grup), ['1', '2', '3'], true))->count())
     <div class="mb-4 flex flex-wrap items-center justify-end gap-3">
         @if ($belumArusKas > 0)
             <span class="text-sm text-amber-700">{{ $belumArusKas }} akun neraca belum punya klasifikasi arus kas.</span>

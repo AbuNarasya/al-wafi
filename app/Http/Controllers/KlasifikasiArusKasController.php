@@ -34,8 +34,13 @@ class KlasifikasiArusKasController extends Controller
 
     public function index(): View
     {
-        $akun = CoaDetail::with('grup')->orderBy('kode_coa')->get()
-            ->filter(fn ($a) => in_array(CoaDetail::akarKelompok($a->kode_grup), self::AKAR_NERACA, true));
+        // Akar kelompok diambil dari PETA (satu kueri), bukan ditelusuri per akun.
+        // Versi pertama layar ini memanggil akarKelompok() dua kali per akun dan
+        // menghabiskan 461 kueri — tak terasa di laptop, tetapi dari Hostinger ke
+        // Neon Singapura menjadi belasan detik dan halamannya kehabisan waktu.
+        $akar = CoaDetail::petaAkarKelompok();
+        $akun = CoaDetail::orderBy('kode_coa')->get()
+            ->filter(fn ($a) => in_array($akar[$a->kode_grup] ?? null, self::AKAR_NERACA, true));
 
         // Rekening kas sengaja DITANDAI, bukan disembunyikan. Laporan Arus Kas
         // menjelaskan perubahan saldo akun-akun inilah, jadi mengklasifikasikan
@@ -44,7 +49,7 @@ class KlasifikasiArusKasController extends Controller
         $kas = BankAccount::pluck('kode_coa')->flip();
 
         return view('coa-detail.klasifikasi', [
-            'akun' => $akun->groupBy(fn ($a) => CoaDetail::akarKelompok($a->kode_grup)),
+            'akun' => $akun->groupBy(fn ($a) => $akar[$a->kode_grup]),
             'kas' => $kas,
             'belum' => $akun->whereNull('klasifikasi_arus_kas')->count(),
         ]);
@@ -60,17 +65,14 @@ class KlasifikasiArusKasController extends Controller
         // Hanya akun neraca yang boleh disentuh dari sini. Kiriman bisa disusun
         // sendiri, dan menulis klasifikasi ke akun Pendapatan lewat pintu ini
         // akan memindahkannya diam-diam di Laporan Arus Kas.
-        $boleh = CoaDetail::all(['kode_coa', 'kode_grup'])
-            ->filter(fn ($a) => in_array(CoaDetail::akarKelompok($a->kode_grup), self::AKAR_NERACA, true))
-            ->pluck('kode_coa')->flip();
+        $akar = CoaDetail::petaAkarKelompok();
+        $semua = CoaDetail::all()->keyBy('kode_coa');
+        $boleh = $semua->filter(fn ($a) => in_array($akar[$a->kode_grup] ?? null, self::AKAR_NERACA, true));
 
         $berubah = 0;
         DB::transaction(function () use ($data, $boleh, &$berubah) {
             foreach ($data['klasifikasi'] ?? [] as $kode => $nilai) {
-                if (! $boleh->has($kode)) {
-                    continue;
-                }
-                $akun = CoaDetail::find($kode);
+                $akun = $boleh->get($kode);
                 // Perbandingan longgar tak dipakai: '' dari dropdown dan null di
                 // basis data sama-sama berarti "belum ditentukan", dan tanpa
                 // penyeragaman ini setiap simpan akan menulis ulang semua baris.

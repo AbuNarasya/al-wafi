@@ -10,6 +10,7 @@ use App\Models\Level;
 use App\Models\User;
 use App\Support\Akses;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -110,6 +111,41 @@ class KlasifikasiArusKasMatriksTest extends TestCase
         ])->assertSessionHasErrors('klasifikasi.1.1.02.001');
 
         $this->assertNull(CoaDetail::find('1.1.02.001')->klasifikasi_arus_kas);
+    }
+
+    /**
+     * Jumlah kueri dikunci — inilah yang sempat membuat layar ini TIDAK BISA
+     * DIBUKA di produksi.
+     *
+     * Versi pertama memanggil `CoaDetail::akarKelompok()` dua kali per akun, dan
+     * helper itu menelusuri pohon grup dengan satu `find()` per tingkat: 109 akun
+     * menjadi 461 kueri. Di laptop (Postgres di mesin yang sama) itu tak terasa
+     * sama sekali; dari Hostinger ke Neon Singapura tiap kueri berbiaya ±40 ms,
+     * jadi halamannya butuh belasan detik dan KEHABISAN WAKTU — bukan melambat,
+     * melainkan gagal dimuat.
+     *
+     * Ambangnya sengaja longgar (25): yang dijaga bukan angka persisnya,
+     * melainkan bahwa jumlahnya tidak tumbuh mengikuti banyaknya akun.
+     */
+    public function test_layar_tak_menembak_kueri_per_akun(): void
+    {
+        // Grup bertingkat, supaya penelusuran ke akar benar-benar berjalan.
+        CoaGroup::create(['kode_grup' => '1.1', 'nama_grup' => 'Aset Lancar', 'kode_induk' => '1']);
+        CoaGroup::create(['kode_grup' => '1.1.1', 'nama_grup' => 'Kas & Setara', 'kode_induk' => '1.1']);
+        for ($i = 1; $i <= 60; $i++) {
+            CoaDetail::create([
+                'kode_coa' => sprintf('1.1.90.%03d', $i), 'nama_coa' => "Akun Uji {$i}",
+                'kode_grup' => '1.1.1', 'jenis_saldo' => 'debet',
+            ]);
+        }
+
+        DB::enableQueryLog();
+        $this->actingAs($this->admin)->get(route('coa.klasifikasi.index'))->assertOk()->assertSee('Akun Uji 60');
+        $jumlah = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertLessThan(25, $jumlah, "Layar ini menembakkan {$jumlah} kueri untuk 65 akun — "
+            .'pertanda akar kelompok ditelusuri per akun lagi, bukan lewat petanya.');
     }
 
     public function test_menyimpan_menuntut_hak_ubah_coa(): void
