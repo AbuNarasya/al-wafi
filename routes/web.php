@@ -137,11 +137,15 @@ Route::middleware('auth')->group(function () {
     crudModul('business-units', BusinessUnitController::class, 'business_unit');
     crudModul('bagian', BagianController::class, 'bagian');
 
-    // Level Pengajuan — edit-only (peringkat 1–4 tetap).
+    // Level Pengajuan — jumlahnya kini bisa disesuaikan pesantren. `peringkat`
+    // (PK) tetap tak bisa diubah: ia dirujuk users & approval_steps.
     Route::prefix('level-pengajuan')->name('level_pengajuan.')->group(function () {
         Route::get('/', [LevelPengajuanController::class, 'index'])->name('index')->middleware('hakakses:level-pengajuan,lihat');
-        Route::get('/{level_pengajuan}/edit', [LevelPengajuanController::class, 'edit'])->name('edit')->middleware('hakakses:level-pengajuan,ubah');
-        Route::put('/{level_pengajuan}', [LevelPengajuanController::class, 'update'])->name('update')->middleware('hakakses:level-pengajuan,ubah');
+        Route::get('/create', [LevelPengajuanController::class, 'create'])->name('create')->middleware('hakakses:level-pengajuan,buat');
+        Route::post('/', [LevelPengajuanController::class, 'store'])->name('store')->middleware('hakakses:level-pengajuan,buat');
+        Route::get('/{level_pengajuan}/edit', [LevelPengajuanController::class, 'edit'])->name('edit')->middleware('hakakses:level-pengajuan,ubah')->whereNumber('level_pengajuan');
+        Route::put('/{level_pengajuan}', [LevelPengajuanController::class, 'update'])->name('update')->middleware('hakakses:level-pengajuan,ubah')->whereNumber('level_pengajuan');
+        Route::delete('/{level_pengajuan}', [LevelPengajuanController::class, 'destroy'])->name('destroy')->middleware('hakakses:level-pengajuan,hapus')->whereNumber('level_pengajuan');
     });
 
     // Pengaturan Perusahaan — singleton, edit-only.

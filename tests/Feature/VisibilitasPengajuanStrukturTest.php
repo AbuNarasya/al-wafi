@@ -8,11 +8,11 @@ use App\Models\CoaDetail;
 use App\Models\CoaGroup;
 use App\Models\HakAksesModul;
 use App\Models\Level;
-use App\Models\LevelPengajuan;
 use App\Models\PengajuanPembayaran;
 use App\Models\User;
 use App\Services\Modules\StatusAnggaranPengajuanService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MembuatLevelPengajuan;
 use Tests\TestCase;
 
 /**
@@ -31,6 +31,7 @@ use Tests\TestCase;
  */
 class VisibilitasPengajuanStrukturTest extends TestCase
 {
+    use MembuatLevelPengajuan;
     use RefreshDatabase;
 
     private const GRP = 'ZZVS';
@@ -52,9 +53,9 @@ class VisibilitasPengajuanStrukturTest extends TestCase
         parent::setUp();
 
         Level::create(['kode_level' => 'L1', 'nama_level' => 'L1', 'max_transaksi' => null]);
-        LevelPengajuan::create(['peringkat' => 1, 'nama' => 'Ketua Yayasan']);
-        LevelPengajuan::create(['peringkat' => 2, 'nama' => 'Mudir Direktorat']);
-        LevelPengajuan::create(['peringkat' => 4, 'nama' => 'Staff']);
+        $this->buatLevelPengajuan(1, 'Ketua Yayasan');
+        $this->buatLevelPengajuan(2, 'Mudir Direktorat');
+        $this->buatLevelPengajuan(4, 'Staff');
 
         Bagian::create(['kode_bagian' => 'YYS', 'nama_bagian' => 'Yayasan', 'level' => 1]);
         Bagian::create(['kode_bagian' => 'DIR-KAU', 'nama_bagian' => 'Direktorat Keuangan', 'kode_induk' => 'YYS', 'level' => 2]);

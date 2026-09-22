@@ -11,7 +11,6 @@ use App\Models\CoaDetail;
 use App\Models\CoaGroup;
 use App\Models\JournalEntry;
 use App\Models\Level;
-use App\Models\LevelPengajuan;
 use App\Models\OperationalAdvance;
 use App\Models\User;
 use App\Services\Modules\AdvanceSettlementService;
@@ -20,11 +19,13 @@ use App\Services\Modules\CashOutService;
 use App\Services\Modules\OperationalAdvanceService;
 use App\Services\Modules\PengajuanPembayaranService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MembuatLevelPengajuan;
 use Tests\TestCase;
 
 /** Bagian uang muka: operasional, penyelesaian, pengajuan uang muka via Kas Keluar. */
 class UangMukaTest extends TestCase
 {
+    use MembuatLevelPengajuan;
     use RefreshDatabase;
 
     private const GRP = 'ZZUM';
@@ -78,8 +79,8 @@ class UangMukaTest extends TestCase
 
     public function test_pengajuan_uang_muka_dibayar_kas_keluar(): void
     {
-        LevelPengajuan::create(['peringkat' => 3, 'nama' => 'Mudir']);
-        LevelPengajuan::create(['peringkat' => 4, 'nama' => 'Staff']);
+        $this->buatLevelPengajuan(3, 'Mudir');
+        $this->buatLevelPengajuan(4, 'Staff');
         $staff = User::create(['username' => 'staff', 'nama' => 'Staff', 'password_hash' => 'x', 'kode_level' => 'L1', 'kode_bagian' => 'B1', 'peringkat_pengajuan' => 4])->id_pengguna;
         $mudir = User::create(['username' => 'mudir', 'nama' => 'Mudir', 'password_hash' => 'x', 'kode_level' => 'L1', 'kode_bagian' => 'B1', 'peringkat_pengajuan' => 3])->id_pengguna;
         $keuangan = User::create(['username' => 'keu', 'nama' => 'Keu', 'password_hash' => 'x', 'kode_level' => 'L1', 'tim_keuangan' => true])->id_pengguna;

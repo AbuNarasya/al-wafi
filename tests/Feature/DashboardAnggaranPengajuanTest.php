@@ -11,13 +11,13 @@ use App\Models\CoaGroup;
 use App\Models\CompanySettings;
 use App\Models\HakAksesModul;
 use App\Models\Level;
-use App\Models\LevelPengajuan;
 use App\Models\OperationalAdvance;
 use App\Models\PengajuanPembayaran;
 use App\Models\User;
 use App\Services\Modules\StatusAnggaranPengajuanService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Tests\Concerns\MembuatLevelPengajuan;
 use Tests\TestCase;
 
 /**
@@ -34,6 +34,7 @@ use Tests\TestCase;
  */
 class DashboardAnggaranPengajuanTest extends TestCase
 {
+    use MembuatLevelPengajuan;
     use RefreshDatabase;
 
     private const GRP = 'ZZDA';
@@ -62,7 +63,7 @@ class DashboardAnggaranPengajuanTest extends TestCase
             'bulan_awal_anggaran' => 1,
         ]);
         Level::create(['kode_level' => 'L1', 'nama_level' => 'L1', 'max_transaksi' => null]);
-        LevelPengajuan::create(['peringkat' => 4, 'nama' => 'Staff']);
+        $this->buatLevelPengajuan(4, 'Staff');
         Bagian::create(['kode_bagian' => 'YYS', 'nama_bagian' => 'Yayasan', 'level' => 1]);
         Bagian::create(['kode_bagian' => 'BAG-A', 'nama_bagian' => 'Bagian A', 'kode_induk' => 'YYS', 'level' => 3]);
         Bagian::create(['kode_bagian' => 'BAG-B', 'nama_bagian' => 'Bagian B', 'kode_induk' => 'YYS', 'level' => 3]);

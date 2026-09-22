@@ -7,15 +7,16 @@ use App\Models\ApprovalFlow;
 use App\Models\ApprovalInstance;
 use App\Models\Bagian;
 use App\Models\Level;
-use App\Models\LevelPengajuan;
 use App\Models\User;
 use App\Services\Modules\ApprovalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MembuatLevelPengajuan;
 use Tests\TestCase;
 
 /** Mesin approval bertingkat: rantai, eskalasi overbudget, tolak & ajukan ulang, dispatch. */
 class ApprovalEngineTest extends TestCase
 {
+    use MembuatLevelPengajuan;
     use RefreshDatabase;
 
     private ApprovalService $svc;
@@ -31,9 +32,9 @@ class ApprovalEngineTest extends TestCase
         $this->svc = new ApprovalService;
 
         Level::create(['kode_level' => 'L1', 'nama_level' => 'L1', 'max_transaksi' => null]);
-        LevelPengajuan::create(['peringkat' => 1, 'nama' => 'Ketua Yayasan']);
-        LevelPengajuan::create(['peringkat' => 3, 'nama' => 'Mudir Bagian']);
-        LevelPengajuan::create(['peringkat' => 4, 'nama' => 'Staff']);
+        $this->buatLevelPengajuan(1, 'Ketua Yayasan');
+        $this->buatLevelPengajuan(3, 'Mudir Bagian');
+        $this->buatLevelPengajuan(4, 'Staff');
         Bagian::create(['kode_bagian' => 'B1', 'nama_bagian' => 'Bagian 1', 'level' => 3]);
 
         $this->staff = User::create(['username' => 'staff', 'nama' => 'Staff', 'password_hash' => 'x', 'kode_level' => 'L1', 'kode_bagian' => 'B1', 'peringkat_pengajuan' => 4])->id_pengguna;

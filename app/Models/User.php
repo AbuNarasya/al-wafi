@@ -71,4 +71,22 @@ class User extends Authenticatable
     {
         return $this->hasMany(HakAksesModul::class, 'id_pengguna', 'id_pengguna');
     }
+
+    /**
+     * Apakah level pengajuan pengguna ini memegang sebuah PERAN (lihat
+     * LevelPengajuan::PERAN)?
+     *
+     * Inilah pengganti pemeriksaan angka yang dulu tersebar di selusin tempat
+     * ("peringkat_pengajuan === 4"). Sejak jumlah levelnya bisa disesuaikan,
+     * angkanya tak lagi berarti apa pun selain urutan.
+     *
+     * Level NONAKTIF tak memegang peran apa pun: menonaktifkannya harus benar-
+     * benar melumpuhkan wewenangnya, bukan sekadar menyembunyikannya dari daftar.
+     */
+    public function berperanPengajuan(string $peran): bool
+    {
+        $level = $this->levelPengajuan;
+
+        return $level !== null && $level->status === 'aktif' && (bool) $level->{$peran};
+    }
 }

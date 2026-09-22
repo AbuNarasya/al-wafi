@@ -3,8 +3,16 @@
 namespace App\Services\Ledger;
 
 /**
- * Peringkat Level Pengajuan. 1 = TERTINGGI. Angkanya stabil, BUKAN namanya
- * (admin bebas mengganti label lewat master Level Pengajuan).
+ * Peringkat empat level BAWAAN. 1 = TERTINGGI.
+ *
+ * ⚠️ Angka-angka ini BUKAN lagi aturan, hanya penamaan susunan bawaan hasil
+ * seeder. Jumlah level kini ditentukan pesantren lewat master Level Pengajuan,
+ * dan wewenangnya melekat pada TANDA PERAN di baris masternya
+ * (`LevelPengajuan::PERAN`), bukan pada angkanya.
+ *
+ * Jangan dipakai untuk memutuskan boleh-tidaknya sesuatu — pakai
+ * `User::berperanPengajuan('...')`. Menanyakan "apakah peringkatnya 4" akan
+ * salah begitu pesantren membuat level kelima atau menghapus salah satunya.
  */
 final class PeringkatPengajuan
 {

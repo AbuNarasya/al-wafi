@@ -6,7 +6,6 @@ use App\Exceptions\AppException;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
 use App\Services\Ledger\AnggaranPeriode;
-use App\Services\Ledger\PeringkatPengajuan;
 use App\Services\Modules\ApprovalService;
 use App\Services\Modules\BudgetLockService;
 use App\Services\Modules\BudgetPengajuanService;
@@ -64,14 +63,11 @@ class BudgetPengajuanController extends Controller
             'rows' => $rows,
             'q' => $q,
             'menunggu' => $menunggu,
-            // Tombol "Ajukan" hanya bagi yang benar-benar bisa mengajukan —
-            // hak modul saja tidak cukup, service menuntut peringkat Staff /
-            // Mudir Bagian (lihat catatan staffOrMudirBagian di Navigation).
-            'bolehAjukan' => \App\Support\Akses::boleh('budget', 'buat') && in_array(
-                $user->peringkat_pengajuan,
-                [PeringkatPengajuan::STAFF, PeringkatPengajuan::MUDIR_BAGIAN],
-                true,
-            ),
+            // Tombol "Ajukan" hanya bagi yang benar-benar bisa mengajukan — hak
+            // modul saja tidak cukup, service menuntut level bertanda "boleh
+            // mengajukan anggaran" (lihat catatan staffOrMudirBagian di Navigation).
+            'bolehAjukan' => \App\Support\Akses::boleh('budget', 'buat')
+                && $user->berperanPengajuan('boleh_ajukan_anggaran'),
             'filter' => ['status' => $fStatus],
             'opsiStatus' => [
                 'diajukan' => 'Diajukan', 'disetujui' => 'Disetujui',

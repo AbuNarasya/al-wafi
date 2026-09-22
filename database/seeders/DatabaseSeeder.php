@@ -67,7 +67,10 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Level otorisasi PENGAJUAN — peringkat pada rantai Pengajuan Pembayaran.
-     * 1 = tertinggi. Nama bebas diubah admin; peringkat tetap 1–4.
+     * 1 = tertinggi. Nama & JUMLAHNYA bebas diubah admin lewat masternya; empat
+     * baris ini hanya susunan awal yang paling lazim. Wewenangnya melekat pada
+     * tanda peran — `LevelPengajuan::peranBawaan()` yang menentukan, supaya
+     * seeder, migrasi, dan fixture test tak punya rumusan sendiri-sendiri.
      */
     private function seedLevelPengajuan(): void
     {
@@ -75,10 +78,13 @@ class DatabaseSeeder extends Seeder
             ['peringkat' => 1, 'nama' => 'Ketua Yayasan', 'keterangan' => 'Peringkat tertinggi. Hanya ikut rantai pembayaran bila pengajuan menembus anggaran.'],
             ['peringkat' => 2, 'nama' => 'Mudir Umum', 'keterangan' => 'Persetujuan wajib untuk seluruh pengajuan pembayaran.'],
             ['peringkat' => 3, 'nama' => 'Mudir Bagian', 'keterangan' => 'Persetujuan wajib, terbatas pada pengajuan dari bagiannya sendiri.'],
-            ['peringkat' => 4, 'nama' => 'Staff', 'keterangan' => 'Pemohon. Hanya peringkat ini yang boleh membuat pengajuan pembayaran.'],
+            ['peringkat' => 4, 'nama' => 'Staff', 'keterangan' => 'Pemohon pembayaran & anggaran, dalam bagiannya sendiri.'],
         ];
         foreach ($rows as $lp) {
-            LevelPengajuan::updateOrCreate(['peringkat' => $lp['peringkat']], $lp);
+            LevelPengajuan::updateOrCreate(
+                ['peringkat' => $lp['peringkat']],
+                $lp + LevelPengajuan::peranBawaan($lp['peringkat']),
+            );
         }
     }
 

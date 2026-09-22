@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Services\Ledger\PeringkatPengajuan;
+use App\Models\LevelPengajuan;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -10,7 +10,7 @@ use Illuminate\Validation\Validator;
 /**
  * Validasi Pengguna. `is_admin` SENGAJA tidak divalidasi/disimpan lewat form —
  * hak membuat pengguna tak boleh otomatis jadi hak menjadikan admin.
- * Peringkat Staff (4) & Mudir Bagian (3) WAJIB punya bagian.
+ * Level pengajuan bertanda TERIKAT BAGIAN mewajibkan penggunanya punya bagian.
  */
 class UserRequest extends FormRequest
 {
@@ -31,7 +31,11 @@ class UserRequest extends FormRequest
             'password' => $isCreate ? ['required', 'string', 'min:6'] : ['nullable', 'string', 'min:6'],
             'kode_level' => ['required', 'string', Rule::exists('levels', 'kode_level')],
             'kode_bagian' => ['nullable', 'string', Rule::exists('bagian', 'kode_bagian')],
-            'peringkat_pengajuan' => ['nullable', 'integer', 'between:1,4', Rule::exists('level_pengajuan', 'peringkat')],
+            // TANPA batas atas: jumlah level pengajuan kini ditentukan pesantren
+            // lewat masternya, jadi keberadaan barisnya yang menjadi satu-satunya
+            // syarat. Dulu `between:1,4` diam-diam menolak level kelima yang
+            // sudah dibuat orang di masternya.
+            'peringkat_pengajuan' => ['nullable', 'integer', 'min:1', Rule::exists('level_pengajuan', 'peringkat')],
             'tim_keuangan' => ['nullable', 'boolean'],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
         ];
@@ -53,14 +57,15 @@ class UserRequest extends FormRequest
             function (Validator $validator) {
                 $peringkat = $this->input('peringkat_pengajuan');
                 $bagian = $this->input('kode_bagian');
-                $wajib = [PeringkatPengajuan::STAFF => 'Staff', PeringkatPengajuan::MUDIR_BAGIAN => 'Mudir Bagian'];
+                // Dulu dua peringkat disebut satu per satu; kini ditanyakan pada
+                // masternya, supaya level buatan sendiri ikut terjaga.
+                $level = $peringkat === null ? null : LevelPengajuan::find((int) $peringkat);
 
-                if ($peringkat !== null && isset($wajib[(int) $peringkat]) && ! $bagian) {
-                    $sebutan = $wajib[(int) $peringkat];
-                    $alasan = (int) $peringkat === PeringkatPengajuan::STAFF
-                        ? 'Pengajuannya dibebankan ke anggaran bagiannya, jadi tanpa bagian ia tidak bisa mengajukan.'
-                        : 'Ia hanya menyetujui pengajuan dari bagiannya sendiri, jadi tanpa bagian ia tidak akan pernah bisa menyetujui apa pun.';
-                    $validator->errors()->add('kode_bagian', "Pengguna berperingkat {$sebutan} wajib ditempatkan di sebuah Bagian. {$alasan}");
+                if ($level?->terikat_bagian && ! $bagian) {
+                    $validator->errors()->add('kode_bagian', "Level pengajuan \"{$level->nama}\" terikat pada sebuah Bagian, "
+                        .'jadi penggunanya wajib ditempatkan di salah satunya. Pengajuan dibebankan ke anggaran bagian, '
+                        .'dan penyetujuannya pun hanya menjangkau bagian itu — tanpa bagian, ia tak bisa mengajukan '
+                        .'maupun menyetujui apa pun.');
                 }
             },
         ];

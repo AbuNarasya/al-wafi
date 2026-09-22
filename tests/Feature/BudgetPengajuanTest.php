@@ -15,7 +15,6 @@ use App\Models\CoaGroup;
 use App\Models\CompanySettings;
 use App\Models\HakAksesModul;
 use App\Models\Level;
-use App\Models\LevelPengajuan;
 use App\Models\Notification;
 use App\Models\User;
 use App\Services\Modules\ApprovalService;
@@ -23,6 +22,7 @@ use App\Services\Modules\BudgetLockService;
 use App\Services\Modules\BudgetPengajuanService;
 use App\Services\Modules\BudgetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MembuatLevelPengajuan;
 use Tests\TestCase;
 
 /**
@@ -33,6 +33,7 @@ use Tests\TestCase;
  */
 class BudgetPengajuanTest extends TestCase
 {
+    use MembuatLevelPengajuan;
     use RefreshDatabase;
 
     private const GRP = 'ZZBP';
@@ -71,7 +72,7 @@ class BudgetPengajuanTest extends TestCase
 
         Level::create(['kode_level' => 'L1', 'nama_level' => 'L1', 'max_transaksi' => null]);
         foreach ([1 => 'Ketua Yayasan', 2 => 'Mudir Umum', 3 => 'Mudir Bagian', 4 => 'Staff'] as $p => $nama) {
-            LevelPengajuan::create(['peringkat' => $p, 'nama' => $nama]);
+            $this->buatLevelPengajuan($p, $nama);
         }
         Bagian::create(['kode_bagian' => self::BAG, 'nama_bagian' => 'Bagian BP', 'level' => 3]);
         BusinessUnit::create(['kode_unit' => self::UNIT, 'nama_unit' => 'Unit BP']);
@@ -203,10 +204,17 @@ class BudgetPengajuanTest extends TestCase
         $this->assertSame(111.0, (float) Budget::where('kode_bagian', self::BAG)->where('tahun', $ta)->where('kode_unit', self::UNIT)->value('nominal'));
     }
 
-    public function test_hanya_staff_atau_mudir_bagian_yang_boleh_mengajukan(): void
+    /**
+     * Mudir Umum tak berperan mengajukan. Yang diuji perannya, bukan angka
+     * peringkatnya: sejak jumlah level bisa disesuaikan, "peringkat 2" tak lagi
+     * berarti apa pun dengan sendirinya.
+     */
+    public function test_hanya_level_berperan_yang_boleh_mengajukan_anggaran(): void
     {
+        $this->assertFalse(User::find($this->mudirUmum)->berperanPengajuan('boleh_ajukan_anggaran'));
+
         $this->expectException(AppException::class);
-        $this->expectExceptionMessageMatches('/Staff atau Mudir Bagian/');
+        $this->expectExceptionMessageMatches('/tidak berwenang mengajukan anggaran/');
         $this->ajukan(2092, [['kode_coa' => self::BEBAN, 'bulan' => 1, 'nominal' => '1000']], $this->mudirUmum);
     }
 

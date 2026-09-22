@@ -12,7 +12,6 @@ use App\Models\PengajuanPembayaran;
 use App\Models\User;
 use App\Services\Ledger\AnggaranPolicy;
 use App\Services\Ledger\DocNumber;
-use App\Services\Ledger\PeringkatPengajuan;
 use App\Services\Ledger\PostingService;
 use App\Services\Ledger\ReversalService;
 use App\Support\Money;
@@ -151,9 +150,12 @@ class PengajuanPembayaranService
         if (! $pemohon) {
             throw new AppException(400, 'Pemohon tidak ditemukan.');
         }
-        // Pagar KERAS: hanya Staff (peringkat 4) yang boleh mengajukan.
-        if ($pemohon->peringkat_pengajuan !== PeringkatPengajuan::STAFF) {
-            throw new AppException(403, 'Hanya Staff yang boleh membuat pengajuan pembayaran. Atasan menyetujui, bukan mengajukan.');
+        // Pagar KERAS: hanya level bertanda "boleh mengajukan pembayaran".
+        // Dulu ini dipaku pada peringkat 4; sejak jumlah level bisa disesuaikan,
+        // yang ditanyakan perannya — bukan angkanya.
+        if (! $pemohon->berperanPengajuan('boleh_ajukan_pembayaran')) {
+            throw new AppException(403, 'Level pengajuan Anda tidak berwenang membuat pengajuan pembayaran. '
+                .'Wewenang itu diatur di Setting Awal → Level Pengajuan.');
         }
         if (! $pemohon->kode_bagian) {
             throw new AppException(422, 'Profil Anda belum ditempatkan di bagian mana pun. Minta administrator mengisi Bagian pada akun Anda.');
@@ -521,11 +523,16 @@ class PengajuanPembayaranService
                 'waktu' => now(),
             ]);
 
-            // Beri tahu pemohon + penyetuju bagiannya (peringkat di atas Staff).
+            // Beri tahu pemohon + ATASAN-nya di bagian itu. Batasnya diambil dari
+            // peringkat pemohonnya sendiri, bukan dari angka 4 yang dulu dipaku:
+            // dengan jumlah level yang bisa disesuaikan, "di atas Staff" tak lagi
+            // punya arti tetap — yang tetap adalah "di atas orang ini".
+            $peringkatPemohon = User::whereKey($rec->id_pengguna)->value('peringkat_pengajuan');
             $penerima = collect([$rec->id_pengguna])->merge(
                 User::where('kode_bagian', $rec->kode_bagian)->where('status', 'aktif')
                     ->whereNotNull('peringkat_pengajuan')
-                    ->where('peringkat_pengajuan', '<', PeringkatPengajuan::STAFF)->pluck('id_pengguna'),
+                    ->when($peringkatPemohon !== null, fn ($q) => $q->where('peringkat_pengajuan', '<', $peringkatPemohon))
+                    ->pluck('id_pengguna'),
             )->unique()->values();
 
             app(\App\Services\Modules\NotificationService::class)->kirim($penerima->map(fn ($uid) => [

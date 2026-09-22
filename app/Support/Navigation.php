@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Services\Ledger\PeringkatPengajuan;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -58,9 +57,10 @@ final class Navigation
 
         // ---- 2. Anggaran ----
         ['url' => '/budget', 'label' => 'Input Anggaran', 'group' => 'ANGGARAN', 'modul' => 'budget'],
-        // Pengajuan anggaran = jalur penyusun bagian. Yang boleh MENGAJUKAN cuma
-        // Staff & Mudir Bagian (ditegakkan BudgetPengajuanService), jadi menunya
-        // pun hanya muncul bagi mereka — daripada mengantar orang ke pesan 403.
+        // Pengajuan anggaran = jalur penyusun bagian. Yang boleh MENGAJUKAN hanya
+        // level bertanda "boleh mengajukan anggaran" (ditegakkan
+        // BudgetPengajuanService), jadi menunya pun hanya muncul bagi mereka —
+        // daripada mengantar orang ke pesan 403.
         ['url' => '/budget/pengajuan/buat', 'label' => 'Ajukan Anggaran', 'group' => 'ANGGARAN', 'modul' => 'budget', 'staffOrMudirBagian' => true],
         ['url' => '/budget/pengajuan', 'label' => 'Status Pengajuan Anggaran', 'group' => 'ANGGARAN', 'modul' => 'budget'],
         ['url' => '/budget/realisasi', 'label' => 'Realisasi Anggaran', 'group' => 'ANGGARAN', 'direktoratOrAdmin' => true],
@@ -386,24 +386,19 @@ final class Navigation
                 return true;
             }
 
-            return $user->kode_bagian
-                && in_array($user->peringkat_pengajuan, [PeringkatPengajuan::MUDIR_BAGIAN, PeringkatPengajuan::STAFF], true);
+            return $user->kode_bagian && $user->berperanPengajuan('terikat_bagian');
         }
-        if (($n['staffOnly'] ?? false) && ! ($user->is_admin || $user->peringkat_pengajuan === PeringkatPengajuan::STAFF)) {
+        if (($n['staffOnly'] ?? false) && ! ($user->is_admin || $user->berperanPengajuan('boleh_ajukan_pembayaran'))) {
             return false;
         }
-        // Pengajuan anggaran boleh dari Staff MAUPUN Mudir Bagian (mudir yang
-        // mengajukan otomatis melewati tahap bagiannya sendiri). SENGAJA tidak
-        // meloloskan is_admin seperti staffOnly: admin lazimnya tanpa peringkat
-        // & tanpa bagian, jadi menunya akan mengantar ke form yang tak bisa
-        // dipakai. Admin punya jalurnya sendiri (Input Anggaran, simpan
-        // langsung). Admin yang MEMANG ber-peringkat Staff/Mudir Bagian tetap
-        // melihatnya lewat pemeriksaan di bawah.
-        if (($n['staffOrMudirBagian'] ?? false) && ! in_array(
-            $user->peringkat_pengajuan,
-            [PeringkatPengajuan::STAFF, PeringkatPengajuan::MUDIR_BAGIAN],
-            true,
-        )) {
+        // Pengajuan anggaran: level bertanda "boleh mengajukan anggaran"
+        // (bawaannya Staff & Mudir Bagian; yang juga pemegang tahap pertama
+        // otomatis melewati tahapnya sendiri). SENGAJA tidak meloloskan is_admin
+        // seperti staffOnly: admin lazimnya tanpa peringkat & tanpa bagian, jadi
+        // menunya akan mengantar ke form yang tak bisa dipakai. Admin punya
+        // jalurnya sendiri (Input Anggaran, simpan langsung). Admin yang MEMANG
+        // berperan mengajukan tetap melihatnya lewat pemeriksaan ini.
+        if (($n['staffOrMudirBagian'] ?? false) && ! $user->berperanPengajuan('boleh_ajukan_anggaran')) {
             return false;
         }
         // Menu yang isinya beberapa bagian berhak-akses sendiri (mis. Dashboard

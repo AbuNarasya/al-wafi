@@ -10,12 +10,12 @@ use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
 use App\Models\CoaGroup;
 use App\Models\Level;
-use App\Models\LevelPengajuan;
 use App\Models\PengajuanPembayaran;
 use App\Models\User;
 use App\Services\Modules\BudgetPengajuanService;
 use App\Services\Modules\PengajuanPembayaranService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MembuatLevelPengajuan;
 use Tests\TestCase;
 
 /**
@@ -35,6 +35,7 @@ use Tests\TestCase;
  */
 class PesanRincianBelumLengkapTest extends TestCase
 {
+    use MembuatLevelPengajuan;
     use RefreshDatabase;
 
     private User $admin;
@@ -106,7 +107,7 @@ class PesanRincianBelumLengkapTest extends TestCase
      */
     public function test_kartu_persetujuan_tidak_tertukar_antar_jenis_dokumen(): void
     {
-        LevelPengajuan::create(['peringkat' => 3, 'nama' => 'Mudir Bagian']);
+        $this->buatLevelPengajuan(3, 'Mudir Bagian');
         Bagian::create(['kode_bagian' => 'B1', 'nama_bagian' => 'Divisi Umum', 'level' => 3]);
         $penyetuju = User::create([
             'username' => 'zzp_mb', 'nama' => 'Penyetuju', 'password_hash' => 'x',

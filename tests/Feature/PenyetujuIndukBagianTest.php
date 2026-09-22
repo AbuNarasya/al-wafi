@@ -7,10 +7,10 @@ use App\Models\ApprovalFlow;
 use App\Models\ApprovalInstance;
 use App\Models\Bagian;
 use App\Models\Level;
-use App\Models\LevelPengajuan;
 use App\Models\User;
 use App\Services\Modules\ApprovalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MembuatLevelPengajuan;
 use Tests\TestCase;
 
 /**
@@ -29,6 +29,7 @@ use Tests\TestCase;
  */
 class PenyetujuIndukBagianTest extends TestCase
 {
+    use MembuatLevelPengajuan;
     use RefreshDatabase;
 
     private const DOK = 'UjiIndukBagian';
@@ -50,8 +51,8 @@ class PenyetujuIndukBagianTest extends TestCase
         $this->svc = new ApprovalService;
 
         Level::create(['kode_level' => 'L1', 'nama_level' => 'L1', 'max_transaksi' => null]);
-        LevelPengajuan::create(['peringkat' => 2, 'nama' => 'Mudir Direktorat']);
-        LevelPengajuan::create(['peringkat' => 4, 'nama' => 'Staff']);
+        $this->buatLevelPengajuan(2, 'Mudir Direktorat');
+        $this->buatLevelPengajuan(4, 'Staff');
 
         // Struktur nyata: Yayasan → Direktorat → Divisi.
         Bagian::create(['kode_bagian' => 'YYS', 'nama_bagian' => 'Yayasan', 'level' => 1]);

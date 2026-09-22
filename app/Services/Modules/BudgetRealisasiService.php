@@ -5,15 +5,15 @@ namespace App\Services\Modules;
 use App\Exceptions\AppException;
 use App\Models\Bagian;
 use App\Models\User;
-use App\Services\Ledger\PeringkatPengajuan;
 
 /**
  * REVIEW REALISASI ANGGARAN — gerbang khusus (port budget-realisasi.service.ts),
  * bebas matriks modul. Bertingkat menurut posisi:
  *  - ADMIN & YAYASAN (Bagian.level = 1) → SEMUA bagian tanpa batas.
  *  - DIREKTORAT (Bagian.level = 2) → bagiannya + seluruh bawahannya (subtree).
- *  - MUDIR BAGIAN (peringkat 3) & STAFF (peringkat 4) → HANYA bagiannya sendiri.
- * Selain itu → 403. Dua sumbu (level bagian & peringkat) memang hierarki terpisah.
+ *  - Level pengajuan bertanda TERIKAT BAGIAN → HANYA bagiannya sendiri.
+ * Selain itu → 403. Dua sumbu (level bagian & level pengajuan) memang hierarki
+ * terpisah.
  */
 class BudgetRealisasiService
 {
@@ -98,10 +98,9 @@ class BudgetRealisasiService
             return array_merge($data, ['boleh_semua' => false, 'bagian_opsi' => $subtree]);
         }
 
-        // Mudir Bagian (3) & Staff (4): HANYA bagiannya sendiri.
-        if ($user->kode_bagian
-            && ((int) $user->peringkat_pengajuan === PeringkatPengajuan::MUDIR_BAGIAN
-                || (int) $user->peringkat_pengajuan === PeringkatPengajuan::STAFF)) {
+        // Level yang TERIKAT BAGIAN (bawaannya Mudir Bagian & Staff): HANYA
+        // bagiannya sendiri. Dulu kedua peringkatnya disebut satu per satu.
+        if ($user->kode_bagian && $user->berperanPengajuan('terikat_bagian')) {
             if ($kodeBagian && $kodeBagian !== $user->kode_bagian) {
                 throw new AppException(403, 'Anda hanya dapat melihat realisasi bagian Anda sendiri.');
             }
@@ -116,7 +115,8 @@ class BudgetRealisasiService
 
         throw new AppException(
             403,
-            'Realisasi Anggaran hanya untuk admin, Yayasan, Direktorat, dan Mudir Bagian/Staff (bagiannya sendiri).',
+            'Realisasi Anggaran hanya untuk admin, Yayasan, Direktorat, dan level pengajuan '
+            .'yang terikat pada sebuah Bagian (bagiannya sendiri).',
         );
     }
 }

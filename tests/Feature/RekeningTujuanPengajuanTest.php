@@ -10,13 +10,13 @@ use App\Models\CoaDetail;
 use App\Models\CoaGroup;
 use App\Models\HakAksesModul;
 use App\Models\Level;
-use App\Models\LevelPengajuan;
 use App\Models\PengajuanPembayaran;
 use App\Models\RekeningTersimpan;
 use App\Models\User;
 use App\Services\Modules\ApprovalService;
 use App\Services\Modules\PengajuanPembayaranService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MembuatLevelPengajuan;
 use Tests\TestCase;
 
 /**
@@ -34,6 +34,7 @@ use Tests\TestCase;
  */
 class RekeningTujuanPengajuanTest extends TestCase
 {
+    use MembuatLevelPengajuan;
     use RefreshDatabase;
 
     private const GRP = 'ZZRT';
@@ -59,8 +60,8 @@ class RekeningTujuanPengajuanTest extends TestCase
         $this->svc = new PengajuanPembayaranService;
 
         Level::create(['kode_level' => 'L1', 'nama_level' => 'L1', 'max_transaksi' => null]);
-        LevelPengajuan::create(['peringkat' => 3, 'nama' => 'Mudir Bagian']);
-        LevelPengajuan::create(['peringkat' => 4, 'nama' => 'Staff']);
+        $this->buatLevelPengajuan(3, 'Mudir Bagian');
+        $this->buatLevelPengajuan(4, 'Staff');
         Bagian::create(['kode_bagian' => 'B1', 'nama_bagian' => 'Bagian 1', 'level' => 3]);
         BusinessUnit::create(['kode_unit' => self::UNIT, 'nama_unit' => 'Unit']);
         CoaGroup::create(['kode_grup' => self::GRP, 'nama_grup' => 'Rek Test']);

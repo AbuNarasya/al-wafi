@@ -10,7 +10,6 @@ use App\Models\CoaDetail;
 use App\Models\User;
 use App\Services\Ledger\AnggaranPeriode;
 use App\Services\Ledger\DocNumber;
-use App\Services\Ledger\PeringkatPengajuan;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -50,9 +49,10 @@ class BudgetPengajuanService
     }
 
     /**
-     * Ajukan anggaran satu scope ke BUDGET-STD. Pengaju: Staff (4) atau Mudir
-     * Bagian (3). Bila Mudir Bagian yang mengajukan, tahap 1 (Mudir Bagian)
-     * disetujui otomatis agar ia tidak menyetujui dirinya sendiri.
+     * Ajukan anggaran satu scope ke BUDGET-STD. Pengaju: level bertanda "boleh
+     * mengajukan anggaran" (bawaannya Staff & Mudir Bagian). Bila pengajunya
+     * sendiri pemegang tahap pertama, tahap itu disetujui otomatis agar ia tidak
+     * menyetujui dirinya sendiri.
      *
      * @param  array{tahun:int,kode_unit?:?string,keterangan?:?string,items:array<int,array{kode_coa:string,bulan:int,nominal:string}>}  $input
      */
@@ -62,9 +62,11 @@ class BudgetPengajuanService
         if (! $pemohon || $pemohon->status !== 'aktif') {
             throw new AppException(401, 'Pengguna tidak ditemukan.');
         }
-        $peringkat = $pemohon->peringkat_pengajuan;
-        if ($peringkat !== PeringkatPengajuan::STAFF && $peringkat !== PeringkatPengajuan::MUDIR_BAGIAN) {
-            throw new AppException(403, 'Hanya Staff atau Mudir Bagian yang boleh mengajukan anggaran.');
+        // Dulu dipaku pada peringkat 3 & 4; kini perannya yang ditanyakan, supaya
+        // pesantren berstruktur lain bisa menunjuk level mana pun sebagai pemohon.
+        if (! $pemohon->berperanPengajuan('boleh_ajukan_anggaran')) {
+            throw new AppException(403, 'Level pengajuan Anda tidak berwenang mengajukan anggaran. '
+                .'Wewenang itu diatur di Setting Awal → Level Pengajuan.');
         }
         // Bagian dari PROFIL, bukan pilihan — orang mengajukan atas nama bagiannya.
         if (! $pemohon->kode_bagian) {
@@ -135,11 +137,15 @@ class BudgetPengajuanService
             'id_pemohon' => $idPengguna,
         ]);
 
-        if ($peringkat === PeringkatPengajuan::MUDIR_BAGIAN) {
+        // Pengaju yang KEBETULAN juga penyetuju tahap pertama akan menyetujui
+        // dirinya sendiri; tahapnya dilewati otomatis. Dulu ini dipaku pada
+        // peringkat 3 (Mudir Bagian) — kini ditanyakan pada rantainya sendiri,
+        // jadi susunan level mana pun tertangani tanpa menyebut angka.
+        if ($this->approval()->bolehMemutuskan(self::SUMBER, (string) $rec->id, $idPengguna)) {
             $this->approval()->approve(
                 $inst->id,
                 $idPengguna,
-                'Disetujui otomatis — pengaju adalah Mudir Bagian; tahap bagian dilewati.',
+                'Disetujui otomatis — pengaju sendiri pemegang peringkat tahap ini.',
             );
         }
 
@@ -228,11 +234,12 @@ class BudgetPengajuanService
      * Kueri pengajuan yang BOLEH DILIHAT seorang pengguna. Rute modul sudah
      * menggerbangi lewat hak "budget"; ini pembatas per-dokumen di atasnya.
      * Penyetuju di rantai membaca lewat /approvals (wewenangnya rantai), jadi
-     * di sini cukup: pemohon, anggota bagiannya, Ketua Yayasan, dan admin.
+     * di sini cukup: pemohon, anggota bagiannya, level berlingkup seluruh
+     * yayasan (bawaannya Ketua Yayasan), dan admin.
      */
     public function kueriTerlihat(User $user): Builder
     {
-        if ($user->is_admin || $user->peringkat_pengajuan === PeringkatPengajuan::KETUA_YAYASAN) {
+        if ($user->is_admin || $user->berperanPengajuan('lingkup_semua')) {
             return BudgetPengajuan::query();
         }
 

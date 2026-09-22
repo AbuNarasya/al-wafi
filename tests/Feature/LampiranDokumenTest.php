@@ -10,7 +10,6 @@ use App\Models\CoaGroup;
 use App\Models\HakAksesModul;
 use App\Models\LampiranDokumen;
 use App\Models\Level;
-use App\Models\LevelPengajuan;
 use App\Models\OperationalAdvance;
 use App\Models\PengajuanPembayaran;
 use App\Models\User;
@@ -21,6 +20,7 @@ use App\Support\Unggahan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Tests\Concerns\MembuatLevelPengajuan;
 use Tests\TestCase;
 
 /**
@@ -40,6 +40,7 @@ use Tests\TestCase;
  */
 class LampiranDokumenTest extends TestCase
 {
+    use MembuatLevelPengajuan;
     use RefreshDatabase;
 
     private const GRP = 'ZZLM';
@@ -59,8 +60,8 @@ class LampiranDokumenTest extends TestCase
         Storage::fake('local');
 
         Level::create(['kode_level' => 'L1', 'nama_level' => 'L1', 'max_transaksi' => null]);
-        LevelPengajuan::create(['peringkat' => 3, 'nama' => 'Mudir Bagian']);
-        LevelPengajuan::create(['peringkat' => 4, 'nama' => 'Staff']);
+        $this->buatLevelPengajuan(3, 'Mudir Bagian');
+        $this->buatLevelPengajuan(4, 'Staff');
         Bagian::create(['kode_bagian' => 'B1', 'nama_bagian' => 'Bagian 1', 'level' => 3]);
         BusinessUnit::create(['kode_unit' => self::UNIT, 'nama_unit' => 'Unit']);
         CoaGroup::create(['kode_grup' => self::GRP, 'nama_grup' => 'Lampiran Test']);
