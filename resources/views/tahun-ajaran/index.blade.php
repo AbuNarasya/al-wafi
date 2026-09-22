@@ -40,7 +40,19 @@
                             <div class="flex items-center justify-end gap-2">
                                 @if (\App\Support\Akses::boleh('tahun-ajaran', 'ubah'))<a href="{{ route('tahun_ajaran.edit', $r->id) }}" class="text-brand hover:underline">Ubah</a>@endif
                                 @if (\App\Support\Akses::boleh('tahun-ajaran', 'hapus'))
-                                    <form method="POST" action="{{ route('tahun_ajaran.destroy', $r->id) }}" data-confirm="Hapus tahun ajaran {{ $r->kode }}?">@csrf @method('DELETE')<button class="text-red-600 hover:underline">Hapus</button></form>
+                                    {{-- Sel tarif boleh ikut terhapus, dan jumlahnya disebut SEBELUM diklik.
+                                         Tanpa hak ubah tarif, tandanya tak dikirim: penghapusannya tertahan
+                                         pesan lama, persis seperti sebelum tombol ini bisa menyapu. --}}
+                                    @php($jml = $selTarif[$r->kode] ?? 0)
+                                    @php($sapu = $jml > 0 && \App\Support\Akses::boleh('tarif', 'ubah'))
+                                    <form method="POST" action="{{ route('tahun_ajaran.destroy', $r->id) }}"
+                                        data-confirm="{{ $sapu
+                                            ? "Tahun ajaran {$r->kode} masih memegang {$jml} sel tarif. Hapus tahun ajaran BESERTA seluruh tarifnya? Tarif yang terhapus tidak bisa dikembalikan."
+                                            : "Hapus tahun ajaran {$r->kode}?" }}">
+                                        @csrf @method('DELETE')
+                                        @if ($sapu)<input type="hidden" name="ikut_tarif" value="1">@endif
+                                        <button class="text-red-600 hover:underline">{{ $sapu ? 'Hapus + tarif' : 'Hapus' }}</button>
+                                    </form>
                                 @endif
                             </div>
                         </td>

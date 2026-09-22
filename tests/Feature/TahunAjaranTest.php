@@ -126,6 +126,141 @@ class TahunAjaranTest extends TestCase
         $this->assertSame('registrasi', $santri->tagihan()->first()->perilaku);
     }
 
+    public function test_hapus_beserta_tarif_menyapu_sel_tarif_dan_penanda_jalur(): void
+    {
+        $svc = new TahunAjaranService;
+        $ta = $svc->create(['kode' => '2026/2027', 'status' => 'aktif']);
+        JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler']);
+        $jenjang = $this->jenjangUji();
+        $this->pasangTarif('2026/2027', $jenjang, 'reguler', 'registrasi', '500000');
+        $this->pasangTarif('2026/2027', $jenjang, 'reguler', 'uang_pangkal', null, bebas: true);
+        // Tarif tahun LAIN tak boleh ikut tersapu.
+        $svc->create(['kode' => '2027/2028', 'status' => 'aktif']);
+        $this->pasangTarif('2027/2028', $jenjang, 'reguler', 'registrasi', '600000');
+        \App\Models\JalurNonaktif::create(['tahun_ajaran' => '2026/2027', 'kode_jenjang' => $jenjang, 'kode_jalur' => 'reguler']);
+
+        // Tanpa tandanya, penghapusan tetap tertahan — angkanya disebut di pesan.
+        try {
+            $svc->remove($ta->id);
+            $this->fail('harus 409');
+        } catch (AppException $e) {
+            $this->assertSame(409, $e->status);
+            $this->assertStringContainsString('2 sel tarif', $e->getMessage());
+        }
+        $jumlah = $svc->jumlahSelTarif();
+        ksort($jumlah); // urutan baris GROUP BY tak dijanjikan PostgreSQL
+        $this->assertSame(['2026/2027' => 2, '2027/2028' => 1], $jumlah);
+
+        $svc->remove($ta->id, ikutTarif: true);
+
+        $this->assertDatabaseMissing('tahun_ajaran', ['kode' => '2026/2027']);
+        $this->assertDatabaseMissing('tarif_biaya', ['tahun_ajaran' => '2026/2027']);
+        $this->assertDatabaseMissing('jalur_nonaktif', ['tahun_ajaran' => '2026/2027']);
+        $this->assertSame(['2027/2028' => 1], $svc->jumlahSelTarif());
+    }
+
+    /**
+     * Sapuan tarif tak boleh menembus data kesantrian. Sebelas tabel merujuk kode
+     * T.A tanpa satu pun kunci asing yang menahannya — dulu hanya empat di
+     * antaranya yang diperiksa, sehingga T.A bertagihan bisa lenyap diam-diam.
+     */
+    public function test_sapuan_tarif_tak_menembus_data_kesantrian(): void
+    {
+        $svc = new TahunAjaranService;
+        $ta = $svc->create(['kode' => '2026/2027', 'status' => 'aktif']);
+        JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler']);
+        $this->pasangTarif('2026/2027', $this->jenjangUji(), 'reguler', 'registrasi', '500000');
+        \App\Models\Gelombang::create(['tahun_ajaran' => '2026/2027', 'kode' => 'G1', 'nama' => 'Gelombang 1']);
+
+        try {
+            $svc->remove($ta->id, ikutTarif: true);
+            $this->fail('harus 409');
+        } catch (AppException $e) {
+            $this->assertSame(409, $e->status);
+            $this->assertStringContainsString('1 gelombang', $e->getMessage());
+            // Yang tersapu hanya setelan; penghalangnya disebut TANPA sel tarif.
+            $this->assertStringNotContainsString('sel tarif', $e->getMessage());
+        }
+
+        // Ditolak sebelum apa pun disentuh — tarifnya masih utuh.
+        $this->assertDatabaseHas('tahun_ajaran', ['kode' => '2026/2027']);
+        $this->assertDatabaseHas('tarif_biaya', ['tahun_ajaran' => '2026/2027']);
+    }
+
+    public function test_hapus_ditolak_selama_masih_default_pendaftaran(): void
+    {
+        $svc = new TahunAjaranService;
+        $ta = $svc->create(['kode' => '2026/2027', 'status' => 'aktif', 'default_pendaftaran' => true]);
+
+        try {
+            $svc->remove($ta->id, ikutTarif: true);
+            $this->fail('harus 409');
+        } catch (AppException $e) {
+            $this->assertSame(409, $e->status);
+            $this->assertStringContainsString('default pendaftaran', $e->getMessage());
+        }
+
+        // Tandanya dilepas dulu lewat Ubah, baru boleh dihapus.
+        $svc->update($ta->id, ['default_pendaftaran' => false]);
+        $svc->remove($ta->id);
+        $this->assertDatabaseMissing('tahun_ajaran', ['kode' => '2026/2027']);
+    }
+
+    /**
+     * Sapuan tarif menuntut hak UBAH di modul Tarif, bukan cuma hak hapus di
+     * master ini. Tanpa syarat itu, orang yang sengaja tak diberi akses tarif
+     * bisa menghabiskan tarif satu tahun ajaran lewat pintu belakang — dan
+     * tandanya dikirim dari form, jadi memalsukannya cuma sebaris.
+     */
+    public function test_sapuan_tarif_menuntut_hak_ubah_tarif(): void
+    {
+        \App\Models\Level::create(['kode_level' => 'L1', 'nama_level' => 'L1', 'max_transaksi' => null]);
+        $svc = new TahunAjaranService;
+        $ta = $svc->create(['kode' => '2026/2027', 'status' => 'aktif']);
+        JalurPendaftaran::create(['kode' => 'reguler', 'nama' => 'Reguler']);
+        $this->pasangTarif('2026/2027', $this->jenjangUji(), 'reguler', 'registrasi', '500000');
+
+        // Hanya hak hapus TA: layar menawarkan Hapus biasa, dan tanda yang
+        // dipalsukan pun tak menembus — pesan penghalangnya tetap muncul.
+        $tanpaTarif = $this->pengujiHak(['tahun-ajaran' => ['hapus' => true]]);
+        $this->actingAs($tanpaTarif)->get(route('tahun_ajaran.index'))
+            ->assertOk()->assertDontSee('ikut_tarif')->assertSee('>Hapus<', false);
+        $this->actingAs($tanpaTarif)
+            ->delete(route('tahun_ajaran.destroy', $ta->id), ['ikut_tarif' => 1])
+            ->assertSessionHas('error');
+        $this->assertDatabaseHas('tarif_biaya', ['tahun_ajaran' => '2026/2027']);
+
+        // Dengan hak ubah tarif: tombolnya menyebut tarif, angkanya disebut di
+        // konfirmasi, dan penghapusannya jadi.
+        $denganTarif = $this->pengujiHak(['tahun-ajaran' => ['hapus' => true], 'tarif' => ['ubah' => true]]);
+        $this->actingAs($denganTarif)->get(route('tahun_ajaran.index'))
+            ->assertOk()->assertSee('ikut_tarif')->assertSee('1 sel tarif', false);
+        $this->actingAs($denganTarif)
+            ->delete(route('tahun_ajaran.destroy', $ta->id), ['ikut_tarif' => 1])
+            ->assertSessionMissing('error');
+        $this->assertDatabaseMissing('tahun_ajaran', ['kode' => '2026/2027']);
+        $this->assertDatabaseMissing('tarif_biaya', ['tahun_ajaran' => '2026/2027']);
+    }
+
+    /** @param  array<string,array<string,bool>>  $hak */
+    private function pengujiHak(array $hak): \App\Models\User
+    {
+        $user = \App\Models\User::create([
+            'username' => 'u'.count($hak).uniqid(), 'nama' => 'Penguji', 'password_hash' => 'x',
+            'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif',
+        ]);
+        foreach ($hak as $modul => $aksi) {
+            \App\Models\HakAksesModul::create([
+                'id_pengguna' => $user->id_pengguna, 'kode_modul' => $modul,
+                'lihat' => true, 'buat' => $aksi['buat'] ?? false, 'ubah' => $aksi['ubah'] ?? false,
+                'hapus' => $aksi['hapus'] ?? false, 'menu' => true,
+            ]);
+        }
+        \App\Support\Akses::lupakan();
+
+        return $user;
+    }
+
     public function test_kode_ta_tidak_bisa_diubah(): void
     {
         $svc = new TahunAjaranService;

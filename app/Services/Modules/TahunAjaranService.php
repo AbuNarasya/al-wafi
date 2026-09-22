@@ -3,19 +3,28 @@
 namespace App\Services\Modules;
 
 use App\Exceptions\AppException;
-use App\Models\JalurPendaftaran;
+use App\Models\Gelombang;
+use App\Models\JadwalPerubahanSantri;
+use App\Models\JalurNonaktif;
+use App\Models\KebijakanKhusus;
+use App\Models\NisSantri;
+use App\Models\Pendaftaran;
 use App\Models\PotonganGelombang;
+use App\Models\RiwayatTingkat;
 use App\Models\Santri;
+use App\Models\TagihanSantri;
 use App\Models\TahunAjaran;
 use App\Models\TargetSantri;
 use App\Models\TarifBiaya;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Master Tahun Ajaran. kode ("2026/2027") dirujuk sebagai string oleh
- * jenis_biaya, potongan_gelombang, target_santri, dan santri — karena itu kode
- * tak bisa diubah dan TA yang terpakai tak bisa dihapus. Maksimal satu TA aktif
- * menjadi default_pendaftaran.
+ * Master Tahun Ajaran. kode ("2026/2027") dirujuk sebagai STRING oleh selusin
+ * tabel lain — tak satu pun lewat kunci asing, jadi tak ada yang menahan
+ * penghapusan selain penjaga di `remove()`. Karena itu kode tak bisa diubah dan
+ * TA yang terpakai tak bisa dihapus. Maksimal satu TA aktif menjadi
+ * default_pendaftaran.
  *
  * Jalur pendaftaran TIDAK termasuk: ia berlaku lintas tahun ajaran.
  */
@@ -74,26 +83,112 @@ class TahunAjaranService
         });
     }
 
-    public function remove(int $id): void
+    /**
+     * Tabel yang merujuk kode T.A, dengan nama yang bisa dibaca petugas di layar.
+     *
+     * Semuanya MENGHALANGI penghapusan dan tak satu pun ikut disapu: ini data
+     * kesantrian & transaksi, yang kalau ditinggal yatim tak bisa diperbaiki
+     * dari layar mana pun — tagihan yang menyebut tahun ajaran tak dikenal
+     * berhenti bisa dibayar, tanpa sebab yang kelihatan.
+     *
+     * `tarif_biaya` & `jalur_nonaktif` sengaja TIDAK di sini: keduanya setelan
+     * tarif yang bisa diisi ulang, dan penanganannya diatur `remove()`.
+     *
+     * Jenis biaya TIDAK dihitung: sejak tarif pindah ke tabelnya sendiri, jenis
+     * biaya hanya memegang akun dan berlaku lintas T.A. Jalur pendaftaran juga
+     * tidak: sejak 2026-07-28 ia berlaku lintas tahun ajaran.
+     *
+     * @var array<string,array{class-string<Model>,string}>
+     */
+    private const PERUJUK = [
+        'potongan gelombang' => [PotonganGelombang::class, 'tahun_ajaran'],
+        'gelombang' => [Gelombang::class, 'tahun_ajaran'],
+        'target santri' => [TargetSantri::class, 'tahun_ajaran'],
+        'santri angkatan ini' => [Santri::class, 'tahun_ajaran'],
+        // Kolom yang lain: tahun yang sedang DIJALANI santri, bukan angkatannya.
+        'santri yang sedang menjalaninya' => [Santri::class, 'tahun_ajaran_berjalan'],
+        'pendaftaran' => [Pendaftaran::class, 'tahun_ajaran'],
+        'tagihan santri' => [TagihanSantri::class, 'tahun_ajaran'],
+        'nomor induk santri' => [NisSantri::class, 'tahun_ajaran'],
+        'riwayat tingkat' => [RiwayatTingkat::class, 'tahun_ajaran'],
+        'kebijakan khusus' => [KebijakanKhusus::class, 'tahun_ajaran'],
+        'jadwal perubahan santri' => [JadwalPerubahanSantri::class, 'tahun_ajaran'],
+    ];
+
+    /**
+     * Hapus tahun ajaran.
+     *
+     * `$ikutTarif` menyapu SETELAN TARIF-nya — sel tarif beserta penanda jalur
+     * nonaktif — dalam transaksi yang sama. Hanya setelan: seluruh PERUJUK tetap
+     * menghalangi. Tarif boleh ikut karena ia bisa diisi ulang atau disalin dari
+     * tahun lain; tagihan dan pendaftaran tidak.
+     *
+     * Penanda jalur nonaktif SELALU ikut terhapus, bahkan tanpa `$ikutTarif`: ia
+     * cuma penanda "jalur ini tak berlaku di sini", tak memuat nilai apa pun, dan
+     * menyisakannya berarti setelan lama hidup kembali diam-diam begitu kode T.A
+     * yang sama dibuat ulang.
+     */
+    public function remove(int $id, bool $ikutTarif = false): void
     {
         $row = $this->get($id);
-        $dipakai = [
-            // Jenis biaya TIDAK lagi dihitung: sejak tarif pindah ke tabelnya
-            // sendiri, jenis biaya hanya memegang akun dan berlaku lintas T.A.
-            // Yang merujuk tahun ajaran sekarang adalah sel tarifnya.
-            'sel tarif' => TarifBiaya::where('tahun_ajaran', $row->kode)->count(),
-            // Jalur pendaftaran TIDAK dihitung: sejak 2026-07-28 jalur berlaku
-            // lintas tahun ajaran, jadi tak pernah merujuk satu T.A.
-            'potongan gelombang' => PotonganGelombang::where('tahun_ajaran', $row->kode)->count(),
-            'target santri' => TargetSantri::where('tahun_ajaran', $row->kode)->count(),
-            'santri' => Santri::where('tahun_ajaran', $row->kode)->count(),
-        ];
-        $ada = array_filter($dipakai);
-        if ($ada !== []) {
-            $rincian = implode(', ', array_map(fn ($n, $t) => "{$n} {$t}", $ada, array_keys($ada)));
+
+        // Default pendaftaran dilepas dulu lewat Ubah. Menghapusnya begitu saja
+        // membuat form PPSB jatuh ke TA aktif terbaru tanpa ada yang memutuskan,
+        // dan itu baru ketahuan dari pendaftaran yang tercap tahun yang salah.
+        if ($row->default_pendaftaran) {
+            throw new AppException(409, "Tahun ajaran {$row->kode} sedang menjadi default pendaftaran. "
+                .'Lepas dulu tandanya lewat Ubah — atau pindahkan ke tahun ajaran lain — sebelum menghapusnya.');
+        }
+
+        $dipakai = $this->rujukan($row->kode);
+        if (! $ikutTarif && ($sel = TarifBiaya::where('tahun_ajaran', $row->kode)->count()) > 0) {
+            $dipakai = ['sel tarif' => $sel] + $dipakai;
+        }
+
+        if ($dipakai !== []) {
+            $rincian = implode(', ', array_map(fn ($n, $t) => "{$n} {$t}", $dipakai, array_keys($dipakai)));
             throw new AppException(409, "Tahun ajaran {$row->kode} masih dirujuk ({$rincian}). Nonaktifkan saja bila sudah tidak dipakai.");
         }
-        $row->delete();
+
+        DB::transaction(function () use ($row, $ikutTarif) {
+            if ($ikutTarif) {
+                TarifBiaya::where('tahun_ajaran', $row->kode)->delete();
+            }
+            JalurNonaktif::where('tahun_ajaran', $row->kode)->delete();
+            $row->delete();
+        });
+    }
+
+    /**
+     * Berapa baris yang merujuk kode T.A ini, per jenis — hanya yang tak nol.
+     * Sel tarif TIDAK termasuk; ia dihitung terpisah karena boleh disapu.
+     *
+     * @return array<string,int>
+     */
+    public function rujukan(string $kode): array
+    {
+        $hitung = [];
+        foreach (self::PERUJUK as $nama => [$model, $kolom]) {
+            $n = $model::where($kolom, $kode)->count();
+            if ($n > 0) {
+                $hitung[$nama] = $n;
+            }
+        }
+
+        return $hitung;
+    }
+
+    /**
+     * Jumlah sel tarif per kode T.A, untuk layar daftar: konfirmasi penghapusan
+     * harus menyebut angkanya SEBELUM diklik, bukan sesudah. Satu query untuk
+     * seluruh tabel, bukan satu per baris.
+     *
+     * @return array<string,int>
+     */
+    public function jumlahSelTarif(): array
+    {
+        return TarifBiaya::selectRaw('tahun_ajaran, count(*) as jml')
+            ->groupBy('tahun_ajaran')->pluck('jml', 'tahun_ajaran')->all();
     }
 
     /** @return array<string,string> kode => kode, hanya TA aktif (untuk dropdown). */
