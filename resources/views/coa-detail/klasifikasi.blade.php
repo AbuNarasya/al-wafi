@@ -62,16 +62,28 @@
                                              ia memang dikecualikan oleh laporannya. Ditandai, bukan
                                              disembunyikan: akun yang hilang dari daftar hanya akan
                                              dicari orang dan dikira rusak. --}}
-                                        <span class="ml-1 rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-600">rekening kas — biarkan kosong</span>
+                                        <span class="ml-1 rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-600">rekening kas — tak perlu diisi</span>
                                     @endif
                                 </td>
                                 <td class="px-4 py-2">
-                                    <select name="klasifikasi[{{ $a->kode_coa }}]" @disabled(! $bolehUbah)
-                                            class="w-full rounded-lg border border-gray-400 px-3 py-1.5 text-sm focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-gray-100 {{ $a->klasifikasi_arus_kas === null && ! $isKas ? 'border-amber-400 bg-amber-50/60' : '' }}">
+                                    {{-- Rekening kas DIKUNCI. Sisa nilai dari sebelum akun itu
+                                         terdaftar sebagai rekening kas sengaja TIDAK ikut dikunci:
+                                         mengunci yang terlanjur terisi membuatnya mustahil
+                                         dikosongkan dari layar mana pun. --}}
+                                    @php($kunci = $isKas && $a->klasifikasi_arus_kas === null)
+                                    <select name="klasifikasi[{{ $a->kode_coa }}]" @disabled(! $bolehUbah || $kunci)
+                                            @if ($kunci) title="Rekening kas tidak diklasifikasikan — Laporan Arus Kas justru menjelaskan perubahan saldonya." @endif
+                                            class="w-full rounded-lg border border-gray-400 px-3 py-1.5 text-sm focus:border-brand focus:ring-1 focus:ring-brand disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 {{ $a->klasifikasi_arus_kas === null && ! $isKas ? 'border-amber-400 bg-amber-50/60' : '' }}">
                                         @foreach ($pilihan as $nilai => $label)
                                             <option value="{{ $nilai }}" @selected((string) $a->klasifikasi_arus_kas === (string) $nilai)>{{ $label }}</option>
                                         @endforeach
                                     </select>
+                                    @if ($isKas && $a->klasifikasi_arus_kas !== null)
+                                        <p class="mt-1 text-xs text-amber-700">
+                                            Rekening kas seharusnya tak berklasifikasi. Pilih
+                                            &quot;belum ditentukan&quot; lalu Simpan untuk mengosongkannya.
+                                        </p>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

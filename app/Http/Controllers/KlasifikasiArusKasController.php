@@ -68,9 +68,10 @@ class KlasifikasiArusKasController extends Controller
         $akar = CoaDetail::petaAkarKelompok();
         $semua = CoaDetail::all()->keyBy('kode_coa');
         $boleh = $semua->filter(fn ($a) => in_array($akar[$a->kode_grup] ?? null, self::AKAR_NERACA, true));
+        $kas = BankAccount::pluck('kode_coa')->flip();
 
         $berubah = 0;
-        DB::transaction(function () use ($data, $boleh, &$berubah) {
+        DB::transaction(function () use ($data, $boleh, $kas, &$berubah) {
             foreach ($data['klasifikasi'] ?? [] as $kode => $nilai) {
                 $akun = $boleh->get($kode);
                 // Perbandingan longgar tak dipakai: '' dari dropdown dan null di
@@ -78,6 +79,17 @@ class KlasifikasiArusKasController extends Controller
                 // penyeragaman ini setiap simpan akan menulis ulang semua baris.
                 $baru = ($nilai ?: null);
                 if (! $akun || $akun->klasifikasi_arus_kas === $baru) {
+                    continue;
+                }
+                // Rekening kas tak boleh DIBERI klasifikasi — laporannya justru
+                // menjelaskan perubahan saldonya, dan mengelompokkannya berarti
+                // menghitungnya dua kali. Dropdown-nya memang dikunci di layar,
+                // tetapi kiriman form bisa disusun sendiri; penguncian yang hanya
+                // ada di layar bukan penguncian.
+                //
+                // MENGOSONGKAN tetap boleh: akun yang terlanjur terisi sebelum ia
+                // didaftarkan sebagai rekening kas harus punya jalan keluar.
+                if ($kas->has($kode) && $baru !== null) {
                     continue;
                 }
                 $akun->update(['klasifikasi_arus_kas' => $baru]);

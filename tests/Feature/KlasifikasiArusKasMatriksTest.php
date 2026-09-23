@@ -148,6 +148,42 @@ class KlasifikasiArusKasMatriksTest extends TestCase
             .'pertanda akar kelompok ditelusuri per akun lagi, bukan lewat petanya.');
     }
 
+    /**
+     * Rekening kas: dropdown-nya dikunci di layar, DAN kirimannya ditolak.
+     * Penguncian yang hanya ada di layar bukan penguncian — kiriman form bisa
+     * disusun sendiri.
+     */
+    public function test_rekening_kas_dikunci_dan_kirimannya_tak_menembus(): void
+    {
+        $this->actingAs($this->admin)->get(route('coa.klasifikasi.index'))->assertOk()
+            ->assertSee('rekening kas — tak perlu diisi', false);
+
+        $this->actingAs($this->admin)->put(route('coa.klasifikasi.simpan'), [
+            'klasifikasi' => ['1.1.01.001' => 'operasi'],
+        ])->assertSessionHas('status', 'Tidak ada perubahan.');
+
+        $this->assertNull(CoaDetail::find('1.1.01.001')->klasifikasi_arus_kas);
+    }
+
+    /**
+     * Sisa nilai dari sebelum akun itu terdaftar sebagai rekening kas HARUS bisa
+     * dikosongkan — mengunci yang terlanjur terisi membuatnya mustahil dibereskan
+     * dari layar mana pun.
+     */
+    public function test_rekening_kas_yang_terlanjur_terisi_masih_bisa_dikosongkan(): void
+    {
+        CoaDetail::whereKey('1.1.01.001')->update(['klasifikasi_arus_kas' => 'operasi']);
+
+        $this->actingAs($this->admin)->get(route('coa.klasifikasi.index'))->assertOk()
+            ->assertSee('Rekening kas seharusnya tak berklasifikasi', false);
+
+        $this->actingAs($this->admin)->put(route('coa.klasifikasi.simpan'), [
+            'klasifikasi' => ['1.1.01.001' => ''],
+        ])->assertSessionHas('status');
+
+        $this->assertNull(CoaDetail::find('1.1.01.001')->klasifikasi_arus_kas);
+    }
+
     public function test_menyimpan_menuntut_hak_ubah_coa(): void
     {
         $user = User::create([
