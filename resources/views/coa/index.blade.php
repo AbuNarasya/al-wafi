@@ -6,8 +6,10 @@
     $roots = $groups->where('level', 1)->sortBy('kode_grup');
     $bolehGrupBuat = \App\Support\Akses::boleh('coa-groups', 'buat');
     $bolehGrupUbah = \App\Support\Akses::boleh('coa-groups', 'ubah');
+    $bolehGrupHapus = \App\Support\Akses::boleh('coa-groups', 'hapus');
     $bolehDetailBuat = \App\Support\Akses::boleh('coa-detail', 'buat');
     $bolehDetailUbah = \App\Support\Akses::boleh('coa-detail', 'ubah');
+    $bolehDetailHapus = \App\Support\Akses::boleh('coa-detail', 'hapus');
 @endphp
 
 @section('content')
@@ -71,7 +73,16 @@
                                 <td class="px-4 py-3 text-gray-500">{{ $g->level }}</td>
                                 <td class="px-4 py-3 text-gray-500">{{ $g->kode_induk ?? '—' }}</td>
                                 <td class="px-4 py-3 text-right">
-                                    @if ($bolehGrupUbah)<a href="{{ route('coa_groups.edit', $g) }}" class="text-brand hover:underline">Ubah</a>@endif
+                                    <div class="flex items-center justify-end gap-2">
+                                        @if ($bolehGrupUbah)<a href="{{ route('coa_groups.edit', $g) }}" class="text-brand hover:underline">Ubah</a>@endif
+                                        {{-- Penjaganya di controller sudah lengkap: hanya sub-grup &
+                                             akun detail yang merujuk grup, keduanya berkunci asing,
+                                             dan keduanya sudah diperiksa beserta jumlahnya. --}}
+                                        @if ($bolehGrupHapus)
+                                            <form method="POST" action="{{ route('coa_groups.destroy', $g) }}"
+                                                  data-confirm="Hapus grup {{ $g->kode_grup }} — {{ $g->nama_grup }}? Grup yang masih menaungi sub-grup atau akun detail akan ditolak.">@csrf @method('DELETE')<button class="text-red-600 hover:underline">Hapus</button></form>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -101,7 +112,17 @@
                                 <td class="px-4 py-3"><span class="rounded px-1.5 py-0.5 text-xs font-medium {{ $a->jenis_saldo === 'debet' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700' }}">{{ ucfirst($a->jenis_saldo) }}</span></td>
                                 <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $a->status === 'aktif' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500' }}">{{ ucfirst($a->status) }}</span></td>
                                 <td class="px-4 py-3 text-right">
-                                    @if ($bolehDetailUbah)<a href="{{ route('coa_detail.edit', $a) }}" class="text-brand hover:underline">Ubah</a>@endif
+                                    <div class="flex items-center justify-end gap-2">
+                                        @if ($bolehDetailUbah)<a href="{{ route('coa_detail.edit', $a) }}" class="text-brand hover:underline">Ubah</a>@endif
+                                        {{-- Penjaganya ada di controller, bukan di sini: akun yang
+                                             masih dipakai ditolak beserta sebutan siapa pemakainya.
+                                             Menyembunyikan tombolnya butuh menghitung pemakaian
+                                             seratus akun sekaligus — mahal, dan tak lebih aman. --}}
+                                        @if ($bolehDetailHapus)
+                                            <form method="POST" action="{{ route('coa_detail.destroy', $a) }}"
+                                                  data-confirm="Hapus akun {{ $a->kode_coa }} — {{ $a->nama_coa }}? Akun yang sudah dipakai jurnal, jenis biaya, atau rekening akan ditolak.">@csrf @method('DELETE')<button class="text-red-600 hover:underline">Hapus</button></form>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
