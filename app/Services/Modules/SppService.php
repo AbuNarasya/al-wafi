@@ -45,7 +45,7 @@ class SppService
             throw new AppException(404, 'Santri tidak ditemukan.');
         }
         if (! $santri->kode_jenjang) {
-            throw new AppException(422, "Santri \"{$santri->nama}\" belum punya jenjang, jadi jenis & tarif SPP-nya tak bisa ditentukan.");
+            throw $this->tanpaJenjang($santri);
         }
         // Tarif dicari pada tahun yang SEDANG DIJALANI, bukan angkatan: santri
         // angkatan 2026 yang kini kelas 3 pada T.A 2028 harus memakai tarif 2028.
@@ -58,8 +58,33 @@ class SppService
         // bisnis mana yang bertambah, jadi laba rugi per unit ikut keliru.
         $jenjang = (new PenempatanSantriService)->pada($santri, $ta)['kode_jenjang'] ?: $santri->kode_jenjang;
 
-        ['jenis' => $jenis, 'tarif' => $tarif] = (new SantriService)
-            ->komponen('spp', $ta, $jenjang, $santri->jalur);
+        return $this->nominalDari(
+            $santri,
+            fn () => (new SantriService)->komponen('spp', $ta, $jenjang, $santri->jalur),
+            (new KebijakanKhususService)->berlaku($santri->id, 'spp', $ta),
+        );
+    }
+
+    private function tanpaJenjang(Santri $santri): AppException
+    {
+        return new AppException(422, "Santri \"{$santri->nama}\" belum punya jenjang, jadi jenis & tarif SPP-nya tak bisa ditentukan.");
+    }
+
+    /**
+     * INTI hitungan nominal SPP — dipakai nominalSppSantri() (satu santri) DAN
+     * pratinjau() (seluruh santri aktif). Keduanya hanya berbeda dalam CARA
+     * mengambil bahannya; aturannya harus satu, supaya angka di layar pratinjau
+     * tak pernah berbeda dari angka yang ditagih.
+     *
+     * `$komponen` berupa closure, bukan nilai: komponen() MELEMPAR bila jenis
+     * biaya jenjangnya belum ada, dan pesan itu harus tetap menang atas
+     * kebijakan khusus maupun nominal khusus — sama seperti dulu.
+     *
+     * @param  \Closure(): array{jenis:JenisBiaya, tarif:array}  $komponen
+     */
+    private function nominalDari(Santri $santri, \Closure $komponen, ?KebijakanKhusus $kebijakan): array
+    {
+        ['jenis' => $jenis, 'tarif' => $tarif] = $komponen();
 
         // KEBIJAKAN KHUSUS menang atas grid — dan sengaja diperiksa SEBELUM
         // status tarif: santri berkebijakan khusus tetap bisa ditagih walau sel
@@ -69,14 +94,12 @@ class SppService
         // alasan, tanpa penyetuju, dan tanpa masa berlaku. Yang bercara
         // `nominal_khusus` berperilaku persis seperti dulu; yang bercara
         // potongan butuh tarif gridnya, jadi hanya berlaku bila selnya terisi.
-        $kebijakan = (new KebijakanKhususService)->berlaku($santri->id, 'spp', $ta);
         if ($kebijakan && ($kebijakan->cara === 'nominal_khusus' || $tarif['status'] === 'ada')) {
             $asli = $kebijakan->cara === 'nominal_khusus' ? '0' : $tarif['nominal'];
-            $hasil = (new KebijakanKhususService)->terapkan($santri->id, 'spp', $ta, $asli);
 
             // `asal_bagian` null: kalimatnya bukan kalimat asal tarif, jadi tak
             // ada nama jenjang/jalur yang bisa ditebalkan <x-asal-tarif>.
-            return ['nominal' => $hasil['nominal'], 'asal' => 'khusus',
+            return ['nominal' => (new KebijakanKhususService)->hitung($kebijakan, $asli), 'asal' => 'khusus',
                 'kode_jenis' => $jenis->kode,
                 'asal_label' => $kebijakan->labelJenis().' — '.$kebijakan->ringkas(),
                 'asal_bagian' => null, 'keterangan' => $kebijakan->alasan];
@@ -288,8 +311,39 @@ class SppService
         $taPeriode = $this->taPeriode($periode);
 
         $santri = Santri::where('status', 'aktif')->orderBy('nama')
-            ->get(['id', 'nama', 'nis', 'tingkat', 'kode_jenjang', 'tahun_ajaran', 'tahun_ajaran_berjalan', 'nominal_spp', 'keterangan_spp']);
+            ->get(['id', 'nama', 'nis', 'tingkat', 'kode_jenjang', 'jalur', 'tahun_ajaran', 'tahun_ajaran_berjalan', 'nominal_spp', 'keterangan_spp']);
         $sudahAda = TagihanSantri::where('perilaku', 'spp')->where('periode', $periode)->pluck('id_santri')->all();
+
+        // BAHAN DIAMBIL SEKALIGUS, bukan sebaris-sebaris. Dulu tiap santri
+        // memanggil nominalSppSantri() — ±7 kueri per santri. Dengan 649 santri
+        // hasil impor ISE itu 4.550 kueri; di produksi (Hostinger → Neon)
+        // halamannya diputus batas waktu sebelum sempat tampil, dan tombol
+        // Terbitkan ikut mati karena menyusun rencananya lewat fungsi ini juga.
+        // Hitungannya tetap satu tempat: nominalDari().
+        $belum = $santri->filter(fn ($s) => $s->kode_jenjang && ! in_array($s->id, $sudahAda, true));
+        $penempatan = (new PenempatanSantriService)->massal($belum, $taPeriode->kode);
+        $kebijakan = (new KebijakanKhususService)->berlakuMassal($belum->pluck('id')->all(), 'spp', $taPeriode->kode);
+
+        // Komponen (jenis biaya + sel tarif) hanya bergantung pada jenjang &
+        // jalur — segelintir kombinasi untuk ratusan santri. Lemparannya ikut
+        // diingat, supaya santri berikutnya di kombinasi yang sama menerima
+        // pesan yang sama tanpa bertanya ulang ke database.
+        $komponen = [];
+        $ambilKomponen = function (?string $jenjang, ?string $jalur) use (&$komponen, $taPeriode) {
+            $kunci = $jenjang.'|'.$jalur;
+            if (! array_key_exists($kunci, $komponen)) {
+                try {
+                    $komponen[$kunci] = (new SantriService)->komponen('spp', $taPeriode->kode, $jenjang, $jalur);
+                } catch (AppException $e) {
+                    $komponen[$kunci] = $e;
+                }
+            }
+            if ($komponen[$kunci] instanceof AppException) {
+                throw $komponen[$kunci];
+            }
+
+            return $komponen[$kunci];
+        };
 
         // Jenjang disebut lewat NAMA di layar — kode `J001` tak bercerita apa pun.
         $jenjang = Jenjang::orderBy('urutan')->orderBy('kode')->pluck('nama', 'kode')->all();
@@ -314,7 +368,15 @@ class SppService
                 continue;
             }
             try {
-                $n = $this->nominalSppSantri($s->id, $taPeriode->kode);
+                if (! $s->kode_jenjang) {
+                    throw $this->tanpaJenjang($s);
+                }
+                $jenjangTa = ($penempatan[$s->id]['kode_jenjang'] ?? null) ?: $s->kode_jenjang;
+                $n = $this->nominalDari(
+                    $s,
+                    fn () => $ambilKomponen($jenjangTa, $s->jalur),
+                    $kebijakan[$s->id] ?? null,
+                );
                 $hasil[] = $identitas + ['nominal' => $n['nominal'], 'asal' => $n['asal'],
                     'asal_label' => $n['asal_label'], 'kode_jenis' => $n['kode_jenis'], 'status' => 'siap',
                     // Tahun ajaran PERIODE-nya — sama untuk seluruh baris, karena

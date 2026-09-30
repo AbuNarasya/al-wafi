@@ -9,6 +9,7 @@ use App\Models\Santri;
 use App\Support\Audit\Jejak;
 use App\Support\Money;
 use App\Support\SumberLampiran;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 
@@ -165,6 +166,12 @@ class KebijakanKhususService
             return ['nominal' => Money::of($nominalAsli), 'kebijakan' => null];
         }
 
+        return ['nominal' => $this->hitung($k, $nominalAsli), 'kebijakan' => $k];
+    }
+
+    /** Nominal sesudah sebuah kebijakan dikenakan pada nominal asli — tanpa kueri. */
+    public function hitung(KebijakanKhusus $k, string $nominalAsli): string
+    {
         $nominal = match ($k->cara) {
             'nominal_khusus' => Money::of($k->besaran),
             'nominal' => Money::sub($nominalAsli, $k->besaran),
@@ -178,15 +185,47 @@ class KebijakanKhususService
             $nominal = Money::of('0');
         }
 
-        return ['nominal' => $nominal, 'kebijakan' => $k];
+        return $nominal;
     }
 
     /** Kebijakan yang sedang berlaku untuk satu sel penagihan, bila ada. */
     public function berlaku(int $idSantri, string $perilaku, ?string $tahunAjaran, ?string $tanggal = null): ?KebijakanKhusus
     {
+        return $this->kueriBerlaku($perilaku, $tahunAjaran, $tanggal)
+            ->where('id_santri', $idSantri)
+            ->first();
+    }
+
+    /**
+     * Bentuk MASSAL berlaku() — satu kueri untuk seluruh daftar. Pratinjau SPP
+     * memutar ratusan santri; sebaris-sebaris, kueri ini saja sudah ratusan
+     * perjalanan ke database. Syarat & urutannya SAMA persis (kueriBerlaku),
+     * jadi yang terpilih per santri tak mungkin berbeda dari berlaku().
+     *
+     * @param  list<int>  $idSantri
+     * @return array<int,KebijakanKhusus> diindeks id santri; yang tak berkebijakan tak ada kuncinya
+     */
+    public function berlakuMassal(array $idSantri, string $perilaku, ?string $tahunAjaran, ?string $tanggal = null): array
+    {
+        if ($idSantri === []) {
+            return [];
+        }
+
+        // Baris pertama tiap santri menurut urutan kueriBerlaku = yang dipilih first().
+        return $this->kueriBerlaku($perilaku, $tahunAjaran, $tanggal)
+            ->whereIn('id_santri', $idSantri)
+            ->get()
+            ->groupBy('id_santri')
+            ->map->first()
+            ->all();
+    }
+
+    /** Syarat & urutan "kebijakan yang berlaku" — satu tempat untuk berlaku() dan berlakuMassal(). */
+    private function kueriBerlaku(string $perilaku, ?string $tahunAjaran, ?string $tanggal): Builder
+    {
         $tgl = $tanggal ? Carbon::parse($tanggal) : Carbon::now();
 
-        return KebijakanKhusus::where('id_santri', $idSantri)
+        return KebijakanKhusus::query()
             ->where('perilaku', $perilaku)
             ->where('status', 'disetujui')
             // Kebijakan tanpa tahun ajaran berlaku untuk semua tahun; yang
@@ -197,8 +236,7 @@ class KebijakanKhususService
             // Yang menyebut tahun ajaran secara eksplisit lebih spesifik, jadi
             // ia menang atas yang berlaku umum.
             ->orderByRaw('CASE WHEN tahun_ajaran IS NULL THEN 1 ELSE 0 END')
-            ->orderByDesc('id')
-            ->first();
+            ->orderByDesc('id');
     }
 
     /** @return list<string> nama surat yang belum terlampir */
