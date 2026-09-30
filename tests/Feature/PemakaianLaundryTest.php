@@ -20,6 +20,8 @@ use App\Models\Wali;
 use App\Services\Modules\PemakaianLainService;
 use App\Services\Ppsb\DompetPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\MenghitungKueri;
 use Tests\TestCase;
 
 /**
@@ -35,6 +37,7 @@ use Tests\TestCase;
  */
 class PemakaianLaundryTest extends TestCase
 {
+    use MenghitungKueri;
     use RefreshDatabase;
 
     private const GRP = 'ZZLD';
@@ -109,6 +112,38 @@ class PemakaianLaundryTest extends TestCase
             'kode_jenis' => 'LDR-SMP', 'id_santri' => $s->id,
             'tanggal' => $tanggal, 'kuantitas' => $kg,
         ], $this->petugas->id_pengguna);
+    }
+
+    /**
+     * Penerbitan tak bertambah kuerinya bersama jumlah santri — dulu setoran
+     * ditandai dengan satu UPDATE per santri. Sekaligus memastikan UPDATE
+     * massalnya tetap menghormati batas tanggal periode.
+     */
+    public function test_terbitkan_tak_tumbuh_bersama_jumlah_santri(): void
+    {
+        $terbitkan = fn () => $this->svc()->terbitkan([
+            'kode_jenis' => 'LDR-SMP', 'periode' => '2026-08', 'tanggal' => '2026-09-01',
+        ], $this->petugas->id_pengguna);
+
+        $a = $this->santri('551001', 'Awal Satu');
+        $this->setor($a, '30');
+        $this->setor($a, '4', '2026-09-03'); // bulan berikutnya — tak boleh ikut tertanda
+        $this->setor($this->santri('551002', 'Awal Dua'), '30');
+        $sedikit = $this->hitungKueri($terbitkan);
+
+        for ($i = 1; $i <= 8; $i++) {
+            $this->setor($this->santri('55110'.$i, "Tambahan {$i}"), '30');
+        }
+        $banyak = $this->hitungKueri($terbitkan);
+
+        $this->assertLessThanOrEqual($sedikit, $banyak, "terbitkan: 2 santri = {$sedikit}, 8 santri = {$banyak}");
+
+        $belum = SetoranPemakaian::whereNull('id_tagihan')->get();
+        $this->assertCount(1, $belum, 'Hanya setoran September yang tetap belum tertagih.');
+        $this->assertSame('2026-09-03', $belum->first()->tanggal->toDateString());
+        foreach (SetoranPemakaian::whereNotNull('id_tagihan')->get() as $s) {
+            $this->assertSame($s->id_santri, TagihanSantri::find($s->id_tagihan)?->id_santri);
+        }
     }
 
     public function test_kelebihan_di_atas_kuota_yang_ditagih_bukan_seluruh_pemakaian(): void
@@ -274,7 +309,7 @@ class PemakaianLaundryTest extends TestCase
         // Aturan proyek: `jenis_biaya` = identitas akuntansi saja, tanpa nominal.
         foreach (['tarif_satuan', 'nama_satuan', 'kuota_gratis'] as $kolom) {
             $this->assertFalse(
-                \Illuminate\Support\Facades\Schema::hasColumn('jenis_biaya', $kolom),
+                Schema::hasColumn('jenis_biaya', $kolom),
                 "Kolom {$kolom} seharusnya sudah pindah ke tarif_pemakaian.",
             );
         }

@@ -3,8 +3,8 @@
 namespace App\Services\Modules;
 
 use App\Exceptions\AppException;
-use App\Models\Jenjang;
 use App\Models\JenisBiaya;
+use App\Models\Jenjang;
 use App\Models\PesertaTagihanLain;
 use App\Models\Santri;
 use App\Models\TarifTagihanLain;
@@ -128,10 +128,12 @@ class KepesertaanLainService
      */
     public function pesertaTanpaTarif(): array
     {
+        $tarif = $this->petaTarif();
+
         return PesertaTagihanLain::where('status', 'ikut')
             ->with(['santri:id,nama,kode_jenjang', 'jenis:kode,nama'])
             ->get()
-            ->filter(fn ($p) => $p->nominal === null && $this->tarifJenjang($p->kode_jenis, $p->santri?->kode_jenjang) === null)
+            ->filter(fn ($p) => $p->nominal === null && $this->dariPeta($tarif, $p->kode_jenis, $p->santri?->kode_jenjang) === null)
             ->map(fn ($p) => "{$p->santri?->nama} ({$p->jenis?->nama})")
             ->values()->all();
     }
@@ -164,18 +166,46 @@ class KepesertaanLainService
     }
 
     /**
+     * Seluruh sel tarif (satu jenis, atau semua) dalam SATU kueri — untuk daftar
+     * peserta yang bisa ratusan baris, padahal jenjangnya cuma segelintir. Dulu
+     * tarifJenjang() dipanggil per peserta.
+     *
+     * @return array<string,?string> ["kode_jenis|kode_jenjang" => nominal]
+     */
+    private function petaTarif(?string $kodeJenis = null): array
+    {
+        return TarifTagihanLain::when($kodeJenis, fn ($q) => $q->where('kode_jenis', $kodeJenis))
+            ->get(['kode_jenis', 'kode_jenjang', 'nominal'])
+            ->mapWithKeys(fn ($t) => [$t->kode_jenis.'|'.$t->kode_jenjang => $t->nominal])
+            ->all();
+    }
+
+    /** Padanan tarifJenjang() yang membaca dari petaTarif() — aturannya sama persis. */
+    private function dariPeta(array $peta, string $kodeJenis, ?string $kodeJenjang): ?string
+    {
+        if ($kodeJenjang === null) {
+            return null;
+        }
+        $n = $peta[$kodeJenis.'|'.$kodeJenjang] ?? null;
+
+        return $n === null ? null : Money::of($n);
+    }
+
+    /**
      * Daftar peserta beserta nominal yang berlaku baginya.
      *
      * @return list<array{rec:PesertaTagihanLain,tarif:?string,nominal:?string,keringanan:bool}>
      */
     public function peserta(string $kodeJenis): array
     {
+        $peta = $this->petaTarif($kodeJenis);
+
         return PesertaTagihanLain::where('kode_jenis', $kodeJenis)
             ->with(['santri:id,nis,nama,kode_jenjang,tingkat,status'])
             ->get()
             ->sortBy(fn ($p) => $p->santri?->nama)
-            ->map(function ($p) use ($kodeJenis) {
-                $tarif = $this->tarifJenjang($kodeJenis, $p->santri?->kode_jenjang);
+            ->map(function ($p) use ($kodeJenis, $peta) {
+                $tarif = $this->dariPeta($peta, $kodeJenis, $p->santri?->kode_jenjang);
                 $nominal = $p->nominal !== null ? Money::of($p->nominal) : $tarif;
 
                 return [

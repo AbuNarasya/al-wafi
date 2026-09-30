@@ -11,6 +11,7 @@ use App\Models\Santri;
 use App\Models\SetoranPemakaian;
 use App\Models\TagihanSantri;
 use App\Support\Money;
+use App\Support\UbahMassal;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -151,13 +152,16 @@ class BatchTagihanService
         $ta = (string) ($p['tahun_ajaran'] ?? '');
         $massal = new TagihanMassalService;
 
-        return array_map(function ($r) use ($ta) {
+        $pratinjau = $massal->pratinjau($p)['baris'];
+
+        return array_map(function ($r) use ($ta, $massal) {
             $d = $r['daftar_ulang'];
             // Jenisnya dijepret untuk DITAMPILKAN di layar draft. Saat rilis,
             // TagihanMassalService mencarinya sendiri dari jenjang yang berlaku
-            // — jadi kolom ini keterangan, bukan perintah.
+            // — jadi kolom ini keterangan, bukan perintah. Diingat per jenjang:
+            // dulu dicari ulang untuk setiap baris.
             $jenis = $d['keputusan'] === TagihanMassalService::TERBIT
-                ? JenisBiaya::untuk('daftar_ulang', $r['kode_jenjang'])
+                ? $massal->jenisDaftarUlang($r['kode_jenjang'])
                 : null;
 
             return [
@@ -171,7 +175,7 @@ class BatchTagihanService
                     'kode_jenjang' => $r['kode_jenjang'], 'asal' => $d['asal'] ?? null,
                 ],
             ];
-        }, $massal->pratinjau($p)['baris']);
+        }, $pratinjau);
     }
 
     /**
@@ -231,6 +235,17 @@ class BatchTagihanService
         $jenis = $pemakaian->jenis($kode);
         $sampai = Carbon::parse($periode.'-01')->endOfMonth()->toDateString();
 
+        // Id setoran yang dijepret, untuk SELURUH santri dalam satu kueri —
+        // syaratnya sama persis dengan rekap(), jadi yang dijepret adalah yang
+        // dihitung nominalnya. Dulu satu kueri per santri.
+        $setoranPerSantri = SetoranPemakaian::belumTertagih()
+            ->where('kode_jenis', $jenis->kode)
+            ->whereDate('tanggal', '<=', $sampai)
+            ->orderBy('id')
+            ->get(['id', 'id_santri'])
+            ->groupBy('id_santri')
+            ->map(fn ($g) => $g->pluck('id')->all());
+
         $baris = [];
         foreach ($pemakaian->rekap($jenis->kode, $sampai) as $r) {
             $s = $r['santri'];
@@ -253,9 +268,7 @@ class BatchTagihanService
                 'nominal' => $r['nominal'], 'keputusan' => BatchTagihanBaris::TERBIT, 'alasan' => null,
                 'snapshot' => [
                     'kuantitas' => $r['kuantitas'], 'kena_tagih' => $r['kena_tagih'],
-                    'setoran' => SetoranPemakaian::belumTertagih()
-                        ->where('kode_jenis', $jenis->kode)->where('id_santri', $s->id)
-                        ->whereDate('tanggal', '<=', $sampai)->pluck('id')->all(),
+                    'setoran' => $setoranPerSantri->get($s->id, []),
                 ],
             ];
         }
@@ -396,9 +409,11 @@ class BatchTagihanService
             $this->tandaiSetoran($terbit, $peta);
         }
 
-        foreach ($terbit as $b) {
-            $b->update(['hasil' => 'terbit', 'id_tagihan' => $peta[$b->id_santri]]);
-        }
+        // Satu kueri, bukan satu per baris: batch SPP seluruh santri = 649 baris,
+        // dan rilis cadangan bisa berjalan di dalam halaman yang sedang dibuka.
+        UbahMassal::perBaris('batch_tagihan_baris', 'id', 'id_tagihan',
+            $terbit->mapWithKeys(fn ($b) => [$b->id => $peta[$b->id_santri]])->all(),
+            tetap: ['hasil' => 'terbit']);
 
         $status = ($gugur->isEmpty() && $gugurTambahan->isEmpty()) ? 'dirilis' : 'sebagian';
 
@@ -611,21 +626,24 @@ class BatchTagihanService
      */
     private function tandaiSetoran($baris, array $peta): void
     {
+        // [id setoran => id tagihan] untuk seluruh batch, lalu SATU kueri.
+        $tanda = [];
         foreach ($baris as $b) {
-            $ids = $b->snapshot['setoran'] ?? [];
-            if ($ids === []) {
-                continue;
+            foreach ($b->snapshot['setoran'] ?? [] as $idSetoran) {
+                $tanda[(int) $idSetoran] = $peta[$b->id_santri];
             }
-            SetoranPemakaian::whereIn('id', $ids)->whereNull('id_tagihan')
-                ->update(['id_tagihan' => $peta[$b->id_santri]]);
+        }
+        if ($tanda !== []) {
+            UbahMassal::perBaris('setoran_pemakaian', 'id', 'id_tagihan', $tanda, syarat: 't.id_tagihan IS NULL');
         }
     }
 
     /** Tutup batch: tandai baris yang gugur, simpan ringkasannya, kembalikan hasil. */
     private function tutup(BatchTagihan $batch, string $status, $gugur, $terbit, ?int $idPengguna, ?string $pesan): array
     {
-        foreach ($gugur as $b) {
-            $b->update([
+        // Semua baris gugur mendapat isi yang SAMA — satu UPDATE cukup.
+        if ($gugur->isNotEmpty()) {
+            BatchTagihanBaris::whereIn('id', $gugur->pluck('id')->all())->update([
                 'hasil' => $status === 'gagal' ? 'gagal' : 'dilewati',
                 'hasil_alasan' => $pesan ?: 'Tidak lagi layak ditagih saat rilis.',
             ]);

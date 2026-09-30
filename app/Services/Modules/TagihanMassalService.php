@@ -5,6 +5,7 @@ namespace App\Services\Modules;
 use App\Exceptions\AppException;
 use App\Models\ActivityLog;
 use App\Models\JenisBiaya;
+use App\Models\Jenjang;
 use App\Models\JournalEntry;
 use App\Models\Santri;
 use App\Models\TagihanSantri;
@@ -54,6 +55,22 @@ class TagihanMassalService
 
     public const TERHALANG = 'terhalang';
 
+    /**
+     * Ingatan per panggilan — tarif per (T.A, jenjang, tingkat), jenis biaya &
+     * tingkat pertama per jenjang. Satu jenjang berisi ratusan santri tetapi
+     * hanya segelintir tingkat; dulu tarifnya dicari ulang untuk SETIAP santri
+     * (SMP di produksi: 267 kueri untuk satu pratinjau).
+     *
+     * @var array<string,array<string,mixed>>
+     */
+    private array $memoTarif = [];
+
+    /** @var array<string,?JenisBiaya> */
+    private array $memoJenis = [];
+
+    /** @var array<string,int>|null */
+    private ?array $tingkatMulai = null;
+
     public function __construct(private readonly TarifService $tarif = new TarifService) {}
 
     /**
@@ -68,6 +85,7 @@ class TagihanMassalService
         if ($ta === '' || $jenjang === '') {
             throw new AppException(422, 'Tahun ajaran tagihan & jenjang wajib dipilih.');
         }
+        $this->lupakan();
 
         $santri = Santri::where('kode_jenjang', $jenjang)
             ->whereIn('status', self::STATUS)
@@ -132,7 +150,8 @@ class TagihanMassalService
 
         // Tarifnya per KENAIKAN, disimpan pada tingkat TUJUAN — yaitu tingkat yang
         // BERLAKU pada T.A yang ditagih, bukan tingkat santri hari ini.
-        $tarif = $this->tarif->cari('daftar_ulang', $tahunAjaran, $di['kode_jenjang'], null, $di['tingkat']);
+        $kunci = $tahunAjaran.'|'.$di['kode_jenjang'].'|'.$di['tingkat'];
+        $tarif = $this->memoTarif[$kunci] ??= $this->tarif->cari('daftar_ulang', $tahunAjaran, $di['kode_jenjang'], null, $di['tingkat']);
 
         // `asal_bagian` ikut dibawa supaya pratinjau bisa menebalkan nama jenjang,
         // jalur, dan tahun ajarannya lewat <x-asal-tarif>.
@@ -166,12 +185,44 @@ class TagihanMassalService
                 .'uang pangkal, & perlengkapan, bukan daftar ulang.';
         }
 
-        if ((int) $di['tingkat'] === 1) {
-            return "Masih di tingkat 1 pada T.A {$tahunAjaran} — belum pernah naik tingkat, jadi belum "
-                .'ada daftar ulang. Tetapkan kenaikannya lebih dulu di Kenaikan Tingkat & Kelulusan.';
+        // Tingkat PERTAMA jenjangnya, bukan angka 1: penomorannya berkelanjutan
+        // (SDTQ 1, SMP 7, SMA 10). Dulu diperiksa `=== 1`, sehingga seluruh kelas
+        // 7 & 10 lolos pemeriksaan ini lalu tampil "tarif belum diisi" — padahal
+        // mereka memang tak punya daftar ulang.
+        $mulai = $this->tingkatMulai($di['kode_jenjang']);
+        if ($di['tingkat'] !== null && (int) $di['tingkat'] === $mulai) {
+            return "Masih di tingkat {$mulai} (tingkat pertama jenjangnya) pada T.A {$tahunAjaran} — belum pernah "
+                .'naik tingkat, jadi belum ada daftar ulang. Tetapkan kenaikannya lebih dulu di Kenaikan Tingkat & Kelulusan.';
         }
 
         return null;
+    }
+
+    /** Ingatan hanya berlaku sepanjang SATU pratinjau/penerbitan — master bisa berubah di antaranya. */
+    private function lupakan(): void
+    {
+        $this->memoTarif = [];
+        $this->memoJenis = [];
+        $this->tingkatMulai = null;
+    }
+
+    private function tingkatMulai(?string $kodeJenjang): int
+    {
+        $this->tingkatMulai ??= Jenjang::all(['kode', 'tingkat_mulai'])
+            ->mapWithKeys(fn ($j) => [$j->kode => $j->tingkatMulai()])->all();
+
+        return $this->tingkatMulai[$kodeJenjang] ?? 1;
+    }
+
+    /** Jenis biaya daftar ulang sebuah jenjang — sekali per jenjang, bukan per santri. */
+    public function jenisDaftarUlang(?string $kodeJenjang): ?JenisBiaya
+    {
+        $kunci = (string) $kodeJenjang;
+        if (! array_key_exists($kunci, $this->memoJenis)) {
+            $this->memoJenis[$kunci] = JenisBiaya::untuk('daftar_ulang', $kodeJenjang);
+        }
+
+        return $this->memoJenis[$kunci];
     }
 
     /**
@@ -231,6 +282,8 @@ class TagihanMassalService
      */
     private function terbitkanDaftarUlang(array $nominalPerSantri, string $tahunAjaran, int $idPengguna, array $opsi): array
     {
+        $this->lupakan();
+
         $santri = Santri::whereIn('id', array_keys($nominalPerSantri))
             ->get(['id', 'nama', 'kode_jenjang', 'tingkat', 'status', 'tahun_ajaran'])->keyBy('id');
 
@@ -255,7 +308,7 @@ class TagihanMassalService
             if ($alasan = $this->alasanTakDitagih($s, $tahunAjaran, $di)) {
                 throw new AppException(422, "{$s->nama} tidak ditagih daftar ulang. {$alasan}");
             }
-            $jenis = JenisBiaya::untuk('daftar_ulang', $di['kode_jenjang']);
+            $jenis = $this->jenisDaftarUlang($di['kode_jenjang']);
             if (! $jenis) {
                 throw new AppException(422, "Belum ada jenis biaya Daftar Ulang yang aktif untuk jenjang \"{$di['kode_jenjang']}\". "
                     .'Buat barisnya di Setting Awal → Jenis Biaya.');

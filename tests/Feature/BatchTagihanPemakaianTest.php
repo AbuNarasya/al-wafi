@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BatchTagihan;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
 use App\Models\CoaGroup;
@@ -20,6 +21,7 @@ use App\Services\Modules\BatchTagihanService;
 use App\Services\Modules\PemakaianLainService;
 use App\Services\Ppsb\DompetPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MenghitungKueri;
 use Tests\TestCase;
 
 /**
@@ -39,6 +41,7 @@ use Tests\TestCase;
  */
 class BatchTagihanPemakaianTest extends TestCase
 {
+    use MenghitungKueri;
     use RefreshDatabase;
 
     private const GRP = 'ZZBP';
@@ -105,7 +108,7 @@ class BatchTagihanPemakaianTest extends TestCase
         ], $this->petugas->id_pengguna);
     }
 
-    private function susun(): \App\Models\BatchTagihan
+    private function susun(): BatchTagihan
     {
         return (new BatchTagihanService)->susun([
             'modul' => 'tagihan_lain',
@@ -189,5 +192,53 @@ class BatchTagihanPemakaianTest extends TestCase
 
         // 25 kg sisa − kuota 20 = 5 kg × 7.000
         $this->assertSame('35000.00', $b2->total);
+    }
+
+    /**
+     * Susun & rilis tak bertambah kuerinya bersama jumlah santri. Dulu id
+     * setoran dijepret dengan satu kueri per santri, dan saat rilis setorannya
+     * ditandai dengan satu UPDATE per santri.
+     */
+    public function test_susun_dan_rilis_tak_tumbuh_bersama_jumlah_santri(): void
+    {
+        foreach (['770001', '770002'] as $nis) {
+            $s = $this->santri($nis, "Santri {$nis}");
+            $this->setor($s, '15');
+            $this->setor($s, '15');
+        }
+        [$susunSedikit, $rilisSedikit] = $this->ukur();
+
+        $baru = [];
+        for ($i = 1; $i <= 8; $i++) {
+            $s = $this->santri('77010'.$i, "Tambahan {$i}");
+            $this->setor($s, '15');
+            $this->setor($s, '15');
+            $baru[] = $s;
+        }
+        [$susunBanyak, $rilisBanyak] = $this->ukur();
+
+        $this->assertLessThanOrEqual($susunSedikit, $susunBanyak, "susun: 2 santri = {$susunSedikit}, 8 santri = {$susunBanyak}");
+        $this->assertLessThanOrEqual($rilisSedikit, $rilisBanyak, "rilis: 2 santri = {$rilisSedikit}, 8 santri = {$rilisBanyak}");
+
+        // Setiap setoran tertandai dengan tagihan SANTRINYA sendiri — tak ada
+        // yang tertinggal, tak ada yang tertukar.
+        $this->assertSame(0, SetoranPemakaian::whereNull('id_tagihan')->count());
+        foreach (SetoranPemakaian::all() as $setoran) {
+            $this->assertSame($setoran->id_santri, TagihanSantri::find($setoran->id_tagihan)?->id_santri);
+        }
+    }
+
+    /** @return array{0:int,1:int} */
+    private function ukur(): array
+    {
+        $batch = null;
+        $susun = $this->hitungKueri(function () use (&$batch) {
+            $batch = $this->susun();
+        });
+        $svc = new BatchTagihanService;
+        $svc->otorisasi($batch->id, [], $this->petugas->id_pengguna);
+        $rilis = $this->hitungKueri(fn () => $svc->rilis($batch->id, $this->petugas->id_pengguna));
+
+        return [$susun, $rilis];
     }
 }

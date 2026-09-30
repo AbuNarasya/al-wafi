@@ -21,6 +21,7 @@ use App\Services\Modules\KepesertaanLainService;
 use App\Services\Modules\TagihanLainService;
 use App\Services\Ppsb\DompetPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MenghitungKueri;
 use Tests\TestCase;
 
 /**
@@ -38,6 +39,7 @@ use Tests\TestCase;
  */
 class KepesertaanLainTest extends TestCase
 {
+    use MenghitungKueri;
     use RefreshDatabase;
 
     private const GRP = 'ZZKP';
@@ -100,6 +102,37 @@ class KepesertaanLainTest extends TestCase
     private function svc(): KepesertaanLainService
     {
         return new KepesertaanLainService;
+    }
+
+    /**
+     * Daftar peserta & penerbitannya tak bertambah kuerinya bersama jumlah
+     * peserta — dulu tarif jenjang dicari sekali per peserta, padahal jenjangnya
+     * cuma segelintir. Angkanya tetap sama: tarif jenjang, keringanan menang.
+     */
+    public function test_daftar_peserta_tak_tumbuh_bersama_jumlah_peserta(): void
+    {
+        $this->svc()->tambah('UMR', $this->santri('881001', 'Awal SMP', 'SMP')->id);
+        $this->svc()->tambah('UMR', $this->santri('881002', 'Awal SMA', 'SMA')->id, '24000000');
+        $sedikit = $this->hitungKueri(fn () => $this->svc()->peserta('UMR'));
+        $sedikitTanpaTarif = $this->hitungKueri(fn () => $this->svc()->pesertaTanpaTarif());
+
+        for ($i = 1; $i <= 8; $i++) {
+            $this->svc()->tambah('UMR', $this->santri('88110'.$i, "Tambahan {$i}", $i % 2 ? 'SMP' : 'SMA')->id);
+        }
+        $peserta = null;
+        $banyak = $this->hitungKueri(function () use (&$peserta) {
+            $peserta = $this->svc()->peserta('UMR');
+        });
+        $banyakTanpaTarif = $this->hitungKueri(fn () => $this->svc()->pesertaTanpaTarif());
+
+        $this->assertLessThanOrEqual($sedikit, $banyak, "peserta: 2 = {$sedikit}, 10 = {$banyak}");
+        $this->assertLessThanOrEqual($sedikitTanpaTarif, $banyakTanpaTarif);
+
+        $nominal = collect($peserta)->mapWithKeys(fn ($p) => [$p['rec']->santri->nama => $p['nominal']]);
+        $this->assertSame('28500000.00', $nominal['Awal SMP']);
+        $this->assertSame('24000000.00', $nominal['Awal SMA'], 'Keringanan menang atas tarif jenjang.');
+        $this->assertSame('31000000.00', $nominal['Tambahan 2']);
+        $this->assertTrue(collect($peserta)->firstWhere(fn ($p) => $p['rec']->santri->nama === 'Awal SMA')['keringanan']);
     }
 
     public function test_jenjang_tanpa_sel_tarif_tidak_bisa_didaftarkan(): void

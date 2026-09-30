@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BatchTagihan;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
 use App\Models\CoaGroup;
@@ -15,9 +16,11 @@ use App\Models\TahunAjaran;
 use App\Models\User;
 use App\Services\Modules\BatchTagihanService;
 use App\Services\Modules\SantriService;
+use App\Services\Modules\SppService;
 use App\Services\Modules\WaliService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\MembuatTarif;
+use Tests\Concerns\MenghitungKueri;
 use Tests\TestCase;
 
 /**
@@ -31,6 +34,7 @@ use Tests\TestCase;
 class BatchTagihanSppTest extends TestCase
 {
     use MembuatTarif;
+    use MenghitungKueri;
     use RefreshDatabase;
 
     private const GRP = 'ZZBS';
@@ -98,7 +102,7 @@ class BatchTagihanSppTest extends TestCase
         return $santri->refresh();
     }
 
-    private function susun(string $periode = '2026-09'): \App\Models\BatchTagihan
+    private function susun(string $periode = '2026-09'): BatchTagihan
     {
         return (new BatchTagihanService)->susun([
             'modul' => 'spp',
@@ -156,7 +160,7 @@ class BatchTagihanSppTest extends TestCase
         $svc->otorisasi($batch->id, [], $this->petugas->id_pengguna);
 
         // Petugas lain menerbitkan SPP lewat layar biasa di tengah jeda.
-        (new \App\Services\Modules\SppService)->generate(
+        (new SppService)->generate(
             ['periode' => '2026-09', 'tanggal' => '2026-09-01'], $this->petugas->id_pengguna,
         );
         $this->assertSame(2, TagihanSantri::where('perilaku', 'spp')->count());
@@ -186,5 +190,48 @@ class BatchTagihanSppTest extends TestCase
         $terhalang = $batch->baris()->where('keputusan', 'terhalang')->first();
         $this->assertNotNull($terhalang);
         $this->assertNotEmpty($terhalang->alasan, 'Alasannya ikut dijepret supaya petugas tahu apa yang harus dibetulkan.');
+    }
+
+    /**
+     * Susun & rilis tak boleh bertambah kuerinya bersama jumlah santri. Batch
+     * SPP seluruh pesantren di produksi = 649 baris; dulu tiap baris ditandai
+     * dengan UPDATE-nya sendiri, dan rilis cadangan bisa berjalan di dalam
+     * halaman yang sedang dibuka petugas.
+     */
+    public function test_susun_dan_rilis_tak_tumbuh_bersama_jumlah_santri(): void
+    {
+        $this->santriAktif('A1');
+        $this->santriAktif('A2');
+        [$susunSedikit, $rilisSedikit] = $this->ukur('2026-09');
+
+        for ($i = 1; $i <= 8; $i++) {
+            $this->santriAktif("B{$i}");
+        }
+        [$susunBanyak, $rilisBanyak, $batch] = $this->ukur('2026-10');
+
+        $this->assertLessThanOrEqual($susunSedikit, $susunBanyak, "susun: 2 santri = {$susunSedikit}, 10 santri = {$susunBanyak}");
+        $this->assertLessThanOrEqual($rilisSedikit, $rilisBanyak, "rilis: 2 santri = {$rilisSedikit}, 10 santri = {$rilisBanyak}");
+
+        // Dan penandaan massalnya benar: tiap baris menunjuk tagihannya sendiri.
+        $baris = $batch->baris()->get();
+        $this->assertCount(10, $baris);
+        foreach ($baris as $b) {
+            $this->assertSame('terbit', $b->hasil);
+            $this->assertSame($b->id_santri, TagihanSantri::find($b->id_tagihan)?->id_santri);
+        }
+    }
+
+    /** @return array{0:int,1:int,2:BatchTagihan} kueri susun, kueri rilis, batch-nya */
+    private function ukur(string $periode): array
+    {
+        $batch = null;
+        $susun = $this->hitungKueri(function () use (&$batch, $periode) {
+            $batch = $this->susun($periode);
+        });
+        $svc = new BatchTagihanService;
+        $svc->otorisasi($batch->id, [], $this->petugas->id_pengguna);
+        $rilis = $this->hitungKueri(fn () => $svc->rilis($batch->id, $this->petugas->id_pengguna));
+
+        return [$susun, $rilis, $batch];
     }
 }

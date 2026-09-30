@@ -21,7 +21,9 @@ use App\Services\Modules\SantriService;
 use App\Services\Modules\TagihanMassalService;
 use App\Services\Modules\TarifService;
 use App\Services\Modules\WaliService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MenghitungKueri;
 use Tests\TestCase;
 
 /**
@@ -37,12 +39,17 @@ use Tests\TestCase;
  */
 class DaftarUlangTest extends TestCase
 {
+    use MenghitungKueri;
     use RefreshDatabase;
 
     private const GRP = 'ZZDU';
+
     private const PEND = '4.ZZDU.PEND';
+
     private const PIUT = '1.ZZDU.PIUT';
+
     private const UNIT = 'ZZDUU';
+
     private const TA = '2026/2027';
 
     private const TA2 = '2027/2028';
@@ -280,7 +287,7 @@ class DaftarUlangTest extends TestCase
         $svc = new TagihanMassalService;
         $svc->terbitkan(self::TA2, [$santri->id => '2500000'], $this->admin->id_pengguna);
 
-        $this->expectException(\Illuminate\Database\UniqueConstraintViolationException::class);
+        $this->expectException(UniqueConstraintViolationException::class);
         $svc->terbitkan(self::TA2, [$santri->id => '2500000'], $this->admin->id_pengguna);
     }
 
@@ -432,5 +439,80 @@ class DaftarUlangTest extends TestCase
         ])->assertRedirect();
 
         $this->assertSame(['OSS'], JalurNonaktif::kodeUntuk(self::TA, 'SDTQ'));
+    }
+
+    // ---- Penomoran tingkat berkelanjutan & beban kueri ----
+
+    /**
+     * Tingkat PERTAMA sebuah jenjang tidak selalu 1 — SMA di produksi mulai 10.
+     * Dulu aturannya memeriksa `=== 1`, sehingga seluruh kelas 10 lolos lalu
+     * tampil "tarif belum diisi" (terhalang) padahal memang tak ada daftar ulang.
+     */
+    public function test_kelas_pertama_jenjang_yang_mulai_dari_sepuluh_dilewati(): void
+    {
+        Jenjang::create(['kode' => 'SMA', 'nama' => 'SMA', 'urutan' => 3, 'jumlah_tingkat' => 3, 'tingkat_mulai' => 10]);
+        $jb = new JenisBiayaService;
+        $jb->create(['kode' => 'REG-SMA', 'nama' => 'Registrasi SMA', 'tipe' => 'registrasi', 'kode_jenjang' => 'SMA',
+            'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT]);
+        $jb->create(['kode' => 'DU-SMA', 'nama' => 'Daftar Ulang SMA', 'tipe' => 'daftar_ulang', 'kode_jenjang' => 'SMA',
+            'kode_coa_pendapatan' => self::PEND, 'kode_coa_piutang' => self::PIUT, 'kode_unit' => self::UNIT]);
+        $tarif = new TarifService;
+        $tarif->simpan(self::TA, 'SMA', ['-' => ['registrasi' => ['nominal' => '500000']]]);
+        $tarif->simpanUmum(self::TA2, 'SMA', ['daftar_ulang' => [11 => ['nominal' => '4000000'], 12 => ['nominal' => '5000000']]]);
+
+        $kelasSepuluh = $this->santriAktif('Kelas Sepuluh');
+        $kelasSepuluh->update(['kode_jenjang' => 'SMA', 'tingkat' => 10]);
+        $kelasSebelas = $this->santriAktif('Kelas Sebelas');
+        $kelasSebelas->update(['kode_jenjang' => 'SMA', 'tingkat' => 11]);
+
+        $baris = collect((new TagihanMassalService)->pratinjau(['tahun_ajaran' => self::TA2, 'kode_jenjang' => 'SMA'])['baris'])
+            ->keyBy('id');
+
+        $this->assertSame('dilewati', $baris[$kelasSepuluh->id]['daftar_ulang']['keputusan']);
+        $this->assertStringContainsString('tingkat 10 (tingkat pertama jenjangnya)', $baris[$kelasSepuluh->id]['daftar_ulang']['alasan']);
+        $this->assertSame('terbit', $baris[$kelasSebelas->id]['daftar_ulang']['keputusan']);
+        $this->assertSame('4000000.00', $baris[$kelasSebelas->id]['daftar_ulang']['nominal']);
+
+        // Penerbitannya pun menolak kelas pertama, bukan hanya pratinjaunya.
+        $this->expectException(AppException::class);
+        $this->expectExceptionMessage('tingkat pertama jenjangnya');
+        (new TagihanMassalService)->terbitkan(self::TA2, [$kelasSepuluh->id => '4000000'], $this->admin->id_pengguna);
+    }
+
+    /**
+     * Pratinjau & penerbitan tak boleh bertambah kuerinya bersama jumlah santri.
+     * Dulu tarif dicari per santri: SMP di produksi (262 santri) = 267 kueri.
+     */
+    public function test_pratinjau_dan_terbit_tak_tumbuh_bersama_jumlah_santri(): void
+    {
+        $svc = new TagihanMassalService;
+        $pratinjau = fn () => $svc->pratinjau(['tahun_ajaran' => self::TA2, 'kode_jenjang' => 'SMP']);
+
+        $sedikit = [$this->santriAktif('A1')->id, $this->santriAktif('A2', self::TA)->id];
+        $kueriPratinjauSedikit = $this->hitungKueri($pratinjau);
+        $kueriTerbitSedikit = $this->hitungKueri(fn () => $svc->terbitkan(self::TA2,
+            array_fill_keys($sedikit, '2500000'), $this->admin->id_pengguna));
+
+        $banyak = [];
+        for ($i = 1; $i <= 8; $i++) {
+            $s = $this->santriAktif("B{$i}");
+            // Campuran tingkat: tarifnya dicari sekali per TINGKAT, bukan per santri.
+            if ($i % 2) {
+                $s->update(['tingkat' => 3]);
+            }
+            $banyak[] = $s->id;
+        }
+        $kueriPratinjauBanyak = $this->hitungKueri($pratinjau);
+        $kueriTerbitBanyak = $this->hitungKueri(fn () => $svc->terbitkan(self::TA2,
+            array_fill_keys($banyak, '2500000'), $this->admin->id_pengguna));
+
+        // Pratinjau kedua bertemu dua tingkat (2 & 3), yang pertama satu saja —
+        // selisih yang sah hanyalah SATU kueri tarif untuk tingkat baru itu.
+        $this->assertLessThanOrEqual($kueriPratinjauSedikit + 1, $kueriPratinjauBanyak,
+            "pratinjau: 2 santri = {$kueriPratinjauSedikit} kueri, 10 santri = {$kueriPratinjauBanyak} kueri");
+        // "Tidak bertambah", bukan "sama": panggilan pertama ikut mengisi cache
+        // statis (tipe biaya, konteks neraca), jadi ia boleh sedikit lebih mahal.
+        $this->assertLessThanOrEqual($kueriTerbitSedikit, $kueriTerbitBanyak,
+            "terbit: 2 santri = {$kueriTerbitSedikit} kueri, 8 santri = {$kueriTerbitBanyak} kueri");
     }
 }

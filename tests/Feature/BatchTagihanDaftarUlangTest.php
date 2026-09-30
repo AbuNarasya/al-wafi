@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BatchTagihan;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
 use App\Models\CoaGroup;
@@ -18,6 +19,7 @@ use App\Services\Modules\SantriService;
 use App\Services\Modules\TarifService;
 use App\Services\Modules\WaliService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\MenghitungKueri;
 use Tests\TestCase;
 
 /**
@@ -29,6 +31,7 @@ use Tests\TestCase;
  */
 class BatchTagihanDaftarUlangTest extends TestCase
 {
+    use MenghitungKueri;
     use RefreshDatabase;
 
     private const GRP = 'ZZBD';
@@ -91,7 +94,7 @@ class BatchTagihanDaftarUlangTest extends TestCase
         return $santri->refresh();
     }
 
-    private function susun(): \App\Models\BatchTagihan
+    private function susun(): BatchTagihan
     {
         return (new BatchTagihanService)->susun([
             'modul' => 'daftar_ulang',
@@ -164,5 +167,49 @@ class BatchTagihanDaftarUlangTest extends TestCase
         $this->assertSame('sebagian', $hasil['status']);
         $this->assertSame(1, TagihanSantri::where('perilaku', 'daftar_ulang')->where('id_santri', $tetap->id)->count());
         $this->assertSame(0, TagihanSantri::where('perilaku', 'daftar_ulang')->where('id_santri', $keluar->id)->count());
+    }
+
+    /**
+     * Susun & rilis tak bertambah kuerinya bersama jumlah santri. Dulu susun
+     * mencari jenis biaya ulang untuk tiap baris, dan rilis menandai tiap baris
+     * dengan UPDATE-nya sendiri.
+     */
+    public function test_susun_dan_rilis_tak_tumbuh_bersama_jumlah_santri(): void
+    {
+        $this->santriAktif('A1');
+        $this->santriAktif('A2');
+        [$susunSedikit, $rilisSedikit] = $this->ukur();
+
+        for ($i = 1; $i <= 8; $i++) {
+            $this->santriAktif("B{$i}");
+        }
+        // Yang dua pertama kini sudah punya tagihan → baris "dilewati"; batch
+        // kedua tetap memuat 10 baris, 8 di antaranya terbit.
+        [$susunBanyak, $rilisBanyak, $batch] = $this->ukur();
+
+        $this->assertLessThanOrEqual($susunSedikit, $susunBanyak, "susun: 2 santri = {$susunSedikit}, 10 santri = {$susunBanyak}");
+        $this->assertLessThanOrEqual($rilisSedikit, $rilisBanyak, "rilis: 2 santri = {$rilisSedikit}, 10 santri = {$rilisBanyak}");
+
+        $terbit = $batch->baris()->where('keputusan', 'terbit')->get();
+        $this->assertCount(8, $terbit);
+        foreach ($terbit as $b) {
+            $this->assertSame('terbit', $b->hasil);
+            $this->assertSame('DU-SMP', $b->kode_jenis);
+            $this->assertSame($b->id_santri, TagihanSantri::find($b->id_tagihan)?->id_santri);
+        }
+    }
+
+    /** @return array{0:int,1:int,2:BatchTagihan} */
+    private function ukur(): array
+    {
+        $batch = null;
+        $susun = $this->hitungKueri(function () use (&$batch) {
+            $batch = $this->susun();
+        });
+        $svc = new BatchTagihanService;
+        $svc->otorisasi($batch->id, [], $this->admin->id_pengguna);
+        $rilis = $this->hitungKueri(fn () => $svc->rilis($batch->id, $this->admin->id_pengguna));
+
+        return [$susun, $rilis, $batch];
     }
 }

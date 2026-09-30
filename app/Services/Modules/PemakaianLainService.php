@@ -11,6 +11,7 @@ use App\Models\TagihanSantri;
 use App\Models\TarifPemakaian;
 use App\Models\TipeBiaya;
 use App\Support\Money;
+use App\Support\UbahMassal;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -276,11 +277,12 @@ class PemakaianLainService
                 ->where('periode', $data['periode'] ?? null)
                 ->whereIn('id_santri', array_keys($nominal))->pluck('id', 'id_santri');
 
-            foreach ($tagihan as $idSantri => $idTagihan) {
-                SetoranPemakaian::belumTertagih()
-                    ->where('kode_jenis', $jenis->kode)->where('id_santri', $idSantri)
-                    ->whereDate('tanggal', '<=', $sampai)
-                    ->update(['id_tagihan' => $idTagihan]);
+            // SATU kueri untuk seluruh santri — dulu satu UPDATE per santri.
+            // Syaratnya sama dengan belumTertagih() + sapuan rekap().
+            if ($tagihan->isNotEmpty()) {
+                UbahMassal::perBaris('setoran_pemakaian', 'id_santri', 'id_tagihan', $tagihan->all(),
+                    syarat: 't.id_tagihan IS NULL AND t.kode_jenis = ? AND t.tanggal::date <= ?',
+                    ikatan: [$jenis->kode, $sampai]);
             }
 
             return array_merge($hasil, ['di_bawah_kuota' => $dibawahKuota]);
