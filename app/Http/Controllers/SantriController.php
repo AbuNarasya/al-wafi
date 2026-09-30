@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
+use App\Models\BankAccount;
 use App\Models\Gelombang;
 use App\Models\JadwalPerubahanSantri;
 use App\Models\JalurNonaktif;
@@ -545,7 +546,12 @@ class SantriController extends Controller
 
     public function show(int $id): View
     {
-        $santri = Santri::with(['wali', 'tagihan.jenis', 'pendaftaran', 'jenjang', 'jalurPendaftaran'])->findOrFail($id);
+        $santri = Santri::with(['wali', 'tagihan.jenis', 'pendaftaran', 'jenjang', 'jalurPendaftaran',
+            // Riwayat bayar per tagihan — untuk menelusuri ke rekening koran.
+            // Yang ditolak & di-void tak pernah menjadi uang, jadi tak ditampilkan.
+            'tagihan.pembayaran' => fn ($q) => $q->whereNotIn('status', ['ditolak', 'void'])
+                ->orderBy('tanggal')->orderBy('id'),
+        ])->findOrFail($id);
 
         // Apa yang MASIH BISA diterbitkan — bukan sekadar "uang pangkalnya sudah
         // ada?". Calon berjalur bebas uang pangkal tak pernah punya tagihan itu,
@@ -649,6 +655,9 @@ class SantriController extends Controller
 
         return view('santri.show', [
             'santri' => $santri,
+            // Nama rekening tujuan tiap pembayaran — itulah rekening koran yang
+            // harus dibuka untuk mencocokkannya. NAMA, bukan kode COA.
+            'namaRekening' => BankAccount::pluck('nama_rekening', 'kode_coa')->all(),
             'labelStatus' => Tahap::labelStatus($santri->status),
             'transisi' => Tahap::TRANSISI[$santri->status] ?? [],
             'bisaTagih' => $bisa,

@@ -261,7 +261,7 @@
                 @endif
             </div>
             <table class="min-w-full text-sm">
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="px-4 py-2">Jenis</th><th class="px-4 py-2">Keterangan</th><th class="px-4 py-2 text-right">Nominal</th><th class="px-4 py-2 text-right">Sisa</th><th class="px-4 py-2">Status</th>@if ($adaKolomAksi)<th class="px-4 py-2"></th>@endif</tr></thead>
+                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="px-4 py-2">Jenis</th><th class="px-4 py-2">Keterangan</th><th class="px-4 py-2">Diterbitkan</th><th class="px-4 py-2 text-right">Nominal</th><th class="px-4 py-2 text-right">Sisa</th><th class="px-4 py-2">Pembayaran</th><th class="px-4 py-2">Status</th>@if ($adaKolomAksi)<th class="px-4 py-2"></th>@endif</tr></thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse ($santri->tagihan as $t)
                         {{-- Setoran yang sudah dicatat tapi belum diverifikasi keuangan tidak
@@ -277,11 +277,57 @@
                                     <span class="ml-1 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] text-sky-700">saldo awal</span>
                                 @endif
                             </td>
+                            {{-- Waktu tagihan LAHIR di sistem. Tanggal jurnal akrualnya bisa
+                                 berbeda (batch terjadwal memakai tanggal rilis) — nomor
+                                 jurnalnya sudah ada di kolom Keterangan. --}}
+                            <td class="whitespace-nowrap px-4 py-2 text-xs text-gray-600">
+                                @if ($t->created_at)
+                                    <div class="tabular-nums">{{ $t->created_at->format('d/m/Y H:i') }}</div>
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
+                                @if ($t->jatuh_tempo)
+                                    <div class="text-[11px] text-gray-400">jatuh tempo {{ $t->jatuh_tempo->format('d/m/Y') }}</div>
+                                @endif
+                            </td>
                             <td class="px-4 py-2 text-right tabular-nums">@rp($t->nominal)</td>
                             <td class="px-4 py-2 text-right tabular-nums">@rp($t->sisa)
                                 @if ($tunggu && (float) $tunggu > 0)
                                     <div class="text-[11px] font-normal text-amber-600">@rp($tunggu) menunggu verifikasi</div>
                                 @endif
+                            </td>
+                            {{-- Satu baris per pembayaran, untuk dicocokkan dengan rekening koran:
+                                 TANGGAL BAYAR (yang tercetak di mutasi bank) + nominal + rekening
+                                 tujuannya. `tanggal` pembayaran tak menyimpan jam, jadi jam yang
+                                 ditampilkan adalah saat dicatat — disebut begitu, bukan disamarkan
+                                 sebagai jam transfer. --}}
+                            <td class="px-4 py-2 text-xs">
+                                @forelse ($t->pembayaran as $b)
+                                    <div class="{{ $loop->first ? '' : 'mt-1.5 border-t border-gray-100 pt-1.5' }}">
+                                        <div class="whitespace-nowrap">
+                                            <span class="tabular-nums text-gray-700">{{ $b->tanggal->format('d/m/Y') }}</span>
+                                            <span class="text-gray-400">·</span>
+                                            <span class="tabular-nums font-medium text-gray-800">@rp($b->nominal)</span>
+                                            @if ($b->status === 'menunggu_verifikasi')
+                                                <span class="ml-1 rounded-full bg-amber-100 px-1.5 text-[10px] text-amber-700">menunggu</span>
+                                            @endif
+                                        </div>
+                                        <div class="text-[11px] text-gray-400">
+                                            {{ $b->nomor }}
+                                            @if ($b->sumber === 'dompet_wali')
+                                                · Dompet Wali
+                                            @elseif ($b->kode_rekening)
+                                                · {{ $namaRekening[$b->kode_rekening] ?? $b->kode_rekening }}
+                                            @endif
+                                        </div>
+                                        <div class="whitespace-nowrap text-[11px] tabular-nums text-gray-400">dicatat {{ $b->created_at?->format('d/m/Y H:i') }}</div>
+                                        @if ($b->diverifikasi_pada)
+                                            <div class="whitespace-nowrap text-[11px] tabular-nums text-gray-400">diverifikasi {{ $b->diverifikasi_pada->format('d/m/Y H:i') }}</div>
+                                        @endif
+                                    </div>
+                                @empty
+                                    <span class="text-gray-400">—</span>
+                                @endforelse
                             </td>
                             <td class="px-4 py-2">
                                 <span class="rounded-full px-2 py-0.5 text-xs {{ $t->status === 'lunas' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">{{ ucfirst(str_replace('_',' ',$t->status)) }}</span>
@@ -410,7 +456,7 @@
                             @endif
                         </tr>
                     @empty
-                        <tr><td colspan="{{ $adaKolomAksi ? 6 : 5 }}" class="px-4 py-6 text-center text-gray-400">Belum ada tagihan.</td></tr>
+                        <tr><td colspan="{{ $adaKolomAksi ? 8 : 7 }}" class="px-4 py-6 text-center text-gray-400">Belum ada tagihan.</td></tr>
                     @endforelse
                 </tbody>
             </table>
