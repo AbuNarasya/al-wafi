@@ -54,10 +54,14 @@ final class ReversalService
                     'debet' => $l->kredit,
                     'kredit' => $l->debet,
                     'keterangan' => $prefix.($l->keterangan ?? ''),
-                    // Dimensi bagian & unit ikut disalin PER BARIS agar pembalik
-                    // meniadakan angka di bagian/unit yang persis sama.
+                    // Dimensi bagian, unit, & DANA ikut disalin PER BARIS agar
+                    // pembalik meniadakan angka di dimensi yang persis sama.
+                    // Tanpa `kode_dana`, belanja dana terikat yang di-void tetap
+                    // tercatat "terpakai" di laporan donatur & ISAK 35 —
+                    // keduanya menyaring baris bertanda dana, bukan status jurnal.
                     'kode_bagian' => $l->kode_bagian,
                     'kode_unit' => $l->kode_unit,
+                    'kode_dana' => $l->kode_dana,
                 ]);
             }
 

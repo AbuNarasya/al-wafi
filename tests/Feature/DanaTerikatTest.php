@@ -7,11 +7,14 @@ use App\Models\Bagian;
 use App\Models\CoaDetail;
 use App\Models\CoaGroup;
 use App\Models\Dana;
+use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\Level;
 use App\Models\User;
 use App\Services\Ledger\PostingService;
+use App\Services\Ledger\ReversalService;
 use App\Services\Modules\DanaService;
+use App\Services\Reports\ReportsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -246,6 +249,40 @@ class DanaTerikatTest extends TestCase
 
         $baris = collect((new DanaService)->laporan()['baris'])->firstWhere('kode_dana', 'WKF001');
         $this->assertSame('0.00', $baris['diterima']);
+    }
+
+    // ---- Void ----
+
+    /**
+     * Belanja dari dana wakaf yang dibatalkan harus HILANG dari laporan donatur.
+     *
+     * Dulu jurnal pembalik menyalin akun, bagian, dan unit — tetapi tidak
+     * `kode_dana`. Baris aslinya tetap bertanda wakaf, pembaliknya tidak, jadi
+     * laporan dana yang menyaring `kode_dana` hanya melihat belanjanya: uang
+     * yang tak jadi dibelanjakan tetap tercatat "terpakai" di depan donatur.
+     */
+    public function test_belanja_dana_yang_di_void_hilang_dari_laporan_dana(): void
+    {
+        $this->danaWakaf();
+        $this->terima('WKF001', '100000000');
+        $this->belanja('WKF001', self::BEBAN_BANGUN, '30000000');
+
+        $belanja = JournalEntry::where('referensi', 'JU-D2')->firstOrFail();
+        $pembalik = ReversalService::reverseJournalEntry($belanja->id, ['tanggal' => '2026-07-20']);
+
+        // Setiap baris pembalik membawa tanda dana yang sama dengan baris aslinya.
+        foreach ($pembalik->lines as $l) {
+            $this->assertSame('WKF001', $l->kode_dana, "baris {$l->kode_coa}");
+        }
+
+        $baris = collect((new DanaService)->laporan()['baris'])->firstWhere('kode_dana', 'WKF001');
+        $this->assertSame('100000000.00', $baris['diterima']);
+        $this->assertSame('0.00', $baris['terpakai'], 'Belanja yang dibatalkan tak boleh terhitung terpakai.');
+        $this->assertSame('100000000.00', $baris['sisa']);
+
+        // Laporan Perubahan Aset Neto (ISAK 35) membaca penanda yang sama.
+        $neto = (new ReportsService)->perubahanAsetNeto('2026-07-01', '2026-07-31');
+        $this->assertSame('0.00', $neto['pelepasan']);
     }
 
     // ---- Layar ----
