@@ -13,6 +13,7 @@ use App\Services\Ledger\ReversalService;
 use App\Support\Audit\Jejak;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Tutup Buku Periode (port period-close dev): status bulanan, tutup/buka bulan,
@@ -208,7 +209,36 @@ class PeriodCloseService
         if (! $entry) {
             throw new AppException(409, 'Tahun ini belum ditutup buku.');
         }
-        ReversalService::reverseJournalEntry($entry->id, ['id_pengguna' => $idPengguna, 'keteranganPrefix' => 'Buka tutup buku — ']);
+
+        // Pembalik WAJIB bertanggal sama dengan jurnal penutupnya (31 Desember).
+        // Dulu tanggalnya dibiarkan bawaan = hari ini: membuka tahun 2025 pada
+        // 2026 membuat laba rugi 2025 tetap nol, dan seluruhnya muncul di 2026.
+        $tanggal = Carbon::create($tahun, 12, 31)->toDateString();
+
+        DB::transaction(function () use ($tahun, $entry, $tanggal, $idPengguna) {
+            // Desember lazimnya sudah dikunci saat tahun dibuka kembali, dan
+            // kunci itu akan menolak pembalik bertanggal 31 Desember. Permohonan
+            // buka tahun sudah disetujui direktur keuangan, jadi Desember ikut
+            // dibuka di sini — dengan jejaknya sendiri, bukan diam-diam. Satu
+            // transaksi: kalau pembaliknya gagal, Desember kembali terkunci.
+            $desember = AccountingPeriod::where('tahun', $tahun)->where('bulan', 12)->first();
+            if ($desember && $desember->status === 'closed') {
+                $desember->update(['status' => 'open', 'reopened_at' => now()]);
+                Jejak::catat('buka_bulan', [
+                    'modul' => 'period-close',
+                    'ref_jenis' => 'AccountingPeriod',
+                    'ref_id' => $desember->id,
+                    'detail' => ['tahun' => $tahun, 'bulan' => 12, 'sebab' => 'ikut dibuka bersama buka tutup buku tahunan'],
+                    'id_pengguna' => $idPengguna,
+                ]);
+            }
+
+            ReversalService::reverseJournalEntry($entry->id, [
+                'tanggal' => $tanggal,
+                'id_pengguna' => $idPengguna,
+                'keteranganPrefix' => 'Buka tutup buku — ',
+            ]);
+        });
 
         Jejak::catat('buka_tahun', [
             'modul' => 'period-close',
