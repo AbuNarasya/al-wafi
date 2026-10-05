@@ -12,7 +12,6 @@ use App\Models\CompanySettings;
 use App\Models\Inventory;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
-use App\Models\OpeningBalance;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -88,17 +87,19 @@ class ReportsService
         return Money::isZero($v);
     }
 
-    /** Saldo pembuka per akun (orientasi debet). @return array<string,string> */
-    private function openingDebitMap(): array
-    {
-        $m = [];
-        foreach (OpeningBalance::all(['kode_coa', 'jenis_saldo', 'saldo']) as $o) {
-            $v = $o->jenis_saldo === 'debet' ? Money::of($o->saldo) : Money::sub('0', $o->saldo);
-            $m[$o->kode_coa] = Money::add($m[$o->kode_coa] ?? '0', $v);
-        }
-
-        return $m;
-    }
+    /*
+     * SALDO AWAL DIBACA HANYA DARI BUKU BESAR.
+     *
+     * Dulu setiap laporan menjumlahkan tabel draf `opening_balances` DITAMBAH
+     * seluruh jurnal — padahal sejak saldo awal difinalisasi, isinya juga sudah
+     * ada sebagai jurnal pembuka (sumber `SaldoAwal`). Sesudah finalisasi angka
+     * itu terhitung dua kali di neraca, neraca saldo, buku besar, arus kas, dan
+     * perubahan modal. Kini jurnal pembuka bertanggal SEHARI SEBELUM periode
+     * pembukuan (OpeningBalanceService::tanggalJurnal()), sehingga setiap
+     * laporan yang dimulai di periode pertama membacanya sebagai saldo awal
+     * lewat mutasi "sebelum tanggal awal" biasa. Draf yang belum difinalisasi
+     * tidak muncul di laporan mana pun.
+     */
 
     /** Mutasi (debet − kredit) per akun untuk entry pada rentang. @return array<string,string> */
     /**
@@ -182,10 +183,9 @@ class ReportsService
     public function neraca(string $asOf): array
     {
         $ctx = $this->coaContext();
-        $opening = $this->openingDebitMap();
         $upToAsOf = $this->movementDebitMap(null, $asOf);
 
-        $balNormal = fn ($a) => $this->applySign(Money::add($opening[$a->kode_coa] ?? '0', $upToAsOf[$a->kode_coa] ?? '0'), $a->jenis_saldo);
+        $balNormal = fn ($a) => $this->applySign($upToAsOf[$a->kode_coa] ?? '0', $a->jenis_saldo);
         $acctsOf = fn ($root) => array_values(array_filter($ctx['accounts'], fn ($a) => $this->rootOfAccount($ctx, $a) === $root));
         $skip = fn ($a, $nilai) => $this->roundedZero($nilai) && $a->status === 'nonaktif';
 
@@ -221,10 +221,10 @@ class ReportsService
      * ketiga pasang total harus sama besar. Karena itu angka nolnya pun ikut
      * dihitung dan ketidakseimbangannya ditampilkan, bukan disembunyikan.
      *
-     * @param  ?string  $kodeUnit  saring per unit bisnis. Sama seperti bukuBesar(),
-     *                             saldo pembuka dari menu Saldo Awal SENGAJA tidak
-     *                             ikut saat menyaring unit: barisnya tak berdimensi
-     *                             unit, jadi membebankannya ke satu unit menyesatkan.
+     * @param  ?string  $kodeUnit  saring per unit bisnis. Saldo awal ikut sebatas
+     *                             baris jurnal pembukanya yang berdimensi unit itu
+     *                             (unit melekat per baris jurnal, termasuk jurnal
+     *                             pembuka); tak ada lagi saldo dari tabel draf.
      *                             Konsekuensinya laporan per unit WAJAR bila tak
      *                             seimbang — `disaring_unit` dipakai halaman untuk
      *                             mengatakannya, bukan untuk menutupinya.
@@ -233,9 +233,9 @@ class ReportsService
     {
         $ctx = $this->coaContext();
 
-        // Saldo awal = saldo pembuka + SELURUH mutasi sebelum tanggal `from`.
+        // Saldo awal = SELURUH mutasi sebelum tanggal `from`, termasuk jurnal
+        // pembuka (bertanggal sehari sebelum periode pembukuan).
         $sebelum = Carbon::parse($from)->subDay()->toDateString();
-        $opening = $kodeUnit ? [] : $this->openingDebitMap();
         $awalMove = $this->movementDebitMap(null, $sebelum, $kodeUnit);
         $periode = $this->movementDebetKreditMap($from, $to, $kodeUnit);
 
@@ -254,7 +254,7 @@ class ReportsService
         ];
 
         foreach ($ctx['accounts'] as $a) {
-            $awal = Money::add($opening[$a->kode_coa] ?? '0', $awalMove[$a->kode_coa] ?? '0');
+            $awal = Money::of($awalMove[$a->kode_coa] ?? '0');
             $mutD = $periode[$a->kode_coa]['debet'] ?? '0';
             $mutK = $periode[$a->kode_coa]['kredit'] ?? '0';
             $akhir = Money::add($awal, Money::sub($mutD, $mutK));
@@ -389,12 +389,11 @@ class ReportsService
     public function perubahanModal(string $from, string $to): array
     {
         $ctx = $this->coaContext();
-        $opening = $this->openingDebitMap();
         $dayBefore = Carbon::parse($from)->subDay()->toDateString();
         $upToAwal = $this->movementDebitMap(null, $dayBefore);
         $inPeriod = $this->movementDebitMap($from, $to);
 
-        $awalNormal = fn ($a) => $this->applySign(Money::add($opening[$a->kode_coa] ?? '0', $upToAwal[$a->kode_coa] ?? '0'), $a->jenis_saldo);
+        $awalNormal = fn ($a) => $this->applySign($upToAwal[$a->kode_coa] ?? '0', $a->jenis_saldo);
         $mutasiNormal = fn ($a) => $this->applySign($inPeriod[$a->kode_coa] ?? '0', $a->jenis_saldo);
 
         $rows = [];
@@ -605,13 +604,13 @@ class ReportsService
         ];
     }
 
-    /** Saldo gabungan akun kas pada satu tanggal (kas = saldo normal debet). */
+    /**
+     * Saldo gabungan akun kas pada satu tanggal (kas = saldo normal debet).
+     * Saldo awal kas ikut lewat jurnal pembuka (bertanggal sebelum periode
+     * pertama), jadi di Arus Kas ia tampil sebagai kas awal, bukan kas masuk.
+     */
     private function saldoKas(array $kasAkun, ?string $gte, ?string $lte): string
     {
-        $pembuka = DB::table('opening_balances')->whereIn('kode_coa', $kasAkun)
-            ->selectRaw("COALESCE(SUM(CASE WHEN jenis_saldo = 'debet' THEN saldo ELSE -saldo END), 0) as v")
-            ->value('v');
-
         $mutasi = DB::table('journal_lines as jl')
             ->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
             ->whereIn('jl.kode_coa', $kasAkun)
@@ -620,7 +619,7 @@ class ReportsService
             ->selectRaw('COALESCE(SUM(jl.debet) - SUM(jl.kredit), 0) as v')
             ->value('v');
 
-        return Money::add($pembuka, $mutasi);
+        return Money::of($mutasi);
     }
 
     /** Belum ada satu pun rekening kas terdaftar — laporannya tak punya dasar. */
@@ -667,7 +666,6 @@ class ReportsService
         $ctx = $this->coaContext();
         $sebelum = Carbon::parse($from)->subDay()->toDateString();
 
-        $opening = $this->openingDebitMap();
         $sampaiAwal = $this->movementDebitMap(null, $sebelum);
         $periode = $this->movementDebitMap($from, $to);
 
@@ -680,10 +678,7 @@ class ReportsService
             if ($akarOf($a) !== '3') {
                 continue;
             }
-            $saldo = $this->applySign(
-                Money::add($opening[$a->kode_coa] ?? '0', $sampaiAwal[$a->kode_coa] ?? '0'),
-                $a->jenis_saldo,
-            );
+            $saldo = $this->applySign($sampaiAwal[$a->kode_coa] ?? '0', $a->jenis_saldo);
             $awal[$sifat($a)] = Money::add($awal[$sifat($a)], $saldo);
         }
 
@@ -787,10 +782,8 @@ class ReportsService
 
     /**
      * @param  ?string  $kodeUnit  saring per unit bisnis (drill-down dari Laba
-     *                             Rugi per unit). Saldo awal dari menu Saldo Awal
-     *                             SENGAJA tidak ikut saat menyaring unit: baris
-     *                             saldo awal tidak berdimensi unit, jadi
-     *                             membebankannya ke satu unit akan menyesatkan.
+     *                             Rugi per unit). Saldo awal ikut lewat jurnal
+     *                             pembukanya, sebatas baris yang berdimensi unit itu.
      */
     public function bukuBesar(string $kodeCoa, ?string $from = null, ?string $to = null, ?string $kodeUnit = null): array
     {
@@ -802,17 +795,12 @@ class ReportsService
         }
         $normal = $akun->jenis_saldo === 'debet';
 
-        $saldoAwalDebit = '0';
-        if (! $kodeUnit) {
-            foreach (OpeningBalance::where('kode_coa', $kodeCoa)->get() as $o) {
-                $saldoAwalDebit = Money::add($saldoAwalDebit, $o->jenis_saldo === 'debet' ? Money::of($o->saldo) : Money::sub('0', $o->saldo));
-            }
-        }
+        // Saldo awal = seluruh mutasi sebelum `from`, termasuk jurnal pembuka.
         $before = DB::table('journal_lines as jl')->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
             ->where('jl.kode_coa', $kodeCoa)->where('je.tanggal', '<', $from)
             ->when($kodeUnit, fn ($q) => $q->where('jl.kode_unit', $kodeUnit))
             ->selectRaw('COALESCE(SUM(jl.debet),0) as d, COALESCE(SUM(jl.kredit),0) as k')->first();
-        $saldoAwalDebit = Money::sub(Money::add($saldoAwalDebit, $before->d), $before->k);
+        $saldoAwalDebit = Money::sub($before->d, $before->k);
 
         $inRange = JournalLine::where('kode_coa', $kodeCoa)
             ->when($kodeUnit, fn ($q) => $q->where('journal_lines.kode_unit', $kodeUnit))

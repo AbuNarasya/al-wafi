@@ -216,18 +216,14 @@ class RekonsiliasiService
             return Money::of('0');
         }
 
-        $pembuka = DB::table('opening_balances')->whereIn('kode_coa', $akun)
-            ->selectRaw("COALESCE(SUM(CASE WHEN jenis_saldo = 'debet' THEN saldo ELSE -saldo END), 0) as v")
-            ->value('v');
-
-        $mutasi = DB::table('journal_lines as jl')
+        // Saldo awal ikut lewat jurnal pembukanya; tabel draf `opening_balances`
+        // tidak ditambahkan lagi (dulu terhitung dua kali sesudah finalisasi).
+        $debet = DB::table('journal_lines as jl')
             ->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
             ->whereIn('jl.kode_coa', $akun)
             ->where('je.tanggal', '<=', $asOf)
             ->selectRaw('COALESCE(SUM(jl.debet) - SUM(jl.kredit), 0) as v')
             ->value('v');
-
-        $debet = Money::add($pembuka, $mutasi);
 
         return $sisi === 'debet' ? Money::of($debet) : Money::sub('0', $debet);
     }

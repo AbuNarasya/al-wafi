@@ -9,7 +9,6 @@ use App\Models\BankReconciliationItem;
 use App\Models\CoaDetail;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
-use App\Models\OpeningBalance;
 use App\Services\Ledger\DocNumber;
 use App\Services\Ledger\PostingService;
 use App\Services\Ledger\ReversalService;
@@ -25,21 +24,19 @@ class BankReconciliationService
 {
     private const SUMBER = 'RekonsiliasiBank';
 
-    /** Saldo buku (orientasi debet — akun bank debet-normal) s/d tanggal. */
+    /**
+     * Saldo buku (orientasi debet — akun bank debet-normal) s/d tanggal.
+     * Saldo awal termasuk di dalamnya lewat jurnal pembuka; tabel draf
+     * `opening_balances` tidak lagi ditambahkan (dulu terhitung dua kali).
+     */
     private function saldoBukuAsOf(string $kodeCoa, string $tanggal): string
     {
-        $saldo = '0';
-        foreach (OpeningBalance::where('kode_coa', $kodeCoa)->get() as $o) {
-            $saldo = $o->jenis_saldo === 'debet'
-                ? Money::add($saldo, $o->saldo)
-                : Money::sub($saldo, $o->saldo);
-        }
         $sumDebet = JournalLine::where('kode_coa', $kodeCoa)
             ->whereHas('entry', fn ($q) => $q->where('tanggal', '<=', $tanggal))->sum('debet');
         $sumKredit = JournalLine::where('kode_coa', $kodeCoa)
             ->whereHas('entry', fn ($q) => $q->where('tanggal', '<=', $tanggal))->sum('kredit');
 
-        return Money::sub(Money::add($saldo, $sumDebet), $sumKredit);
+        return Money::sub($sumDebet, $sumKredit);
     }
 
     /** Nilai item orientasi debet. */
@@ -50,6 +47,7 @@ class BankReconciliationService
 
     /**
      * selisih = saldo_bank − (saldo_buku + Σadj) + Σ(item reguler belum cleared).
+     *
      * @return array{efektifBuku:string,selisih:string,clearedCount:int}
      */
     private function computeTotals(string $saldoBank, string $saldoBuku, $items): array

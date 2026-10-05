@@ -22,14 +22,31 @@ use Illuminate\Support\Facades\DB;
  */
 class OpeningBalanceService
 {
-    private const SUMBER = 'SaldoAwal';
+    /** Penanda `sumber_modul` jurnal pembuka — dibaca juga oleh laporan yang memisahkan kolom "saldo awal". */
+    public const SUMBER = 'SaldoAwal';
 
-    /** Tanggal jurnal pembuka = awal periode pembukuan (Pengaturan Perusahaan). */
+    /** Awal periode pembukuan (Pengaturan Perusahaan). */
     private function periodeAwal(): Carbon
     {
         $t = CompanySettings::query()->value('periode_awal_pembukuan');
 
         return $t ? Carbon::parse($t) : Carbon::create((int) now()->format('Y'), 1, 1);
+    }
+
+    /**
+     * Tanggal jurnal pembuka = SEHARI SEBELUM periode pembukuan: "saldo per
+     * 31 Agustus" untuk pembukuan yang dimulai 1 September.
+     *
+     * Laporan membaca saldo awal HANYA dari buku besar (dulu juga dari tabel
+     * `opening_balances` — sehingga sesudah difinalisasi angkanya terhitung
+     * dua kali). Bertanggal di hari pertama, jurnal ini akan terbaca sebagai
+     * MUTASI hari itu — dan sebagai kas masuk di Arus Kas periode pertama.
+     * Sehari sebelumnya, setiap laporan yang dimulai di periode pertama
+     * membacanya sebagai saldo awal tanpa perlakuan khusus.
+     */
+    private function tanggalJurnal(): Carbon
+    {
+        return $this->periodeAwal()->subDay();
     }
 
     private function isPosted(): bool
@@ -225,7 +242,7 @@ class OpeningBalanceService
             ];
         }
 
-        $tanggal = $this->periodeAwal();
+        $tanggal = $this->tanggalJurnal();
 
         return DB::transaction(function () use ($lines, $tanggal, $idPengguna) {
             $referensi = DocNumber::nextJournalRef('SA', $tanggal);
@@ -252,7 +269,8 @@ class OpeningBalanceService
             throw new AppException(409, 'Saldo awal belum difinalisasi, tidak ada yang di-void.');
         }
         $entryId = $posted->journal_entry_id;
-        $tanggal = $this->periodeAwal();
+        // Pembalik bertanggal sama dengan jurnal pembukanya, bukan hari pertama.
+        $tanggal = $this->tanggalJurnal();
 
         return DB::transaction(function () use ($entryId, $tanggal, $idPengguna) {
             $reversal = ReversalService::reverseJournalEntry($entryId, [

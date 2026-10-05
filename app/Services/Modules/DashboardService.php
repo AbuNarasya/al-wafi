@@ -6,8 +6,10 @@ use App\Models\BankAccount;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
 use App\Models\CoaGroup;
+use App\Models\EditApproval;
 use App\Models\JournalLine;
-use App\Models\OpeningBalance;
+use App\Models\PostingApproval;
+use App\Models\VoidApproval;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -30,23 +32,40 @@ class DashboardService
             ->get(['journal_lines.kode_coa', 'journal_lines.debet', 'journal_lines.kredit', 'journal_lines.kode_unit', 'journal_entries.tanggal']);
     }
 
-    /** Saldo pembuka per akun dalam orientasi DEBET. @return array<string,string> */
+    /**
+     * Saldo pembuka per akun dalam orientasi DEBET — dari JURNAL saldo awal yang
+     * sudah difinalisasi (beserta pembaliknya bila di-void), bukan dari tabel
+     * draf `opening_balances`. Dulu dari tabel draf, padahal sumByAccount() juga
+     * menjumlahkan jurnal pembuka yang isinya sama: angkanya terhitung dua kali.
+     *
+     * @return array<string,string>
+     */
     private function openingDebit(): array
     {
-        $m = [];
-        foreach (OpeningBalance::all(['kode_coa', 'jenis_saldo', 'saldo']) as $o) {
-            $cur = $m[$o->kode_coa] ?? '0';
-            $m[$o->kode_coa] = Money::add($cur, $o->jenis_saldo === 'debet' ? Money::of($o->saldo) : Money::mul($o->saldo, '-1'));
-        }
+        $rows = JournalLine::query()
+            ->join('journal_entries', 'journal_lines.entry_id', '=', 'journal_entries.id')
+            ->where('journal_entries.sumber_modul', OpeningBalanceService::SUMBER)
+            ->groupBy('journal_lines.kode_coa')
+            ->selectRaw('journal_lines.kode_coa as kode_coa, COALESCE(SUM(journal_lines.debet),0) - COALESCE(SUM(journal_lines.kredit),0) as v')
+            ->get();
 
-        return $m;
+        return $rows->mapWithKeys(fn ($r) => [$r->kode_coa => Money::of($r->v)])->all();
     }
 
-    /** Σdebet & Σkredit per akun (seluruh waktu). @return array<string,array{d:string,k:string}> */
+    /**
+     * Σdebet & Σkredit per akun (seluruh waktu), TANPA jurnal saldo awal — yang
+     * itu sudah dihitung openingDebit() dan tampil di kolomnya sendiri.
+     *
+     * @return array<string,array{d:string,k:string}>
+     */
     private function sumByAccount(): array
     {
-        $rows = JournalLine::selectRaw('kode_coa, COALESCE(SUM(debet),0) as d, COALESCE(SUM(kredit),0) as k')
-            ->groupBy('kode_coa')->get();
+        $rows = JournalLine::query()
+            ->join('journal_entries', 'journal_lines.entry_id', '=', 'journal_entries.id')
+            ->where('journal_entries.sumber_modul', '!=', OpeningBalanceService::SUMBER)
+            ->groupBy('journal_lines.kode_coa')
+            ->selectRaw('journal_lines.kode_coa as kode_coa, COALESCE(SUM(journal_lines.debet),0) as d, COALESCE(SUM(journal_lines.kredit),0) as k')
+            ->get();
         $m = [];
         foreach ($rows as $r) {
             $m[$r->kode_coa] = ['d' => Money::of($r->d), 'k' => Money::of($r->k)];
@@ -209,9 +228,9 @@ class DashboardService
             return ['count' => $rows->count(), 'nominal' => $t];
         })($model::where('status', 'pending')->get());
 
-        $void = $sum(\App\Models\VoidApproval::class);
-        $edit = $sum(\App\Models\EditApproval::class);
-        $posting = $sum(\App\Models\PostingApproval::class);
+        $void = $sum(VoidApproval::class);
+        $edit = $sum(EditApproval::class);
+        $posting = $sum(PostingApproval::class);
 
         return ['void' => $void, 'edit' => $edit, 'posting' => $posting, 'total_count' => $void['count'] + $edit['count'] + $posting['count']];
     }

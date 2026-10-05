@@ -5,7 +5,6 @@ namespace App\Services\Modules;
 use App\Models\AkunPengurangDanaBebas;
 use App\Models\BankAccount;
 use App\Models\JournalLine;
-use App\Models\OpeningBalance;
 use App\Models\PerintahPembayaran;
 use App\Models\PerintahPembayaranDetail;
 use App\Support\Money;
@@ -157,13 +156,9 @@ class DanaBebasService
             $m[$r->kode_coa] = ['d' => Money::of($r->d), 'k' => Money::of($r->k)];
         }
 
-        foreach (OpeningBalance::all(['kode_coa', 'jenis_saldo', 'saldo']) as $o) {
-            $cur = $m[$o->kode_coa] ?? ['d' => '0', 'k' => '0'];
-            $sisi = $o->jenis_saldo === 'debet' ? 'd' : 'k';
-            $cur[$sisi] = Money::add($cur[$sisi], Money::of($o->saldo));
-            $m[$o->kode_coa] = $cur;
-        }
-
+        // Saldo awal sudah ada di jurnal pembukanya (sumber `SaldoAwal`). Dulu
+        // tabel draf `opening_balances` ikut dijumlahkan di sini, sehingga
+        // sesudah difinalisasi saldo awal terhitung dua kali.
         return $m;
     }
 

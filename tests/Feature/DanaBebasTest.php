@@ -7,12 +7,14 @@ use App\Models\BankAccount;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
 use App\Models\CoaGroup;
+use App\Models\CompanySettings;
 use App\Models\Level;
 use App\Models\PerintahPembayaran;
 use App\Models\PerintahPembayaranDetail;
 use App\Models\User;
 use App\Services\Ledger\PostingService;
 use App\Services\Modules\DanaBebasService;
+use App\Services\Modules\OpeningBalanceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -232,11 +234,29 @@ class DanaBebasTest extends TestCase
         $this->assertSame('Titipan Tabungan Santri', $h['rincian_pengurang'][0]['nama']);
     }
 
-    /** Saldo awal (opening balance) ikut terhitung, bukan hanya jurnal. */
+    /**
+     * Saldo awal ikut terhitung — lewat jurnal pembukanya, SESUDAH difinalisasi.
+     *
+     * Dulu test ini memasukkan baris draf `opening_balances` langsung dan
+     * mengharapkannya terhitung. Justru itu sumber saldo awal ganda: sesudah
+     * difinalisasi, angka yang sama juga ada di jurnal pembuka. Kini laporan
+     * hanya membaca buku besar.
+     */
     public function test_saldo_awal_ikut_dihitung(): void
     {
-        \App\Models\OpeningBalance::create(['kode_coa' => self::BANK, 'jenis_saldo' => 'debet', 'saldo' => '75000000']);
-        \App\Models\OpeningBalance::create(['kode_coa' => self::TITIP_TABUNGAN, 'jenis_saldo' => 'kredit', 'saldo' => '25000000']);
+        CoaDetail::create(['kode_coa' => '3.ZZDB.EKU', 'nama_coa' => 'Aset Neto Awal', 'kode_grup' => self::GRP_TITIP, 'jenis_saldo' => 'kredit']);
+        CompanySettings::create(['nama_perusahaan' => 'Uji', 'periode_awal_pembukuan' => '2026-08-01', 'kode_unit_neraca' => self::UNIT]);
+
+        $saldoAwal = new OpeningBalanceService;
+        $saldoAwal->addLine(['kode_coa' => self::BANK, 'jenis_saldo' => 'debet', 'saldo' => '75000000']);
+        $saldoAwal->addLine(['kode_coa' => self::TITIP_TABUNGAN, 'jenis_saldo' => 'kredit', 'saldo' => '25000000']);
+        $saldoAwal->addLine(['kode_coa' => '3.ZZDB.EKU', 'jenis_saldo' => 'kredit', 'saldo' => '50000000']);
+
+        // Draf belum dihitung …
+        $this->assertSame(0.0, (float) (new DanaBebasService)->hitung()['saldo_kas']);
+
+        // … sesudah difinalisasi, dihitung tepat SEKALI.
+        $saldoAwal->post($this->admin->id_pengguna);
         AkunPengurangDanaBebas::create(['kode_coa' => self::TITIP_TABUNGAN]);
 
         $h = (new DanaBebasService)->hitung();
