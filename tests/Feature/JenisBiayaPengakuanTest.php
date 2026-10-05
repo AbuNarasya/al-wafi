@@ -141,4 +141,68 @@ class JenisBiayaPengakuanTest extends TestCase
         $this->assertContains('tarif-pemakaian', $modul);
         $this->assertContains('setoran-laundry', $modul);
     }
+
+    // ---- Akun Pendapatan Diterima di Muka (prabayar SPP) ----
+
+    private function sppDenganDiterimaDimuka(): void
+    {
+        CoaDetail::create(['kode_coa' => '2.ZZJB.DMK', 'nama_coa' => 'Pendapatan SPP Diterima di Muka', 'kode_grup' => self::GRP, 'jenis_saldo' => 'kredit']);
+
+        $this->kirim([
+            'kode' => 'SPP-UJI', 'nama' => 'SPP Uji', 'tipe' => 'spp', 'cara_tagih' => '',
+            'kode_coa_diterima_dimuka' => '2.ZZJB.DMK',
+        ])->assertSessionHasNoErrors();
+    }
+
+    /** @param array<string,mixed> $ganti */
+    private function ubahSpp(array $ganti = [])
+    {
+        return $this->actingAs($this->admin)->put(route('jenis_biaya.update', 'SPP-UJI'), array_merge([
+            'nama' => 'SPP Uji (diubah)', 'tipe' => 'spp',
+            'kode_coa_pendapatan' => self::PENDAPATAN,
+            'kode_unit' => 'ZZJBU', 'status' => 'aktif', 'pengakuan' => 'kas',
+        ], $ganti));
+    }
+
+    /**
+     * Dulu isian ini TIDAK ADA di form, dan setiap simpan mengosongkan kolomnya —
+     * sehingga setoran prabayar SPP selalu ditolak "belum punya akun Pendapatan
+     * Diterima Dimuka" tanpa ada tempat untuk mengisinya.
+     */
+    public function test_form_spp_menawarkan_akun_diterima_dimuka(): void
+    {
+        $this->sppDenganDiterimaDimuka();
+
+        $this->actingAs($this->admin)->get(route('jenis_biaya.edit', 'SPP-UJI'))->assertOk()
+            ->assertSee('Akun Pendapatan Diterima di Muka')
+            ->assertSee('name="kode_coa_diterima_dimuka"', false);
+
+        $this->assertSame('2.ZZJB.DMK', JenisBiaya::find('SPP-UJI')->kode_coa_diterima_dimuka);
+    }
+
+    public function test_menyunting_jenis_biaya_tidak_menghapus_akun_diterima_dimuka(): void
+    {
+        $this->sppDenganDiterimaDimuka();
+
+        // Penyuntingan yang tidak menyertakan isiannya (bagian lain form, atau
+        // pemanggil lain) tak boleh menghapus akunnya diam-diam.
+        $this->ubahSpp()->assertSessionHasNoErrors();
+        $jb = JenisBiaya::find('SPP-UJI');
+        $this->assertSame('SPP Uji (diubah)', $jb->nama);
+        $this->assertSame('2.ZZJB.DMK', $jb->kode_coa_diterima_dimuka);
+
+        // Dikosongkan dengan sengaja = memang dihapus.
+        $this->ubahSpp(['kode_coa_diterima_dimuka' => ''])->assertSessionHasNoErrors();
+        $this->assertNull(JenisBiaya::find('SPP-UJI')->kode_coa_diterima_dimuka);
+    }
+
+    public function test_akun_diterima_dimuka_dibuang_bila_tipenya_bukan_spp(): void
+    {
+        CoaDetail::create(['kode_coa' => '2.ZZJB.DMK', 'nama_coa' => 'Diterima di Muka', 'kode_grup' => self::GRP, 'jenis_saldo' => 'kredit']);
+
+        // Isian yang disembunyikan (x-show) tetap terkirim oleh peramban.
+        $this->kirim(['kode_coa_diterima_dimuka' => '2.ZZJB.DMK'])->assertSessionHasNoErrors();
+
+        $this->assertNull(JenisBiaya::find('UJI-1')->kode_coa_diterima_dimuka);
+    }
 }

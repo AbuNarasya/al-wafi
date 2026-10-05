@@ -60,7 +60,7 @@ class JenisBiayaRequest extends FormRequest
             $data['kode'] = $this->input('kode');
         }
         $data['berulang'] = $this->boolean('berulang');
-        foreach (['kode_coa_piutang', 'kode_coa_diterima_dimuka', 'kode_jenjang', 'cara_tagih'] as $f) {
+        foreach (['kode_coa_piutang', 'kode_jenjang', 'cara_tagih'] as $f) {
             if (($data[$f] ?? '') === '') {
                 $data[$f] = null;
             }
@@ -69,8 +69,20 @@ class JenisBiayaRequest extends FormRequest
         // Dibersihkan DI SINI, bukan diandalkan pada tersembunyinya isian di
         // layar: peramban tetap mengirim isian yang di-x-show, jadi sisa nilai
         // dari pilihan sebelumnya bisa menempel pada baris yang tak mengenalnya.
-        if (TipeBiaya::perilakuDari($data['tipe'] ?? null) !== 'lain') {
+        $perilaku = TipeBiaya::perilakuDari($data['tipe'] ?? null);
+        if ($perilaku !== 'lain') {
             $data['cara_tagih'] = null;
+        }
+
+        // Akun Diterima di Muka hanya bermakna untuk SPP (setoran prabayar).
+        // Dulu ia ikut dikosongkan di perulangan atas setiap kali TIDAK dikirim
+        // — dan form memang tak pernah mengirimnya — jadi tiap simpan
+        // menghapusnya. Kini: dikosongkan hanya bila memang dikirim kosong atau
+        // perilakunya bukan SPP; tidak dikirim = nilai lama dipertahankan.
+        if ($perilaku !== 'spp') {
+            $data['kode_coa_diterima_dimuka'] = null;
+        } elseif (array_key_exists('kode_coa_diterima_dimuka', $data) && ($data['kode_coa_diterima_dimuka'] ?? '') === '') {
+            $data['kode_coa_diterima_dimuka'] = null;
         }
 
         return $data;

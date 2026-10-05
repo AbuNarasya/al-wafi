@@ -87,6 +87,15 @@
                     <x-field name="kode_coa_pendapatan" label="Akun Pendapatan" :value="$jb->kode_coa_pendapatan" :options="$coaWajib" required />
                     <x-field name="kode_coa_piutang" label="Akun Piutang" :value="$jb->kode_coa_piutang" :options="$coaOpsional"
                              hint="Wajib diisi bila pengakuannya “saat ditagihkan” — ke sanalah piutangnya dibukukan. Untuk pengakuan “saat dibayar”, biarkan kosong." />
+
+                    {{-- Hanya SPP: satu-satunya perilaku yang menerima setoran PRABAYAR.
+                         Dulu isian ini tak ada di form sama sekali, dan penyimpanan
+                         mengosongkan kolomnya — sehingga setoran prabayar selalu
+                         ditolak "belum punya akun Pendapatan Diterima Dimuka". --}}
+                    <div x-show="tipe === 'spp'" x-cloak>
+                        <x-field name="kode_coa_diterima_dimuka" label="Akun Pendapatan Diterima di Muka" :value="$jb->kode_coa_diterima_dimuka" :options="$coaOpsional"
+                                 hint="Untuk setoran SPP PRABAYAR: kelebihan setoran di atas tunggakan dicatat di akun ini (liabilitas), lalu dipindah ke piutang saat SPP bulan berikutnya terbit. Kosongkan bila pesantren tidak menerima prabayar." />
+                    </div>
                 </div>
             </fieldset>
 
