@@ -12,6 +12,7 @@ use App\Models\CompanySettings;
 use App\Models\Inventory;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
+use App\Services\Modules\PeriodCloseService;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -101,20 +102,31 @@ class ReportsService
      * tidak muncul di laporan mana pun.
      */
 
-    /** Mutasi (debet − kredit) per akun untuk entry pada rentang. @return array<string,string> */
     /**
+     * Mutasi (debet − kredit) per akun untuk entry pada rentang.
+     *
      * @param  ?string  $kodeUnit  saring per unit bisnis. Dimensi unit melekat di
      *                             BARIS jurnal (PostingService menyalinnya dari
      *                             kepala transaksi), jadi penyaringannya di jl,
      *                             bukan je.
+     * @param  bool  $tanpaTutupBuku  kecualikan jurnal tutup buku tahunan (beserta
+     *                                pembaliknya). WAJIB untuk laporan KINERJA:
+     *                                jurnal itu memindahkan saldo pendapatan &
+     *                                beban ke Laba Ditahan, bukan transaksi — dulu
+     *                                ia membuat laba setahun penuh terbaca nol
+     *                                sesudah tahunnya ditutup. Laporan POSISI
+     *                                (neraca, neraca saldo) justru harus memuatnya.
+     * @return array<string,string>
      */
-    private function movementDebitMap(?string $gte, ?string $lte, ?string $kodeUnit = null): array
+    private function movementDebitMap(?string $gte, ?string $lte, ?string $kodeUnit = null, bool $tanpaTutupBuku = false): array
     {
         $rows = DB::table('journal_lines as jl')
             ->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
             ->when($gte, fn ($q) => $q->where('je.tanggal', '>=', $gte))
             ->when($lte, fn ($q) => $q->where('je.tanggal', '<=', $lte))
             ->when($kodeUnit, fn ($q) => $q->where('jl.kode_unit', $kodeUnit))
+            // `sumber_modul` NOT NULL, jadi `!=` tak ikut membuang baris lain.
+            ->when($tanpaTutupBuku, fn ($q) => $q->where('je.sumber_modul', '!=', PeriodCloseService::SUMBER))
             ->groupBy('jl.kode_coa')
             ->selectRaw('jl.kode_coa as kode_coa, SUM(jl.debet) as d, SUM(jl.kredit) as k')
             ->get();
@@ -338,7 +350,7 @@ class ReportsService
     public function labaRugi(string $from, string $to, ?string $kodeUnit = null): array
     {
         $ctx = $this->coaContext();
-        $move = $this->movementDebitMap($from, $to, $kodeUnit);
+        $move = $this->movementDebitMap($from, $to, $kodeUnit, tanpaTutupBuku: true);
         $periodNormal = fn ($a) => $this->applySign($move[$a->kode_coa] ?? '0', $a->jenis_saldo);
         $acctsOf = fn ($root) => array_values(array_filter($ctx['accounts'], fn ($a) => $this->rootOfAccount($ctx, $a) === $root));
         $skip = fn ($a, $nilai) => $this->roundedZero($nilai);
@@ -376,6 +388,7 @@ class ReportsService
         $row = DB::table('journal_lines as jl')
             ->join('journal_entries as je', 'jl.entry_id', '=', 'je.id')
             ->whereBetween('je.tanggal', [$from, $to])
+            ->where('je.sumber_modul', '!=', PeriodCloseService::SUMBER)
             ->whereNull('jl.kode_unit')
             ->whereIn('jl.kode_coa', $kode)
             ->selectRaw('COALESCE(SUM(jl.debet + jl.kredit), 0) as n')
@@ -666,8 +679,10 @@ class ReportsService
         $ctx = $this->coaContext();
         $sebelum = Carbon::parse($from)->subDay()->toDateString();
 
+        // Aset neto AWAL memuat tutup buku tahun-tahun lalu (laba sudah pindah
+        // ke ekuitas); pendapatan & beban PERIODE tidak (lihat movementDebitMap).
         $sampaiAwal = $this->movementDebitMap(null, $sebelum);
-        $periode = $this->movementDebitMap($from, $to);
+        $periode = $this->movementDebitMap($from, $to, tanpaTutupBuku: true);
 
         $sifat = fn ($a) => $a->sifat_pembatasan === 'dengan_pembatasan' ? 'dengan' : 'tanpa';
         $akarOf = fn ($a) => $this->rootOfAccount($ctx, $a);

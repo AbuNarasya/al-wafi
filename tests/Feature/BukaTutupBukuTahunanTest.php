@@ -11,8 +11,10 @@ use App\Models\JournalEntry;
 use App\Models\Level;
 use App\Models\User;
 use App\Services\Ledger\PostingService;
+use App\Services\Modules\DashboardService;
 use App\Services\Modules\PeriodCloseService;
 use App\Services\Reports\ReportsService;
+use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -118,6 +120,50 @@ class BukaTutupBukuTahunanTest extends TestCase
             ActivityLog::where('aksi', 'buka_bulan')->where('detail', 'like', '%"bulan":12%')->exists(),
             'Pembukaan Desember harus meninggalkan jejak sendiri, bukan diam-diam.'
         );
+    }
+
+    /**
+     * Jurnal tutup buku memindahkan saldo pendapatan & beban ke Laba Ditahan —
+     * ia bukan transaksi. Dulu Laba Rugi ikut menghitungnya, sehingga laba
+     * setahun penuh terbaca NOL begitu tahunnya ditutup.
+     */
+    public function test_laba_rugi_tahun_yang_sudah_ditutup_tetap_utuh(): void
+    {
+        $this->tutupTahunDanDesember();
+        $laporan = new ReportsService;
+
+        $lr = $laporan->labaRugi('2025-01-01', '2025-12-31');
+        $this->assertSame('10000000.00', $lr['total_pendapatan']);
+        $this->assertSame('4000000.00', $lr['total_beban']);
+        $this->assertSame('6000000.00', $lr['laba_rugi_bersih']);
+
+        // Laba Rugi Desember saja pun tak boleh negatif karena jurnal penutup.
+        $this->assertSame('0.00', $laporan->labaRugi('2025-12-01', '2025-12-31')['laba_rugi_bersih']);
+
+        // Perubahan Aset Neto (ISAK 35) membaca pendapatan & beban yang sama.
+        $this->assertSame('6000000.00', $laporan->perubahanAsetNeto('2025-01-01', '2025-12-31')['kenaikan']['jumlah']);
+
+        // Kartu Laba Rugi per Unit di dashboard.
+        $dash = new DashboardService;
+        $laba = collect($dash->labaRugiUnit($dash->lines(), [])['total'])->reduce(
+            fn ($t, $r) => Money::add($t, $r['laba']), '0');
+        $this->assertSame('6000000.00', Money::of($laba));
+    }
+
+    /**
+     * Penjaga sisi sebaliknya: NERACA justru harus memuat jurnal penutup. Di
+     * sanalah laba pindah ke Laba Ditahan; mengecualikannya membuat laba
+     * terhitung dua kali (laba berjalan + laba ditahan).
+     */
+    public function test_neraca_sesudah_tutup_buku_memindahkan_laba_tanpa_dobel(): void
+    {
+        $this->tutupTahunDanDesember();
+
+        $neraca = (new ReportsService)->neraca('2025-12-31');
+        $this->assertSame('6000000.00', $neraca['total_aset']);
+        $this->assertSame('0.00', $neraca['ekuitas']['laba_berjalan'], 'Laba sudah pindah ke Laba Ditahan.');
+        $this->assertSame('6000000.00', $neraca['total_ekuitas']);
+        $this->assertTrue($neraca['balanced']);
     }
 
     public function test_tahun_yang_desembernya_terbuka_tetap_bisa_dibuka(): void

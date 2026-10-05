@@ -21,7 +21,12 @@ use Illuminate\Support\Facades\DB;
  */
 class PeriodCloseService
 {
-    private const SUMBER = 'TutupBuku';
+    /**
+     * Penanda `sumber_modul` jurnal tutup buku tahunan (dan pembaliknya).
+     * Publik karena laporan KINERJA (laba rugi, perubahan aset neto) harus
+     * mengecualikannya, sementara laporan POSISI (neraca) harus memuatnya.
+     */
+    public const SUMBER = 'TutupBuku';
 
     private function refTahun(int $tahun): string
     {

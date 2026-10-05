@@ -24,11 +24,18 @@ class DashboardService
 {
     private const HUTANG_PREFIX = ['pendek' => '2.1', 'panjang' => '2.2', 'pajak' => '2.3'];
 
-    /** Baris jurnal + tanggal entry + unit (dari baris). */
+    /**
+     * Baris jurnal + tanggal entry + unit (dari baris) — bahan grafik ARUS
+     * (kas, laba rugi per unit, pencapaian). Jurnal tutup buku tahunan
+     * dikecualikan: ia memindahkan saldo pendapatan & beban ke Laba Ditahan,
+     * dan bila ikut, laba Desember / setahun penuh terbaca nol atau negatif.
+     * Ia tak menyentuh kas maupun piutang, jadi grafik lain tak berubah.
+     */
     public function lines(): Collection
     {
         return JournalLine::query()
             ->join('journal_entries', 'journal_lines.entry_id', '=', 'journal_entries.id')
+            ->where('journal_entries.sumber_modul', '!=', PeriodCloseService::SUMBER)
             ->get(['journal_lines.kode_coa', 'journal_lines.debet', 'journal_lines.kredit', 'journal_lines.kode_unit', 'journal_entries.tanggal']);
     }
 
