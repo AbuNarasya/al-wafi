@@ -2,12 +2,16 @@
 
 namespace App\Services\Modules;
 
+use App\Models\JalurPendaftaran;
 use App\Models\JenisBiaya;
 use App\Models\PembayaranSantri;
+use App\Models\Pendaftaran;
 use App\Models\Santri;
+use App\Models\SumberInformasi;
 use App\Models\TagihanSantri;
 use App\Models\TahunAjaran;
 use App\Models\TargetSantri;
+use App\Models\TarifBiaya;
 use App\Models\TipeBiaya;
 use App\Support\Money;
 use App\Support\Referensi;
@@ -86,8 +90,9 @@ class PpsbDashboardService
     public function tabelBulanan(string $ta, string $tipe): array
     {
         $bulan = $this->bulanTa($ta);
-        $pertama = $this->bulanPertamaBayar($ta, $tipe === 'pendaftar' ? ['registrasi'] : ['uang_pangkal']);
-        $jenjangSantri = Santri::where('tahun_ajaran', $ta)->pluck('kode_jenjang', 'id')->all();
+        $pembayar = $this->pembayarPertama($ta, $tipe === 'pendaftar' ? ['registrasi'] : ['uang_pangkal']);
+        $pertama = array_map(fn ($r) => $r['bulan'], $pembayar);
+        $jenjangSantri = array_map(fn ($r) => $r['jenjang'], $pembayar);
 
         $baris = [];
         $totalKolom = array_fill_keys(array_column($bulan, 'kunci'), 0);
@@ -162,20 +167,71 @@ class PpsbDashboardService
      */
     private function bulanPertamaBayar(string $ta, array $tipe): array
     {
+        return array_map(fn ($r) => $r['bulan'], $this->pembayarPertama($ta, $tipe));
+    }
+
+    /**
+     * Pembayar per santri untuk SATU SIKLUS PSB: bulan pembayaran pertamanya dan
+     * JENJANG siklusnya.
+     *
+     * Tahun ajarannya diambil dari TAGIHAN PSB (registrasi, uang pangkal,
+     * perlengkapan), bukan dari `santri.tahun_ajaran`. Yang terakhir adalah tahun
+     * MASUK/angkatan yang tak pernah maju — memakainya menghitung pendaftar
+     * lanjutan (SMP→SMA) di tahun angkatan lamanya, bukan tahun PSB tujuannya.
+     * Untuk calon baru keduanya sama. Jenjangnya dari siklus() — lihat di sana.
+     *
+     * @param  list<string>  $tipe
+     * @return array<int,array{bulan:string,jenjang:?string}>
+     */
+    private function pembayarPertama(string $ta, array $tipe): array
+    {
         $rows = PembayaranSantri::query()
             ->where('status', self::DIAKUI)
-            ->whereHas('santri', fn ($q) => $q->where('tahun_ajaran', $ta))
-            ->whereHas('tagihan.jenis', fn ($q) => $q->whereIn('tipe', TipeBiaya::kodeBerperilaku(...$tipe)))
+            ->whereHas('tagihan', fn ($q) => $q->where('tahun_ajaran', $ta)
+                ->whereHas('jenis', fn ($j) => $j->whereIn('tipe', TipeBiaya::kodeBerperilaku(...$tipe))))
             ->orderBy('tanggal')->orderBy('id')
             ->get(['id_santri', 'tanggal']);
 
-        $hasil = [];
+        $bulan = [];
         foreach ($rows as $r) {
             // Sudah terurut tanggal → yang pertama ditemukan adalah yang terawal.
-            $hasil[$r->id_santri] ??= Carbon::parse($r->tanggal)->format('Y-m');
+            $bulan[$r->id_santri] ??= Carbon::parse($r->tanggal)->format('Y-m');
+        }
+        $siklus = $this->siklus($ta, array_keys($bulan));
+
+        $hasil = [];
+        foreach ($bulan as $id => $kunci) {
+            $hasil[$id] = ['bulan' => $kunci, 'jenjang' => $siklus[$id]['jenjang'] ?? null];
         }
 
         return $hasil;
+    }
+
+    /**
+     * Jenjang & jalur SIKLUS PSB tahun ini per santri.
+     *  • Siklus LANJUTAN (santri aktif naik jenjang): dari baris pendaftaran
+     *    lanjutannya — jenjang & jalur TUJUAN. Data santri masih menyebut jenjang
+     *    lamanya sampai kenaikan dieksekusi.
+     *  • Calon BARU: dari data santri hari ini. Tagihan & baris pendaftarannya
+     *    menyimpan jenjang/jalur saat dibuat, dan tak ikut diperbarui bila
+     *    petugas menyunting jenjang atau jalur calon sesudahnya.
+     *
+     * @param  list<int>  $ids
+     * @return array<int,array{jenjang:?string,jalur:?string}>
+     */
+    private function siklus(string $ta, array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        $lanjutan = Pendaftaran::lanjutan()->whereIn('id_santri', $ids)->where('tahun_ajaran', $ta)
+            ->get(['id_santri', 'kode_jenjang', 'kode_jalur'])->keyBy('id_santri');
+
+        return Santri::whereIn('id', $ids)->get(['id', 'kode_jenjang', 'jalur'])
+            ->mapWithKeys(fn ($s) => [$s->id => [
+                'jenjang' => $lanjutan[$s->id]->kode_jenjang ?? $s->kode_jenjang,
+                'jalur' => $lanjutan[$s->id]->kode_jalur ?? $s->jalur,
+            ]])->all();
     }
 
     /** Id santri yang sudah mulai membayar uang pangkal (definisi CLOSING). */
@@ -198,12 +254,15 @@ class PpsbDashboardService
             return ['total' => '0', 'jumlah_santri' => 0, 'per_jenjang' => []];
         }
 
+        // Tagihan uang pangkal SIKLUS INI saja: santri lanjutan juga punya uang
+        // pangkal jenjang lamanya, yang bukan urusan dasbor T.A ini.
         $rows = TagihanSantri::query()
             ->whereIn('id_santri', $ids)
+            ->where('tahun_ajaran', $ta)
             ->whereNotIn('status', TagihanSantri::TIDAK_BERLAKU)
             ->whereHas('jenis', fn ($q) => $q->whereIn('tipe', TipeBiaya::kodeBerperilaku('uang_pangkal')))
-            ->with('santri:id,kode_jenjang')
             ->get(['id', 'id_santri', 'sisa']);
+        $siklus = $this->siklus($ta, $rows->pluck('id_santri')->unique()->values()->all());
 
         $total = '0';
         $perJenjang = [];
@@ -212,7 +271,7 @@ class PpsbDashboardService
             if (Money::lte($t->sisa, '0')) {
                 continue;
             }
-            $kode = $t->santri?->kode_jenjang ?? '—';
+            $kode = $siklus[$t->id_santri]['jenjang'] ?? '—';
             // `nama` ikut disiapkan: tabelnya menyebut NAMA jenjang.
             $perJenjang[$kode] ??= [
                 'kode' => $kode,
@@ -244,7 +303,7 @@ class PpsbDashboardService
     {
         $rows = PembayaranSantri::query()
             ->where('status', self::DIAKUI)
-            ->whereHas('santri', fn ($q) => $q->where('tahun_ajaran', $ta))
+            ->whereHas('tagihan', fn ($q) => $q->where('tahun_ajaran', $ta))
             ->with('tagihan.jenis:kode,tipe')
             ->get(['id', 'id_tagihan', 'nominal', 'tanggal']);
 
@@ -308,12 +367,15 @@ class PpsbDashboardService
             ->join('tagihan_santri as t', 't.id', '=', 'p.id_tagihan')
             ->join('jenis_biaya as j', 'j.kode', '=', 't.kode_jenis')
             ->join('santri as s', 's.id', '=', 'p.id_santri')
+            ->tap(fn ($q) => $this->gabungSiklusLanjutan($q, $ta))
             ->where('p.status', self::DIAKUI)
-            ->where('s.tahun_ajaran', $ta)
+            ->where('t.tahun_ajaran', $ta)
             ->whereIn('j.tipe', TipeBiaya::kodeBerperilaku(...$tipe))
             ->tap(fn ($q) => $this->saringCari($q, $cari))
-            ->groupBy('s.id', 's.nama', 's.no_pendaftaran', 's.nis', 's.kode_jenjang', 's.jalur')
-            ->select(['s.id', 's.nama', 's.no_pendaftaran', 's.nis', 's.kode_jenjang as jenjang', 's.jalur'])
+            ->groupBy('s.id', 's.nama', 's.no_pendaftaran', 's.nis', 's.kode_jenjang', 's.jalur', 'pl.kode_jenjang', 'pl.kode_jalur')
+            ->select(['s.id', 's.nama', 's.no_pendaftaran', 's.nis'])
+            ->selectRaw('COALESCE(pl.kode_jenjang, s.kode_jenjang) as jenjang')
+            ->selectRaw('COALESCE(pl.kode_jalur, s.jalur) as jalur')
             ->selectRaw("COALESCE(SUM(CASE WHEN j.tipe IN ({$isi($kodeReg)}) THEN p.nominal ELSE 0 END), 0) as registrasi", $kodeReg)
             ->selectRaw("COALESCE(SUM(CASE WHEN j.tipe IN ({$isi($kodeUp)}) THEN p.nominal ELSE 0 END), 0) as uang_pangkal", $kodeUp)
             ->selectRaw("COALESCE(SUM(CASE WHEN j.tipe IN ({$isi($kodePl)}) THEN p.nominal ELSE 0 END), 0) as perlengkapan", $kodePl)
@@ -335,24 +397,38 @@ class PpsbDashboardService
             ->join('jenis_biaya as j', 'j.kode', '=', 't.kode_jenis')
             ->join('santri as s', 's.id', '=', 't.id_santri')
             ->whereIn('j.tipe', TipeBiaya::kodeBerperilaku('uang_pangkal'))
-            ->where('t.status', '!=', 'batal')
+            // Sama dengan kartunya: tagihan yang batal maupun dihapus tak dihitung.
+            ->whereNotIn('t.status', TagihanSantri::TIDAK_BERLAKU)
             ->where('t.sisa', '>', 0)
-            ->where('s.tahun_ajaran', $ta)
+            ->where('t.tahun_ajaran', $ta)
             ->whereExists(fn ($q) => $q->from('pembayaran_santri as p2')
                 ->join('tagihan_santri as t2', 't2.id', '=', 'p2.id_tagihan')
                 ->join('jenis_biaya as j2', 'j2.kode', '=', 't2.kode_jenis')
                 ->whereColumn('p2.id_santri', 's.id')
                 ->where('p2.status', self::DIAKUI)
+                ->where('t2.tahun_ajaran', $ta)
                 ->whereIn('j2.tipe', TipeBiaya::kodeBerperilaku('uang_pangkal'))
                 ->selectRaw('1'))
             ->tap(fn ($q) => $this->saringCari($q, $cari))
+            ->tap(fn ($q) => $this->gabungSiklusLanjutan($q, $ta))
             ->select([
                 's.id', 's.nama', 's.no_pendaftaran', 's.nis',
-                's.kode_jenjang as jenjang', 's.jalur',
+                DB::raw('COALESCE(pl.kode_jenjang, s.kode_jenjang) as jenjang'),
+                DB::raw('COALESCE(pl.kode_jalur, s.jalur) as jalur'),
                 't.nominal', 't.sisa', 't.jatuh_tempo',
                 DB::raw('(t.nominal - t.sisa) as terbayar'),
             ])
             ->orderByDesc('t.sisa')->orderBy('s.nama');
+    }
+
+    /**
+     * LEFT JOIN baris pendaftaran LANJUTAN T.A ini sebagai `pl`, supaya kueri
+     * rincian bisa menyebut jenjang & jalur TUJUAN — padanan siklus() di SQL.
+     */
+    private function gabungSiklusLanjutan($query, string $ta): void
+    {
+        $query->leftJoin('pendaftaran as pl', fn ($j) => $j->on('pl.id_santri', '=', 's.id')
+            ->where('pl.tahun_ajaran', '=', $ta)->where('pl.jenis', '=', 'lanjutan'));
     }
 
     /** Pencarian bebas pada identitas santri: nomor pendaftaran, NIS, atau nama. */
@@ -391,9 +467,13 @@ class PpsbDashboardService
     public function planVsAktual(string $ta): array
     {
         $target = TargetSantri::where('tahun_ajaran', $ta)->get()->keyBy('kode_jenjang');
-        $aktual = Santri::whereIn('id', $this->idClosing($ta))
-            ->get(['id', 'kode_jenjang', 'jenis_kelamin'])
-            ->groupBy('kode_jenjang');
+        // Jenjang SIKLUS (dari tagihan uang pangkalnya), bukan jenjang santri
+        // hari ini — pendaftar lanjutan masuk target jenjang tujuannya.
+        $closing = $this->pembayarPertama($ta, ['uang_pangkal']);
+        $aktual = Santri::whereIn('id', array_keys($closing))
+            ->get(['id', 'jenis_kelamin'])
+            ->each(fn ($s) => $s->setAttribute('jenjang_siklus', $closing[$s->id]['jenjang'] ?? null))
+            ->groupBy('jenjang_siklus');
 
         $kodeJenjang = collect($this->jenjangDipakai($ta))->keys()
             ->merge($target->keys())->unique()->values();
@@ -454,17 +534,21 @@ class PpsbDashboardService
      */
     public function sebaranJalur(string $ta, string $basis = 'closing'): array
     {
-        $ids = $basis === 'pendaftar'
-            ? array_keys($this->bulanPertamaBayar($ta, ['registrasi']))
-            : $this->idClosing($ta);
+        $ids = array_keys($this->bulanPertamaBayar($ta, $basis === 'pendaftar' ? ['registrasi'] : ['uang_pangkal']));
+        $siklus = $this->siklus($ta, $ids);
 
-        $santri = Santri::whereIn('id', $ids)->get(['id', 'jalur', 'kode_jenjang', 'jenis_kelamin']);
+        // Jenjang & jalur SIKLUS PSB ini (lanjutan = tujuannya), bukan jenjang lama.
+        $santri = Santri::whereIn('id', $ids)->get(['id', 'jenis_kelamin'])
+            ->each(function ($s) use ($siklus) {
+                $s->setAttribute('kode_jenjang', $siklus[$s->id]['jenjang'] ?? null);
+                $s->setAttribute('jalur', $siklus[$s->id]['jalur'] ?? null);
+            });
         $jenjang = $this->jenjangDipakai($ta);
 
         // Baris = SELURUH jalur master (aktif) + jalur yang benar-benar dipakai,
         // supaya jalur yang belum ada pendaftarnya tetap terlihat sebagai 0
         // — itu informasi, bukan baris kosong yang layak disembunyikan.
-        $jalur = \App\Models\JalurPendaftaran::where('status', 'aktif')->orderBy('urutan')->orderBy('kode')
+        $jalur = JalurPendaftaran::where('status', 'aktif')->orderBy('urutan')->orderBy('kode')
             ->pluck('nama', 'kode')->all();
         foreach ($santri->pluck('jalur')->filter()->unique() as $kode) {
             $jalur[$kode] ??= $kode;
@@ -512,7 +596,7 @@ class PpsbDashboardService
         $rows = Santri::whereIn('id', $ids)->get(['id', 'sumber_informasi', 'sumber_informasi_lain']);
 
         // Label dari master (termasuk yang nonaktif) agar data lama tetap terbaca.
-        $label = \App\Models\SumberInformasi::label();
+        $label = SumberInformasi::label();
 
         $hitung = [];
         $lain = [];
@@ -553,8 +637,12 @@ class PpsbDashboardService
     private function jenjangDipakai(string $ta): array
     {
         $master = Referensi::jenjang();
+        // Jenjang calon baru T.A ini + jenjang TUJUAN pendaftar lanjutan T.A ini.
         $dipakai = Santri::where('tahun_ajaran', $ta)->whereNotNull('kode_jenjang')
-            ->distinct()->pluck('kode_jenjang');
+            ->distinct()->pluck('kode_jenjang')
+            ->merge(Pendaftaran::lanjutan()->where('tahun_ajaran', $ta)->whereNotNull('kode_jenjang')
+                ->distinct()->pluck('kode_jenjang'))
+            ->unique();
 
         foreach ($dipakai as $kode) {
             $master[$kode] ??= $kode;
@@ -573,7 +661,7 @@ class PpsbDashboardService
         $adaAkun = JenisBiaya::whereIn('tipe', TipeBiaya::kodeBerperilaku('registrasi', 'uang_pangkal'))
             ->where('status', 'aktif')->exists();
 
-        return $adaAkun && \App\Models\TarifBiaya::where('tahun_ajaran', $ta)
+        return $adaAkun && TarifBiaya::where('tahun_ajaran', $ta)
             ->whereIn('perilaku', ['registrasi', 'uang_pangkal'])->exists();
     }
 }

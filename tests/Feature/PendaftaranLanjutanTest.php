@@ -6,9 +6,12 @@ use App\Exceptions\AppException;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
 use App\Models\CoaGroup;
+use App\Models\DompetWali;
 use App\Models\JalurPendaftaran;
+use App\Models\JenisBiaya;
 use App\Models\Jenjang;
 use App\Models\Level;
+use App\Models\PembayaranSantri;
 use App\Models\Pendaftaran;
 use App\Models\RiwayatTingkat;
 use App\Models\Santri;
@@ -16,11 +19,16 @@ use App\Models\TagihanSantri;
 use App\Models\TahunAjaran;
 use App\Models\User;
 use App\Services\Modules\JenisBiayaService;
+use App\Services\Modules\KenaikanTingkatService;
+use App\Services\Modules\PembayaranSantriService;
 use App\Services\Modules\PendaftaranLanjutanService;
+use App\Services\Modules\PpsbDashboardService;
 use App\Services\Modules\SantriService;
 use App\Services\Modules\SppService;
 use App\Services\Modules\TarifService;
 use App\Services\Modules\WaliService;
+use App\Services\Ppsb\DompetPolicy;
+use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -167,7 +175,7 @@ class PendaftaranLanjutanTest extends TestCase
 
         $mulai = TahunAjaran::where('kode', $p->tahun_ajaran)->value('tanggal_mulai');
         Carbon::setTestNow(Carbon::parse($mulai));
-        (new \App\Services\Modules\KenaikanTingkatService)->terapkanYangJatuhTempo();
+        (new KenaikanTingkatService)->terapkanYangJatuhTempo();
         Carbon::setTestNow(self::HARI_UJI);
 
         $hasil['santri'] = $hasil['santri']->refresh();
@@ -392,6 +400,64 @@ class PendaftaranLanjutanTest extends TestCase
         $this->assertSame('aktif', $santri->refresh()->status, 'status santri tak boleh ikut mundur ke terbayar');
     }
 
+    /**
+     * Santri aktif SUDAH punya Dompet Wali, jadi registrasi lanjutannya bisa
+     * dibayar dari dompet. Dulu jalur itu hanya melunasi tagihan: siklusnya
+     * macet di "Calon" tanpa tombol apa pun, padahal uangnya sudah terpotong.
+     */
+    public function test_registrasi_lanjutan_dibayar_dari_dompet_juga_memajukan_tahap(): void
+    {
+        CoaDetail::create(['kode_coa' => DompetPolicy::COA_TITIPAN['wali'], 'nama_coa' => 'Titipan Dompet Wali', 'kode_grup' => self::GRP, 'jenis_saldo' => 'kredit']);
+        $santri = $this->santriKelasAkhir();
+        $p = (new PendaftaranLanjutanService)->buat($santri->id, ['tahun_ajaran' => self::TA2], $this->admin->id_pengguna);
+        $this->assertSame('calon', $p->status);
+
+        $registrasi = TagihanSantri::where('id_santri', $santri->id)->where('perilaku', 'registrasi')
+            ->where('tahun_ajaran', self::TA2)->firstOrFail();
+        DompetWali::create(['id_wali' => $santri->id_wali, 'saldo' => '1000000']);
+
+        (new PembayaranSantriService)->bayarDariDompet([
+            'id_tagihan' => $registrasi->id, 'nominal' => $registrasi->sisa, 'tanggal' => self::HARI_UJI,
+        ], $this->admin->id_pengguna);
+
+        $this->assertSame('lunas', $registrasi->refresh()->status);
+        $this->assertSame('terbayar', $p->refresh()->status, 'Tahap pendaftaran lanjutan harus maju, sama seperti bayar di loket.');
+        $this->assertSame('aktif', $santri->refresh()->status);
+    }
+
+    /**
+     * Dasbor PPSB menghitung pendaftar lanjutan di T.A PSB TUJUANNYA, dengan
+     * jenjang & jalur tujuan. Dulu dasbor menyaring `santri.tahun_ajaran`
+     * (angkatan, tak pernah maju): pendaftar SDTQ→SMP untuk 2027/2028 justru
+     * terhitung di dasbor 2026/2027, sebagai pendaftar SDTQ.
+     */
+    public function test_dasbor_ppsb_menghitung_pendaftar_lanjutan_di_tahun_tujuannya(): void
+    {
+        $santri = $this->santriKelasAkhir();
+        (new PendaftaranLanjutanService)->buat($santri->id, ['tahun_ajaran' => self::TA2], $this->admin->id_pengguna);
+        $registrasi = TagihanSantri::where('id_santri', $santri->id)->where('perilaku', 'registrasi')
+            ->where('tahun_ajaran', self::TA2)->firstOrFail();
+        PembayaranSantri::create([
+            'nomor' => 'UJI-LNJ-1', 'id_santri' => $santri->id, 'id_tagihan' => $registrasi->id,
+            'tanggal' => self::HARI_UJI, 'nominal' => $registrasi->nominal, 'kode_rekening' => self::PEND,
+            'status' => 'terverifikasi', 'dicatat_oleh' => $this->admin->id_pengguna,
+        ]);
+
+        $dasbor = new PpsbDashboardService;
+
+        // T.A TUJUAN: terhitung, sebagai pendaftar SMP berjalur lanjutan.
+        $smp = collect($dasbor->tabelBulanan(self::TA2, 'pendaftar')['baris'])->firstWhere('kode', 'J002');
+        $this->assertSame(1, $smp['total']);
+        $this->assertSame('250000.00', Money::of($dasbor->penerimaan(self::TA2)['registrasi']));
+        $jalur = collect($dasbor->sebaranJalur(self::TA2, 'pendaftar')['baris'])->firstWhere('kode', '003');
+        $this->assertSame(1, $jalur['sel']['L']['J002']);
+
+        // T.A ANGKATAN-nya: tidak terhitung lagi.
+        $sdtq = collect($dasbor->tabelBulanan(self::TA1, 'pendaftar')['baris'])->firstWhere('kode', 'J001');
+        $this->assertSame(0, $sdtq['total'] ?? 0);
+        $this->assertSame('0.00', Money::of($dasbor->penerimaan(self::TA1)['registrasi']));
+    }
+
     // ---- Eksekusi kenaikan ----
 
     public function test_eksekusi_memindahkan_santri_dan_menagihkan_biaya_tujuan(): void
@@ -526,7 +592,7 @@ class PendaftaranLanjutanTest extends TestCase
 
         // 1 Juli tiba → menyala, lengkap dengan riwayat tingkatnya.
         Carbon::setTestNow('2027-07-01');
-        (new \App\Services\Modules\KenaikanTingkatService)->terapkanYangJatuhTempo();
+        (new KenaikanTingkatService)->terapkanYangJatuhTempo();
 
         $santri->refresh();
         $this->assertSame('J002', $santri->kode_jenjang);
@@ -563,7 +629,7 @@ class PendaftaranLanjutanTest extends TestCase
         $this->assertSame(1500000.0, (float) $susulan['nominal'], 'tarif SDTQ T.A1, bukan SMP');
         $this->assertStringContainsString('SDTQ', $susulan['asal_label']);
         // Akun & unit bisnisnya ikut benar, karena jenis biayanya per jenjang.
-        $this->assertSame('J001', \App\Models\JenisBiaya::find($susulan['kode_jenis'])->kode_jenjang);
+        $this->assertSame('J001', JenisBiaya::find($susulan['kode_jenis'])->kode_jenjang);
     }
 
     /** PPSB baru tuntas SETELAH tahun tujuannya berjalan → langsung berlaku. */
