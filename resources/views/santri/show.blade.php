@@ -517,7 +517,7 @@
                             <p class="text-xs text-gray-500">Masukkan nominal <b>NORMAL</b>. Bila gelombang berpotongan, tagihan terbit sebesar setelah potongan. <b>Belum menerbitkan jurnal</b> — yang dibayar sebelum daftar ulang diakui saat uang diterima, sisanya diakrualkan saat Daftar Ulang.</p>
                             @if ($potonganUangPangkal)
                                 <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                                    Potongan Gelombang {{ $santri->gelombang }} (T.A {{ $potonganUangPangkal->tahun_ajaran }}): <b>− @rp($potonganUangPangkal->potongan)</b>. Tagihan = nominal normal − potongan. Syarat pertahankan potongan: bayar <b>≥ 50%</b> dalam {{ $potonganUangPangkal->masa_berlaku_hari ?? 7 }} hari.
+                                    Potongan Gelombang {{ $santri->gelombang }} (T.A {{ $potonganUangPangkal->tahun_ajaran }}): <b>− @rp($potonganUangPangkal->potongan)</b>. Tagihan = nominal normal − potongan. Syarat pertahankan potongan: bayar <b>≥ {{ $aturanPotongan['syarat_persen'] ?? 50 }}%</b> dalam {{ $aturanPotongan['masa_berlaku_hari'] ?? 7 }} hari.
                                 </div>
                             @endif
                             <div class="grid gap-2 sm:grid-cols-3">

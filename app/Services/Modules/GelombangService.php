@@ -8,6 +8,7 @@ use App\Models\Jenjang;
 use App\Models\PotonganGelombang;
 use App\Models\Santri;
 use App\Support\Money;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -22,7 +23,7 @@ class GelombangService
 {
     // ---- Master ----
 
-    /** @return \Illuminate\Support\Collection<int,Gelombang> */
+    /** @return Collection<int,Gelombang> */
     public function daftar(?string $tahunAjaran = null)
     {
         return Gelombang::when($tahunAjaran, fn ($q) => $q->where('tahun_ajaran', $tahunAjaran))
@@ -58,6 +59,8 @@ class GelombangService
             'berlaku_mulai' => $data['berlaku_mulai'] ?: null,
             'berlaku_sampai' => $data['berlaku_sampai'] ?: null,
             'masa_berlaku_hari' => (int) ($data['masa_berlaku_hari'] ?? 7),
+            'syarat_persen_potongan' => (int) ($data['syarat_persen_potongan'] ?? 50),
+            'jeda_termin_hangus_hari' => (int) ($data['jeda_termin_hangus_hari'] ?? 30),
             'status' => ($data['status'] ?? 'aktif') === 'arsip' ? 'arsip' : 'aktif',
             'keterangan' => $data['keterangan'] ?? null,
         ];

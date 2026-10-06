@@ -19,7 +19,7 @@ class Gelombang extends Model
 
     protected $fillable = [
         'tahun_ajaran', 'kode', 'nama', 'berlaku_mulai', 'berlaku_sampai',
-        'masa_berlaku_hari', 'status', 'keterangan',
+        'masa_berlaku_hari', 'syarat_persen_potongan', 'jeda_termin_hangus_hari', 'status', 'keterangan',
     ];
 
     protected function casts(): array
@@ -28,6 +28,8 @@ class Gelombang extends Model
             'berlaku_mulai' => 'date',
             'berlaku_sampai' => 'date',
             'masa_berlaku_hari' => 'integer',
+            'syarat_persen_potongan' => 'integer',
+            'jeda_termin_hangus_hari' => 'integer',
         ];
     }
 

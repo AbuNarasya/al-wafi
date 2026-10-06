@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\ReminderSetting;
+use App\Services\Modules\AngsuranUangPangkalService;
 use App\Services\Modules\KenaikanTingkatService;
 use App\Services\Modules\ReminderTagihanService;
 use Illuminate\Foundation\Inspiring;
@@ -18,8 +20,8 @@ Artisan::command('reminder:tagihan', function (ReminderTagihanService $service) 
 // Jadwal harian pada jam dari pengaturan. try/catch: file ini juga dimuat saat
 // DB belum ada (mis. migrate pertama) — jangan sampai artisan gagal boot.
 try {
-    $jamKirim = \App\Models\ReminderSetting::query()->value('jam_kirim') ?: '07:00';
-} catch (\Throwable) {
+    $jamKirim = ReminderSetting::query()->value('jam_kirim') ?: '07:00';
+} catch (Throwable) {
     $jamKirim = '07:00';
 }
 Schedule::command('reminder:tagihan')->dailyAt($jamKirim);
@@ -40,6 +42,18 @@ Artisan::command('santri:terapkan-jadwal', function (KenaikanTingkatService $ser
 // Kenaikan Tingkat & daftar santri ikut memanggilnya (lihat controllernya).
 // Penerapnya idempoten, jadi dipanggil dari kedua arah pun aman.
 Schedule::command('santri:terapkan-jadwal')->dailyAt('00:30');
+
+// Potongan uang pangkal per gelombang: setelah tenggatnya lewat, putuskan
+// "terkunci" (syarat bayar terpenuhi) atau "hangus" (ditambahkan kembali ke
+// tagihan). Dulu hanya lewat tombol Evaluasi atau saat halaman detail dibuka,
+// sehingga potongan yang tenggatnya lewat bisa tetap "berlaku" berminggu-minggu.
+// Pemicu lain: verifikasi pembayaran uang pangkal & sebelum akrual aktivasi.
+// Idempoten — yang sudah diputuskan dilewati.
+Artisan::command('potongan:evaluasi', function (AngsuranUangPangkalService $service) {
+    $h = $service->evaluasiPotonganSemua();
+    $this->info("Potongan gelombang: diperiksa {$h['dievaluasi']}, terkunci {$h['earned']}, hangus {$h['hangus']}, dibatalkan {$h['batal']}.");
+})->purpose('Putuskan potongan uang pangkal yang tenggatnya lewat: terkunci, hangus, atau batal');
+Schedule::command('potongan:evaluasi')->dailyAt('00:45')->withoutOverlapping();
 
 // Batch tagihan yang waktu rilisnya sudah lewat. Tiap 5 menit — bukan harian:
 // petugas menetapkan waktu rilis sampai ke menitnya, dan menjanjikan "terbit

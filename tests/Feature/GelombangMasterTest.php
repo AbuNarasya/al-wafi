@@ -212,11 +212,15 @@ class GelombangMasterTest extends TestCase
             'tahun_ajaran' => self::TA, 'kode' => 'TAHFIZH', 'nama' => 'Beasiswa Tahfizh',
             'berlaku_mulai' => '2026-01-01', 'berlaku_sampai' => '2026-06-30',
             'masa_berlaku_hari' => 30, 'status' => 'aktif',
+            // Syarat potongan kini isian gelombang (dulu tertanam 50% & +30 hari).
+            'syarat_persen_potongan' => 40, 'jeda_termin_hangus_hari' => 14,
         ])->assertRedirect();
 
         $g = Gelombang::where('kode', 'TAHFIZH')->firstOrFail();
         $this->assertSame('Beasiswa Tahfizh', $g->nama);
         $this->assertSame(30, $g->masa_berlaku_hari);
+        $this->assertSame(40, $g->syarat_persen_potongan);
+        $this->assertSame(14, $g->jeda_termin_hangus_hari);
     }
 
     private function buatSantri(string $gelombang): Santri

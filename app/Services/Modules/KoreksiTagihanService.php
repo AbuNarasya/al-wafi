@@ -8,6 +8,7 @@ use App\Models\JournalEntry;
 use App\Models\KoreksiTagihan;
 use App\Models\MutasiDompet;
 use App\Models\PembayaranSantri;
+use App\Models\PotonganUangPangkal;
 use App\Models\RencanaAngsuranUangPangkal;
 use App\Models\TagihanSantri;
 use App\Services\Ledger\DocNumber;
@@ -108,6 +109,11 @@ class KoreksiTagihanService
 
             if (Money::gtZero($kelebihan)) {
                 $this->pindahkanKeDompetWali($tagihan, $kelebihan, $idPengguna);
+            }
+
+            // Tagihan yang DIHAPUS tak punya urusan potongan gelombang lagi.
+            if (Money::isZero($baru)) {
+                PotonganUangPangkal::batalkanUntuk($tagihan->id);
             }
 
             $jadwalDibatalkan = $this->batalkanJadwalAngsuran($tagihan, $lama, $baru);

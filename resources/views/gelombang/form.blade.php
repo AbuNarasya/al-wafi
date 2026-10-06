@@ -48,11 +48,24 @@
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-field name="masa_berlaku_hari" label="Masa Berlaku (hari)" type="number"
                          :value="old('masa_berlaku_hari', $row->masa_berlaku_hari ?? 7)" required
-                         hint="Tenggat tiap calon membayar ≥50% agar potongannya tidak hangus. Beda dari periode di atas." />
+                         hint="Tenggat tiap calon memenuhi syarat bayar di bawah agar potongannya tidak hangus. Dihitung sejak uang pangkal ditagihkan. Beda dari periode di atas." />
                 <x-field name="status" label="Status" :value="old('status', $row->status ?? 'aktif')"
                          :options="['aktif' => 'Aktif', 'arsip' => 'Arsip']" required
                          hint="Arsip = tidak ditawarkan lagi, tapi data santri lama tetap utuh." />
             </div>
+
+            {{-- Dulu dua angka ini tertanam di kode (50% & +30 hari). Keduanya
+                 dijepret ke tiap potongan saat uang pangkal ditagihkan, jadi
+                 mengubahnya di sini hanya berlaku untuk penagihan berikutnya. --}}
+            <div class="grid gap-4 sm:grid-cols-2">
+                <x-field name="syarat_persen_potongan" label="Syarat Bayar Minimal (%)" type="number"
+                         :value="old('syarat_persen_potongan', $row->syarat_persen_potongan ?? 50)" required
+                         hint="Potongan dipertahankan bila pembayaran terverifikasi mencapai persentase ini dari uang pangkal sebelum tenggat." />
+                <x-field name="jeda_termin_hangus_hari" label="Jatuh Tempo Termin Hangus (hari)" type="number"
+                         :value="old('jeda_termin_hangus_hari', $row->jeda_termin_hangus_hari ?? 30)" required
+                         hint="Bila potongan hangus, nominalnya ditambahkan sebagai termin baru yang jatuh tempo sekian hari sesudah termin terakhir." />
+            </div>
+            <p class="-mt-2 text-xs text-gray-400">Perubahan hanya berlaku untuk uang pangkal yang ditagihkan sesudahnya; potongan yang sudah berjalan memakai syarat saat ditagihkan.</p>
 
             <x-field name="keterangan" label="Keterangan" :value="old('keterangan', $row->keterangan)" />
 

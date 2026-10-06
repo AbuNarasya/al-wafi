@@ -10,6 +10,7 @@ use App\Models\RencanaAngsuranUangPangkal;
 use App\Models\TagihanSantri;
 use App\Models\TerminUangPangkal;
 use App\Models\TipeBiaya;
+use App\Services\Ledger\PostingService;
 use App\Services\Ppsb\Tahap;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
@@ -224,14 +225,31 @@ class AngsuranUangPangkalService
         return $termin;
     }
 
-    /** Evaluasi siklus potongan satu tagihan: earned / masih berlaku / hangus. */
-    public function evaluasiPotongan(int $idTagihan): array
+    /**
+     * Evaluasi siklus potongan satu tagihan: earned / masih berlaku / hangus / batal.
+     *
+     * @param  ?int  $idPengguna  pelaku jurnal penyesuaian bila potongan hangus
+     *                            SESUDAH uang pangkalnya diakrualkan; null =
+     *                            evaluasi otomatis (penjadwal).
+     */
+    public function evaluasiPotongan(int $idTagihan, ?int $idPengguna = null): array
     {
         $potongan = PotonganUangPangkal::where('id_tagihan', $idTagihan)->first();
         if (! $potongan || $potongan->status !== 'berlaku') {
             return ['status' => $potongan->status ?? null, 'berubah' => false];
         }
-        $tagihan = TagihanSantri::findOrFail($idTagihan);
+        $tagihan = TagihanSantri::with(['jenis', 'santri'])->findOrFail($idTagihan);
+
+        // Tagihan yang sudah BATAL atau DIHAPUS (calon mundur, santri keluar,
+        // koreksi ke nol) tak punya urusan potongan lagi. Dulu potongannya tetap
+        // `berlaku`, dan begitu tenggatnya lewat evaluasi membuatnya "hangus" —
+        // menghidupkan tagihan yang sudah batal sebesar potongannya.
+        if (! $tagihan->berlaku()) {
+            $potongan->update(['status' => 'batal', 'dinilai_pada' => Carbon::now()]);
+
+            return ['status' => 'batal', 'berubah' => true];
+        }
+
         $ambang = Money::div(Money::mul($tagihan->nominal, (string) $potongan->syarat_persen), '100');
 
         $verif = PembayaranSantri::where('id_tagihan', $idTagihan)->where('status', 'terverifikasi')->orderBy('tanggal')->get(['tanggal', 'nominal']);
@@ -263,16 +281,42 @@ class AngsuranUangPangkalService
         $sisaBaru = Money::add($tagihan->sisa, $potongan->potongan);
         $statusTagihan = Money::lte($sisaBaru, '0') ? 'lunas' : (Money::lt($sisaBaru, $nominalBaru) ? 'sebagian' : 'belum_bayar');
 
-        DB::transaction(function () use ($idTagihan, $potongan, $tagihan, $nominalBaru, $sisaBaru, $statusTagihan) {
+        DB::transaction(function () use ($idTagihan, $potongan, $tagihan, $nominalBaru, $sisaBaru, $statusTagihan, $idPengguna) {
             $potongan->update(['status' => 'hangus', 'dinilai_pada' => Carbon::now()]);
             $tagihan->update(['nominal' => $nominalBaru, 'sisa' => $sisaBaru, 'status' => $statusTagihan]);
+
+            // Uang pangkal dicatat cash basis selama calon, tetapi SISANYA
+            // diakrualkan saat santri aktif. Potongan yang hangus sesudah itu
+            // menambah piutang — dulu tanpa jurnal, sehingga piutang buku besar
+            // lebih kecil dari buku pembantu (dan bisa minus saat dilunasi).
+            if ($tagihan->sudah_akrual) {
+                $jenis = $tagihan->jenis;
+                if (! $jenis?->kode_coa_piutang) {
+                    throw new AppException(422, "Tagihan \"{$jenis?->nama}\" sudah diakrualkan tetapi jenis biayanya tidak punya akun piutang.");
+                }
+                $ket = "Potongan gelombang hangus — {$jenis->nama}";
+                PostingService::postJournal([
+                    'referensi' => $tagihan->santri?->nis ?: ($tagihan->santri?->no_pendaftaran ?: (string) $tagihan->id),
+                    'tanggal' => Carbon::now()->toDateString(),
+                    'kode_unit' => $jenis->kode_unit,
+                    'sumber_modul' => 'KoreksiTagihan',
+                    'id_sumber' => (string) $tagihan->id,
+                    'id_pengguna' => $idPengguna,
+                    'keterangan' => "{$ket} — {$tagihan->santri?->nama}".($idPengguna ? '' : ' (evaluasi otomatis)'),
+                    'lines' => [
+                        ['kode_coa' => $jenis->kode_coa_piutang, 'debet' => Money::of($potongan->potongan), 'kredit' => '0', 'keterangan' => $ket],
+                        ['kode_coa' => $jenis->kode_coa_pendapatan, 'debet' => '0', 'kredit' => Money::of($potongan->potongan), 'keterangan' => $ket],
+                    ],
+                ]);
+            }
 
             $aktif = RencanaAngsuranUangPangkal::where('id_tagihan', $idTagihan)->where('status', 'aktif')
                 ->with(['termin' => fn ($q) => $q->orderBy('urutan')])->first();
             if ($aktif) {
                 $maks = (int) RencanaAngsuranUangPangkal::where('id_tagihan', $idTagihan)->max('versi');
                 $jtTerakhir = $aktif->termin->max('jatuh_tempo');
-                $jtTermin = Carbon::parse($jtTerakhir ?? $potongan->tenggat)->addDays(30)->toDateString();
+                // Jeda dijepret ke baris potongan saat ditagihkan (dulu tertanam +30).
+                $jtTermin = Carbon::parse($jtTerakhir ?? $potongan->tenggat)->addDays((int) ($potongan->jeda_hangus_hari ?: 30))->toDateString();
                 $aktif->update(['status' => 'digantikan']);
                 $baru = RencanaAngsuranUangPangkal::create([
                     'id_tagihan' => $idTagihan, 'versi' => $maks + 1, 'status' => 'aktif',
@@ -290,21 +334,18 @@ class AngsuranUangPangkalService
     }
 
     /** Evaluasi seluruh potongan yang masih berlaku. */
-    public function evaluasiPotonganSemua(): array
+    public function evaluasiPotonganSemua(?int $idPengguna = null): array
     {
         $rows = PotonganUangPangkal::where('status', 'berlaku')->pluck('id_tagihan');
-        $earned = 0;
-        $hangus = 0;
+        $hitung = ['earned' => 0, 'hangus' => 0, 'batal' => 0];
         foreach ($rows as $idTagihan) {
-            $hasil = $this->evaluasiPotongan($idTagihan);
-            if ($hasil['status'] === 'earned') {
-                $earned++;
-            } elseif ($hasil['status'] === 'hangus') {
-                $hangus++;
+            $hasil = $this->evaluasiPotongan($idTagihan, $idPengguna);
+            if (isset($hitung[$hasil['status']]) && $hasil['berubah']) {
+                $hitung[$hasil['status']]++;
             }
         }
 
-        return ['dievaluasi' => $rows->count(), 'earned' => $earned, 'hangus' => $hangus];
+        return ['dievaluasi' => $rows->count()] + $hitung;
     }
 
     /**

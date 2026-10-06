@@ -53,8 +53,26 @@ class PotonganGelombangService
     /** Masa berlaku (hari) untuk menghitung tenggat "bayar ≥50%" — milik gelombangnya. */
     public function masaBerlakuHari(string $gelombang, string $tahunAjaran): int
     {
-        return (int) (Gelombang::where('tahun_ajaran', $tahunAjaran)->where('kode', $gelombang)
-            ->value('masa_berlaku_hari') ?: 7);
+        return $this->aturan($gelombang, $tahunAjaran)['masa_berlaku_hari'];
+    }
+
+    /**
+     * Ketiga aturan potongan sebuah gelombang, dari master Gelombang. Dulu syarat
+     * 50% & jeda +30 hari tertanam di kode; kini isian per gelombang. Nilai
+     * cadangannya (7 / 50 / 30) hanya untuk gelombang yang barisnya tak ada.
+     *
+     * @return array{masa_berlaku_hari:int, syarat_persen:int, jeda_hangus_hari:int}
+     */
+    public function aturan(string $gelombang, string $tahunAjaran): array
+    {
+        $g = Gelombang::where('tahun_ajaran', $tahunAjaran)->where('kode', $gelombang)
+            ->first(['masa_berlaku_hari', 'syarat_persen_potongan', 'jeda_termin_hangus_hari']);
+
+        return [
+            'masa_berlaku_hari' => (int) ($g?->masa_berlaku_hari ?: 7),
+            'syarat_persen' => (int) ($g?->syarat_persen_potongan ?: 50),
+            'jeda_hangus_hari' => (int) ($g?->jeda_termin_hangus_hari ?: 30),
+        ];
     }
 
     /**

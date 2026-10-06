@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\AppException;
 use App\Models\CompanySettings;
 use App\Services\Modules\AngsuranUangPangkalService;
+use App\Services\Modules\TerminFilterService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -21,7 +22,7 @@ class AngsuranUangPangkalController extends Controller
     public function index(Request $request): View
     {
         // Pilihan & default dropdown filter dari modul Setting Filter Termin.
-        $filter = new \App\Services\Modules\TerminFilterService;
+        $filter = new TerminFilterService;
         $opsiHari = $filter->opsi();
         $dalamHari = $filter->dalamHari($request->query('dalam_hari'));
 
@@ -128,11 +129,11 @@ class AngsuranUangPangkalController extends Controller
         return back()->with('status', 'Feedback wali tersimpan.');
     }
 
-    public function evaluasiPotongan(): RedirectResponse
+    public function evaluasiPotongan(Request $request): RedirectResponse
     {
-        $r = $this->service->evaluasiPotonganSemua();
+        $r = $this->service->evaluasiPotonganSemua($request->user()->id_pengguna);
 
-        return back()->with('status', "Evaluasi potongan gelombang — diperiksa {$r['dievaluasi']}, terkunci {$r['earned']}, hangus {$r['hangus']}.");
+        return back()->with('status', "Evaluasi potongan gelombang — diperiksa {$r['dievaluasi']}, terkunci {$r['earned']}, hangus {$r['hangus']}, dibatalkan {$r['batal']} (tagihannya sudah batal).");
     }
 
     /** Cetak rekap seluruh rencana aktif. */

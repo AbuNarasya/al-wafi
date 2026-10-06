@@ -54,7 +54,7 @@
                     </tbody>
                 </table>
             </div>
-            <p class="px-4 py-2 text-xs text-gray-400">Bila ≥50% belum terbayar s/d tenggat, potongan hangus &amp; tagihan naik ke nominal normal.</p>
+            <p class="px-4 py-2 text-xs text-gray-400">Bila syarat bayar minimal gelombangnya belum terpenuhi s/d tenggat, potongan hangus &amp; tagihan naik ke nominal normal.</p>
         </div>
     @endif
 

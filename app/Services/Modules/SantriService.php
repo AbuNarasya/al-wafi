@@ -335,13 +335,16 @@ class SantriService
                 'jatuh_tempo' => $data['jatuh_tempo'] ?? null, 'keterangan' => $data['keterangan'] ?? $jenis->nama,
             ]);
             if ($tagihan && Money::gtZero($potongan)) {
-                // Masa berlaku milik GELOMBANGNYA, bukan sel potongannya —
-                // satu tenggat untuk seluruh jenjang di gelombang yang sama.
-                $masaBerlaku = (new PotonganGelombangService)->masaBerlakuHari((string) $santri->gelombang, $taTagihan);
+                // Aturannya milik GELOMBANGNYA, bukan sel potongannya — satu
+                // tenggat, satu syarat, satu jeda untuk seluruh jenjang di
+                // gelombang yang sama. Syarat & jeda DIJEPRET ke baris potongan:
+                // mengubah master tak boleh menggeser janji yang sudah berjalan.
+                $aturan = (new PotonganGelombangService)->aturan((string) $santri->gelombang, $taTagihan);
                 PotonganUangPangkal::create([
                     'id_tagihan' => $tagihan->id, 'gelombang' => $santri->gelombang,
-                    'nominal_normal' => $nominalNormal, 'potongan' => $potongan, 'syarat_persen' => 50,
-                    'tenggat' => Carbon::now()->startOfDay()->addDays($masaBerlaku)->toDateString(), 'status' => 'berlaku',
+                    'nominal_normal' => $nominalNormal, 'potongan' => $potongan,
+                    'syarat_persen' => $aturan['syarat_persen'], 'jeda_hangus_hari' => $aturan['jeda_hangus_hari'],
+                    'tenggat' => Carbon::now()->startOfDay()->addDays($aturan['masa_berlaku_hari'])->toDateString(), 'status' => 'berlaku',
                 ]);
             }
 
@@ -755,6 +758,16 @@ class SantriService
             if (! $t || $t->sudah_akrual || $t->status === 'batal') {
                 continue;
             }
+            // Potongan gelombang DIPUTUSKAN DULU sebelum sisa diakrualkan:
+            // hangus yang diputuskan di sini masih cash basis (belum ada jurnal),
+            // jadi tambahannya ikut terakrualkan di bawah. Tanpa ini, potongan
+            // yang baru dinilai sesudah aktivasi menambah piutang di luar buku
+            // besar. (Yang masih belum tenggat tetap `berlaku`; bila kelak hangus,
+            // AngsuranUangPangkalService menerbitkan jurnal penyesuaiannya.)
+            if ($t->perilaku === 'uang_pangkal') {
+                (new AngsuranUangPangkalService)->evaluasiPotongan($t->id, $idPengguna);
+                $t->refresh();
+            }
             $label = $t->jenis?->nama ?? 'tagihan';
             $menunggu = PembayaranSantri::where('id_tagihan', $t->id)->where('status', 'menunggu_verifikasi')->count();
             if ($menunggu > 0) {
@@ -974,6 +987,7 @@ class SantriService
             'status' => 'batal',
             'keterangan' => trim(($t->keterangan ? $t->keterangan.' · ' : '').$jejak),
         ]);
+        PotonganUangPangkal::batalkanUntuk($t->id);
 
         RencanaAngsuranUangPangkal::where('id_tagihan', $t->id)->where('status', 'aktif')
             ->update(['status' => 'digantikan', 'alasan' => "Santri mengundurkan diri: {$alasan}"]);
@@ -1045,6 +1059,7 @@ class SantriService
                 }
 
                 $t->update(['sisa' => '0', 'status' => 'batal']);
+                PotonganUangPangkal::batalkanUntuk($t->id);
 
                 // Jadwal angsuran atas tagihan yang dibatalkan tak lagi berlaku.
                 RencanaAngsuranUangPangkal::where('id_tagihan', $t->id)->where('status', 'aktif')

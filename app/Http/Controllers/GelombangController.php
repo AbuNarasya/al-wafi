@@ -34,7 +34,8 @@ class GelombangController extends Controller
     public function create(Request $request): View
     {
         return view('gelombang.form', [
-            'row' => new Gelombang(['tahun_ajaran' => $this->tahunAjaran($request), 'masa_berlaku_hari' => 7, 'status' => 'aktif']),
+            'row' => new Gelombang(['tahun_ajaran' => $this->tahunAjaran($request), 'masa_berlaku_hari' => 7,
+                'syarat_persen_potongan' => 50, 'jeda_termin_hangus_hari' => 30, 'status' => 'aktif']),
             'baru' => true,
             'opsiTa' => (new TahunAjaranService)->opsiAktif(),
         ]);
@@ -70,6 +71,8 @@ class GelombangController extends Controller
             'berlaku_mulai' => ['nullable', 'date'],
             'berlaku_sampai' => ['nullable', 'date', 'after_or_equal:berlaku_mulai'],
             'masa_berlaku_hari' => ['required', 'integer', 'min:1'],
+            'syarat_persen_potongan' => ['required', 'integer', 'min:1', 'max:100'],
+            'jeda_termin_hangus_hari' => ['required', 'integer', 'min:1'],
             'status' => ['required', 'in:aktif,arsip'],
             'keterangan' => ['nullable', 'string'],
         ], [

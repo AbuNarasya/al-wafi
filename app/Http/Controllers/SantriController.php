@@ -559,6 +559,7 @@ class SantriController extends Controller
         // walau perlengkapannya — satu-satunya yang memang terbit — sudah ada.
         $bisa = $this->bisaDitagihkan($santri);
         $potonganUangPangkal = null;
+        $aturanPotongan = null;
         $nominalDefaultUangPangkal = null;
         $nominalDefaultPerlengkapan = null;
         $asalTarifUangPangkal = null;
@@ -567,6 +568,11 @@ class SantriController extends Controller
         if (in_array($santri->status, ['diterima', 'lolos_kesehatan'], true) && $bisa['ada']) {
             $potonganUangPangkal = (new PotonganGelombangService)
                 ->potonganAktif($santri->gelombang, $santri->kode_jenjang, $santri->tahun_ajaran);
+            // Syarat & masa berlaku diambil dari master Gelombang — teks di layar
+            // dulu menulis "≥ 50%" tetap, padahal kini angkanya bisa diatur.
+            $aturanPotongan = $potonganUangPangkal
+                ? (new PotonganGelombangService)->aturan((string) $santri->gelombang, (string) $santri->tahun_ajaran)
+                : null;
 
             // Angka default diambil dari grid Tarif, dan ASAL-nya ikut ditampilkan
             // supaya petugas tahu sel mana yang terpakai — bukan sekadar melihat
@@ -662,6 +668,7 @@ class SantriController extends Controller
             'transisi' => Tahap::TRANSISI[$santri->status] ?? [],
             'bisaTagih' => $bisa,
             'potonganUangPangkal' => $potonganUangPangkal,
+            'aturanPotongan' => $aturanPotongan,
             'nominalDefaultUangPangkal' => $nominalDefaultUangPangkal,
             'nominalDefaultPerlengkapan' => $nominalDefaultPerlengkapan,
             'asalTarifUangPangkal' => $asalTarifUangPangkal,

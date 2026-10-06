@@ -8,6 +8,7 @@ use App\Models\DompetWali;
 use App\Models\PembayaranSantri;
 use App\Models\Santri;
 use App\Models\TagihanSantri;
+use App\Models\TipeBiaya;
 use App\Models\User;
 use App\Services\Ledger\DocNumber;
 use App\Services\Ledger\PostingService;
@@ -15,6 +16,7 @@ use App\Services\Ppsb\BayarDompet;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * PEMBAYARAN SANTRI — dua tangan: PPSB mencatat (menunggu_verifikasi, belum
@@ -61,7 +63,7 @@ class PembayaranSantriService
      */
     private function assertLunasSekaligus(TagihanSantri $tagihan, string $nominal, string $ruang): void
     {
-        $perilaku = \App\Models\TipeBiaya::perilakuDari($tagihan->jenis?->tipe);
+        $perilaku = TipeBiaya::perilakuDari($tagihan->jenis?->tipe);
         if (! in_array($perilaku, self::LUNAS_SEKALIGUS, true) || Money::eq($nominal, $ruang)) {
             return;
         }
@@ -144,7 +146,7 @@ class PembayaranSantriService
             throw new AppException(422, "Nominal {$nominal} melebihi sisa tagihan {$tagihan->sisa} — kemungkinan sudah ada pembayaran lain yang diverifikasi lebih dulu.");
         }
 
-        return DB::transaction(function () use ($pembayaran, $tagihan, $nominal, $sisaBaru, $idPengguna, $id) {
+        $hasil = DB::transaction(function () use ($pembayaran, $tagihan, $nominal, $sisaBaru, $idPengguna) {
             $jenis = $tagihan->jenis;
             $akunKredit = $jenis->kode_coa_pendapatan;
             if ($tagihan->sudah_akrual) {
@@ -165,20 +167,7 @@ class PembayaranSantriService
             ]);
 
             $tagihan->update(['sisa' => $sisaBaru, 'status' => Money::isZero($sisaBaru) ? 'lunas' : 'sebagian']);
-
-            // Registrasi lunas = gerbang tahap berikutnya (calon → terbayar).
-            if (\App\Models\TipeBiaya::perilakuDari($jenis->tipe) === 'registrasi' && Money::isZero($sisaBaru)) {
-                if ($pembayaran->santri->status === 'calon') {
-                    Santri::where('id', $pembayaran->id_santri)->update(['status' => 'terbayar']);
-                } elseif ($pembayaran->santri->status === 'aktif') {
-                    // Santri AKTIF yang melunasi registrasi = pendaftaran ke jenjang
-                    // lanjutan. Yang maju tahapnya PENDAFTARAN-nya, bukan santrinya:
-                    // ia masih bersekolah di jenjang lama sampai kenaikan dieksekusi.
-                    (new PendaftaranLanjutanService)->tandaiRegistrasiLunas(
-                        (int) $pembayaran->id_santri, $tagihan->kode_jenjang, $tagihan->tahun_ajaran,
-                    );
-                }
-            }
+            $this->majukanTahapBilaRegistrasiLunas($tagihan->refresh(), $pembayaran->santri);
 
             $pembayaran->update([
                 'status' => 'terverifikasi', 'diverifikasi_oleh' => $idPengguna,
@@ -187,6 +176,30 @@ class PembayaranSantriService
 
             return $pembayaran;
         });
+
+        $this->evaluasiPotonganSesudahBayar($tagihan, $idPengguna);
+
+        return $hasil;
+    }
+
+    /**
+     * Pembayaran uang pangkal bisa memenuhi syarat potongan gelombang — putuskan
+     * sekarang, bukan menunggu jadwal malam. SESUDAH transaksi pembayaran
+     * selesai, dan kegagalannya tak membatalkan pembayaran yang sudah sah:
+     * evaluasi terjadwal akan mengulangnya.
+     */
+    private function evaluasiPotonganSesudahBayar(TagihanSantri $tagihan, int $idPengguna): void
+    {
+        if ($tagihan->perilaku !== 'uang_pangkal') {
+            return;
+        }
+        try {
+            (new AngsuranUangPangkalService)->evaluasiPotongan($tagihan->id, $idPengguna);
+        } catch (\Throwable $e) {
+            Log::warning('Evaluasi potongan sesudah pembayaran gagal; diulang oleh jadwal harian.', [
+                'id_tagihan' => $tagihan->id, 'pesan' => $e->getMessage(),
+            ]);
+        }
     }
 
     /** Bayar tagihan dari Dompet Wali (tanpa verifikasi — dana sudah diverifikasi saat top-up). */
@@ -222,10 +235,45 @@ class PembayaranSantriService
             throw new AppException(422, "Saldo Dompet Wali tidak cukup (tersedia {$dompet->saldo}).");
         }
 
-        return DB::transaction(fn () => BayarDompet::bayarTagihanDariDompet($tagihan, [
-            'id_dompet' => $dompet->id, 'nominal' => (string) $nominal, 'tanggal' => $data['tanggal'],
-            'id_pengguna' => $idPengguna, 'namaSantri' => $tagihan->santri->nama, 'catatan' => $data['catatan'] ?? null,
-        ]));
+        $hasil = DB::transaction(function () use ($tagihan, $dompet, $nominal, $data, $idPengguna) {
+            $bayar = BayarDompet::bayarTagihanDariDompet($tagihan, [
+                'id_dompet' => $dompet->id, 'nominal' => (string) $nominal, 'tanggal' => $data['tanggal'],
+                'id_pengguna' => $idPengguna, 'namaSantri' => $tagihan->santri->nama, 'catatan' => $data['catatan'] ?? null,
+            ]);
+            // Gerbang tahap yang SAMA dengan verifikasi di loket. Dulu jalur dompet
+            // hanya melunasi tagihan: registrasi lanjutan santri aktif yang dibayar
+            // dari dompet membuat siklusnya macet di "Calon" tanpa tombol apa pun.
+            $this->majukanTahapBilaRegistrasiLunas($tagihan->refresh(), $tagihan->santri);
+
+            return $bayar;
+        });
+
+        $this->evaluasiPotonganSesudahBayar($tagihan, $idPengguna);
+
+        return $hasil;
+    }
+
+    /**
+     * Registrasi LUNAS = gerbang tahap berikutnya. Satu tempat untuk kedua jalur
+     * pembayaran (verifikasi loket & Dompet Wali), supaya keduanya tak pernah
+     * berbeda perilaku lagi.
+     *  • calon baru → `terbayar`;
+     *  • santri AKTIF = pendaftaran ke jenjang lanjutan. Yang maju tahapnya
+     *    PENDAFTARAN-nya, bukan santrinya: ia masih bersekolah di jenjang lama
+     *    sampai kenaikan dieksekusi.
+     */
+    private function majukanTahapBilaRegistrasiLunas(TagihanSantri $tagihan, Santri $santri): void
+    {
+        if (TipeBiaya::perilakuDari($tagihan->jenis?->tipe) !== 'registrasi' || ! Money::isZero($tagihan->sisa)) {
+            return;
+        }
+        if ($santri->status === 'calon') {
+            Santri::where('id', $santri->id)->update(['status' => 'terbayar']);
+        } elseif ($santri->status === 'aktif') {
+            (new PendaftaranLanjutanService)->tandaiRegistrasiLunas(
+                (int) $santri->id, $tagihan->kode_jenjang, $tagihan->tahun_ajaran,
+            );
+        }
     }
 
     public function tolak(int $id, string $alasan, int $idPengguna): PembayaranSantri
@@ -258,7 +306,7 @@ class PembayaranSantriService
     {
         // Dibandingkan lewat PERILAKU tipe: tipe buatan sendiri ikut masuk lingkup
         // yang benar tanpa perlu didaftarkan lagi di sini.
-        if (! in_array(\App\Models\TipeBiaya::perilakuDari($tipe), self::TIPE_LINGKUP[$lingkup], true)) {
+        if (! in_array(TipeBiaya::perilakuDari($tipe), self::TIPE_LINGKUP[$lingkup], true)) {
             $lain = $lingkup === 'ppsb' ? 'kesantrian' : 'ppsb';
             throw new AppException(422, "Tagihan berjenis \"{$tipe}\" bukan urusan modul ".self::LABEL_LINGKUP[$lingkup].'. Pakai modul '.self::LABEL_LINGKUP[$lain].'.');
         }
