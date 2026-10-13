@@ -111,12 +111,22 @@ class KenaikanTingkatService
             // Tanpa kolom itu setiap baris tampak "jalurnya belum punya lanjutan".
             ->get(['id', 'nama', 'nis', 'no_pendaftaran', 'tingkat', 'kode_jenjang', 'jalur', 'tahun_ajaran', 'tahun_ajaran_berjalan']);
 
+        // Jadwal yang SUDAH ditetapkan untuk T.A ini — sekali kueri untuk seluruh
+        // pratinjau. Tanpa ini, menetapkan satu tingkat lalu menyusun pratinjau
+        // semua tingkat menawarkan lagi santri yang sudah terjadwal, dan seluruh
+        // penetapan berikutnya ditolak 409 oleh pastikanBolehDitetapkan().
+        $terjadwal = JadwalPerubahanSantri::hidup()
+            ->whereIn('id_santri', $santri->pluck('id'))->where('tahun_ajaran', $ta)
+            ->get(['id_santri', 'keputusan', 'tingkat_tujuan', 'status'])->keyBy('id_santri');
+
         $baris = [];
         // Diturunkan dari KEPUTUSAN, bukan didaftar ulang: menambah keputusan baru
         // tanpa menyentuh baris ini pernah membuat penghitungnya "undefined key".
         $ringkas = array_fill_keys(array_keys(self::KEPUTUSAN), 0);
         foreach ($santri as $s) {
-            $usul = $this->usulkan($s, $ta, $terakhir, $punyaLanjutan);
+            $usul = isset($terjadwal[$s->id])
+                ? $this->usulanSudahTerjadwal($terjadwal[$s->id], $ta)
+                : $this->usulkan($s, $ta, $terakhir, $punyaLanjutan);
             $ringkas[$usul['usul']]++;
             $baris[] = [
                 'id' => $s->id, 'nama' => $s->nama, 'nis' => $s->nis, 'no_pendaftaran' => $s->no_pendaftaran,
@@ -183,6 +193,24 @@ class KenaikanTingkatService
         return $this->memoUrutanTa ??= TahunAjaran::whereNotNull('tanggal_mulai')
             ->orderBy('tanggal_mulai')->pluck('kode')
             ->values()->flip()->all();
+    }
+
+    /**
+     * Santri yang perubahannya untuk T.A ini sudah ditetapkan — hanya bisa dilewati.
+     *
+     * @return array{usul:string, pilihan:list<string>, alasan:string}
+     */
+    private function usulanSudahTerjadwal(JadwalPerubahanSantri $j, string $taTujuan): array
+    {
+        $keputusan = self::KEPUTUSAN[$j->keputusan] ?? $j->keputusan;
+        $tujuan = $j->tingkat_tujuan ? " ke tingkat {$j->tingkat_tujuan}" : '';
+        // Yang masih menunggu PPSB bukan urusan layar ini lagi — tunjukkan ke mana.
+        $lanjut = $j->status === 'menunggu_ppsb'
+            ? 'PPSB-nya masih berjalan — lanjutkan tahapnya di halaman santri.'
+            : 'Lihat daftar Perubahan Terjadwal di atas.';
+
+        return ['usul' => self::LEWATI, 'pilihan' => [self::LEWATI],
+            'alasan' => "Sudah dijadwalkan untuk T.A {$taTujuan}: {$keputusan}{$tujuan}. {$lanjut}"];
     }
 
     /**

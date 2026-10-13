@@ -6,6 +6,7 @@ use App\Exceptions\AppException;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
 use App\Models\CoaGroup;
+use App\Models\JadwalPerubahanSantri;
 use App\Models\JalurPendaftaran;
 use App\Models\Jenjang;
 use App\Models\Level;
@@ -187,6 +188,36 @@ class KenaikanTingkatTest extends TestCase
     }
 
     /**
+     * Menetapkan PER TINGKAT lewat saringan "Tingkat sekarang", lalu menyusun
+     * pratinjau SEMUA tingkat: santri yang sudah terjadwal harus terkunci di
+     * Lewati. Dulu ia diusulkan lagi, dan menekan Tetapkan apa adanya membuat
+     * SELURUH penetapan ditolak "sudah punya perubahan terjadwal".
+     */
+    public function test_santri_yang_sudah_terjadwal_dilewati_di_pratinjau_berikutnya(): void
+    {
+        $akhir = $this->santri('Tingkat Akhir', 3, 'J003');
+        $tengah = $this->santri('Tingkat Tengah', 1, 'J003');
+
+        // Langkah 1 — hanya tingkat 3.
+        $p1 = (new KT)->pratinjau(['tahun_ajaran' => self::TA2, 'kode_jenjang' => 'J003', 'tingkat' => 3]);
+        (new KT)->tetapkan(self::TA2, collect($p1['baris'])->pluck('usul', 'id')->all(), $this->admin->id_pengguna);
+
+        // Langkah 2 — semua tingkat.
+        $p2 = (new KT)->pratinjau(['tahun_ajaran' => self::TA2, 'kode_jenjang' => 'J003']);
+        $baris = collect($p2['baris'])->keyBy('id');
+
+        $this->assertSame(KT::LEWATI, $baris[$akhir->id]['usul']);
+        $this->assertSame([KT::LEWATI], $baris[$akhir->id]['pilihan']);
+        $this->assertStringContainsString('Sudah dijadwalkan', $baris[$akhir->id]['alasan']);
+        $this->assertSame(KT::NAIK, $baris[$tengah->id]['usul'], 'yang belum terjadwal tetap diusulkan');
+
+        // Menetapkan pratinjau kedua apa adanya kini lolos.
+        $hasil = (new KT)->tetapkan(self::TA2, $baris->pluck('usul', 'id')->all(), $this->admin->id_pengguna);
+        $this->assertSame(1, $hasil['naik']);
+        $this->assertSame(2, JadwalPerubahanSantri::hidup()->where('tahun_ajaran', self::TA2)->count());
+    }
+
+    /**
      * ALUMNI & SANTRI KELUAR berdaftar SENDIRI, terpisah dari santri aktif.
      *
      * Dulu ketiganya bercampur di satu daftar, sehingga jumlah "santri" di layar
@@ -312,7 +343,10 @@ class KenaikanTingkatTest extends TestCase
 
         $this->assertSame(KT::LEWATI, $baris['usul']);
         $this->assertNotContains(KT::MELANJUTKAN, $baris['pilihan']);
-        $this->assertStringContainsString('sudah dibuka', $baris['alasan']);
+        // Dulu Lulus & Mengulang masih ditawarkan — padahal jadwalnya sudah ada,
+        // jadi memilihnya pasti ditolak saat menetapkan. Kini terkunci di Lewati.
+        $this->assertSame([KT::LEWATI], $baris['pilihan']);
+        $this->assertStringContainsString('halaman santri', $baris['alasan']);
     }
 
     /** Jalur tanpa "Jalur Setelah Naik Jenjang" pun dihalangi & dikatakan sebabnya. */
