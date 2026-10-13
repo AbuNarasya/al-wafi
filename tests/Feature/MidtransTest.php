@@ -50,8 +50,11 @@ class MidtransTest extends TestCase
 
     private Wali $wali;
 
-    /** @var array<string,array<string,mixed>> jawaban API status per order_id */
+    /** @var array<string,array<string,mixed>> jawaban API status per order_id / transaction_id */
     private array $statusApi = [];
+
+    /** @var array<string,array<string,mixed>> jawaban status Snap per token */
+    private array $statusSnap = [];
 
     protected function setUp(): void
     {
@@ -83,6 +86,9 @@ class MidtransTest extends TestCase
             'email_ibu' => 'aminah@contoh.id', 'nama' => 'Ibu Aminah', 'telepon' => '0811', 'status' => 'aktif']);
 
         Http::fake(function (PermintaanHttp $r) {
+            if (preg_match('#/snap/v1/transactions/([^/]+)/status$#', $r->url(), $m)) {
+                return Http::response($this->statusSnap[urldecode($m[1])] ?? ['status_code' => '404'], isset($this->statusSnap[urldecode($m[1])]) ? 200 : 404);
+            }
             if (str_contains($r->url(), '/snap/v1/transactions')) {
                 return Http::response(['token' => 'TOKEN-'.$r['transaction_details']['order_id'], 'redirect_url' => 'https://app.sandbox.midtrans.com/snap/v4/x'], 201);
             }
@@ -239,6 +245,55 @@ class MidtransTest extends TestCase
         $this->assertSame(0, JournalEntry::count());
     }
 
+    /**
+     * Akun Midtrans platform baru (ditemukan saat uji sandbox 13 Okt 2026): Core API tak
+     * mengenal order_id kita — transaksinya bernomor transaction_id (`A1…`), dan notifikasi
+     * pun membawa nomor itu. Penghubungnya status Snap (lewat token).
+     */
+    private function platformBaru(TransaksiMidtrans $t, string $trx, string $status = 'settlement'): void
+    {
+        $this->statusSnap[$t->snap_token] = ['status_code' => '200', 'order_id' => $t->order_id, 'transaction_id' => $trx,
+            'transaction_status' => $status];
+        $this->statusApi[$trx] = ['status_code' => '200', 'order_id' => $trx, 'transaction_id' => $trx,
+            'transaction_status' => $status, 'fraud_status' => 'accept',
+            'gross_amount' => number_format((float) $t->total, 2, '.', ''), 'payment_type' => 'bank_transfer',
+            'va_numbers' => [['bank' => 'bsi', 'va_number' => '92617201012154537']], 'settlement_time' => '2026-10-13 12:47:44'];
+    }
+
+    public function test_platform_baru_notifikasi_bernomor_transaction_id(): void
+    {
+        $this->santri('Ahmad', 'aktif');
+        $this->sebagaiIbu()->post(route('portal.online.dompet'), ['nominal' => 100000]);
+        $t = TransaksiMidtrans::sole();
+        $this->platformBaru($t, 'A1UJI0001');
+
+        $kode = '200';
+        $gross = number_format((float) $t->total, 2, '.', '');
+        $this->postJson(route('midtrans.notifikasi'), [
+            'order_id' => 'A1UJI0001', 'status_code' => $kode, 'gross_amount' => $gross, 'transaction_status' => 'settlement',
+            'signature_key' => hash('sha512', 'A1UJI0001'.$kode.$gross.self::KUNCI),
+        ])->assertOk();
+
+        $t->refresh();
+        $this->assertSame(['lunas', 'A1UJI0001', 'bsi'], [$t->status, $t->transaction_id, $t->bank]);
+        $this->assertSame('100000.00', (string) DompetWali::where('id_wali', $this->wali->id)->value('saldo'));
+        $this->assertSame(2, JournalEntry::count());
+    }
+
+    public function test_platform_baru_cek_status_dari_halaman_pesanan(): void
+    {
+        $reg = $this->tagihan($this->santri('Calon', 'calon'), 'registrasi', 500000);
+        $this->sebagaiIbu()->post(route('portal.online.tagihan', $reg->id), ['nominal' => 500000]);
+        $t = TransaksiMidtrans::sole();
+        $this->platformBaru($t, 'A1UJI0002');
+
+        $this->sebagaiIbu()->get(route('portal.online.lihat', $t->order_id))->assertOk()->assertSee('pembayaran diterima');
+
+        $this->assertSame('lunas', $t->refresh()->status);
+        $this->assertSame('A1UJI0002', PembayaranSantri::sole()->provider_ref);
+        $this->assertSame('lunas', $reg->refresh()->status);
+    }
+
     public function test_belum_dikonfigurasi_pilihan_online_tak_tampil(): void
     {
         $this->santri('Ahmad', 'aktif');
@@ -287,7 +342,7 @@ class MidtransTest extends TestCase
         $reg = $this->tagihan($this->santri('Calon', 'calon'), 'registrasi', 500000);
         $this->sebagaiIbu()->post(route('portal.online.tagihan', $reg->id), ['nominal' => 500000]);
         $lama = TransaksiMidtrans::sole();
-        $this->apiMenjawab($lama, 'cancel');
+        $this->apiMenjawab($lama, 'pending'); // VA sudah terbit, belum dibayar
 
         $this->sebagaiIbu()->post(route('portal.online.tagihan', $reg->id), ['nominal' => 500000]);
 

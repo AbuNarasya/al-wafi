@@ -148,15 +148,68 @@ class PembayaranMidtrans
 
     // ---- 2. Status ----
 
-    /** Tanyakan status ke Midtrans lalu terapkan. Pesanan tak dikenal → null (notifikasi uji dari dasbor). */
-    public function sinkron(string $orderId): ?TransaksiMidtrans
+    /**
+     * Tanyakan status ke Midtrans lalu terapkan. `$id` = order_id kita ATAU transaction_id
+     * Midtrans (notifikasi akun platform baru membawa yang kedua). Tak dikenal → null.
+     */
+    public function sinkron(string $id): ?TransaksiMidtrans
     {
-        $t = TransaksiMidtrans::where('order_id', $orderId)->first();
+        $t = TransaksiMidtrans::where('order_id', $id)->orWhere('transaction_id', $id)->first()
+            ?? $this->cariLewatSnap($id);
         if (! $t || $t->status !== 'menunggu') {
             return $t;
         }
 
-        return $this->terapkan($t, $this->klien->status($orderId));
+        return $this->terapkan($t, $this->statusResmi($t));
+    }
+
+    /**
+     * Status dari Core API (terautentikasi Server Key) — satu-satunya yang dibukukan.
+     * Akun Midtrans platform baru tak mengenal order_id kita di Core API (selalu 404);
+     * transaction_id-nya diambil dari status Snap lalu Core API ditanya dengan itu.
+     *
+     * @return array<string,mixed>
+     */
+    private function statusResmi(TransaksiMidtrans $t): array
+    {
+        foreach (array_filter([$t->transaction_id, $t->order_id]) as $id) {
+            $s = $this->klien->status($id);
+            if ((string) ($s['status_code'] ?? '') !== '404') {
+                return $s;
+            }
+        }
+        if (! $t->snap_token || $t->transaction_id) {
+            return ['status_code' => '404'];
+        }
+
+        $snap = $this->klien->statusSnap($t->snap_token);
+        if (($snap['order_id'] ?? null) !== $t->order_id || empty($snap['transaction_id'])) {
+            return ['status_code' => '404']; // bank belum dipilih
+        }
+        $t->update(['transaction_id' => $snap['transaction_id']]);
+
+        return $this->klien->status($snap['transaction_id']);
+    }
+
+    /**
+     * Notifikasi dengan transaction_id yang belum pernah kita lihat (pesanan yang wali
+     * bayar tanpa sempat membuka halaman pesanan lagi): cocokkan lewat status Snap
+     * pesanan yang masih menunggu. Dibatasi yang baru & sedikit — tiap cek satu panggilan HTTP.
+     */
+    private function cariLewatSnap(string $transactionId): ?TransaksiMidtrans
+    {
+        $calon = TransaksiMidtrans::where('status', 'menunggu')->whereNull('transaction_id')->whereNotNull('snap_token')
+            ->where('created_at', '>=', now()->subDays(3))->latest('id')->limit(30)->get();
+        foreach ($calon as $t) {
+            $snap = $this->klien->statusSnap($t->snap_token);
+            if (($snap['transaction_id'] ?? null) === $transactionId && ($snap['order_id'] ?? null) === $t->order_id) {
+                $t->update(['transaction_id' => $transactionId]);
+
+                return $t;
+            }
+        }
+
+        return null;
     }
 
     /** Batalkan pesanan yang belum dibayar — kecuali ternyata sudah lunas di Midtrans. */
@@ -165,8 +218,15 @@ class PembayaranMidtrans
         if ($t->status !== 'menunggu') {
             return $t;
         }
-        $this->klien->batalkan($t->order_id);
-        $t = $this->terapkan($t, $this->klien->status($t->order_id));
+        // Lebih dulu: barangkali sudah dibayar (dan ini sekaligus menemukan transaction_id-nya).
+        $t = $this->terapkan($t, $this->statusResmi($t));
+        if ($t->status !== 'menunggu') {
+            return $t;
+        }
+        foreach (array_filter([$t->order_id, $t->transaction_id]) as $id) {
+            $this->klien->batalkan($id);
+        }
+        $t = $this->terapkan($t, $this->statusResmi($t));
         if ($t->status === 'menunggu') {
             // Belum pernah memilih bank (Midtrans menjawab 404) atau masih pending sesudah dibatalkan:
             // pesanan ditutup di sisi kita. VA-nya — bila ada — ikut dibatalkan di atas.
@@ -182,7 +242,10 @@ class PembayaranMidtrans
         if ((string) ($s['status_code'] ?? '') === '404') {
             return $t; // Snap dibuat tapi bank belum dipilih — tetap menunggu.
         }
-        if (($s['order_id'] ?? null) !== $t->order_id) {
+        // Platform lama menjawab dengan order_id kita; platform baru dengan transaction_id-nya.
+        $cocok = ($s['order_id'] ?? null) === $t->order_id
+            || ($t->transaction_id !== null && ($s['transaction_id'] ?? null) === $t->transaction_id);
+        if (! $cocok) {
             throw new AppException(502, 'Jawaban Midtrans tidak cocok dengan pesanan.');
         }
 

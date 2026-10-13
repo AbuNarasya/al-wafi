@@ -104,6 +104,27 @@ class KlienMidtrans
         return (array) $res->json();
     }
 
+    /**
+     * Status pesanan di lapisan SNAP, lewat token. Akun Midtrans platform baru mencatat
+     * transaksi di Core API dengan order_id = transaction_id buatan Midtrans (`A1…`),
+     * sehingga order_id kita hanya dikenal di sini — inilah penghubung keduanya.
+     * Dipakai HANYA untuk menemukan transaction_id; status yang dibukukan tetap dari
+     * Core API (terautentikasi Server Key).
+     *
+     * @return array<string,mixed>
+     */
+    public function statusSnap(string $token): array
+    {
+        $dasar = self::produksi() ? 'https://app.midtrans.com' : 'https://app.sandbox.midtrans.com';
+        try {
+            $res = Http::acceptJson()->timeout(20)->get($dasar.'/snap/v1/transactions/'.rawurlencode($token).'/status');
+        } catch (ConnectionException) {
+            return [];
+        }
+
+        return $res->successful() ? (array) $res->json() : [];
+    }
+
     /** Batalkan VA yang belum dibayar. Hasilnya tak dipercaya — status sesudahnya ditanyakan ulang. */
     public function batalkan(string $orderId): void
     {

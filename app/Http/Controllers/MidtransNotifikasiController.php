@@ -27,6 +27,7 @@ class MidtransNotifikasiController extends Controller
             return response()->json(['pesan' => 'Tanda tangan tidak sah.'], 403);
         }
 
+        Log::info('Notifikasi Midtrans diterima', ['order_id' => $n['order_id'], 'status' => $n['transaction_status'] ?? null]);
         try {
             $t = $midtrans->sinkron((string) $n['order_id']);
         } catch (\Throwable $e) {
