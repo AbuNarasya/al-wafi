@@ -11,6 +11,8 @@
         </p>
     </div>
 
+    @include('portal._kode-uji')
+
     <form method="POST" action="{{ route('portal.kode') }}" data-no-confirm class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
         @csrf
         <input name="kode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required autofocus

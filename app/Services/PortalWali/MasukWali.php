@@ -43,8 +43,23 @@ class MasukWali
         return mb_strtolower(trim($email));
     }
 
-    /** @throws AppException */
-    public function mintaKode(string $email, string $tujuan, ?string $ip): void
+    /**
+     * Mode uji (dev.erp, data salinan produksi): surel tak dikirim, jadi kodenya
+     * ditampilkan di layar. DUA syarat sengaja dituntut — saklar `.env` DAN surel
+     * mode log — supaya saklar yang terbawa ke server dengan SMTP sungguhan tetap
+     * tak pernah membocorkan kode ke layar orang yang sekadar mengetik email.
+     */
+    public static function modeUji(): bool
+    {
+        return (bool) config('app.otp_tampil_di_layar') && config('mail.default') === 'log';
+    }
+
+    /**
+     * @return string|null kodenya — HANYA dalam mode uji, selain itu selalu null
+     *
+     * @throws AppException
+     */
+    public function mintaKode(string $email, string $tujuan, ?string $ip): ?string
     {
         $email = self::normalEmail($email);
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -76,6 +91,8 @@ class MasukWali
         });
 
         Notification::route('mail', $email)->notify(new KodeMasukWali($kode, self::MENIT));
+
+        return self::modeUji() ? $kode : null;
     }
 
     /** Benar = kode terbaru, belum kedaluwarsa, belum dipakai. Lima kali salah = kodenya hangus. */

@@ -10,6 +10,8 @@
         <p class="mt-1 text-sm text-slate-500">Kode 6 angka dikirim ke <b class="text-slate-700">{{ $tujuan }}</b>. Berlaku {{ $menit }} menit.</p>
     </div>
 
+    @include('portal._kode-uji')
+
     <form method="POST" action="{{ route('portal.pin.konfirmasi') }}" data-no-confirm class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
         @csrf
         <input name="kode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required autofocus placeholder="••••••" aria-label="Kode 6 angka"

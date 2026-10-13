@@ -147,6 +147,36 @@ class PortalWaliTest extends TestCase
         Notification::assertSentOnDemandTimes(KodeMasukWali::class, 1);
     }
 
+    /** Mode uji dev.erp: kode tampil di layar HANYA bila saklar menyala DAN surel mode log. */
+    public function test_kode_tampil_di_layar_hanya_dalam_mode_uji(): void
+    {
+        $lihat = function (string $email) {
+            $this->post(route('portal.masuk'), ['email' => $email]);
+
+            return $this->get(route('portal.kode'))->assertOk();
+        };
+
+        // Bawaan: tidak pernah tampil.
+        $lihat('a@contoh.id')->assertDontSee('Mode uji');
+
+        // Saklar menyala tapi surel sungguhan (bukan log) — tetap tidak tampil.
+        config(['app.otp_tampil_di_layar' => true, 'mail.default' => 'smtp']);
+        $lihat('b@contoh.id')->assertDontSee('Mode uji');
+
+        // Saklar + surel log: kode yang benar tampil.
+        config(['mail.default' => 'log']);
+        $layar = $lihat('c@contoh.id')->assertSee('Mode uji');
+        $kode = null;
+        Notification::assertSentOnDemand(KodeMasukWali::class, function (KodeMasukWali $n, array $s, AnonymousNotifiable $t) use (&$kode) {
+            if ($t->routes['mail'] === 'c@contoh.id') {
+                $kode = $n->kode;
+            }
+
+            return true;
+        });
+        $layar->assertSee($kode);
+    }
+
     /** Satu pintu: email tak terdaftar tetap dikirimi kode — layar tak membocorkan siapa yang terdaftar. */
     public function test_email_baru_menjadi_pendaftar_bukan_wali(): void
     {

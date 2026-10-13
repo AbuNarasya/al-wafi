@@ -58,13 +58,13 @@ class PortalWaliController extends Controller
         $data = $request->validate(['email' => ['required', 'email', 'max:255']]);
 
         try {
-            $this->masuk->mintaKode($data['email'], 'masuk', $request->ip());
+            $kodeUji = $this->masuk->mintaKode($data['email'], 'masuk', $request->ip());
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
         $request->session()->put(SesiWali::MENUNGGU, MasukWali::normalEmail($data['email']));
 
-        return redirect()->route('portal.kode');
+        return redirect()->route('portal.kode')->with('kode_uji', $kodeUji);
     }
 
     public function formKode(Request $request): View|RedirectResponse

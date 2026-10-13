@@ -60,13 +60,13 @@ class PortalDompetController extends Controller
         $data = $request->validate(['pin_baru' => ['required', 'string'], 'pin_ulang' => ['required', 'string']]);
         try {
             PinTransaksi::assertSah($data['pin_baru'], $data['pin_ulang']);
-            $this->masuk()->mintaKode($this->emailSaya($request), 'pin', $request->ip());
+            $kodeUji = $this->masuk()->mintaKode($this->emailSaya($request), 'pin', $request->ip());
         } catch (AppException $e) {
             return back()->with('error', $e->getMessage());
         }
         $request->session()->put(self::PIN_BARU, Crypt::encryptString($data['pin_baru']));
 
-        return redirect()->route('portal.pin.konfirmasi');
+        return redirect()->route('portal.pin.konfirmasi')->with('kode_uji', $kodeUji);
     }
 
     public function formKonfirmasiPin(Request $request): View|RedirectResponse

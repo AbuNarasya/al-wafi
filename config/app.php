@@ -30,6 +30,13 @@ return [
     'pwa_aktif' => (bool) env('PWA_AKTIF', true),
 
     /*
+    | Mode uji Portal Wali (dev.erp): kode OTP ikut tampil di layar karena surel
+    | tak dikirim sungguhan. Hanya berlaku bila MAIL_MAILER=log juga — lihat
+    | MasukWali::modeUji(). JANGAN dinyalakan di produksi.
+    */
+    'otp_tampil_di_layar' => (bool) env('OTP_TAMPIL_DI_LAYAR', false),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
