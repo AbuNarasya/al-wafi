@@ -46,9 +46,11 @@
                 @endif
             </p>
         </div>
-        {{-- Saklar 56×32 px: cukup besar untuk ibu jari. Kenop & jalur memakai kelas khusus (app.css)
-             supaya tak ikut penimpaan warna mode gelap. --}}
-        <button type="submit" @class(['relative h-8 w-14 shrink-0 rounded-full transition-colors', 'bg-emerald-500' => $autoDebet, 'bg-slate-300 saklar-mati' => ! $autoDebet])
+        {{-- Saklar 56×32 px. Kenop & jalur memakai kelas khusus (app.css) supaya tak ikut penimpaan
+             warna mode gelap. `tanpa-sentuh`: aturan layar sentuh (min-height 44px untuk SEMUA tombol)
+             memanjangkan jalurnya & kenopnya jadi menempel di atas; sasaran sentuhnya diganti
+             lapisan tak terlihat `before:-inset-2` (72×48 px). --}}
+        <button type="submit" @class(['tanpa-sentuh relative h-8 w-14 shrink-0 rounded-full transition-colors before:absolute before:-inset-2', 'bg-emerald-500' => $autoDebet, 'bg-slate-300 saklar-mati' => ! $autoDebet])
                 role="switch" aria-checked="{{ $autoDebet ? 'true' : 'false' }}" aria-label="Auto-debet tagihan">
             <span @class(['saklar-kenop absolute top-1 h-6 w-6 rounded-full shadow-md transition-all', 'left-7' => $autoDebet, 'left-1' => ! $autoDebet])></span>
         </button>
