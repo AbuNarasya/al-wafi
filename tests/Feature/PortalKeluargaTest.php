@@ -101,7 +101,9 @@ class PortalKeluargaTest extends TestCase
             'status' => 'terverifikasi', 'dicatat_oleh' => $this->staf->id_pengguna]);
 
         $this->sebagai($wali)->get(route('portal.tagihan'))->assertOk()
-            ->assertSee('Rp 400.000')->assertSee('Sebagian')->assertSee('Lunas')
+            ->assertSee('Rp 400.000')->assertSee('Sebagian')
+            // Tab Tagihan hanya yang belum lunas — yang lunas ada di Riwayat bayar (13 Okt 2026).
+            ->assertDontSee('Daftar Ulang')
             ->assertDontSee('Tagihan Dibatalkan');
 
         $this->sebagai($wali)->get(route('portal.tagihan', ['tab' => 'riwayat']))->assertOk()

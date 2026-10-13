@@ -52,8 +52,11 @@
         </div>
 
         @if ($tab === 'tagihan')
+            {{-- Hanya yang belum lunas (keputusan user 13 Okt 2026): yang lunas sudah tercatat di
+                 Riwayat bayar — menampilkannya di sini juga membuat kedua tab berisi hal yang sama. --}}
+            @php $belumLunas = collect($tagihan)->reject(fn ($t) => $t['status'] === 'lunas'); @endphp
             <div class="mt-4 space-y-2">
-                @forelse ($tagihan as $t)
+                @forelse ($belumLunas as $t)
                     @php $p = $periode($t['periode']); @endphp
                     <div class="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
                         <div class="flex items-start justify-between gap-2">
@@ -90,7 +93,14 @@
                         @endif
                     </div>
                 @empty
-                    <div class="rounded-3xl bg-white p-6 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">Belum ada tagihan.</div>
+                    <div class="rounded-3xl bg-white p-6 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">
+                        @if (collect($tagihan)->isEmpty())
+                            Belum ada tagihan.
+                        @else
+                            <span class="block font-semibold text-emerald-700">Alhamdulillah, semua tagihan sudah lunas.</span>
+                            <a href="{{ route('portal.tagihan', ['anak' => $dipilih->id, 'tab' => 'riwayat']) }}" class="mt-2 inline-block font-semibold text-brand">Lihat riwayat bayar &rarr;</a>
+                        @endif
+                    </div>
                 @endforelse
             </div>
         @else

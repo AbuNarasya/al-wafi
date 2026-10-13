@@ -66,31 +66,100 @@
             </section>
 
             @if ($pendaftarBaru)
-                <section class="space-y-4">
-                    <h2 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span>Data Anda</h2>
+                {{-- Data keluarga selengkap modul Wali/Keluarga (13 Okt 2026). Wajib: nama ayah & ibu,
+                     plus nama & HP peran pendaftar — sama dengan aturan di PortalWaliController. --}}
+                <section class="space-y-4" x-data="{ peran: @js(old('peran', '')) }">
+                    <h2 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span>Data keluarga</h2>
                     <div>
                         <label class="{{ $kelasLabel }}">Anda sebagai <span class="text-red-500">*</span></label>
                         <div class="grid grid-cols-3 gap-2">
                             @foreach (\App\Models\Wali::PERAN as $kode => $label)
                                 <label class="flex cursor-pointer items-center justify-center gap-1.5 rounded-2xl border border-slate-300 bg-white py-2.5 text-sm has-[:checked]:border-brand has-[:checked]:bg-blue-50 has-[:checked]:text-brand">
-                                    <input type="radio" name="peran" value="{{ $kode }}" required @checked(old('peran') === $kode) class="sr-only">{{ $label }}
+                                    <input type="radio" name="peran" value="{{ $kode }}" x-model="peran" required @checked(old('peran') === $kode) class="sr-only">{{ $label }}
                                 </label>
                             @endforeach
                         </div>
                         @error('peran')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
+
+                    @foreach (\App\Models\Wali::PERAN as $p => $label)
+                        @php
+                            $pilihanKerja = old('pekerjaan_'.$p, '');
+                            $bukaAwal = $p !== 'wali' || filled(old('nama_wali')) || old('peran') === 'wali';
+                        @endphp
+                        <div class="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200"
+                             x-data="{ buka: @js($bukaAwal), kerja: @js($pilihanKerja) }">
+                            <div class="flex items-center justify-between gap-2">
+                                <h3 class="text-sm font-bold text-slate-900">
+                                    Data {{ $label }}
+                                    <span x-show="peran === @js($p)" x-cloak class="ml-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-brand">Anda</span>
+                                </h3>
+                                @if ($p === 'wali')
+                                    <button type="button" x-show="peran !== 'wali'" @click="buka = ! buka" class="text-xs font-semibold text-brand"
+                                            x-text="buka ? 'Tutup' : 'Isi bila bukan orang tua'"></button>
+                                @endif
+                            </div>
+
+                            <div x-show="buka || peran === @js($p)" @if (! $bukaAwal) x-cloak @endif class="mt-3 space-y-3">
+                                <div>
+                                    <label for="nama_{{ $p }}" class="{{ $kelasLabel }}">Nama lengkap
+                                        <span @if ($p === 'wali') x-show="peran === 'wali'" x-cloak @endif class="text-red-500">*</span></label>
+                                    <input id="nama_{{ $p }}" name="nama_{{ $p }}" value="{{ old('nama_'.$p) }}" class="{{ $kelasInput }}"
+                                           @if ($p === 'wali') :required="peran === 'wali'" @else required @endif>
+                                    @error('nama_'.$p)<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="telepon_{{ $p }}" class="{{ $kelasLabel }}">Nomor HP / WhatsApp
+                                        <span x-show="peran === @js($p)" x-cloak class="text-red-500">*</span></label>
+                                    <input id="telepon_{{ $p }}" name="telepon_{{ $p }}" inputmode="tel" value="{{ old('telepon_'.$p) }}"
+                                           placeholder="0812 3456 7890" :required="peran === @js($p)" class="{{ $kelasInput }}">
+                                    @error('telepon_'.$p)<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="email_{{ $p }}" class="{{ $kelasLabel }}">Email</label>
+                                    <div x-show="peran === @js($p)" x-cloak class="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                                        {{ $emailPendaftar }}
+                                        <span class="block text-xs text-slate-500">Email masuk Anda — tak bisa diubah di sini.</span>
+                                    </div>
+                                    <div x-show="peran !== @js($p)">
+                                        <input id="email_{{ $p }}" name="email_{{ $p }}" type="email" value="{{ old('email_'.$p) }}" class="{{ $kelasInput }}">
+                                        <p class="mt-1 text-xs text-slate-500">Bila diisi, {{ strtolower($label) }} bisa masuk portal dengan email ini.</p>
+                                    </div>
+                                    @error('email_'.$p)<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="pekerjaan_{{ $p }}" class="{{ $kelasLabel }}">Pekerjaan</label>
+                                    <select id="pekerjaan_{{ $p }}" name="pekerjaan_{{ $p }}" x-model="kerja" class="{{ $kelasInput }}">
+                                        <option value="">— pilih —</option>
+                                        @foreach (\App\Models\Wali::PEKERJAAN as $kerja)
+                                            <option value="{{ $kerja }}">{{ $kerja }}</option>
+                                        @endforeach
+                                        <option value="{{ \App\Models\Wali::PEKERJAAN_LAIN }}">Lainnya…</option>
+                                    </select>
+                                    <input name="pekerjaan_lain_{{ $p }}" value="{{ old('pekerjaan_lain_'.$p) }}" placeholder="Sebutkan pekerjaannya"
+                                           x-show="kerja === @js(\App\Models\Wali::PEKERJAAN_LAIN)" x-cloak
+                                           :required="kerja === @js(\App\Models\Wali::PEKERJAAN_LAIN)" class="mt-2 {{ $kelasInput }}">
+                                    @error('pekerjaan_lain_'.$p)<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="pendapatan_{{ $p }}" class="{{ $kelasLabel }}">Rentang pendapatan per bulan</label>
+                                    <select id="pendapatan_{{ $p }}" name="pendapatan_{{ $p }}" class="{{ $kelasInput }}">
+                                        <option value="">— pilih —</option>
+                                        @foreach (\App\Models\Wali::PENDAPATAN as $kode => $teks)
+                                            <option value="{{ $kode }}" @selected(old('pendapatan_'.$p) === $kode)>{{ $teks }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+
                     <div>
-                        <label for="nama_wali" class="{{ $kelasLabel }}">Nama lengkap Anda <span class="text-red-500">*</span></label>
-                        <input id="nama_wali" name="nama_wali" required value="{{ old('nama_wali') }}" autocomplete="name" class="{{ $kelasInput }}">
-                        @error('nama_wali')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                        <label for="nik" class="{{ $kelasLabel }}">NIK</label>
+                        <input id="nik" name="nik" inputmode="numeric" data-bukan-rupiah value="{{ old('nik') }}" class="{{ $kelasInput }}">
                     </div>
                     <div>
-                        <label for="telepon" class="{{ $kelasLabel }}">Nomor HP / WhatsApp <span class="text-red-500">*</span></label>
-                        <input id="telepon" name="telepon" required inputmode="tel" autocomplete="tel" value="{{ old('telepon') }}" placeholder="0812 3456 7890" class="{{ $kelasInput }}">
-                        @error('telepon')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
-                    </div>
-                    <div>
-                        <label for="alamat" class="{{ $kelasLabel }}">Alamat</label>
+                        <label for="alamat" class="{{ $kelasLabel }}">Alamat keluarga</label>
                         <textarea id="alamat" name="alamat" rows="2" class="{{ $kelasInput }}">{{ old('alamat') }}</textarea>
                     </div>
                 </section>

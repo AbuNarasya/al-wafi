@@ -58,6 +58,19 @@ class Wali extends Model implements AuthenticatableContract
         'juta_10_15' => 'Rp 10–15 juta', 'juta_15_25' => 'Rp 15–25 juta', 'di_atas_25' => '> Rp 25 juta',
     ];
 
+    /**
+     * Pilihan pekerjaan di form pendaftaran portal (keputusan user 13 Okt 2026).
+     * Kolom `pekerjaan_*` tetap teks bebas: yang disimpan LABELNYA, dan pilihan
+     * "Lainnya" menyimpan apa yang diketik wali — data lama tetap sah.
+     */
+    public const PEKERJAAN = [
+        'PNS', 'TNI / Polri', 'Pegawai BUMN / BUMD', 'Karyawan Swasta', 'Wiraswasta / Pengusaha',
+        'Pedagang', 'Petani / Nelayan', 'Guru / Dosen', 'Tenaga Kesehatan', 'Buruh',
+        'Ibu Rumah Tangga', 'Pensiunan', 'Tidak Bekerja',
+    ];
+
+    public const PEKERJAAN_LAIN = 'Lainnya';
+
     protected function casts(): array
     {
         return [

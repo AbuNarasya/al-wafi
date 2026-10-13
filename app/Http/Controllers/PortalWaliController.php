@@ -167,8 +167,38 @@ class PortalWaliController extends Controller
     {
         return view('portal.daftar', $pendaftaran->pilihan() + [
             'pendaftarBaru' => ! SesiWali::wali(),
+            'emailPendaftar' => SesiWali::emailPendaftar($request),
             'sumber' => SumberInformasi::where('status', 'aktif')->orderBy('urutan')->orderBy('kode')->get(['kode', 'nama', 'butuh_keterangan']),
         ]);
+    }
+
+    /**
+     * Data keluarga baru — kolomnya mengikuti modul Wali/Keluarga (keputusan user 13 Okt 2026).
+     * Wajib: nama ayah & ibu, plus nama & HP peran pendaftar. Email pendaftar TIDAK
+     * diterima dari form: ia email yang terbukti lewat OTP (lihat PendaftaranPortal).
+     *
+     * @return array<string,mixed>
+     */
+    private function aturanKeluargaBaru(string $peranPendaftar): array
+    {
+        $aturan = [
+            'peran' => ['required', Rule::in(MasukWali::PERAN)],
+            'nik' => ['nullable', 'string', 'max:32'],
+            'alamat' => ['nullable', 'string', 'max:1000'],
+        ];
+        foreach (MasukWali::PERAN as $p) {
+            $milikPendaftar = $p === $peranPendaftar;
+            $aturan += [
+                "nama_{$p}" => [$milikPendaftar || $p !== 'wali' ? 'required' : 'nullable', 'string', 'max:255'],
+                "telepon_{$p}" => [$milikPendaftar ? 'required' : 'nullable', 'string', 'regex:/^[0-9+\-\s()]{8,20}$/'],
+                "email_{$p}" => ['nullable', 'email', 'max:255'],
+                "pekerjaan_{$p}" => ['nullable', Rule::in([...Wali::PEKERJAAN, Wali::PEKERJAAN_LAIN])],
+                "pekerjaan_lain_{$p}" => ['nullable', "required_if:pekerjaan_{$p},".Wali::PEKERJAAN_LAIN, 'string', 'max:100'],
+                "pendapatan_{$p}" => ['nullable', Rule::in(array_keys(Wali::PENDAPATAN))],
+            ];
+        }
+
+        return $aturan;
     }
 
     public function simpanDaftar(Request $request, PendaftaranPortal $pendaftaran): RedirectResponse
@@ -191,15 +221,15 @@ class PortalWaliController extends Controller
             'sumber_informasi_lain' => ['nullable', 'string', 'max:255'],
             'versi_surat' => ['required', 'integer'],
             'setuju' => ['accepted'],
-        ] + ($baru ? [
-            'peran' => ['required', Rule::in(MasukWali::PERAN)],
-            'nama_wali' => ['required', 'string', 'max:255'],
-            'telepon' => ['required', 'string', 'regex:/^[0-9+\-\s()]{8,20}$/'],
-            'alamat' => ['nullable', 'string', 'max:1000'],
-        ] : []), [
+        ] + ($baru ? $this->aturanKeluargaBaru((string) $request->input('peran')) : []), [
             'setuju.accepted' => 'Surat pernyataan wajib dibaca dan disetujui.',
-            'telepon.regex' => 'Nomor HP tidak sah.',
-        ]);
+            'required' => ':Attribute wajib diisi.',
+            'required_if' => 'Sebutkan pekerjaannya.',
+            'email' => ':Attribute tidak sah.',
+            'regex' => ':Attribute tidak sah.',
+        ], collect(MasukWali::PERAN)->flatMap(fn ($p) => [
+            "nama_{$p}" => "nama {$p}", "telepon_{$p}" => "nomor HP {$p}", "email_{$p}" => "email {$p}",
+        ])->all());
 
         $peran = $baru ? $data['peran'] : SesiWali::peran($request);
         $email = $baru ? SesiWali::emailPendaftar($request) : MasukWali::normalEmail((string) $wali->{"email_{$peran}"});

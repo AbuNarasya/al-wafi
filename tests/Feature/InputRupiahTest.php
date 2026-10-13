@@ -92,7 +92,9 @@ class InputRupiahTest extends TestCase
             foreach ($m[0] as $tag) {
                 // Kode OTP & PIN (portal wali) juga ber-papan-ketik angka, tapi bukan rupiah
                 // dan tak bertopeng — nilainya memang dikirim apa adanya.
-                if (str_contains($tag, 'autocomplete="one-time-code"') || str_contains($tag, 'type="password"')) {
+                // Begitu pula isian angka lain yang ditandai `data-bukan-rupiah` (mis. NIK).
+                if (str_contains($tag, 'autocomplete="one-time-code"') || str_contains($tag, 'type="password"')
+                    || str_contains($tag, 'data-bukan-rupiah')) {
                     continue;
                 }
                 if (preg_match('/\s:?name="/', $tag)) {

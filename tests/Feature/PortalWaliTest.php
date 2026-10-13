@@ -105,7 +105,8 @@ class PortalWaliTest extends TestCase
         return $timpa + [
             'tahun_ajaran' => self::TA, 'gelombang' => 'G1', 'versi_surat' => 1, 'setuju' => '1',
             'nama' => 'Ahmad Faqih', 'jenis_kelamin' => 'L', 'kode_jenjang' => 'J001', 'tingkat' => 1, 'jalur' => '001',
-            'peran' => 'ibu', 'nama_wali' => 'Ibu Aminah', 'telepon' => '+62 812-9999-0001',
+            'peran' => 'ibu', 'nama_ibu' => 'Ibu Aminah', 'telepon_ibu' => '+62 812-9999-0001',
+            'nama_ayah' => 'Bapak Faqih',
         ];
     }
 
@@ -182,7 +183,7 @@ class PortalWaliTest extends TestCase
     {
         $this->masukSebagai('baru@contoh.id')->assertRedirect(route('portal.daftar'));
 
-        $this->get(route('portal.daftar'))->assertOk()->assertSee('Data Anda')->assertSee('Patuh tata tertib.');
+        $this->get(route('portal.daftar'))->assertOk()->assertSee('Data keluarga')->assertSee('baru@contoh.id')->assertSee('Patuh tata tertib.');
         $this->get(route('portal.beranda'))->assertRedirect(route('portal.masuk'));
     }
 
@@ -262,6 +263,56 @@ class PortalWaliTest extends TestCase
 
         $this->assertSame(0, Santri::count());
         $this->assertSame(1, Wali::count());
+    }
+
+    /** Data keluarga selengkap modul Wali/Keluarga; pekerjaan "Lainnya" menyimpan yang diketik. */
+    public function test_pendaftar_baru_mengisi_data_keluarga_lengkap(): void
+    {
+        $this->masukSebagai('aminah@contoh.id');
+
+        $this->post(route('portal.daftar'), $this->isianDaftar([
+            'email_ibu' => 'palsu@contoh.id', // diabaikan: email pendaftar = email OTP
+            'telepon_ayah' => '0813 7777 0002', 'email_ayah' => ' Faqih@Contoh.id ',
+            'pekerjaan_ayah' => 'Lainnya', 'pekerjaan_lain_ayah' => 'Penerjemah', 'pendapatan_ayah' => 'juta_5_10',
+            'pekerjaan_ibu' => 'Guru / Dosen', 'nik' => '3201010101010001', 'alamat' => 'Bogor',
+        ]))->assertRedirect(route('portal.beranda'));
+
+        $wali = Santri::sole()->wali;
+        $this->assertSame('aminah@contoh.id', $wali->email_ibu);
+        $this->assertSame('faqih@contoh.id', $wali->email_ayah);
+        $this->assertSame('081377770002', $wali->telepon_ayah);
+        $this->assertSame('Penerjemah', $wali->pekerjaan_ayah);
+        $this->assertSame('juta_5_10', $wali->pendapatan_ayah);
+        $this->assertSame('Guru / Dosen', $wali->pekerjaan_ibu);
+        $this->assertSame('3201010101010001', $wali->nik);
+        $this->assertNull($wali->nama_wali);
+
+        // Ayah kini bisa masuk portal dengan emailnya sendiri, ke keluarga yang sama.
+        $this->assertSame(['status' => 'satu', 'peran' => 'ayah'],
+            \Illuminate\Support\Arr::only((new MasukWali)->cariKeluarga('faqih@contoh.id'), ['status', 'peran']));
+    }
+
+    public function test_nama_ayah_ibu_dan_pekerjaan_lainnya_wajib(): void
+    {
+        $this->masukSebagai('aminah@contoh.id');
+
+        $this->post(route('portal.daftar'), $this->isianDaftar(['nama_ayah' => '', 'pekerjaan_ibu' => 'Lainnya']))
+            ->assertSessionHasErrors(['nama_ayah', 'pekerjaan_lain_ibu']);
+        $this->assertSame(0, Santri::count());
+    }
+
+    /** Email/HP orang tua kedua yang milik keluarga lain ditolak — tanpa menyebut pemiliknya. */
+    public function test_email_dan_hp_peran_lain_milik_keluarga_lain_ditolak(): void
+    {
+        $this->keluarga(); // Bapak Hasan: hasan@contoh.id, 081211110000
+        $this->masukSebagai('aminah@contoh.id');
+
+        $this->post(route('portal.daftar'), $this->isianDaftar(['email_ayah' => 'HASAN@contoh.id']))
+            ->assertSessionHas('error', fn ($p) => str_contains($p, 'Email Ayah') && ! str_contains($p, 'Hasan'));
+        $this->post(route('portal.daftar'), $this->isianDaftar(['telepon_ayah' => '+62 812 1111 0000']))
+            ->assertSessionHas('error', fn ($p) => str_contains($p, 'Nomor HP Ayah') && ! str_contains($p, 'Hasan'));
+
+        $this->assertSame(0, Santri::count());
     }
 
     public function test_jalur_yang_tak_dibuka_untuk_portal_ditolak(): void

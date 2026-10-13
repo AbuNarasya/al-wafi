@@ -95,6 +95,76 @@ class PendaftaranPortal
         })->exists();
     }
 
+    public static function emailTerdaftar(string $email): bool
+    {
+        return Wali::where(function ($q) use ($email) {
+            foreach (MasukWali::PERAN as $p) {
+                $q->orWhereRaw("lower(trim(email_{$p})) = ?", [MasukWali::normalEmail($email)]);
+            }
+        })->exists();
+    }
+
+    /**
+     * Data keluarga baru selengkap modul Wali/Keluarga: ayah, ibu, wali — masing-masing
+     * nama, HP, email, pekerjaan, pendapatan.
+     *
+     * SETIAP nomor HP & email yang diisi diperiksa, bukan cuma milik pendaftar: email
+     * ibu yang sudah tercatat di keluarga lain akan membuat ibu itu ditolak masuk
+     * ("kembar"), dan nomor yang sudah terdaftar menandai keluarga yang sudah ada —
+     * yang harus masuk lewat email tercatatnya, bukan membuat keluarga kedua. Pesannya
+     * tak pernah menyebut pemilik data yang bentrok.
+     *
+     * Email pendaftar diambil dari OTP, bukan dari form: itulah identitas masuknya.
+     *
+     * @param  array<string,mixed>  $data
+     * @return array<string,mixed>
+     *
+     * @throws AppException
+     */
+    private function keluargaBaru(array $data, string $peran, string $emailPendaftar): array
+    {
+        $keluarga = [
+            'kontak_utama' => $peran, 'status' => 'aktif',
+            'nik' => self::teks($data['nik'] ?? null), 'alamat' => self::teks($data['alamat'] ?? null),
+        ];
+
+        foreach (MasukWali::PERAN as $p) {
+            $label = Wali::PERAN[$p];
+            $telepon = self::teks($data["telepon_{$p}"] ?? null);
+            $email = $p === $peran ? $emailPendaftar : self::teks($data["email_{$p}"] ?? null);
+
+            if ($telepon !== null && self::teleponTerdaftar($telepon)) {
+                throw new AppException(409, $p === $peran
+                    ? 'Nomor HP ini sudah terdaftar di data keluarga santri. Masuklah dengan email yang tercatat di '
+                        .'keluarga Anda, atau hubungi panitia PSB untuk memperbarui email Anda.'
+                    : "Nomor HP {$label} sudah terdaftar di data keluarga santri lain. Kosongkan isiannya, atau hubungi panitia PSB.");
+            }
+            if ($p !== $peran && $email !== null && self::emailTerdaftar($email)) {
+                throw new AppException(409, "Email {$label} sudah terdaftar di data keluarga santri lain. Kosongkan isiannya, atau hubungi panitia PSB.");
+            }
+
+            $pekerjaan = $data["pekerjaan_{$p}"] ?? null;
+            $keluarga += [
+                "nama_{$p}" => self::teks($data["nama_{$p}"] ?? null),
+                "telepon_{$p}" => $telepon !== null ? self::normalTelepon($telepon) : null,
+                "email_{$p}" => $email !== null ? MasukWali::normalEmail($email) : null,
+                "pekerjaan_{$p}" => $pekerjaan === Wali::PEKERJAAN_LAIN
+                    ? self::teks($data["pekerjaan_lain_{$p}"] ?? null)
+                    : self::teks($pekerjaan),
+                "pendapatan_{$p}" => self::teks($data["pendapatan_{$p}"] ?? null),
+            ];
+        }
+
+        return $keluarga;
+    }
+
+    private static function teks(mixed $nilai): ?string
+    {
+        $nilai = trim((string) $nilai);
+
+        return $nilai === '' ? null : $nilai;
+    }
+
     /**
      * @param  array<string,mixed>  $data  isian formulir yang sudah divalidasi controller
      * @param  ?Wali  $wali  keluarga yang sedang masuk; null = pendaftar baru
@@ -144,18 +214,7 @@ class PendaftaranPortal
             $peran = $penanda['peran'];
         } else {
             $peran = $data['peran'];
-            if (self::teleponTerdaftar($data['telepon'])) {
-                throw new AppException(409, 'Nomor HP ini sudah terdaftar di data keluarga santri. Masuklah dengan email '
-                    .'yang tercatat di keluarga Anda, atau hubungi panitia PSB untuk memperbarui email Anda.');
-            }
-            // Email pendaftar = email peran yang dipilihnya. Itulah identitas masuknya nanti.
-            $isianSantri['wali_baru'] = [
-                'kontak_utama' => $peran, 'status' => 'aktif',
-                "nama_{$peran}" => $data['nama_wali'],
-                "telepon_{$peran}" => self::normalTelepon($data['telepon']),
-                "email_{$peran}" => $penanda['email'],
-                'alamat' => $data['alamat'] ?? null,
-            ];
+            $isianSantri['wali_baru'] = $this->keluargaBaru($data, $peran, $penanda['email']);
         }
 
         try {
@@ -164,13 +223,13 @@ class PendaftaranPortal
 
                 Pendaftaran::where('id_santri', $santri->id)->update(['asal' => 'portal']);
 
-                $nama = $wali ? (string) $wali->{"nama_{$peran}"} : (string) $data['nama_wali'];
+                $nama = $wali ? (string) $wali->{"nama_{$peran}"} : (string) $data["nama_{$peran}"];
                 PersetujuanTerm::create([
                     'id_santri' => $santri->id, 'id_wali' => $santri->id_wali, 'id_term_template' => $surat->id,
                     'isi_umum' => $surat->isi, 'hash_sha256' => hash('sha256', $surat->isi),
                     'metode_ttd' => 'otp_email', 'status' => 'disetujui', 'disetujui_pada' => now(),
                     'penanda_tangan_nama' => $nama ?: $santri->wali->nama,
-                    'penanda_tangan_telepon' => $wali ? $wali->{"telepon_{$peran}"} : self::normalTelepon($data['telepon']),
+                    'penanda_tangan_telepon' => $wali ? $wali->{"telepon_{$peran}"} : self::normalTelepon($data["telepon_{$peran}"]),
                     'penanda_tangan_email' => $penanda['email'], 'penanda_tangan_peran' => $peran,
                     'ip_address' => $penanda['ip'], 'user_agent' => mb_substr((string) $penanda['user_agent'], 0, 1000),
                     // Email-nya dibuktikan dengan kode saat masuk sesi ini.

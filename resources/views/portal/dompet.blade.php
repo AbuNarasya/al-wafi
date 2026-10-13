@@ -9,10 +9,11 @@
         <div class="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-white/5"></div>
         <p class="relative text-xs font-semibold uppercase tracking-widest text-blue-100/80">Saldo Dompet Wali</p>
         <p class="relative mt-1 text-3xl font-bold tabular-nums">{{ $rp($saldoWali) }}</p>
-        <div class="relative mt-3 flex items-center justify-between gap-2 border-t border-white/10 pt-3 text-sm">
-            <span class="text-white/75">Untuk membayar tagihan santri aktif</span>
-            <a href="{{ route('portal.dompet.isi') }}" class="rounded-full bg-accent px-3 py-1 text-xs font-bold text-slate-900">Isi saldo</a>
-        </div>
+        <p class="relative mt-1 text-sm text-white/75">Untuk membayar tagihan santri aktif</p>
+        <a href="{{ route('portal.dompet.isi') }}"
+           class="relative mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-accent py-3 text-sm font-bold text-slate-900 shadow-sm active:opacity-90">
+            <span class="text-lg leading-none">+</span> Isi saldo
+        </a>
     </div>
 
     <div class="mt-4 grid grid-cols-2 gap-3">
@@ -45,9 +46,11 @@
                 @endif
             </p>
         </div>
-        <button type="submit" @class(['relative h-7 w-12 shrink-0 rounded-full transition', 'bg-emerald-500' => $autoDebet, 'bg-slate-300' => ! $autoDebet])
-                aria-pressed="{{ $autoDebet ? 'true' : 'false' }}" aria-label="Auto-debet">
-            <span @class(['absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all', 'left-[1.375rem]' => $autoDebet, 'left-0.5' => ! $autoDebet])></span>
+        {{-- Saklar 56×32 px: cukup besar untuk ibu jari. Kenop & jalur memakai kelas khusus (app.css)
+             supaya tak ikut penimpaan warna mode gelap. --}}
+        <button type="submit" @class(['relative h-8 w-14 shrink-0 rounded-full transition-colors', 'bg-emerald-500' => $autoDebet, 'bg-slate-300 saklar-mati' => ! $autoDebet])
+                role="switch" aria-checked="{{ $autoDebet ? 'true' : 'false' }}" aria-label="Auto-debet tagihan">
+            <span @class(['saklar-kenop absolute top-1 h-6 w-6 rounded-full shadow-md transition-all', 'left-7' => $autoDebet, 'left-1' => ! $autoDebet])></span>
         </button>
         @unless ($autoDebet)
             @include('portal._pin', ['judul' => 'Aktifkan auto-debet tagihan'])

@@ -25,6 +25,16 @@
 .wali-gelap .text-red-800, .wali-gelap .text-red-700 { color: #fca5a5; }
 .wali-gelap .text-brand { color: #8fb4ee; }
 .wali-gelap input, .wali-gelap select, .wali-gelap textarea { background-color: #0f172a; color: #e5e7eb; border-color: #334155; }
+/* Latar emas tetap emas, jadi tulisannya harus TETAP gelap — penimpaan `text-slate-900` di atas
+   membuatnya abu terang di atas kuning (tombol "Isi saldo" tak terbaca, 13 Okt 2026). */
+.wali-gelap .bg-accent, .wali-gelap .bg-accent.text-slate-900 { color: #0f172a; }
+/* Saklar: kenopnya `bg-white` ikut digelapkan aturan di atas sehingga lenyap; jalurnya yang mati
+   terlalu terang di latar gelap. Dua kelas khusus ini tak ikut penimpaan umum. */
+.saklar-kenop { background-color: #ffffff; }
+/* Pilihan berbentuk tombol (peran, jenis kelamin): varian `has-[:checked]:text-brand` tak ikut
+   penimpaan `.text-brand` di atas, sehingga pilihan yang terpilih biru tua di latar gelap. */
+.wali-gelap label:has(> input[type='radio']:checked) { color: #8fb4ee; background-color: #0f2547; border-color: #3b82f6; }
+.wali-gelap .saklar-mati { background-color: #475569; }
 
 /* Border input LEBIH JELAS di semua modul.
    Tailwind preflight men-set border-width:0 → input yang hanya punya utilitas
