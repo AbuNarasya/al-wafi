@@ -197,6 +197,10 @@ class BatchTagihanService
             throw new AppException(422, 'Sumber peserta tagihan lain tidak dikenal.');
         }
         $periode = $p['periode'] ?? null;
+        // Jenis bulanan wajib berbulan — ditolak saat MENYUSUN, bukan baru saat rilis.
+        if ($jenisDulu = \App\Models\JenisBiaya::find($kode)) {
+            TagihanLainService::assertPeriode($jenisDulu, $periode);
+        }
 
         if ($sumber === 'manual') {
             $nominal = Money::of($p['nominal'] ?? '0');

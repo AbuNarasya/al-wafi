@@ -108,6 +108,51 @@ class TagihanLainTest extends TestCase
         $this->assertSame('Laundry Agustus 2026', $t->keterangan);
     }
 
+    /**
+     * Kegiatan BULANAN (keputusan user 13 Okt 2026): `jenis_biaya.berulang` → bulan wajib,
+     * satu tagihan per santri per bulan. Dulu periode opsional, dan yang dikosongkan membuat
+     * bulan berikutnya terlewati sebagai "sudah punya tagihan ini".
+     */
+    public function test_kegiatan_bulanan_ditagih_tiap_bulan_sekali_per_bulan(): void
+    {
+        JenisBiaya::create(['kode' => 'EKS', 'nama' => 'Excul Robotic', 'tipe' => 'lain',
+            'kode_coa_pendapatan' => self::PENDAPATAN, 'kode_unit' => 'ZZTLU', 'status' => 'aktif',
+            'pengakuan' => 'kas', 'cara_tagih' => 'kepesertaan', 'berulang' => true]);
+        $santri = $this->santri('990009', 'Bilal');
+        $terbit = fn (?string $periode) => $this->actingAs($this->petugas)->post(route('tagihan_lain.store'), [
+            'kode_jenis' => 'EKS', 'id_santri' => [$santri->id], 'nominal' => '150000',
+            'periode' => $periode, 'tanggal' => '2026-10-01',
+        ]);
+
+        $terbit(null)->assertSessionHas('error', fn ($p) => str_contains($p, 'tiap bulan'));
+        $terbit('Oktober')->assertSessionHas('error');
+        $terbit('2026-10')->assertRedirect(route('tagihan_lain.index'));
+        $terbit('2026-11')->assertRedirect(route('tagihan_lain.index'));
+        $terbit('2026-10')->assertSessionHas('error', fn ($p) => str_contains($p, 'sudah punya tagihan ini'));
+
+        $this->assertSame(['2026-10', '2026-11'],
+            TagihanSantri::where('id_santri', $santri->id)->orderBy('periode')->pluck('periode')->all());
+
+        // Layar terbit: jenis bulanan → pilihan bulan yang wajib. (Jenis kepesertaan baru
+        // menampilkan form setelah ada peserta, jadi yang diperiksa jenis berdaftar santri.)
+        JenisBiaya::whereKey('LDR')->update(['berulang' => true]);
+        $this->actingAs($this->petugas)->get(route('tagihan_lain.create', ['jenis' => 'LDR']))->assertOk()
+            ->assertSee('Bulan tagihan')->assertSee('type="month"', false);
+    }
+
+    /** Per kegiatan (tak bertanda bulanan) tetap seperti dulu: tanpa periode = sekali saja. */
+    public function test_kegiatan_sekali_tetap_boleh_tanpa_periode(): void
+    {
+        $santri = $this->santri('990010', 'Umar');
+        $terbit = fn () => $this->actingAs($this->petugas)->post(route('tagihan_lain.store'), [
+            'kode_jenis' => 'LDR', 'id_santri' => [$santri->id], 'nominal' => '50000', 'tanggal' => '2026-10-01',
+        ]);
+
+        $terbit()->assertRedirect(route('tagihan_lain.index'));
+        $terbit()->assertSessionHas('error');
+        $this->assertSame(1, TagihanSantri::where('id_santri', $santri->id)->count());
+    }
+
     public function test_tanpa_keterangan_memakai_nama_jenis_biayanya(): void
     {
         $santri = $this->santri('990002', 'Bilal Ramadhan');

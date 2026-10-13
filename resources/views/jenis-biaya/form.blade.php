@@ -137,7 +137,8 @@
                     <input type="hidden" name="berulang" value="0">
                     <input type="checkbox" name="berulang" value="1" @checked(old('berulang', $jb->berulang))
                            class="rounded border-gray-300 text-brand focus:ring-brand">
-                    Berulang tiap periode (centang untuk SPP)
+                    {{-- Untuk lain-lain: ditagih TIAP BULAN (bulan wajib saat terbit) — selain itu sekali per kegiatan. --}}
+                    <span x-text="tipe === 'lain' ? 'Ditagih tiap bulan (satu tagihan per santri per bulan)' : 'Berulang tiap periode (centang untuk SPP)'">Berulang tiap periode (centang untuk SPP)</span>
                 </label>
                 <x-field name="status" label="Status" :value="$jb->status ?? 'aktif'" :options="['aktif' => 'Aktif', 'nonaktif' => 'Nonaktif']" />
             </div>

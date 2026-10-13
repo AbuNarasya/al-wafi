@@ -90,6 +90,19 @@ class TagihanLainService
         return $this->terbitkanUntuk($jenis, $nominalPerSantri, $data, $idPengguna);
     }
 
+    /**
+     * Jenis BULANAN (`jenis_biaya.berulang`, keputusan user 13 Okt 2026) wajib menyebut
+     * bulannya (YYYY-MM): tagihan dianggap sudah ada bila santri, jenis, DAN periodenya
+     * sama — periode kosong membuat bulan berikutnya terlewati sebagai "sudah ditagih".
+     * Jenis per kegiatan tetap boleh tanpa periode (= sekali saja).
+     */
+    public static function assertPeriode(JenisBiaya $jenis, ?string $periode): void
+    {
+        if ($jenis->berulang && ! preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', (string) $periode)) {
+            throw new AppException(422, "\"{$jenis->nama}\" ditagih tiap bulan — pilih bulan tagihannya (misalnya ".now()->format('Y-m').').');
+        }
+    }
+
     private function jenisSah(string $kode): JenisBiaya
     {
         $jenis = JenisBiaya::find($kode);
@@ -123,6 +136,7 @@ class TagihanLainService
      */
     private function terbitkanUntuk(JenisBiaya $jenis, array $nominalPerSantri, array $data, int $idPengguna, array $gugur = []): array
     {
+        self::assertPeriode($jenis, $data['periode'] ?? null);
         $santri = Santri::whereIn('id', array_keys($nominalPerSantri))->where('status', 'aktif')
             ->get(['id', 'nama', 'kode_jenjang', 'tahun_ajaran']);
         // Yang dipilih tapi tak terjaring query di atas = sudah tidak berstatus

@@ -128,7 +128,7 @@
                     <x-field name="tanggal" label="Tanggal" type="date" :value="old('tanggal', now()->toDateString())" required />
                     <x-field name="jatuh_tempo" label="Jatuh Tempo" type="date" :value="old('jatuh_tempo')"
                              hint="Dipakai Reminder Tagihan." />
-                    <x-field name="periode" label="Periode (opsional)" :value="old('periode')" placeholder="2026-08" />
+                    @include('tagihan-lain._periode', ['bulanan' => (bool) $jenis?->berulang, 'contoh' => '2026-08'])
                     <x-field name="keterangan" label="Keterangan (opsional)" :value="old('keterangan')" />
                 </div>
                 <div class="mt-3 flex justify-end">
