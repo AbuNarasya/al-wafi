@@ -75,7 +75,7 @@ class PortalBayarOnlineController extends Controller
         }
 
         return view('portal.bayar-online', [
-            't' => $t->load(['tagihan.santri', 'tagihan.jenis']),
+            't' => $t->load(['tagihan.santri', 'tagihan.jenis', 'rincian.tagihan.santri', 'rincian.tagihan.jenis']),
             'snapJs' => KlienMidtrans::urlSnapJs(),
             'clientKey' => (string) config('services.midtrans.client_key'),
         ]);

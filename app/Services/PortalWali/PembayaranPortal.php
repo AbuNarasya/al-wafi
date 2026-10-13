@@ -109,8 +109,154 @@ class PembayaranPortal
     {
         $menunggu = PembayaranSantri::where('id_tagihan', $t->id)->where('status', 'menunggu_verifikasi')->sum('nominal');
         $online = \App\Models\TransaksiMidtrans::where('id_tagihan', $t->id)->where('status', 'menunggu')->sum('nominal');
+        $onlineKelompok = \App\Models\TransaksiMidtransTagihan::where('id_tagihan', $t->id)
+            ->whereHas('transaksi', fn ($q) => $q->where('status', 'menunggu'))->sum('nominal');
 
-        return Money::sub(Money::sub($t->sisa, (string) $menunggu), (string) $online);
+        return Money::sub(Money::sub(Money::sub($t->sisa, (string) $menunggu), (string) $online), (string) $onlineKelompok);
+    }
+
+    // ---- Bayar beberapa tagihan sekaligus (keputusan user 13 Okt 2026) ----
+
+    public const MAKS_KERANJANG = 24;
+
+    /**
+     * Keranjang: tagihan milik keluarga ini + nominalnya, beserta cara bayar yang sah untuk
+     * SEMUA isinya ('dompet' | 'transfer' | 'online'). Campuran santri aktif + calon hanya
+     * lewat dompet; transfer & online hanya bila semuanya tagihan PSB calon.
+     *
+     * @param  array<int|string,int|string>  $isian  [id_tagihan => nominal]
+     * @return array{tagihan:\Illuminate\Support\Collection<int,TagihanSantri>, nominal:array<int,string>, total:string, cara:list<string>}
+     */
+    public function keranjang(array $isian): array
+    {
+        $isian = array_filter($isian, fn ($n) => $n !== null && $n !== '');
+        if ($isian === []) {
+            throw new AppException(422, 'Pilih minimal satu tagihan.');
+        }
+        if (count($isian) > self::MAKS_KERANJANG) {
+            throw new AppException(422, 'Paling banyak '.self::MAKS_KERANJANG.' tagihan sekali bayar.');
+        }
+
+        $daftar = collect();
+        $nominal = [];
+        $semuaDompet = $semuaTransfer = true;
+        foreach ($isian as $id => $n) {
+            $t = $this->tagihan((int) $id);
+            $nama = \App\Http\Controllers\PortalKeluargaController::namaTagihan($t).' — '.$t->santri->nama;
+            [$alur, $alasan] = self::alur($t);
+            if ($alur === null) {
+                throw new AppException(422, "{$nama}: {$alasan}");
+            }
+            $n = Money::of($n);
+            $ruang = self::ruang($t);
+            if (Money::lte($n, '0') || Money::gt($n, $ruang)) {
+                throw new AppException(422, "{$nama}: nominal harus antara Rp 1 dan Rp ".number_format((float) $ruang, 0, ',', '.').'.');
+            }
+            $semuaDompet = $semuaDompet && self::bisaDompet($alur);
+            $semuaTransfer = $semuaTransfer && self::bisaTransfer($alur);
+            $daftar->push($t);
+            $nominal[$t->id] = $n;
+        }
+
+        $cara = array_values(array_filter([
+            $semuaDompet ? 'dompet' : null,
+            $semuaTransfer && \App\Services\Midtrans\PembayaranMidtrans::siap() ? 'online' : null,
+            $semuaTransfer ? 'transfer' : null,
+        ]));
+        if ($cara === []) {
+            throw new AppException(422, 'Tagihan santri aktif dan tagihan pendaftaran calon tidak bisa dibayar bersamaan '
+                .'kecuali dari Dompet Wali. Bayar terpisah, atau isi Dompet Wali dulu.');
+        }
+
+        return ['tagihan' => $daftar, 'nominal' => $nominal, 'total' => Money::of(array_sum(array_map('floatval', $nominal))), 'cara' => $cara];
+    }
+
+    public static function nomorKelompok(string $awalan = 'KB'): string
+    {
+        return $awalan.'-'.now()->format('ymdHis').'-'.\Illuminate\Support\Str::upper(\Illuminate\Support\Str::random(4));
+    }
+
+    /**
+     * Bayar keranjang dari Dompet Wali — SATU PIN, semua atau tidak sama sekali. Tetap
+     * satu pembayaran + satu jurnal per tagihan (lewat jalur loket yang sama), diikat
+     * `kelompok_bayar`. Langkah susulan (evaluasi potongan) sesudah transaksinya selesai.
+     *
+     * @return \Illuminate\Support\Collection<int,PembayaranSantri>
+     */
+    public function bayarKelompokDariDompet(array $isian, ?string $pin): \Illuminate\Support\Collection
+    {
+        $k = $this->keranjang($isian);
+        if (! in_array('dompet', $k['cara'], true)) {
+            throw new AppException(422, 'Tagihan-tagihan ini tidak bisa dibayar dari Dompet Wali.');
+        }
+        foreach ($k['tagihan'] as $t) {
+            if (in_array($t->perilaku, self::PENUH, true) && ! Money::eq($k['nominal'][$t->id], $t->sisa)) {
+                throw new AppException(422, \App\Http\Controllers\PortalKeluargaController::namaTagihan($t)
+                    .' harus dilunasi sekaligus sebesar Rp '.number_format((float) $t->sisa, 0, ',', '.').'.');
+            }
+        }
+        $saldo = DompetWali::where('id_wali', $this->wali->id)->value('saldo') ?? '0';
+        if (Money::lt($saldo, $k['total'])) {
+            throw new AppException(422, 'Saldo Dompet Wali tidak cukup untuk total Rp '.number_format((float) $k['total'], 0, ',', '.')
+                .'. Isi dompet terlebih dahulu.');
+        }
+        // PIN SESUDAH semua pemeriksaan murah & DI LUAR transaksi (lihat bayarDariDompet).
+        $this->pin()->periksa($pin);
+
+        $kelompok = self::nomorKelompok();
+        $hasil = DB::transaction(function () use ($k, $kelompok) {
+            DompetWali::where('id_wali', $this->wali->id)->lockForUpdate()->first();
+            $layanan = new PembayaranSantriService;
+
+            return $k['tagihan']->sortBy('id')->values()->map(function (TagihanSantri $t) use ($k, $kelompok, $layanan) {
+                $t = TagihanSantri::with(['santri', 'jenis'])->lockForUpdate()->find($t->id);
+                [$alur, $alasan] = self::alur($t);
+                if (! self::bisaDompet($alur)) {
+                    throw new AppException(422, $alasan ?? 'Tagihan ini tidak bisa dibayar dari dompet.');
+                }
+
+                return $layanan->bayarDariDompet([
+                    'id_tagihan' => $t->id, 'nominal' => (string) $k['nominal'][$t->id], 'tanggal' => now()->toDateString(),
+                    'catatan' => 'Dibayar dari Portal Wali (sekaligus).', 'kelompok_bayar' => $kelompok,
+                ], null, $this->pencatat, tundaSusulan: true);
+            });
+        });
+
+        $layanan = new PembayaranSantriService;
+        foreach ($k['tagihan'] as $t) {
+            $layanan->sesudahBayarGateway($t->refresh());
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Transfer SATU bukti untuk beberapa tagihan PSB calon. Tiap tagihan mendapat baris
+     * pembayaran sendiri (menunggu verifikasi), diikat `kelompok_bayar`; keuangan
+     * memverifikasi / menolaknya sekaligus. Satu kabar ke keuangan.
+     *
+     * @return \Illuminate\Support\Collection<int,PembayaranSantri>
+     */
+    public function bayarKelompokTransfer(array $isian, array $data): \Illuminate\Support\Collection
+    {
+        $k = $this->keranjang($isian);
+        if (! in_array('transfer', $k['cara'], true)) {
+            throw new AppException(422, 'Tagihan-tagihan ini tidak bisa dibayar lewat transfer.');
+        }
+        $this->pastikanRekeningPortal($data['kode_rekening']);
+        $kelompok = self::nomorKelompok();
+        $layanan = new PembayaranSantriService;
+
+        $baris = DB::transaction(fn () => $k['tagihan']->sortBy('id')->values()->map(fn (TagihanSantri $t) => $layanan->catat([
+            'id_santri' => $t->id_santri, 'id_tagihan' => $t->id, 'tanggal' => $data['tanggal'],
+            'nominal' => (string) $k['nominal'][$t->id], 'kode_rekening' => $data['kode_rekening'], 'metode' => 'transfer',
+            'bukti_path' => $data['bukti_path'], 'catatan' => 'Dikirim dari Portal Wali (satu bukti untuk '.$k['tagihan']->count().' tagihan).',
+            'kelompok_bayar' => $kelompok,
+        ], null, 'ppsb', $this->pencatat)));
+
+        $layanan->kabariKelompok($baris);
+
+        return $baris;
     }
 
     public function pin(): PinTransaksi
@@ -243,6 +389,32 @@ class PembayaranPortal
                 'keterangan' => "{$label} — {$santri->nama} (portal, {$nama})",
             ], null, $this->pencatat);
         });
+    }
+
+    /** Uang saku anak A → uang saku anak B (keduanya santri aktif keluarga ini). PIN. */
+    public function pindahAntarAnak(int $idAsal, int $idTujuan, string $nominal, ?string $pin): void
+    {
+        $asal = $this->anakAktif($idAsal);
+        $tujuan = $this->anakAktif($idTujuan);
+        if ($asal->id === $tujuan->id) {
+            throw new AppException(422, 'Pilih anak tujuan yang berbeda.');
+        }
+        $nominal = Money::of($nominal);
+        if (Money::lte($nominal, '0')) {
+            throw new AppException(422, 'Nominal harus lebih dari nol.');
+        }
+        $saldo = \App\Models\DompetSantri::where('id_santri', $asal->id)->value('saldo') ?? '0';
+        if (Money::lt($saldo, $nominal)) {
+            throw new AppException(422, "Uang saku {$asal->nama} tidak cukup (tersedia Rp ".number_format((float) $saldo, 0, ',', '.').').');
+        }
+        $this->pin()->periksa($pin);
+
+        $nama = $this->wali->{'nama_'.$this->pencatat['peran']} ?: $this->wali->nama;
+        (new DompetService)->pindahAntarSantri([
+            'id_santri_asal' => $asal->id, 'id_santri_tujuan' => $tujuan->id, 'nominal' => (string) $nominal,
+            'tanggal' => now()->toDateString(),
+            'keterangan' => "Uang saku {$asal->nama} → {$tujuan->nama} (portal, {$nama})",
+        ], null, $this->pencatat);
     }
 
     // ---- E. Pengajuan tarik tabungan ----

@@ -54,13 +54,24 @@
         @if ($tab === 'tagihan')
             {{-- Hanya yang belum lunas (keputusan user 13 Okt 2026): yang lunas sudah tercatat di
                  Riwayat bayar — menampilkannya di sini juga membuat kedua tab berisi hal yang sama. --}}
-            @php $belumLunas = collect($tagihan)->reject(fn ($t) => $t['status'] === 'lunas'); @endphp
-            <div class="mt-4 space-y-2">
+            @php
+                $belumLunas = collect($tagihan)->reject(fn ($t) => $t['status'] === 'lunas');
+                // Centang untuk bayar sekaligus — hanya bila ada ≥ 2 tagihan yang bisa dibayar.
+                $bisaDipilih = $belumLunas->where('bisa_bayar', true)->count() > 1;
+            @endphp
+            <div class="mt-4 space-y-2" x-data="{ pilih: [] }">
+                @if ($bisaDipilih)
+                    <p class="px-1 text-xs text-slate-500">Centang beberapa tagihan untuk dibayar sekaligus.</p>
+                @endif
                 @forelse ($belumLunas as $t)
                     @php $p = $periode($t['periode']); @endphp
-                    <div class="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <div class="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200" :class="pilih.includes({{ $t['id'] }}) && 'ring-2 ring-brand'">
                         <div class="flex items-start justify-between gap-2">
-                            <p class="min-w-0 font-semibold text-slate-900">
+                            @if ($bisaDipilih && $t['bisa_bayar'])
+                                <input type="checkbox" value="{{ $t['id'] }}" x-model.number="pilih" aria-label="Pilih {{ $t['nama'] }}"
+                                       class="mt-1 h-5 w-5 shrink-0 rounded border-slate-300 text-brand focus:ring-brand">
+                            @endif
+                            <p class="min-w-0 flex-1 font-semibold text-slate-900">
                                 {{ $t['nama'] }}
                                 @if ($p && ! str_contains(mb_strtolower($t['nama']), mb_strtolower($p)))
                                     <span class="font-normal text-slate-500">&middot; {{ $p }}</span>
@@ -102,6 +113,17 @@
                         @endif
                     </div>
                 @endforelse
+
+                {{-- Bilah bayar sekaligus — melayang di atas menu bawah selama ada yang dicentang. --}}
+                @if ($bisaDipilih)
+                    <div x-show="pilih.length > 0" x-cloak class="fixed inset-x-0 bottom-16 z-40 px-4" style="margin-bottom: env(safe-area-inset-bottom)">
+                        <a :href="@js(route('portal.bayar_banyak.form')) + '?' + pilih.map(id => 't[]=' + id).join('&')"
+                           class="mx-auto flex max-w-lg items-center justify-between gap-3 rounded-2xl bg-brand px-4 py-3 text-white shadow-xl">
+                            <span class="text-sm"><b x-text="pilih.length"></b> tagihan dipilih</span>
+                            <span class="text-sm font-bold">Bayar sekaligus &rarr;</span>
+                        </a>
+                    </div>
+                @endif
             </div>
         @else
             <div class="mt-4 divide-y divide-slate-100 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">

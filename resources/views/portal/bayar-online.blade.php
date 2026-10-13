@@ -1,13 +1,23 @@
 @extends('layouts.portal')
 
 @section('title', 'Bayar online')
-@section('kembali', $t->jenis === 'isi_dompet' ? route('portal.dompet') : route('portal.tagihan', ['anak' => $t->tagihan?->id_santri]))
-
 @php
     $rp = fn ($n) => 'Rp '.number_format((float) $n, 0, ',', '.');
-    $judul = $t->jenis === 'isi_dompet'
-        ? 'Isi Dompet Wali'
-        : \App\Http\Controllers\PortalKeluargaController::namaTagihan($t->tagihan).' — '.$t->tagihan->santri->nama;
+    $judul = match ($t->jenis) {
+        'isi_dompet' => 'Isi Dompet Wali',
+        'bayar_kelompok' => 'Bayar '.$t->rincian->count().' tagihan sekaligus',
+        default => \App\Http\Controllers\PortalKeluargaController::namaTagihan($t->tagihan).' — '.$t->tagihan->santri->nama,
+    };
+    $kembali = match ($t->jenis) {
+        'isi_dompet' => route('portal.dompet'),
+        'bayar_kelompok' => route('portal.tagihan'),
+        default => route('portal.tagihan', ['anak' => $t->tagihan?->id_santri]),
+    };
+@endphp
+
+@section('kembali', $kembali)
+
+@php
     $warna = ['menunggu' => 'bg-amber-50 text-amber-800', 'lunas' => 'bg-emerald-50 text-emerald-700',
         'kedaluwarsa' => 'bg-slate-100 text-slate-600', 'gagal' => 'bg-red-50 text-red-700', 'batal' => 'bg-slate-100 text-slate-600'];
 @endphp
@@ -21,7 +31,13 @@
         <p class="mt-0.5 font-mono text-xs text-slate-500">{{ $t->order_id }}</p>
 
         <div class="mt-4 space-y-1 text-sm">
-            <div class="flex justify-between text-slate-600"><span>Nominal</span><span class="tabular-nums">{{ $rp($t->nominal) }}</span></div>
+            @foreach ($t->rincian as $r)
+                <div class="flex justify-between gap-2 text-slate-600">
+                    <span class="min-w-0 truncate">{{ \App\Http\Controllers\PortalKeluargaController::namaTagihan($r->tagihan) }} — {{ $r->tagihan->santri->nama }}</span>
+                    <span class="shrink-0 tabular-nums">{{ $rp($r->nominal) }}</span>
+                </div>
+            @endforeach
+            <div class="flex justify-between text-slate-600"><span>Nominal{{ $t->rincian->isNotEmpty() ? ' (jumlah)' : '' }}</span><span class="tabular-nums">{{ $rp($t->nominal) }}</span></div>
             <div class="flex justify-between text-slate-600"><span>Biaya layanan Virtual Account</span><span class="tabular-nums">{{ $rp($t->biaya) }}</span></div>
             <div class="flex justify-between border-t border-slate-100 pt-2 text-base font-bold text-slate-900">
                 <span>Total dibayar</span><span class="tabular-nums">{{ $rp($t->total) }}</span>
@@ -115,7 +131,7 @@
             <p class="text-base font-bold">Alhamdulillah, pembayaran diterima.</p>
             <p class="mt-1">{{ $t->jenis === 'isi_dompet' ? 'Saldo Dompet Wali sudah bertambah.' : 'Tagihan sudah tercatat terbayar.' }}</p>
         </div>
-        <a href="{{ $t->jenis === 'isi_dompet' ? route('portal.dompet') : route('portal.tagihan', ['anak' => $t->tagihan?->id_santri]) }}"
+        <a href="{{ $kembali }}"
            class="mt-4 block rounded-2xl bg-brand py-3 text-center text-sm font-bold text-white">
             {{ $t->jenis === 'isi_dompet' ? 'Lihat dompet' : 'Lihat tagihan' }}
         </a>

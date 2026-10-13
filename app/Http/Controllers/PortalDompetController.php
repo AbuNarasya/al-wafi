@@ -133,15 +133,22 @@ class PortalDompetController extends Controller
     {
         $data = $request->validate([
             'arah' => ['required', 'string'], 'id_santri' => ['required', 'integer'],
+            'id_santri_tujuan' => ['required_if:arah,antar_anak', 'nullable', 'integer'],
             'nominal' => ['required', 'numeric', 'gt:0'], 'pin' => ['nullable', 'string'],
         ]);
         try {
-            $this->portal($request)->pindah($data['arah'], (int) $data['id_santri'], (string) $data['nominal'], $data['pin'] ?? null);
+            if ($data['arah'] === 'antar_anak') {
+                $this->portal($request)->pindahAntarAnak((int) $data['id_santri'], (int) $data['id_santri_tujuan'],
+                    (string) $data['nominal'], $data['pin'] ?? null);
+            } else {
+                $this->portal($request)->pindah($data['arah'], (int) $data['id_santri'], (string) $data['nominal'], $data['pin'] ?? null);
+            }
         } catch (AppException $e) {
             return self::tanganiGalat($e, $request);
         }
 
-        return redirect()->route('portal.dompet')->with('status', 'Saldo dipindahkan: '.PembayaranPortal::ARAH[$data['arah']][2].'.');
+        return redirect()->route('portal.dompet')->with('status', 'Saldo dipindahkan: '
+            .($data['arah'] === 'antar_anak' ? 'uang saku antar anak' : PembayaranPortal::ARAH[$data['arah']][2]).'.');
     }
 
     // ---- Tarik tabungan ----

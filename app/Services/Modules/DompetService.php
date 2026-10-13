@@ -267,6 +267,59 @@ class DompetService
         });
     }
 
+    /**
+     * PINDAH UANG SAKU ANTAR ANAK sekeluarga (keputusan user 13 Okt 2026): Dompet Santri A →
+     * Dompet Santri B. TANPA JURNAL — keduanya di akun buku besar yang sama (Titipan Dompet
+     * Santri), jadi yang bergerak hanya buku pembantunya; total & rekonsiliasinya tak berubah.
+     * Tetap tercatat sepasang mutasi yang saling menaut. `kunci_tarik` tak menghalangi
+     * (sama seperti arah santri → wali): kunci itu untuk tarik tunai.
+     *
+     * @param  array{id_santri_asal:int, id_santri_tujuan:int, nominal:string, tanggal:string, keterangan:string}  $data
+     * @param  array{id:int,peran:string}|null  $wali
+     * @return array{keluar:MutasiDompet, masuk:MutasiDompet}
+     */
+    public function pindahAntarSantri(array $data, ?int $idPengguna, ?array $wali = null): array
+    {
+        if ($data['id_santri_asal'] === $data['id_santri_tujuan']) {
+            throw new AppException(422, 'Pilih anak tujuan yang berbeda.');
+        }
+        $pencatat = \App\Services\PortalWali\Pencatat::kolom($wali ? null : $idPengguna, $wali);
+        $nominal = Money::of($data['nominal']);
+        if (Money::lte($nominal, '0')) {
+            throw new AppException(422, 'Nominal pemindahan harus lebih dari nol.');
+        }
+        $asal = $this->ambilDompetSantri($data['id_santri_asal']);
+        $tujuan = $this->ambilDompetSantri($data['id_santri_tujuan']);
+        if (Santri::whereKey($data['id_santri_asal'])->value('id_wali') !== Santri::whereKey($data['id_santri_tujuan'])->value('id_wali')) {
+            throw new AppException(422, 'Uang saku hanya bisa dipindah antar anak dari keluarga yang sama.');
+        }
+
+        return DB::transaction(function () use ($data, $nominal, $asal, $tujuan, $pencatat) {
+            // Kunci keduanya berurutan id: dua pemindahan berlawanan arah tak saling menunggu.
+            DompetSantri::whereIn('id', [$asal->id, $tujuan->id])->orderBy('id')->lockForUpdate()->get();
+            $asal->refresh();
+            if (Money::lt($asal->saldo, $nominal)) {
+                throw new AppException(422, "Saldo uang saku tidak cukup (tersedia {$asal->saldo}).");
+            }
+            $saldoAsal = $this->kurangiSaldo('santri', $asal->id, $nominal);
+            $saldoTujuan = $this->tambahSaldo('santri', $tujuan->id, $nominal);
+
+            $keluar = MutasiDompet::create([
+                'nomor' => $this->nomorMutasi($data['tanggal']), 'pemilik' => 'santri', 'id_dompet' => $asal->id,
+                'jenis' => 'distribusi_keluar', 'nominal' => Money::sub('0', $nominal), 'saldo_setelah' => $saldoAsal,
+                'tanggal' => $data['tanggal'], 'keterangan' => $data['keterangan'],
+            ] + $pencatat);
+            $masuk = MutasiDompet::create([
+                'nomor' => $this->nomorMutasi($data['tanggal']), 'pemilik' => 'santri', 'id_dompet' => $tujuan->id,
+                'jenis' => 'distribusi_masuk', 'nominal' => $nominal, 'saldo_setelah' => $saldoTujuan,
+                'tanggal' => $data['tanggal'], 'keterangan' => $data['keterangan'], 'id_pasangan' => $keluar->id,
+            ] + $pencatat);
+            $keluar->update(['id_pasangan' => $masuk->id]);
+
+            return ['keluar' => $keluar, 'masuk' => $masuk];
+        });
+    }
+
     public function setKunciTarik(int $idSantri, bool $kunci): DompetSantri
     {
         $dompet = $this->ambilDompetSantri($idSantri);

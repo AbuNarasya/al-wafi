@@ -17,7 +17,8 @@
     <form method="POST" action="{{ route('portal.dompet.pindah') }}" data-no-confirm class="space-y-4"
           x-data="{ ...pinPad(@js(\App\Services\PortalWali\SesiWali::punyaPin()), @js(route('portal.pin'))),
               anak: @js($anak->map(fn ($a) => ['id' => $a->id, 'nama' => $a->nama, 'santri' => (float) ($a->dompet?->saldo ?? 0), 'tabungan' => (float) ($a->tabungan?->saldo ?? 0)])->values()),
-              wali: {{ (float) $saldoWali }}, idSantri: {{ $anak->first()->id }}, arah: 'wali_santri',
+              wali: {{ (float) $saldoWali }}, idSantri: {{ $anak->first()->id }}, arah: @js(old('arah', 'wali_santri')),
+              idTujuan: {{ $anak->count() > 1 ? $anak->get(1)->id : 'null' }},
               get a() { return this.anak.find(x => x.id == this.idSantri) },
               get saldoAsal() { return this.arah.startsWith('wali') ? this.wali : this.a.santri },
               rp(n) { return 'Rp ' + Math.round(n).toLocaleString('id-ID') },
@@ -34,12 +35,19 @@
                         <span class="font-medium text-slate-900">{{ $label }}</span>
                     </label>
                 @endforeach
+                {{-- Antar anak hanya bila anak aktifnya lebih dari satu. Tanpa jurnal (lihat DompetService). --}}
+                @if ($anak->count() > 1)
+                    <label class="flex cursor-pointer items-center gap-3 rounded-2xl bg-white px-4 py-3 text-sm shadow-sm ring-1 ring-slate-200 has-[:checked]:ring-2 has-[:checked]:ring-brand">
+                        <input type="radio" name="arah" value="antar_anak" x-model="arah" class="text-brand focus:ring-brand">
+                        <span class="font-medium text-slate-900">Uang saku antar anak</span>
+                    </label>
+                @endif
             </div>
             <p class="mt-2 text-xs text-slate-500">Tabungan tak bisa dipindah langsung &mdash; <a href="{{ route('portal.dompet.tabungan') }}" class="font-semibold text-brand">ajukan penarikan tabungan</a>.</p>
         </div>
 
         <div class="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-            <label class="mb-1 block text-sm font-medium text-slate-700">Anak</label>
+            <label class="mb-1 block text-sm font-medium text-slate-700" x-text="arah === 'antar_anak' ? 'Dari anak' : 'Anak'">Anak</label>
             <select name="id_santri" x-model="idSantri" class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base">
                 @foreach ($anak as $a)
                     <option value="{{ $a->id }}">{{ $a->nama }}</option>
@@ -49,6 +57,19 @@
                 <div class="rounded-2xl bg-slate-50 px-3 py-2">Uang saku<br><b class="text-sm text-slate-900" x-text="rp(a.santri)"></b></div>
                 <div class="rounded-2xl bg-slate-50 px-3 py-2">Tabungan<br><b class="text-sm text-slate-900" x-text="rp(a.tabungan)"></b></div>
             </div>
+
+            @if ($anak->count() > 1)
+                <div x-show="arah === 'antar_anak'" x-cloak class="mt-4">
+                    <label class="mb-1 block text-sm font-medium text-slate-700">Ke anak</label>
+                    <select name="id_santri_tujuan" x-model="idTujuan" :disabled="arah !== 'antar_anak'"
+                            class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base">
+                        @foreach ($anak as $a)
+                            <option value="{{ $a->id }}" :disabled="idSantri == {{ $a->id }}">{{ $a->nama }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-slate-500">Dari uang saku ke uang saku. Tabungan tidak ikut.</p>
+                </div>
+            @endif
         </div>
 
         <div>

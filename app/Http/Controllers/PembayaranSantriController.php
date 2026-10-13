@@ -70,8 +70,15 @@ class PembayaranSantriController extends Controller
         $bolehDompet = $lingkup === 'kesantrian';
         $tagihanDompet = $bolehDompet ? $this->tagihanDompet() : collect();
 
+        // Ringkasan kelompok (bayar sekaligus) — dihitung dari SELURUH anggotanya, bukan cuma
+        // yang kebetulan ada di halaman ini.
+        $kelompok = PembayaranSantri::whereIn('kelompok_bayar', $rows->pluck('kelompok_bayar')->filter()->unique())
+            ->selectRaw('kelompok_bayar, count(*) as n, sum(nominal) as total, max(id) as kepala')
+            ->groupBy('kelompok_bayar')->get()->keyBy('kelompok_bayar');
+
         return view('pembayaran-santri.index', [
             'rows' => $rows,
+            'kelompok' => $kelompok,
             'lingkup' => $lingkup,
             'bolehDompet' => $bolehDompet,
             'tagihanDompet' => $tagihanDompet,
@@ -248,5 +255,43 @@ class PembayaranSantriController extends Controller
         }
 
         return redirect()->route($this->rt($lingkup).'.index')->with('status', 'Pembayaran ditolak.');
+    }
+
+    // ---- Transfer berkelompok (satu bukti, beberapa tagihan) ----
+
+    public function verifikasiKelompok(Request $request, string $kelompok, string $lingkup): RedirectResponse
+    {
+        try {
+            $hasil = $this->service->verifikasiKelompok($kelompok, $request->user()->id_pengguna);
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route($this->rt($lingkup).'.index')
+            ->with('status', $hasil->count().' pembayaran dalam kelompok diverifikasi & jurnal diposting.');
+    }
+
+    public function tolakKelompok(Request $request, string $kelompok, string $lingkup): RedirectResponse
+    {
+        $data = $request->validate(['alasan' => ['required', 'string', 'max:255']]);
+        try {
+            $n = $this->service->tolakKelompok($kelompok, $data['alasan'], $request->user()->id_pengguna);
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route($this->rt($lingkup).'.index')->with('status', "{$n} pembayaran dalam kelompok ditolak.");
+    }
+
+    /** Kuitansi gabungan — seluruh tagihan yang dibayar sekaligus, hanya yang terverifikasi. */
+    public function kuitansiKelompok(string $kelompok, string $lingkup): View
+    {
+        $baris = PembayaranSantri::with(['santri.wali', 'santri.jenjang', 'tagihan.jenis', 'pemverifikasi', 'rekening'])
+            ->where('kelompok_bayar', $kelompok)->where('status', 'terverifikasi')->orderBy('id')->get();
+        abort_if($baris->isEmpty(), 403, 'Kuitansi gabungan hanya untuk pembayaran yang sudah diverifikasi keuangan.');
+
+        return view('pembayaran-santri.kuitansi-kelompok', [
+            'baris' => $baris, 'kelompok' => $kelompok, 'lingkup' => $lingkup, 'company' => CompanySettings::find(1),
+        ]);
     }
 }

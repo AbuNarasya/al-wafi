@@ -43,8 +43,19 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse ($rows as $r)
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-3 font-medium text-gray-900">{{ $r->nomor }}</td>
+                        @php
+                            // Bayar sekaligus dari Portal Wali: satu bukti / satu VA untuk beberapa tagihan.
+                            $kel = $r->kelompok_bayar ? $kelompok->get($r->kelompok_bayar) : null;
+                            $kepala = $kel && (int) $kel->kepala === $r->id;
+                        @endphp
+                        <tr @class(['hover:bg-gray-50', 'bg-amber-50/40' => $kel && $r->status === 'menunggu_verifikasi'])>
+                            <td class="px-4 py-3 font-medium text-gray-900">
+                                {{ $r->nomor }}
+                                @if ($kel)
+                                    <span class="mt-0.5 block whitespace-nowrap text-[11px] font-normal text-amber-700"
+                                          title="{{ $r->kelompok_bayar }}">Kelompok {{ $kel->n }} tagihan · Rp {{ number_format((float) $kel->total, 0, ',', '.') }}</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-3 whitespace-nowrap">{{ $r->tanggal->format('d/m/Y') }}</td>
                             <td class="px-4 py-3">{{ $r->santri?->nama }}</td>
                             <td class="px-4 py-3 text-gray-500">{{ $r->tagihan?->jenis?->nama }}</td>
@@ -59,7 +70,27 @@
                             </td>
                             <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $labelStatus[$r->status] ?? '' }}">{{ ucfirst(str_replace('_', ' ', $r->status)) }}</span></td>
                             <td class="px-4 py-3 text-right">
-                                @if ($r->status === 'menunggu_verifikasi' && $bolehVerif)
+                                @if ($kel && $r->status === 'menunggu_verifikasi' && $bolehVerif)
+                                    {{-- Satu bukti untuk seluruh kelompok → diputus SEKALIGUS dari baris kepalanya. --}}
+                                    @if ($kepala)
+                                        <div class="flex flex-col items-end gap-1.5">
+                                            <form method="POST" action="{{ route($rt . '.verifikasi_kelompok', $r->kelompok_bayar) }}"
+                                                  onsubmit="return confirm('Verifikasi {{ $kel->n }} pembayaran sekaligus, total Rp {{ number_format((float) $kel->total, 0, ',', '.') }}? Cocokkan TOTALNYA dengan mutasi bank. Jurnal terbit per tagihan.')">
+                                                @csrf<button class="whitespace-nowrap font-semibold text-brand hover:underline">Verifikasi kelompok</button>
+                                            </form>
+                                            <div x-data="{ open: false }" class="relative">
+                                                <button @click="open=!open" class="whitespace-nowrap text-red-600 hover:underline">Tolak kelompok</button>
+                                                <form x-show="open" x-cloak @click.outside="open=false" method="POST" action="{{ route($rt . '.tolak_kelompok', $r->kelompok_bayar) }}"
+                                                      class="absolute right-0 z-10 mt-2 w-60 space-y-2 rounded-lg border border-gray-200 bg-white p-3 text-left shadow-lg">
+                                                    @csrf<input type="text" name="alasan" required placeholder="Alasan (dikirim ke wali)" class="w-full rounded border-gray-300 text-sm">
+                                                    <button class="w-full rounded bg-red-600 px-3 py-1.5 text-xs font-semibold text-white">Tolak {{ $kel->n }} pembayaran</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    @else
+                                        <span class="whitespace-nowrap text-xs text-gray-400">ikut kelompok di atas</span>
+                                    @endif
+                                @elseif ($r->status === 'menunggu_verifikasi' && $bolehVerif)
                                     <div class="flex items-center justify-end gap-2">
                                         <form method="POST" action="{{ route($rt . '.verifikasi', $r->id) }}" onsubmit="return confirm('Verifikasi pembayaran {{ $r->nomor }}? Jurnal akan terbit.')">
                                             @csrf<button class="text-brand hover:underline">Verifikasi</button>
@@ -76,6 +107,9 @@
                                 @elseif ($r->status === 'terverifikasi')
                                     <div class="flex items-center justify-end gap-3">
                                         <a href="{{ route($rt . '.kuitansi', $r->id) }}" target="_blank" class="text-brand hover:underline">🖨 Kuitansi</a>
+                                        @if ($kepala)
+                                            <a href="{{ route($rt . '.kuitansi_kelompok', $r->kelompok_bayar) }}" target="_blank" class="whitespace-nowrap text-brand hover:underline">🖨 Gabungan</a>
+                                        @endif
                                         <a href="{{ route('rekap_pembayaran.show', $r->id_santri) }}" class="text-gray-500 hover:underline">Rekap</a>
                                     </div>
                                 @else

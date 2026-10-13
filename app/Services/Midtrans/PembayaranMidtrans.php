@@ -109,24 +109,77 @@ class PembayaranMidtrans
         return $this->buatPesanan($wali, $pencatat, $tagihan, $nominal, $nama);
     }
 
-    /** @param  array{id:int,peran:string}  $pencatat */
-    private function buatPesanan(Wali $wali, array $pencatat, ?TagihanSantri $tagihan, string $nominal, string $nama): TransaksiMidtrans
+    /**
+     * SATU VA untuk beberapa tagihan PSB calon (keranjang). Biaya VA dipungut sekali.
+     *
+     * @param  array{id:int,peran:string}  $pencatat
+     * @param  array<int|string,int|string>  $isian  [id_tagihan => nominal]
+     */
+    public function mulaiBayarKelompok(Wali $wali, array $pencatat, array $isian): TransaksiMidtrans
+    {
+        $this->assertSiap();
+        $portal = PembayaranPortal::dari($wali, $pencatat['peran']);
+        $k = $portal->keranjang($isian);
+        if (! in_array('online', $k['cara'], true)) {
+            throw new AppException(422, 'Tagihan-tagihan ini tidak bisa dibayar online. Tagihan santri aktif dibayar dari Dompet Wali.');
+        }
+
+        // VA lama yang menyentuh salah satu tagihan ini dibatalkan dulu (satu tagihan, satu VA hidup).
+        $ids = $k['tagihan']->pluck('id');
+        $lama = TransaksiMidtrans::where('status', 'menunggu')->where(fn ($q) => $q->whereIn('id_tagihan', $ids)
+            ->orWhereHas('rincian', fn ($r) => $r->whereIn('id_tagihan', $ids)))->get();
+        foreach ($lama as $l) {
+            $this->batalkan($l);
+        }
+        if ($lama->isNotEmpty()) {
+            $k = $portal->keranjang($isian); // ruangnya berubah sesudah pembatalan
+        }
+
+        foreach ($k['nominal'] as $n) {
+            $this->rupiahBulat($n);
+        }
+        $nama = $k['tagihan']->count().' tagihan — '.$k['tagihan']->pluck('santri.nama')->unique()->implode(', ');
+
+        return $this->buatPesanan($wali, $pencatat, null, Money::of($k['total']), $nama, $k);
+    }
+
+    /**
+     * @param  array{id:int,peran:string}  $pencatat
+     * @param  array{tagihan:\Illuminate\Support\Collection, nominal:array<int,string>}|null  $keranjang
+     */
+    private function buatPesanan(Wali $wali, array $pencatat, ?TagihanSantri $tagihan, string $nominal, string $nama, ?array $keranjang = null): TransaksiMidtrans
     {
         $biaya = self::biaya();
         $jam = max(1, (int) config('services.midtrans.kedaluwarsa_jam'));
-        $t = TransaksiMidtrans::create([
-            'order_id' => 'AW-'.now()->format('ymdHis').'-'.Str::upper(Str::random(6)),
-            'jenis' => $tagihan ? 'bayar_tagihan' : 'isi_dompet', 'id_wali' => $wali->id, 'peran' => $pencatat['peran'],
-            'id_tagihan' => $tagihan?->id, 'nominal' => $nominal, 'biaya' => $biaya, 'total' => Money::add($nominal, $biaya),
-            'status' => 'menunggu', 'kedaluwarsa_pada' => now()->addHours($jam),
-        ]);
+        $t = DB::transaction(function () use ($wali, $pencatat, $tagihan, $nominal, $biaya, $jam, $keranjang) {
+            $t = TransaksiMidtrans::create([
+                'order_id' => 'AW-'.now()->format('ymdHis').'-'.Str::upper(Str::random(6)),
+                'jenis' => $keranjang ? 'bayar_kelompok' : ($tagihan ? 'bayar_tagihan' : 'isi_dompet'),
+                'id_wali' => $wali->id, 'peran' => $pencatat['peran'],
+                'id_tagihan' => $tagihan?->id, 'nominal' => $nominal, 'biaya' => $biaya, 'total' => Money::add($nominal, $biaya),
+                'status' => 'menunggu', 'kedaluwarsa_pada' => now()->addHours($jam),
+            ]);
+            foreach ($keranjang['tagihan'] ?? [] as $kt) {
+                $t->rincian()->create(['id_tagihan' => $kt->id, 'nominal' => $keranjang['nominal'][$kt->id]]);
+            }
+
+            return $t;
+        });
+
+        // Satu baris per tagihan di halaman Midtrans (jumlahnya wajib = gross_amount).
+        $item = $keranjang
+            ? $keranjang['tagihan']->map(fn ($kt) => [
+                'id' => 'T'.$kt->id, 'price' => (int) $keranjang['nominal'][$kt->id], 'quantity' => 1,
+                'name' => mb_substr(\App\Http\Controllers\PortalKeluargaController::namaTagihan($kt).' — '.$kt->santri->nama, 0, 50),
+            ])->values()->all()
+            : [['id' => 'NOMINAL', 'price' => (int) $nominal, 'quantity' => 1, 'name' => mb_substr($nama, 0, 50)]];
 
         $email = (string) $wali->{'email_'.$pencatat['peran']};
         try {
             $snap = $this->klien->buatSnap([
                 'transaction_details' => ['order_id' => $t->order_id, 'gross_amount' => (int) $t->total],
                 'item_details' => [
-                    ['id' => 'NOMINAL', 'price' => (int) $nominal, 'quantity' => 1, 'name' => mb_substr($nama, 0, 50)],
+                    ...$item,
                     ['id' => 'BIAYA-VA', 'price' => (int) $biaya, 'quantity' => 1, 'name' => 'Biaya layanan Virtual Account'],
                 ],
                 'customer_details' => array_filter([
@@ -316,22 +369,34 @@ class PembayaranMidtrans
             'pencatat' => ['id' => $t->id_wali, 'peran' => $t->peran],
         ];
         $biaya = Money::of($t->biaya);
-        $keDompet = Money::of($t->nominal);
+        $kelompok = $t->jenis === 'bayar_kelompok';
+        // [id_tagihan, nominal, baris rincian] — satu untuk bayar_tagihan, beberapa untuk bayar_kelompok.
+        $daftar = match ($t->jenis) {
+            'bayar_tagihan' => [[$t->id_tagihan, Money::of($t->nominal), null]],
+            'bayar_kelompok' => $t->rincian()->get()->sortBy('id_tagihan')->map(fn ($r) => [$r->id_tagihan, Money::of($r->nominal), $r])->all(),
+            default => [],
+        };
+        $keDompet = $t->jenis === 'isi_dompet' ? Money::of($t->nominal) : '0';
+        $trx = $s['transaction_id'] ?? null;
 
-        if ($t->jenis === 'bayar_tagihan') {
-            $tagihan = TagihanSantri::whereKey($t->id_tagihan)->lockForUpdate()->first();
+        foreach ($daftar as [$idTagihan, $n, $rinci]) {
+            $tagihan = TagihanSantri::whereKey($idTagihan)->lockForUpdate()->first();
             // Sisa bisa sudah berkurang sejak pesanan dibuat (mis. setoran lain diverifikasi).
             $porsi = $tagihan && $tagihan->berlaku() && $tagihan->status !== 'lunas'
-                ? (Money::lt($tagihan->sisa, $keDompet) ? Money::of($tagihan->sisa) : $keDompet) : '0';
+                ? (Money::lt($tagihan->sisa, $n) ? Money::of($tagihan->sisa) : $n) : '0';
             if (Money::gtZero($porsi)) {
                 $p = (new PembayaranSantriService)->bukukanGateway($tagihan, $umum + [
-                    'nominal' => $porsi, 'biaya' => $biaya, 'external_id' => $t->order_id,
-                    'provider_ref' => $s['transaction_id'] ?? null, 'metode' => 'va_'.($t->bank ?? 'midtrans'),
+                    'nominal' => $porsi, 'biaya' => $biaya, 'metode' => 'va_'.($t->bank ?? 'midtrans'),
+                    // external_id & provider_ref UNIK per pembayaran — satu VA kelompok = beberapa baris.
+                    'external_id' => $kelompok ? "{$t->order_id}#{$idTagihan}" : $t->order_id,
+                    'provider_ref' => $trx && $kelompok ? "{$trx}#{$idTagihan}" : $trx,
+                    'kelompok_bayar' => $kelompok ? $t->order_id : null,
                 ]);
-                $t->id_pembayaran = $p->id;
-                $keDompet = Money::sub($keDompet, $porsi);
-                $biaya = '0';
+                $t->id_pembayaran ??= $p->id;
+                $rinci?->update(['id_pembayaran' => $p->id]);
+                $biaya = '0'; // biaya VA dipungut & dijurnal sekali saja
             }
+            $keDompet = Money::add($keDompet, Money::sub($n, $porsi));
         }
 
         // Isi dompet — atau KELEBIHAN bayar tagihan: uangnya sudah diterima, jadi
@@ -339,6 +404,7 @@ class PembayaranMidtrans
         if (Money::gtZero($keDompet)) {
             $m = (new DompetService)->topUpGateway($umum + [
                 'id_wali' => $t->id_wali, 'nominal' => $keDompet, 'biaya' => $biaya,
+                // Biaya VA ikut ke sini hanya bila tak ada tagihan yang terbayar sama sekali.
                 'keterangan' => ($t->jenis === 'isi_dompet' ? 'Isi dompet online (Midtrans VA)' : 'Kelebihan bayar online tagihan (Midtrans VA)')
                     .' — '.$t->order_id,
             ]);
@@ -352,8 +418,13 @@ class PembayaranMidtrans
     private function sesudahLunas(TransaksiMidtrans $t): void
     {
         try {
-            if ($t->id_pembayaran) {
-                (new PembayaranSantriService)->sesudahBayarGateway($t->tagihan()->first());
+            $layanan = new PembayaranSantriService;
+            if ($t->jenis === 'bayar_kelompok') {
+                foreach ($t->rincian()->whereNotNull('id_pembayaran')->with('tagihan')->get() as $r) {
+                    $layanan->sesudahBayarGateway($r->tagihan);
+                }
+            } elseif ($t->id_pembayaran) {
+                $layanan->sesudahBayarGateway($t->tagihan()->first());
             }
             if ($t->id_mutasi) {
                 (new AutoDebetService)->jalankan(null, $t->dibayar_pada?->toDateString(), [$t->id_wali],

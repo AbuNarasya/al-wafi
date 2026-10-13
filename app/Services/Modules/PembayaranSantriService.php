@@ -120,11 +120,14 @@ class PembayaranSantriService
                 'tanggal' => $data['tanggal'], 'nominal' => $nominal, 'kode_rekening' => $data['kode_rekening'],
                 'metode' => $data['metode'] ?? null, 'bukti_path' => $data['bukti_path'] ?? null,
                 'catatan' => $data['catatan'] ?? null, 'sumber' => 'manual',
-                'status' => 'menunggu_verifikasi',
+                'status' => 'menunggu_verifikasi', 'kelompok_bayar' => $data['kelompok_bayar'] ?? null,
             ] + \App\Services\PortalWali\Pencatat::kolom($idPengguna, $wali));
         });
 
-        $this->notifKeuangan("{$pembayaran->nomor} — {$tagihan->jenis->nama} atas nama {$tagihan->santri->nama}. Pastikan dananya sudah masuk sebelum menyetujui.", (string) $pembayaran->id);
+        // Anggota kelompok: pemanggilnya mengirim SATU kabar untuk seluruh kelompok.
+        if (empty($data['kelompok_bayar'])) {
+            $this->notifKeuangan("{$pembayaran->nomor} — {$tagihan->jenis->nama} atas nama {$tagihan->santri->nama}. Pastikan dananya sudah masuk sebelum menyetujui.", (string) $pembayaran->id);
+        }
 
         return $pembayaran;
     }
@@ -133,6 +136,79 @@ class PembayaranSantriService
     public function verifikasi(int $id, int $idPengguna): PembayaranSantri
     {
         $this->assertTimKeuangan($idPengguna);
+        $pembayaran = PembayaranSantri::find($id);
+        if ($pembayaran?->kelompok_bayar) {
+            throw new AppException(422, 'Pembayaran ini bagian dari transfer berkelompok (satu bukti untuk beberapa tagihan). Gunakan "Verifikasi kelompok".');
+        }
+        [$hasil, $tagihan] = $this->verifikasiSatu($id, $idPengguna);
+        $this->evaluasiPotonganSesudahBayar($tagihan, $idPengguna);
+
+        return $hasil;
+    }
+
+    /**
+     * Transfer BERKELOMPOK (satu bukti, beberapa tagihan) — diverifikasi SEKALIGUS: satu
+     * gagal = tak satu pun terverifikasi. Jurnal tetap satu per tagihan.
+     *
+     * @return Collection<int,PembayaranSantri>
+     */
+    public function verifikasiKelompok(string $kelompok, int $idPengguna): \Illuminate\Support\Collection
+    {
+        $this->assertTimKeuangan($idPengguna);
+        $ids = PembayaranSantri::where('kelompok_bayar', $kelompok)->where('status', 'menunggu_verifikasi')->orderBy('id')->pluck('id');
+        if ($ids->isEmpty()) {
+            throw new AppException(404, 'Tidak ada pembayaran kelompok ini yang menunggu verifikasi.');
+        }
+
+        $hasil = DB::transaction(fn () => $ids->map(fn ($id) => $this->verifikasiSatu($id, $idPengguna)));
+
+        // Di LUAR transaksi: kegagalan evaluasi potongan tak boleh menggagalkan verifikasinya.
+        foreach ($hasil as [, $tagihan]) {
+            $this->evaluasiPotonganSesudahBayar($tagihan, $idPengguna);
+        }
+
+        return $hasil->map(fn ($h) => $h[0]);
+    }
+
+    /** Menolak transfer berkelompok — seluruh anggotanya, satu kabar ke pengirimnya. */
+    public function tolakKelompok(string $kelompok, string $alasan, int $idPengguna): int
+    {
+        $this->assertTimKeuangan($idPengguna);
+        $baris = PembayaranSantri::where('kelompok_bayar', $kelompok)->where('status', 'menunggu_verifikasi')->orderBy('id')->get();
+        if ($baris->isEmpty()) {
+            throw new AppException(404, 'Tidak ada pembayaran kelompok ini yang menunggu verifikasi.');
+        }
+        DB::transaction(fn () => PembayaranSantri::whereIn('id', $baris->pluck('id'))->update([
+            'status' => 'ditolak', 'alasan_tolak' => $alasan,
+            'diverifikasi_oleh' => $idPengguna, 'diverifikasi_pada' => Carbon::now(),
+        ]));
+
+        $pertama = $baris->first();
+        \App\Services\PortalWali\KabarWali::kePencatat($pertama, [
+            'judul' => 'Pembayaran ditolak keuangan', 'id_santri' => $pertama->id_santri,
+            'pesan' => "{$pertama->nomor} s/d {$baris->last()->nomor} ({$baris->count()} tagihan) ditolak: {$alasan}",
+            'jenis' => 'pembayaran_santri_ditolak', 'ref_jenis' => 'PembayaranSantri', 'ref_id' => (string) $pertama->id,
+        ]);
+
+        return $baris->count();
+    }
+
+    /** Kabar SATU kali untuk transfer berkelompok yang baru dikirim. */
+    public function kabariKelompok(\Illuminate\Support\Collection $baris): void
+    {
+        $total = Money::of($baris->sum(fn ($p) => (float) $p->nominal));
+        $this->notifKeuangan("{$baris->first()->nomor} s/d {$baris->last()->nomor} — {$baris->count()} tagihan, total {$total}, satu bukti transfer. "
+            .'Cocokkan TOTALNYA dengan mutasi bank, lalu "Verifikasi kelompok".', (string) $baris->first()->id);
+    }
+
+    /**
+     * Inti verifikasi tanpa langkah susulan (evaluasi potongan) — supaya beberapa
+     * verifikasi bisa dibungkus SATU transaksi tanpa susulan yang ikut menggagalkannya.
+     *
+     * @return array{0:PembayaranSantri, 1:TagihanSantri}
+     */
+    private function verifikasiSatu(int $id, int $idPengguna): array
+    {
         $pembayaran = PembayaranSantri::with(['tagihan.jenis', 'santri'])->find($id);
         if (! $pembayaran) {
             throw new AppException(404, 'Pembayaran tidak ditemukan.');
@@ -175,9 +251,7 @@ class PembayaranSantriService
             return $pembayaran;
         });
 
-        $this->evaluasiPotonganSesudahBayar($tagihan, $idPengguna);
-
-        return $hasil;
+        return [$hasil, $tagihan];
     }
 
     /**
@@ -212,6 +286,7 @@ class PembayaranSantriService
                 'external_id' => $d['external_id'], 'provider_ref' => $d['provider_ref'] ?? null,
                 'catatan' => 'Dibayar online lewat Midtrans (Virtual Account).',
                 'status' => 'terverifikasi', 'diverifikasi_pada' => Carbon::now(),
+                'kelompok_bayar' => $d['kelompok_bayar'] ?? null,
             ] + \App\Services\PortalWali\Pencatat::kolom(null, $d['pencatat']));
 
             [$entry] = PostingService::postJournals(\App\Services\Midtrans\JurnalGateway::susun([
@@ -276,7 +351,7 @@ class PembayaranSantriService
      *
      * @param  array{id:int, peran:string}|null  $wali  pembayar dari Portal Wali (null = dicatat staf)
      */
-    public function bayarDariDompet(array $data, ?int $idPengguna, ?array $wali = null): PembayaranSantri
+    public function bayarDariDompet(array $data, ?int $idPengguna, ?array $wali = null, bool $tundaSusulan = false): PembayaranSantri
     {
         $tagihan = TagihanSantri::with(['jenis', 'santri'])->find($data['id_tagihan']);
         if (! $tagihan) {
@@ -318,11 +393,18 @@ class PembayaranSantriService
             // hanya melunasi tagihan: registrasi lanjutan santri aktif yang dibayar
             // dari dompet membuat siklusnya macet di "Calon" tanpa tombol apa pun.
             $this->majukanTahapBilaRegistrasiLunas($tagihan->refresh(), $tagihan->santri);
+            if (! empty($data['kelompok_bayar'])) {
+                $bayar->update(['kelompok_bayar' => $data['kelompok_bayar']]);
+            }
 
             return $bayar;
         });
 
-        $this->evaluasiPotonganSesudahBayar($tagihan, $idPengguna);
+        // Bayar berkelompok dibungkus SATU transaksi oleh pemanggilnya — susulan dijalankannya
+        // sesudah semuanya selesai (sesudahBayarGateway), bukan di tengah transaksi itu.
+        if (! $tundaSusulan) {
+            $this->evaluasiPotonganSesudahBayar($tagihan, $idPengguna);
+        }
 
         return $hasil;
     }
@@ -356,6 +438,9 @@ class PembayaranSantriService
         $pembayaran = PembayaranSantri::find($id);
         if (! $pembayaran) {
             throw new AppException(404, 'Pembayaran tidak ditemukan.');
+        }
+        if ($pembayaran->kelompok_bayar) {
+            throw new AppException(422, 'Pembayaran ini bagian dari transfer berkelompok. Gunakan "Tolak kelompok".');
         }
         if ($pembayaran->status !== 'menunggu_verifikasi') {
             throw new AppException(422, "Pembayaran ini sudah berstatus \"{$pembayaran->status}\".");

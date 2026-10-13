@@ -162,6 +162,13 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(Po
     Route::post('/dompet/isi', 'isi')->middleware('throttle:10,1');
     Route::post('/dompet/auto-debet', 'autoDebet')->name('dompet.auto_debet')->middleware('throttle:10,1');
 });
+// Bayar beberapa tagihan sekaligus — PembayaranPortal::keranjang().
+Route::prefix('wali/bayar-banyak')->name('portal.bayar_banyak.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalBayarBanyakController::class)->group(function () {
+    Route::get('/', 'form')->name('form');
+    Route::post('/dompet', 'dompet')->name('dompet')->middleware('throttle:10,1');
+    Route::post('/transfer', 'transfer')->name('transfer')->middleware('throttle:10,1');
+    Route::post('/online', 'online')->name('online')->middleware('throttle:10,1');
+});
 // Bayar online lewat Midtrans (Virtual Account) — PembayaranMidtrans.
 Route::prefix('wali/online')->name('portal.online.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalBayarOnlineController::class)->group(function () {
     Route::post('/dompet', 'isiDompet')->name('dompet')->middleware('throttle:10,1');
@@ -919,6 +926,10 @@ Route::middleware('auth')->group(function () {
                 Route::get('/{id}/kuitansi', 'kuitansi')->name('kuitansi')->defaults('lingkup', $lingkup)->middleware("hakakses:{$kode},lihat")->whereNumber('id');
                 Route::post('/{id}/verifikasi', 'verifikasi')->name('verifikasi')->defaults('lingkup', $lingkup)->middleware("hakakses:{$kode},ubah")->whereNumber('id');
                 Route::post('/{id}/tolak', 'tolak')->name('tolak')->defaults('lingkup', $lingkup)->middleware("hakakses:{$kode},hapus")->whereNumber('id');
+                // Transfer berkelompok dari Portal Wali (satu bukti, beberapa tagihan).
+                Route::post('/kelompok/{kelompok}/verifikasi', 'verifikasiKelompok')->name('verifikasi_kelompok')->defaults('lingkup', $lingkup)->middleware("hakakses:{$kode},ubah");
+                Route::post('/kelompok/{kelompok}/tolak', 'tolakKelompok')->name('tolak_kelompok')->defaults('lingkup', $lingkup)->middleware("hakakses:{$kode},hapus");
+                Route::get('/kelompok/{kelompok}/kuitansi', 'kuitansiKelompok')->name('kuitansi_kelompok')->defaults('lingkup', $lingkup)->middleware("hakakses:{$kode},lihat");
             });
     }
 

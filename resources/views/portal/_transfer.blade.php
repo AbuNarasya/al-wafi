@@ -40,12 +40,15 @@
 
     <section class="mt-5 space-y-4">
         <h2 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span> 2. Isi data transfer</h2>
+        {{-- Bayar beberapa tagihan: nominalnya per tagihan di keranjang (nominal[id]), bukan di sini. --}}
+        @unless ($tanpaNominal ?? false)
         <div>
             <label for="nominal" class="mb-1 block text-sm font-medium text-slate-700">Nominal yang ditransfer</label>
             <input id="nominal" name="nominal" type="number" min="1" step="1" required
                    value="{{ old('nominal', $nominalAwal ?? '') }}" class="{{ $kelasInput }}">
             @error('nominal')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
         </div>
+        @endunless
         <div>
             <label for="tanggal" class="mb-1 block text-sm font-medium text-slate-700">Tanggal transfer</label>
             <input id="tanggal" name="tanggal" type="date" required max="{{ now()->toDateString() }}"

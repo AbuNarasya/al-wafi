@@ -43,6 +43,12 @@ class TransaksiMidtrans extends Model
         return $this->belongsTo(TagihanSantri::class, 'id_tagihan');
     }
 
+    /** Rincian tagihan untuk pesanan `bayar_kelompok`. */
+    public function rincian(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(TransaksiMidtransTagihan::class, 'id_transaksi')->orderBy('id');
+    }
+
     public function pembayaran(): BelongsTo
     {
         return $this->belongsTo(PembayaranSantri::class, 'id_pembayaran');
