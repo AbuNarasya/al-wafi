@@ -51,6 +51,8 @@
         </div>
     @endif
 
+    @include('portal._pasang')
+
     {{-- Menu utama: ikon kotak berwarna --}}
     <section class="mt-5">
         <h2 class="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span> Menu utama</h2>

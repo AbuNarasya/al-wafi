@@ -20,10 +20,10 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Portal Wali') · Portal Wali Al Wafi</title>
 
-    {{-- WAJIB ada walau portal belum punya PWA sendiri: tanpa meta `pwa`, app.js
-         membacanya sebagai "mati" dan MENCABUT pekerja layanan staf di perangkat
-         yang sama (lihat komentar di komponennya). --}}
-    <x-kepala-pwa />
+    {{-- WAJIB ada: tanpa meta `pwa`, app.js membacanya sebagai "mati" dan MENCABUT
+         pekerja layanan di perangkat yang sama (lihat komentar di komponennya).
+         Manifest sendiri → terpasang sebagai aplikasi "Al Wafi Wali". --}}
+    <x-kepala-pwa manifest="/manifest-wali.json" judul="Al Wafi Wali" />
 
     {{-- Mode gelap per perangkat (pilihan di Akun; kosong = ikut setelan HP). Dipasang
          SEBELUM halaman tampil supaya tidak berkedip putih lalu gelap. --}}

@@ -1241,7 +1241,22 @@ Alpine.start();
         tawaran = e;
         if (tombol) tombol.hidden = false;
         if (petunjuk) petunjuk.hidden = true;
+        // Kartu "Pasang di HP" Portal Wali (portal/_pasang) memakai tawaran yang sama.
+        // Disimpan di window karena peristiwanya bisa datang SEBELUM Alpine menyala.
+        window.tawaranPasang = e;
+        window.dispatchEvent(new CustomEvent('pwa-bisa-dipasang'));
     });
+
+    // Dipanggil kartu Portal Wali. Tawaran hanya bisa dipakai sekali.
+    window.pasangAplikasi = async () => {
+        const t = window.tawaranPasang;
+        if (! t) return false;
+        window.tawaranPasang = null;
+        t.prompt();
+        const { outcome } = await t.userChoice;
+
+        return outcome === 'accepted';
+    };
 
     tombol?.addEventListener('click', async () => {
         if (! tawaran) return;
@@ -1254,6 +1269,7 @@ Alpine.start();
     window.addEventListener('appinstalled', () => {
         if (tombol) tombol.hidden = true;
         if (petunjuk) petunjuk.hidden = true;
+        window.dispatchEvent(new CustomEvent('pwa-terpasang'));
     });
 
     // iOS tak mengenal beforeinstallprompt sama sekali — di sana yang bisa

@@ -9,9 +9,10 @@
 # kalimat cadangan Chrome "This site has been updated in the background".
 #
 # `manifest.json` ikut, dengan alasan serupa: ia menentukan nama, ikon, dan
-# perilaku aplikasi yang sudah terpasang di layar utama.
+# perilaku aplikasi yang sudah terpasang di layar utama. Begitu pula
+# `manifest-wali.json` (aplikasi Portal Wali).
 <IfModule mod_headers.c>
-    <FilesMatch "^(sw\.js|manifest\.json)$">
+    <FilesMatch "^(sw\.js|manifest\.json|manifest-wali\.json)$">
         Header set Cache-Control "no-cache, no-store, must-revalidate"
         Header set Pragma "no-cache"
         Header set Expires "0"

@@ -104,6 +104,24 @@ class PwaTest extends TestCase
     }
 
     /**
+     * Portal Wali = aplikasi TERPISAH "Al Wafi Wali" (13 Okt 2026): manifest sendiri yang
+     * membuka beranda wali, sementara halaman staf tetap memakai manifest staf.
+     */
+    public function test_portal_wali_punya_manifest_sendiri(): void
+    {
+        $m = json_decode(file_get_contents(public_path('manifest-wali.json')), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame(['/wali/', '/wali/beranda', '/wali/', 'standalone', 'Al Wafi Wali'],
+            [$m['id'], $m['start_url'], $m['scope'], $m['display'], $m['name']]);
+        $this->assertSame(['any maskable', 'any maskable'], array_column($m['icons'], 'purpose'));
+
+        $this->get(route('portal.masuk'))->assertOk()
+            ->assertSee('<link rel="manifest" href="/manifest-wali.json">', false)
+            ->assertSee('<meta name="apple-mobile-web-app-title" content="Al Wafi Wali">', false)
+            ->assertSee('<meta name="pwa" content="aktif">', false);
+        $this->get(route('login'))->assertOk()->assertSee('<link rel="manifest" href="/manifest.json">', false);
+    }
+
+    /**
      * Pekerja layanan TIDAK BOLEH menyimpan halaman ber-sesi: halaman tersimpan
      * bisa menampilkan data milik pengguna sebelumnya, atau angka keuangan basi
      * yang tampak mutakhir.
