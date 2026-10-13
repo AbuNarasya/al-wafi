@@ -130,7 +130,7 @@ class DatabaseSeeder extends Seeder
             // Kas & bank
             ['kode_coa' => '1.1.01.001', 'nama_coa' => 'Kas Ditangan', 'kode_grup' => '1.1.01', 'jenis_saldo' => 'debet'],
             ['kode_coa' => '1.1.01.002', 'nama_coa' => 'Bank', 'kode_grup' => '1.1.01', 'jenis_saldo' => 'debet'],
-            ['kode_coa' => '1.1.01.003', 'nama_coa' => 'Kas Xendit Settlement', 'kode_grup' => '1.1.01', 'jenis_saldo' => 'debet'],
+            ['kode_coa' => '1.1.01.003', 'nama_coa' => 'Rekening Midtrans', 'kode_grup' => '1.1.01', 'jenis_saldo' => 'debet'],
             // Piutang santri
             ['kode_coa' => '1.1.02.001', 'nama_coa' => 'Piutang SPP', 'kode_grup' => '1.1.02', 'jenis_saldo' => 'debet'],
             ['kode_coa' => '1.1.02.003', 'nama_coa' => 'Piutang Uang Pangkal', 'kode_grup' => '1.1.02', 'jenis_saldo' => 'debet'],
@@ -138,7 +138,7 @@ class DatabaseSeeder extends Seeder
             ['kode_coa' => '2.1.01.006', 'nama_coa' => 'Titipan Uang Saku', 'kode_grup' => '2.1.01', 'jenis_saldo' => 'kredit'],
             ['kode_coa' => '2.1.01.007', 'nama_coa' => 'Titipan Tabungan Santri', 'kode_grup' => '2.1.01', 'jenis_saldo' => 'kredit'],
             ['kode_coa' => '2.1.01.009', 'nama_coa' => 'Titipan Dompet Wali', 'kode_grup' => '2.1.01', 'jenis_saldo' => 'kredit'],
-            ['kode_coa' => '2.1.01.010', 'nama_coa' => 'Titipan Biaya Admin Xendit', 'kode_grup' => '2.1.01', 'jenis_saldo' => 'kredit'],
+            ['kode_coa' => '2.1.01.010', 'nama_coa' => 'Titipan Biaya Admin Payment Gateway', 'kode_grup' => '2.1.01', 'jenis_saldo' => 'kredit'],
             ['kode_coa' => '2.1.01.011', 'nama_coa' => 'Titipan Kantin Pihak Ketiga', 'kode_grup' => '2.1.01', 'jenis_saldo' => 'kredit'],
             ['kode_coa' => '2.1.02.001', 'nama_coa' => 'Pendapatan Diterima Dimuka', 'kode_grup' => '2.1.02', 'jenis_saldo' => 'kredit'],
             // Pendapatan
@@ -153,6 +153,12 @@ class DatabaseSeeder extends Seeder
         foreach ($akun as $a) {
             CoaDetail::updateOrCreate(['kode_coa' => $a['kode_coa']], $a);
         }
+
+        // Rekening Midtrans = kas/rekening tersendiri (dipindahbukukan ke bank saat dana cair).
+        // firstOrCreate: setelan yang sudah diubah keuangan tak ditimpa.
+        \App\Models\BankAccount::firstOrCreate(['kode_coa' => '1.1.01.003'], [
+            'nama_rekening' => 'Rekening Midtrans', 'jenis_rekening' => 'bank', 'nama_bank' => 'Midtrans', 'status' => 'aktif',
+        ]);
     }
 
     /**

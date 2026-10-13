@@ -256,7 +256,7 @@ class PortalBayarTest extends TestCase
         $reg = $this->tagihan($adik, 'REG', 'registrasi', 500000);
 
         $this->sebagaiIbu()->get(route('portal.bayar', $reg->id))->assertOk()
-            ->assertSee('Dari Dompet Wali')->assertSee('Transfer bank');
+            ->assertSee("cara = 'dompet'", false)->assertSee('Transfer + bukti');
 
         $this->sebagaiIbu()->post(route('portal.bayar.dompet', $reg->id), ['nominal' => 500000, 'pin' => self::PIN])
             ->assertSessionHas('status');

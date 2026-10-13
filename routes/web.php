@@ -162,6 +162,16 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(Po
     Route::post('/dompet/isi', 'isi')->middleware('throttle:10,1');
     Route::post('/dompet/auto-debet', 'autoDebet')->name('dompet.auto_debet')->middleware('throttle:10,1');
 });
+// Bayar online lewat Midtrans (Virtual Account) — PembayaranMidtrans.
+Route::prefix('wali/online')->name('portal.online.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalBayarOnlineController::class)->group(function () {
+    Route::post('/dompet', 'isiDompet')->name('dompet')->middleware('throttle:10,1');
+    Route::post('/tagihan/{id}', 'bayarTagihan')->name('tagihan')->whereNumber('id')->middleware('throttle:10,1');
+    Route::get('/{order}', 'lihat')->name('lihat');
+    Route::post('/{order}/batal', 'batal')->name('batal')->middleware('throttle:10,1');
+});
+// Notifikasi Midtrans — tanpa sesi & dikecualikan dari CSRF (bootstrap/app.php).
+Route::post('/midtrans/notifikasi', \App\Http\Controllers\MidtransNotifikasiController::class)
+    ->name('midtrans.notifikasi')->middleware('throttle:120,1');
 Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(PortalDompetController::class)->group(function () {
     Route::get('/pin', 'pin')->name('pin');
     Route::post('/pin/kode', 'mintaKodePin')->name('pin.kode')->middleware('throttle:5,1');

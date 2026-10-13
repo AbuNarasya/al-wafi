@@ -101,12 +101,16 @@ class PembayaranPortal
         return in_array($alur, ['transfer', 'keduanya'], true);
     }
 
-    /** Sisa yang belum tertutup setoran lain yang masih menunggu verifikasi. */
+    /**
+     * Sisa yang belum tertutup setoran lain yang masih menunggu verifikasi — termasuk
+     * VA Midtrans yang sudah dipesan tapi belum dibayar.
+     */
     public static function ruang(TagihanSantri $t): string
     {
         $menunggu = PembayaranSantri::where('id_tagihan', $t->id)->where('status', 'menunggu_verifikasi')->sum('nominal');
+        $online = \App\Models\TransaksiMidtrans::where('id_tagihan', $t->id)->where('status', 'menunggu')->sum('nominal');
 
-        return Money::sub($t->sisa, (string) $menunggu);
+        return Money::sub(Money::sub($t->sisa, (string) $menunggu), (string) $online);
     }
 
     public function pin(): PinTransaksi

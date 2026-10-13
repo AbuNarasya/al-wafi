@@ -72,6 +72,42 @@ class DompetService
         return $mutasi;
     }
 
+    /**
+     * TOP-UP lewat payment gateway (Midtrans) — LANGSUNG terverifikasi & berjurnal:
+     * lunasnya sudah dipastikan ke API Midtrans, jadi tak ada yang perlu diperiksa staf.
+     * Dipanggil dari dalam transaksi PembayaranMidtrans. Jurnal: lihat JurnalGateway.
+     *
+     * @param  array{id_wali:int, nominal:string, biaya:string, tanggal:string, kode_rekening:string,
+     *               akun_biaya:string, pencatat:array{id:int,peran:string}, keterangan:string}  $d
+     */
+    public function topUpGateway(array $d): MutasiDompet
+    {
+        $dompet = $this->ambilDompetWali($d['id_wali']);
+        $this->assertRekening($d['kode_rekening']);
+        $nominal = Money::of($d['nominal']);
+        if (Money::lte($nominal, '0')) {
+            throw new AppException(422, 'Nominal top-up harus lebih dari nol.');
+        }
+
+        return DB::transaction(function () use ($d, $dompet, $nominal) {
+            $saldo = $this->tambahSaldo('wali', $dompet->id, $nominal);
+            $mutasi = MutasiDompet::create([
+                'nomor' => $this->nomorMutasi($d['tanggal']), 'pemilik' => 'wali', 'id_dompet' => $dompet->id,
+                'jenis' => 'topup', 'nominal' => $nominal, 'saldo_setelah' => $saldo, 'tanggal' => $d['tanggal'],
+                'keterangan' => $d['keterangan'], 'status' => 'terverifikasi', 'sumber' => 'midtrans',
+                'kode_rekening' => $d['kode_rekening'], 'diverifikasi_pada' => Carbon::now(),
+            ] + \App\Services\PortalWali\Pencatat::kolom(null, $d['pencatat']));
+
+            [$entry] = PostingService::postJournals(\App\Services\Midtrans\JurnalGateway::susun([
+                'referensi' => $mutasi->nomor, 'tanggal' => $d['tanggal'], 'keterangan' => $d['keterangan'],
+                'sumber_modul' => self::SUMBER, 'id_sumber' => (string) $mutasi->id,
+            ], $d['kode_rekening'], DompetPolicy::COA_TITIPAN['wali'], $nominal, Money::of($d['biaya']), $d['akun_biaya']));
+            $mutasi->update(['journal_entry_id' => $entry->id]);
+
+            return $mutasi;
+        });
+    }
+
     /** TOP-UP Dompet Santri lewat setor tunai (opsional, ada saklar kebijakan). */
     public function topUpSantri(array $data, int $idPengguna): MutasiDompet
     {

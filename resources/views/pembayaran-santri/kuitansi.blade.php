@@ -32,7 +32,7 @@
         // berlabel benar, dan kuitansi tak jatuh ke "Pembayaran" yang kabur.
     ][\App\Models\TipeBiaya::perilakuDari($jenis?->tipe) ?? ''] ?? 'Pembayaran';
 
-    $labelSumber = ['manual' => 'Setoran langsung', 'dompet_wali' => 'Potong Dompet Wali', 'xendit' => 'Pembayaran daring'][$p->sumber] ?? $p->sumber;
+    $labelSumber = ['manual' => 'Setoran langsung', 'dompet_wali' => 'Potong Dompet Wali', 'xendit' => 'Pembayaran daring', 'midtrans' => 'Virtual Account (Midtrans)'][$p->sumber] ?? $p->sumber;
     $sisaSesudah = $p->tagihan ? (float) $p->tagihan->sisa : null;
     $lunas = $p->tagihan?->status === 'lunas';
 @endphp

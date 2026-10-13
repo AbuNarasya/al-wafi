@@ -55,8 +55,10 @@ class AutoDebetService
     /**
      * Jalankan auto-debet untuk seluruh keluarga yang mengizinkan (atau subset).
      * @param  array<int>|null  $hanyaWali
+     * @param  array{id:int,peran:string}|null  $wali  pencatat bila tak ada staf yang memicu —
+     *         mis. sesudah top-up Midtrans yang lunas sendiri (lihat PembayaranMidtrans)
      */
-    public function jalankan(int $idPengguna, ?string $tanggal = null, ?array $hanyaWali = null): array
+    public function jalankan(?int $idPengguna, ?string $tanggal = null, ?array $hanyaWali = null, ?array $wali = null): array
     {
         $tanggal ??= Carbon::now()->toDateString();
         $waliList = Wali::where('auto_debet', true)->where('status', 'aktif')
@@ -118,7 +120,7 @@ class AutoDebetService
 
                 DB::transaction(fn () => BayarDompet::bayarTagihanDariDompet($t, [
                     'id_dompet' => $w->dompet->id, 'nominal' => (string) $bayar, 'tanggal' => $tanggal,
-                    'id_pengguna' => $idPengguna, 'namaSantri' => $t->santri->nama, 'otomatis' => true,
+                    'id_pengguna' => $idPengguna, 'wali' => $wali, 'namaSantri' => $t->santri->nama, 'otomatis' => true,
                 ]));
 
                 $saldo = Money::sub($saldo, $bayar);

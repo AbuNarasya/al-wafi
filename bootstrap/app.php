@@ -25,6 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // ada proxy di depannya.
         $middleware->trustProxies(at: '*');
 
+        // Notifikasi Midtrans datang dari server Midtrans, tanpa sesi & token CSRF.
+        // Pengamannya tanda tangan SHA-512 + status yang ditanyakan ulang ke API.
+        $middleware->validateCsrfTokens(except: ['midtrans/notifikasi']);
+
         // Rute web belum ditemukan / tamu diarahkan ke halaman login.
         $middleware->redirectGuestsTo(fn () => route('login'));
     })

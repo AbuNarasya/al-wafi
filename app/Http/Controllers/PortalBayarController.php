@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Exceptions\AppException;
 use App\Models\BankAccount;
 use App\Models\DompetWali;
+use App\Models\TransaksiMidtrans;
+use App\Services\Midtrans\PembayaranMidtrans;
 use App\Services\PortalWali\PembayaranPortal;
 use App\Services\PortalWali\SesiWali;
 use App\Support\Unggahan;
@@ -60,6 +62,10 @@ class PortalBayarController extends Controller
             'penuh' => PembayaranPortal::bisaDompet($alur) && in_array($t->perilaku, PembayaranPortal::PENUH, true),
             'saldo' => DompetWali::where('id_wali', SesiWali::wali()->id)->value('saldo') ?? '0',
             'rekening' => PembayaranPortal::bisaTransfer($alur) ? $this->rekening() : [],
+            // Bayar online ikut alur transfer (calon santri) — tagihan santri aktif tetap dari dompet.
+            'online' => PembayaranPortal::bisaTransfer($alur) && PembayaranMidtrans::siap(),
+            'biaya' => PembayaranMidtrans::biaya(),
+            'pesanan' => TransaksiMidtrans::where('id_tagihan', $t->id)->where('status', 'menunggu')->latest('id')->first(),
         ]);
     }
 
@@ -102,7 +108,12 @@ class PortalBayarController extends Controller
             return redirect()->route('portal.beranda')->with('error', 'Dompet aktif setelah anak Anda berstatus santri aktif.');
         }
 
-        return view('portal.isi-dompet', ['rekening' => $this->rekening()]);
+        return view('portal.isi-dompet', [
+            'rekening' => $this->rekening(),
+            'online' => PembayaranMidtrans::siap(), 'biaya' => PembayaranMidtrans::biaya(),
+            'pesanan' => TransaksiMidtrans::where('id_wali', SesiWali::wali()->id)->where('jenis', 'isi_dompet')
+                ->where('status', 'menunggu')->latest('id')->get(),
+        ]);
     }
 
     public function isi(Request $request): RedirectResponse

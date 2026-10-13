@@ -45,7 +45,7 @@ class PortalKeluargaController extends Controller
 
     private const KELUAR = ['distribusi_keluar', 'tabung_keluar', 'bayar_tagihan', 'jajan', 'tarik'];
 
-    private const LABEL_SUMBER = ['dompet_wali' => 'Dompet Wali', 'xendit' => 'Pembayaran online', 'manual' => 'Transfer / tunai'];
+    private const LABEL_SUMBER = ['dompet_wali' => 'Dompet Wali', 'xendit' => 'Pembayaran online', 'midtrans' => 'Virtual Account (online)', 'manual' => 'Transfer / tunai'];
 
     /** @return Collection<int,Santri> */
     private function anakKeluarga(): Collection

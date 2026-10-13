@@ -152,13 +152,7 @@ class PembayaranSantriService
 
         $hasil = DB::transaction(function () use ($pembayaran, $tagihan, $nominal, $sisaBaru, $idPengguna) {
             $jenis = $tagihan->jenis;
-            $akunKredit = $jenis->kode_coa_pendapatan;
-            if ($tagihan->sudah_akrual) {
-                if (! $jenis->kode_coa_piutang) {
-                    throw new AppException(422, "Tagihan \"{$jenis->nama}\" sudah diakrualkan tetapi jenis biayanya tidak punya akun piutang. Lengkapi dulu di master Jenis Biaya.");
-                }
-                $akunKredit = $jenis->kode_coa_piutang;
-            }
+            $akunKredit = $this->akunKredit($tagihan);
 
             $entry = PostingService::postJournal([
                 'referensi' => $pembayaran->nomor, 'tanggal' => $pembayaran->tanggal, 'kode_unit' => $jenis->kode_unit,
@@ -184,6 +178,74 @@ class PembayaranSantriService
         $this->evaluasiPotonganSesudahBayar($tagihan, $idPengguna);
 
         return $hasil;
+    }
+
+    /**
+     * Pembayaran lewat payment gateway (Midtrans) — LANGSUNG terverifikasi & berjurnal,
+     * tanpa tangan kedua: lunasnya sudah dipastikan ke API Midtrans. Dipanggil dari
+     * dalam transaksi PembayaranMidtrans, dengan tagihan yang SUDAH dikunci; nominal
+     * di sini tak pernah melebihi sisa (kelebihannya dialihkan ke Dompet Wali di sana).
+     * Sesudah transaksinya selesai, pemanggil wajib memanggil sesudahBayarGateway().
+     *
+     * @param  array{nominal:string, biaya:string, tanggal:string, kode_rekening:string, akun_biaya:string,
+     *               pencatat:array{id:int,peran:string}, external_id:string, provider_ref:?string, metode:?string}  $d
+     */
+    public function bukukanGateway(TagihanSantri $tagihan, array $d): PembayaranSantri
+    {
+        $tagihan->loadMissing(['jenis', 'santri']);
+        $nominal = Money::of($d['nominal']);
+        $sisaBaru = Money::sub($tagihan->sisa, $nominal);
+        if (Money::lte($nominal, '0') || Money::isNegative($sisaBaru)) {
+            throw new AppException(422, "Nominal {$nominal} tidak sah untuk sisa tagihan {$tagihan->sisa}.");
+        }
+        $this->assertRekeningAda($d['kode_rekening']);
+
+        return DB::transaction(function () use ($tagihan, $d, $nominal, $sisaBaru) {
+            $jenis = $tagihan->jenis;
+            $base = DocNumber::docBase('BYR', $d['tanggal']);
+            $last = PembayaranSantri::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor');
+            $pembayaran = PembayaranSantri::create([
+                'nomor' => DocNumber::nextDocNumber($base, $last),
+                'id_santri' => $tagihan->id_santri, 'id_tagihan' => $tagihan->id,
+                'tanggal' => $d['tanggal'], 'nominal' => $nominal, 'kode_rekening' => $d['kode_rekening'],
+                'metode' => $d['metode'] ?? null, 'sumber' => 'midtrans',
+                'external_id' => $d['external_id'], 'provider_ref' => $d['provider_ref'] ?? null,
+                'catatan' => 'Dibayar online lewat Midtrans (Virtual Account).',
+                'status' => 'terverifikasi', 'diverifikasi_pada' => Carbon::now(),
+            ] + \App\Services\PortalWali\Pencatat::kolom(null, $d['pencatat']));
+
+            [$entry] = PostingService::postJournals(\App\Services\Midtrans\JurnalGateway::susun([
+                'referensi' => $pembayaran->nomor, 'tanggal' => $d['tanggal'], 'kode_unit' => $jenis->kode_unit,
+                'sumber_modul' => 'PembayaranSantri', 'id_sumber' => (string) $pembayaran->id,
+                'keterangan' => "{$jenis->nama} (Midtrans) — {$tagihan->santri->nama} ({$tagihan->santri->no_pendaftaran})",
+            ], $d['kode_rekening'], $this->akunKredit($tagihan), $nominal, Money::of($d['biaya']), $d['akun_biaya']));
+
+            $tagihan->update(['sisa' => $sisaBaru, 'status' => Money::isZero($sisaBaru) ? 'lunas' : 'sebagian']);
+            $this->majukanTahapBilaRegistrasiLunas($tagihan->refresh(), $tagihan->santri);
+            $pembayaran->update(['journal_entry_id' => $entry->id]);
+
+            return $pembayaran;
+        });
+    }
+
+    /** Langkah susulan bayar gateway — di LUAR transaksi, sama seperti sesudah verifikasi(). */
+    public function sesudahBayarGateway(TagihanSantri $tagihan): void
+    {
+        $this->evaluasiPotonganSesudahBayar($tagihan, null);
+    }
+
+    /** Sisi KREDIT pembayaran tagihan: Pendapatan (cash basis) atau Piutang bila sudah diakrualkan. */
+    private function akunKredit(TagihanSantri $tagihan): string
+    {
+        $jenis = $tagihan->jenis;
+        if (! $tagihan->sudah_akrual) {
+            return $jenis->kode_coa_pendapatan;
+        }
+        if (! $jenis->kode_coa_piutang) {
+            throw new AppException(422, "Tagihan \"{$jenis->nama}\" sudah diakrualkan tetapi jenis biayanya tidak punya akun piutang. Lengkapi dulu di master Jenis Biaya.");
+        }
+
+        return $jenis->kode_coa_piutang;
     }
 
     /**

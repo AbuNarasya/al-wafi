@@ -23,15 +23,40 @@
         $bisaDompet = \App\Services\PortalWali\PembayaranPortal::bisaDompet($alur);
         $bisaTransfer = \App\Services\PortalWali\PembayaranPortal::bisaTransfer($alur);
         // Kembali dari galat isian transfer → tetap di pilihan transfer.
-        $caraAwal = $bisaTransfer && (! $bisaDompet || old('kode_rekening')) ? 'transfer' : 'dompet';
+        $caraAwal = match (true) {
+            $bisaTransfer && old('kode_rekening') !== null => 'transfer',
+            $bisaDompet => 'dompet',
+            $online => 'online',
+            default => 'transfer',
+        };
+        $pilihan = array_filter([
+            'dompet' => $bisaDompet ? 'Dompet Wali' : null,
+            'online' => $online ? 'Online (VA)' : null,
+            'transfer' => $bisaTransfer ? 'Transfer + bukti' : null,
+        ]);
     @endphp
 
+    @if ($pesanan)
+        <a href="{{ route('portal.online.lihat', $pesanan->order_id) }}" class="mt-4 flex items-center justify-between gap-2 rounded-3xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
+            <span>Pembayaran online {{ $rp($pesanan->total) }} menunggu dibayar</span>
+            <span class="font-semibold">Lanjutkan &rarr;</span>
+        </a>
+    @endif
+
     <div x-data="{ cara: @js($caraAwal) }">
-    {{-- Calon dari keluarga yang sudah ber-Dompet Wali: boleh pilih dompet ATAU transfer. --}}
-    @if ($bisaDompet && $bisaTransfer)
-        <div class="mt-4 grid grid-cols-2 gap-1 rounded-2xl bg-slate-200 p-1 text-center text-sm">
-            <button type="button" @click="cara = 'dompet'" :class="cara === 'dompet' ? 'bg-white font-semibold text-slate-900 shadow-sm' : 'text-slate-600'" class="rounded-xl py-2">Dari Dompet Wali</button>
-            <button type="button" @click="cara = 'transfer'" :class="cara === 'transfer' ? 'bg-white font-semibold text-slate-900 shadow-sm' : 'text-slate-600'" class="rounded-xl py-2">Transfer bank</button>
+    {{-- Lebih dari satu cara bayar (dompet / online / transfer): wali memilih. --}}
+    @if (count($pilihan) > 1)
+        <div @class(['mt-4 grid gap-1 rounded-2xl bg-slate-200 p-1 text-center text-sm', 'grid-cols-2' => count($pilihan) === 2, 'grid-cols-3' => count($pilihan) === 3])>
+            @foreach ($pilihan as $kode => $label)
+                <button type="button" @click="cara = @js($kode)" :class="cara === @js($kode) ? 'bg-white font-semibold text-slate-900 shadow-sm' : 'text-slate-600'" class="rounded-xl py-2">{{ $label }}</button>
+            @endforeach
+        </div>
+    @endif
+
+    @if ($online)
+        <div class="mt-4" x-show="cara === 'online'" @if ($caraAwal !== 'online') x-cloak @endif>
+            @include('portal._online', ['aksi' => route('portal.online.tagihan', $tagihan->id), 'nominalAwal' => (int) $ruang,
+                'min' => 1, 'maks' => (int) $ruang, 'biaya' => $biaya])
         </div>
     @endif
 
@@ -80,7 +105,7 @@
 
     @if ($bisaTransfer)
         <form method="POST" action="{{ route('portal.bayar.transfer', $tagihan->id) }}" enctype="multipart/form-data" class="mt-5"
-              x-show="cara === 'transfer'" @if ($bisaDompet) x-cloak @endif
+              x-show="cara === 'transfer'" @if ($caraAwal !== 'transfer') x-cloak @endif
               data-confirm="Kirim bukti transfer ini? Keuangan akan memeriksanya sebelum pembayaran diakui.">
             @csrf
             @include('portal._transfer', ['nominalAwal' => (int) $ruang])
