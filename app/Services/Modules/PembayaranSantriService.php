@@ -75,8 +75,12 @@ class PembayaranSantriService
         ));
     }
 
-    /** Langkah 1 — PPSB mencatat setoran. Tidak ada jurnal. */
-    public function catat(array $data, int $idPengguna, string $lingkup): PembayaranSantri
+    /**
+     * Langkah 1 — PPSB (atau wali lewat portal) mencatat setoran. Tidak ada jurnal.
+     *
+     * @param  array{id:int, peran:string}|null  $wali  pengirim dari Portal Wali (null = dicatat staf)
+     */
+    public function catat(array $data, ?int $idPengguna, string $lingkup, ?array $wali = null): PembayaranSantri
     {
         $tagihan = TagihanSantri::with(['jenis', 'santri'])->find($data['id_tagihan']);
         if (! $tagihan) {
@@ -106,7 +110,7 @@ class PembayaranSantriService
         $this->assertLunasSekaligus($tagihan, $nominal, $ruang);
         $this->assertRekeningAda($data['kode_rekening']);
 
-        $pembayaran = DB::transaction(function () use ($data, $idPengguna, $nominal) {
+        $pembayaran = DB::transaction(function () use ($data, $idPengguna, $nominal, $wali) {
             $base = DocNumber::docBase('BYR', $data['tanggal']);
             $last = PembayaranSantri::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor');
 
@@ -116,8 +120,8 @@ class PembayaranSantriService
                 'tanggal' => $data['tanggal'], 'nominal' => $nominal, 'kode_rekening' => $data['kode_rekening'],
                 'metode' => $data['metode'] ?? null, 'bukti_path' => $data['bukti_path'] ?? null,
                 'catatan' => $data['catatan'] ?? null, 'sumber' => 'manual',
-                'status' => 'menunggu_verifikasi', 'dicatat_oleh' => $idPengguna,
-            ]);
+                'status' => 'menunggu_verifikasi',
+            ] + \App\Services\PortalWali\Pencatat::kolom($idPengguna, $wali));
         });
 
         $this->notifKeuangan("{$pembayaran->nomor} — {$tagihan->jenis->nama} atas nama {$tagihan->santri->nama}. Pastikan dananya sudah masuk sebelum menyetujui.", (string) $pembayaran->id);
@@ -188,7 +192,7 @@ class PembayaranSantriService
      * selesai, dan kegagalannya tak membatalkan pembayaran yang sudah sah:
      * evaluasi terjadwal akan mengulangnya.
      */
-    private function evaluasiPotonganSesudahBayar(TagihanSantri $tagihan, int $idPengguna): void
+    private function evaluasiPotonganSesudahBayar(TagihanSantri $tagihan, ?int $idPengguna): void
     {
         if ($tagihan->perilaku !== 'uang_pangkal') {
             return;
@@ -202,8 +206,15 @@ class PembayaranSantriService
         }
     }
 
-    /** Bayar tagihan dari Dompet Wali (tanpa verifikasi — dana sudah diverifikasi saat top-up). */
-    public function bayarDariDompet(array $data, int $idPengguna): PembayaranSantri
+    /**
+     * Bayar tagihan dari Dompet Wali (tanpa verifikasi — dana sudah diverifikasi saat top-up).
+     *
+     * Dipakai loket DAN Portal Wali, supaya gerbang tahap PSB (registrasi lunas →
+     * calon maju) & evaluasi potongan gelombang berlaku sama di kedua pintu.
+     *
+     * @param  array{id:int, peran:string}|null  $wali  pembayar dari Portal Wali (null = dicatat staf)
+     */
+    public function bayarDariDompet(array $data, ?int $idPengguna, ?array $wali = null): PembayaranSantri
     {
         $tagihan = TagihanSantri::with(['jenis', 'santri'])->find($data['id_tagihan']);
         if (! $tagihan) {
@@ -235,10 +246,11 @@ class PembayaranSantriService
             throw new AppException(422, "Saldo Dompet Wali tidak cukup (tersedia {$dompet->saldo}).");
         }
 
-        $hasil = DB::transaction(function () use ($tagihan, $dompet, $nominal, $data, $idPengguna) {
+        $hasil = DB::transaction(function () use ($tagihan, $dompet, $nominal, $data, $idPengguna, $wali) {
             $bayar = BayarDompet::bayarTagihanDariDompet($tagihan, [
                 'id_dompet' => $dompet->id, 'nominal' => (string) $nominal, 'tanggal' => $data['tanggal'],
                 'id_pengguna' => $idPengguna, 'namaSantri' => $tagihan->santri->nama, 'catatan' => $data['catatan'] ?? null,
+                'wali' => $wali,
             ]);
             // Gerbang tahap yang SAMA dengan verifikasi di loket. Dulu jalur dompet
             // hanya melunasi tagihan: registrasi lanjutan santri aktif yang dibayar
@@ -291,11 +303,12 @@ class PembayaranSantriService
             'diverifikasi_oleh' => $idPengguna, 'diverifikasi_pada' => Carbon::now(),
         ]);
 
-        (new NotificationService)->kirim([[
-            'id_pengguna' => $pembayaran->dicatat_oleh, 'judul' => 'Pembayaran santri ditolak keuangan',
+        // Ke PENCATATNYA — staf atau wali yang mengirim dari portal.
+        \App\Services\PortalWali\KabarWali::kePencatat($pembayaran, [
+            'judul' => 'Pembayaran santri ditolak keuangan', 'id_santri' => $pembayaran->id_santri,
             'pesan' => "{$pembayaran->nomor} ditolak: {$alasan}", 'jenis' => 'pembayaran_santri_ditolak',
             'ref_jenis' => 'PembayaranSantri', 'ref_id' => (string) $id,
-        ]]);
+        ]);
 
         return $pembayaran;
     }

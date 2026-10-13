@@ -31,6 +31,7 @@ class JalurPendaftaranService
             'nama' => $data['nama'],
             'kode_jalur_lanjutan' => $data['kode_jalur_lanjutan'] ?? null,
             'bebas_uang_pangkal' => (bool) ($data['bebas_uang_pangkal'] ?? false),
+            'tampil_di_portal' => (bool) ($data['tampil_di_portal'] ?? false),
             'keterangan' => $data['keterangan'] ?? null,
             'status' => $data['status'] ?? 'aktif',
             // Jalur baru masuk paling bawah, bukan menyelinap ke tengah susunan
@@ -53,6 +54,8 @@ class JalurPendaftaranService
             // hidden 0/1 yang menyertainya — bukan dari ada/tidaknya kunci.
             'bebas_uang_pangkal' => array_key_exists('bebas_uang_pangkal', $data)
                 ? (bool) $data['bebas_uang_pangkal'] : $lama->bebas_uang_pangkal,
+            'tampil_di_portal' => array_key_exists('tampil_di_portal', $data)
+                ? (bool) $data['tampil_di_portal'] : $lama->tampil_di_portal,
             'keterangan' => array_key_exists('keterangan', $data) ? $data['keterangan'] : $lama->keterangan,
             'status' => $data['status'] ?? $lama->status,
         ]);

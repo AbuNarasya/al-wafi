@@ -31,7 +31,25 @@ class BankAccount extends Model
         'nama_bank',
         'no_rekening',
         'status',
+        'tampil_di_portal',
+        'atas_nama',
     ];
+
+    protected function casts(): array
+    {
+        return ['tampil_di_portal' => 'boolean'];
+    }
+
+    /**
+     * Rekening tujuan transfer yang ditunjukkan kepada wali — hanya bank aktif
+     * yang dipilih keuangan di Keuangan → Rekening Portal Wali.
+     */
+    public static function untukPortal()
+    {
+        return static::where('tampil_di_portal', true)->where('status', 'aktif')
+            ->where('jenis_rekening', 'bank')->whereNotNull('no_rekening')
+            ->orderBy('nama_bank')->orderBy('kode_coa')->get();
+    }
 
     public function coa(): BelongsTo
     {

@@ -132,6 +132,7 @@ final class Navigation
         ['url' => '/business-units', 'label' => 'Unit Bisnis', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'business-units'],
         ['url' => '/unit-default', 'label' => 'Default Unit Bisnis', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'unit-default'],
         ['url' => '/bank-accounts', 'label' => 'Kas & Rekening', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'bank-accounts'],
+        ['url' => '/rekening-portal', 'label' => 'Rekening Portal Wali', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'bank-accounts'],
         ['url' => '/opening-balance', 'label' => 'Saldo Awal', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'opening-balance'],
         // Master dulu, laporannya menyusul — urutan pengisiannya memang begitu.
         ['url' => '/dana', 'label' => 'Dana Terikat', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'dana'],
@@ -148,7 +149,7 @@ final class Navigation
         // di `hak_akses_modul`, jadi menggantinya memutus hak yang sudah diberikan.
         // Urutannya mengikuti perjalanan santri: keluarganya → calon (diproses →
         // siap aktivasi → mundur) → aktif → dua daftar arsip.
-        ['url' => '/wali', 'label' => 'Wali / Keluarga', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'wali'],
+        ['url' => '/datawali', 'label' => 'Wali / Keluarga', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'wali'],
         ['url' => '/ppsb/calon-santri', 'label' => 'Calon Santri', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
         // Berkasnya tuntas, tinggal menunggu tahun ajarannya dimulai. Dipisah dari
         // Calon Santri supaya jumlah yang MASIH diproses tak bercampur dengan yang
@@ -179,6 +180,7 @@ final class Navigation
         // harus sudah ada sebelum jenis biaya diisi.
         ['url' => '/ppsb/jalur-pendaftaran', 'label' => 'Jalur Pendaftaran', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'jalur-pendaftaran'],
         ['url' => '/ppsb/sumber-informasi', 'label' => 'Sumber Informasi', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'sumber-informasi'],
+        ['url' => '/ppsb/surat-pernyataan', 'label' => 'Surat Pernyataan Wali', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'surat-pernyataan'],
         ['url' => '/ppsb/gelombang', 'label' => 'Gelombang', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'potongan-gelombang'],
         ['url' => '/ppsb/gelombang/potongan', 'label' => 'Potongan Gelombang', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'potongan-gelombang'],
         ['url' => '/ppsb/target-santri', 'label' => 'Target Santri', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'target-santri'],

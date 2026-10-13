@@ -58,11 +58,19 @@ final class BayarDompet
         $last = PembayaranSantri::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor');
         $nomor = DocNumber::nextDocNumber($base, $last);
         $otomatis = $opts['otomatis'] ?? false;
+        // Dari Portal Wali: pencatatnya wali, tak ada staf. Jurnal boleh tanpa
+        // pengguna (`journal_entries.id_pengguna` nullable); keterangannya yang
+        // menyebut asalnya. Verifikasi memang tak ada — dompet sudah diverifikasi
+        // saat top-up, itulah sebabnya pembayaran dompet berlaku seketika.
+        $wali = $opts['wali'] ?? null;
+        $idPengguna = $wali ? null : ($opts['id_pengguna'] ?? null);
+        $pencatat = \App\Services\PortalWali\Pencatat::kolom($idPengguna, $wali);
+        $asal = $otomatis ? ' (auto-debet)' : ($wali ? ' (portal wali)' : '');
 
         $entry = PostingService::postJournal([
             'referensi' => $nomor, 'tanggal' => $opts['tanggal'], 'kode_unit' => $jenis->kode_unit,
-            'sumber_modul' => 'PembayaranSantri', 'id_pengguna' => $opts['id_pengguna'],
-            'keterangan' => "{$jenis->nama} dari Dompet Wali".($otomatis ? ' (auto-debet)' : '')." — {$opts['namaSantri']}",
+            'sumber_modul' => 'PembayaranSantri', 'id_pengguna' => $idPengguna,
+            'keterangan' => "{$jenis->nama} dari Dompet Wali{$asal} — {$opts['namaSantri']}",
             'lines' => [
                 ['kode_coa' => DompetPolicy::COA_TITIPAN['wali'], 'debet' => $nominal, 'kredit' => '0'],
                 ['kode_coa' => $akunKredit, 'debet' => '0', 'kredit' => $nominal],
@@ -79,19 +87,19 @@ final class BayarDompet
             'pemilik' => 'wali', 'id_dompet' => $opts['id_dompet'], 'jenis' => 'bayar_tagihan',
             'nominal' => Money::sub('0', $nominal), 'saldo_setelah' => $dompet->saldo,
             'tanggal' => $opts['tanggal'],
-            'keterangan' => "{$jenis->nama}".($otomatis ? ' (auto-debet)' : '')." — {$opts['namaSantri']}",
-            'dicatat_oleh' => $opts['id_pengguna'], 'journal_entry_id' => $entry->id,
-        ]);
+            'keterangan' => "{$jenis->nama}{$asal} — {$opts['namaSantri']}",
+            'journal_entry_id' => $entry->id,
+        ] + $pencatat);
 
         $tagihan->update(['sisa' => $sisaBaru, 'status' => Money::isZero($sisaBaru) ? 'lunas' : 'sebagian']);
 
         return PembayaranSantri::create([
             'nomor' => $nomor, 'id_santri' => $tagihan->id_santri, 'id_tagihan' => $tagihan->id,
             'tanggal' => $opts['tanggal'], 'nominal' => $nominal, 'kode_rekening' => DompetPolicy::COA_TITIPAN['wali'],
-            'sumber' => 'dompet_wali', 'metode' => $otomatis ? 'auto_debet' : 'dompet_wali',
+            'sumber' => 'dompet_wali', 'metode' => $otomatis ? 'auto_debet' : ($wali ? 'portal_wali' : 'dompet_wali'),
             'catatan' => $opts['catatan'] ?? null, 'status' => 'terverifikasi',
-            'dicatat_oleh' => $opts['id_pengguna'], 'diverifikasi_oleh' => $opts['id_pengguna'],
+            'diverifikasi_oleh' => $idPengguna,
             'diverifikasi_pada' => Carbon::now(), 'journal_entry_id' => $entry->id,
-        ]);
+        ] + $pencatat);
     }
 }

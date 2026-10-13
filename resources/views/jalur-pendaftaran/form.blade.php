@@ -37,6 +37,19 @@
                 </span>
             </label>
 
+            <label class="flex items-start gap-2 text-sm text-gray-700">
+                <input type="hidden" name="tampil_di_portal" value="0">
+                <input type="checkbox" name="tampil_di_portal" value="1" @checked(old('tampil_di_portal', $row->tampil_di_portal))
+                       class="mt-0.5 rounded border-gray-300 text-brand focus:ring-brand">
+                <span>
+                    Boleh dipilih wali di Portal Wali
+                    <span class="block text-xs text-gray-400">
+                        Centang hanya jalur yang terbuka untuk umum. Jalur khusus (mis. anak karyawan, lanjutan internal)
+                        tetap didaftarkan oleh panitia.
+                    </span>
+                </span>
+            </label>
+
             <x-field name="keterangan" label="Keterangan" :value="$row->keterangan" textarea />
             <x-field name="status" label="Status" :value="$row->status ?? 'aktif'" :options="['aktif' => 'Aktif', 'nonaktif' => 'Nonaktif']" />
 

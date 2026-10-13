@@ -28,7 +28,9 @@
                     <tr data-row data-kode="{{ $r->kode }}" class="hover:bg-gray-50">
                         <x-urut-sel :boleh="$bolehUrut" />
                         <td class="px-4 py-3 font-medium text-gray-900">{{ $r->kode }}</td>
-                        <td class="px-4 py-3">{{ $r->nama }}</td>
+                        <td class="px-4 py-3">{{ $r->nama }}
+                            @if ($r->tampil_di_portal)<span class="ml-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-700" title="Boleh dipilih wali di Portal Wali">portal</span>@endif
+                        </td>
                         <td class="px-4 py-3 text-gray-500">{{ $r->keterangan }}</td>
                         <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $r->status === 'aktif' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500' }}">{{ ucfirst($r->status) }}</span></td>
                         <td class="px-4 py-3 text-right">

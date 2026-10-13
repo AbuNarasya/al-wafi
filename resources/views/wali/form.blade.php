@@ -10,11 +10,15 @@
 
 @section('content')
     <div class="mx-auto max-w-3xl">
-        <a href="{{ route('wali.index') }}" class="mb-3 inline-block text-sm text-gray-500 hover:text-gray-700">&larr; Kembali</a>
+        @php $dariKesiapan = old('dari', request('dari')) === 'kesiapan'; @endphp
+        <a href="{{ $dariKesiapan ? route('wali.kesiapan_portal') : route('wali.index') }}" class="mb-3 inline-block text-sm text-gray-500 hover:text-gray-700">&larr; Kembali</a>
 
         <form method="POST" action="{{ $baru ? route('wali.store') : route('wali.update', $wali->id) }}"
               class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             @csrf @unless ($baru) @method('PUT') @endunless
+            @if ($dariKesiapan)
+                <input type="hidden" name="dari" value="kesiapan">
+            @endif
 
             <div class="grid gap-4 sm:grid-cols-3">
                 <x-field name="kontak_utama" label="Kontak Utama" :value="$wali->kontak_utama ?? 'ayah'"

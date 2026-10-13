@@ -28,6 +28,7 @@ class JalurPendaftaranRequest extends FormRequest
             // Karyawan setelah naik jenjang), jadi tak ada larangan self-ref.
             'kode_jalur_lanjutan' => ['nullable', 'string', Rule::exists('jalur_pendaftaran', 'kode')],
             'bebas_uang_pangkal' => ['boolean'],
+            'tampil_di_portal' => ['boolean'],
             'keterangan' => ['nullable', 'string'],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
         ];

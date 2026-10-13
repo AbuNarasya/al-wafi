@@ -76,7 +76,13 @@ use App\Http\Controllers\SantriManualController;
 use App\Http\Controllers\SetoranPemakaianController;
 use App\Http\Controllers\SimpleMasterController;
 use App\Http\Controllers\SppController;
+use App\Http\Controllers\PortalBayarController;
+use App\Http\Controllers\PortalDompetController;
+use App\Http\Controllers\PortalKeluargaController;
+use App\Http\Controllers\RekeningPortalController;
+use App\Http\Controllers\PortalWaliController;
 use App\Http\Controllers\SumberInformasiController;
+use App\Http\Controllers\SuratPernyataanController;
 use App\Http\Controllers\TagihanLainController;
 use App\Http\Controllers\TagihanMassalController;
 use App\Http\Controllers\TahunAjaranController;
@@ -117,6 +123,57 @@ if (! function_exists('crudModul')) {
 Route::get('/login', [LoginController::class, 'showLogin'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:10,1');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+
+// ---- Portal Wali (guard `wali`, terpisah dari staf) ----
+// Di LUAR grup `auth`: sesi wali tak pernah membuka rute staf, dan sebaliknya.
+// Alamat `/wali` milik portal; layar staf Wali / Keluarga pindah ke `/datawali`.
+// Nama rute sengaja tetap `portal.*` (wali) dan `wali.*` (staf) — hanya alamatnya yang ditukar.
+Route::prefix('wali')->name('portal.')->controller(PortalWaliController::class)->group(function () {
+    Route::get('/', fn () => redirect()->route('portal.beranda'));
+    Route::get('/masuk', 'formMasuk')->name('masuk');
+    Route::post('/masuk', 'kirimKode')->middleware('throttle:10,1');
+    Route::get('/kode', 'formKode')->name('kode');
+    Route::post('/kode', 'periksaKode')->middleware('throttle:20,1');
+    Route::post('/keluar', 'keluar')->name('keluar');
+
+    Route::middleware('portal.wali:pendaftar')->group(function () {
+        Route::get('/daftar', 'formDaftar')->name('daftar');
+        Route::post('/daftar', 'simpanDaftar')->middleware('throttle:10,1');
+    });
+    Route::middleware('portal.wali')->group(function () {
+        Route::get('/beranda', 'beranda')->name('beranda');
+    });
+});
+Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(PortalKeluargaController::class)->group(function () {
+    Route::get('/tagihan', 'tagihan')->name('tagihan');
+    Route::get('/dompet', 'dompet')->name('dompet');
+    Route::get('/akun', 'akun')->name('akun');
+    Route::get('/kabar', 'kabar')->name('kabar');
+    Route::get('/anak/{id}', 'anak')->name('anak')->whereNumber('id');
+    Route::get('/tagihan/riwayat', 'riwayatTagihan')->name('tagihan.riwayat');
+    Route::get('/dompet/mutasi-anak', 'mutasiAnak')->name('dompet.mutasi_anak');
+    Route::post('/akun/perangkat/{id}/cabut', 'cabutPerangkat')->name('cabut_perangkat')->whereNumber('id');
+});
+Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(PortalBayarController::class)->group(function () {
+    Route::get('/bayar/{id}', 'form')->name('bayar')->whereNumber('id');
+    Route::post('/bayar/{id}/dompet', 'dariDompet')->name('bayar.dompet')->whereNumber('id')->middleware('throttle:10,1');
+    Route::post('/bayar/{id}/transfer', 'transfer')->name('bayar.transfer')->whereNumber('id')->middleware('throttle:10,1');
+    Route::get('/dompet/isi', 'formIsi')->name('dompet.isi');
+    Route::post('/dompet/isi', 'isi')->middleware('throttle:10,1');
+    Route::post('/dompet/auto-debet', 'autoDebet')->name('dompet.auto_debet')->middleware('throttle:10,1');
+});
+Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(PortalDompetController::class)->group(function () {
+    Route::get('/pin', 'pin')->name('pin');
+    Route::post('/pin/kode', 'mintaKodePin')->name('pin.kode')->middleware('throttle:5,1');
+    Route::get('/pin/konfirmasi', 'formKonfirmasiPin')->name('pin.konfirmasi');
+    Route::post('/pin/konfirmasi', 'konfirmasiPin')->middleware('throttle:10,1');
+    Route::post('/pin/ganti', 'gantiPin')->name('pin.ganti')->middleware('throttle:10,1');
+    Route::get('/dompet/pindah', 'formPindah')->name('dompet.pindah');
+    Route::post('/dompet/pindah', 'pindah')->middleware('throttle:10,1');
+    Route::get('/dompet/tabungan', 'formTabungan')->name('dompet.tabungan');
+    Route::post('/dompet/tabungan', 'ajukanTabungan')->middleware('throttle:10,1');
+    Route::post('/dompet/tabungan/{id}/batal', 'batalTabungan')->name('dompet.tabungan.batal')->whereNumber('id');
+});
 
 // ---- Aplikasi (wajib login) ----
 Route::middleware('auth')->group(function () {
@@ -226,6 +283,9 @@ Route::middleware('auth')->group(function () {
     crudModul('coa-groups', CoaGroupController::class, 'coa_group');
     crudModul('coa-detail', CoaDetailController::class, 'coa_detail');
     crudModul('bank-accounts', BankAccountController::class, 'bank_account');
+    // Rekening tujuan transfer di Portal Wali — atribut rekening, jadi menumpang hak Kas & Rekening.
+    Route::get('/rekening-portal', [RekeningPortalController::class, 'index'])->name('rekening_portal.index')->middleware('hakakses:bank-accounts,lihat');
+    Route::post('/rekening-portal', [RekeningPortalController::class, 'simpan'])->name('rekening_portal.simpan')->middleware('hakakses:bank-accounts,ubah');
     crudModul('unit-default', UnitDefaultController::class, 'unit_default');
 
     // Master "jenis" sederhana (kode + nama + status) via controller generik.
@@ -452,6 +512,18 @@ Route::middleware('auth')->group(function () {
         Route::put('/{kode}', [$s, 'update'])->name('update')->middleware('hakakses:sumber-informasi,ubah');
         Route::post('/urutan', [$s, 'urutan'])->name('urutan')->middleware('hakakses:sumber-informasi,ubah');
         Route::delete('/{kode}', [$s, 'destroy'])->name('destroy')->middleware('hakakses:sumber-informasi,hapus');
+    });
+
+    // Surat Pernyataan Wali (PPSB → Setting Awal) — teks yang disetujui wali saat mendaftar di portal.
+    Route::prefix('ppsb/surat-pernyataan')->name('surat_pernyataan.')->group(function () {
+        $s = SuratPernyataanController::class;
+        Route::get('/', [$s, 'index'])->name('index')->middleware('hakakses:surat-pernyataan,lihat');
+        Route::get('/create', [$s, 'create'])->name('create')->middleware('hakakses:surat-pernyataan,buat');
+        Route::post('/', [$s, 'store'])->name('store')->middleware('hakakses:surat-pernyataan,buat');
+        Route::get('/{id}/edit', [$s, 'edit'])->name('edit')->middleware('hakakses:surat-pernyataan,ubah')->whereNumber('id');
+        Route::put('/{id}', [$s, 'update'])->name('update')->middleware('hakakses:surat-pernyataan,ubah')->whereNumber('id');
+        Route::post('/{id}/aktifkan', [$s, 'aktifkan'])->name('aktifkan')->middleware('hakakses:surat-pernyataan,ubah')->whereNumber('id');
+        Route::delete('/{id}', [$s, 'destroy'])->name('destroy')->middleware('hakakses:surat-pernyataan,hapus')->whereNumber('id');
     });
 
     // Notifikasi pribadi — seperti approval inbox, di luar matriks modul: tiap
@@ -910,6 +982,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/topup/{id}/verifikasi', 'verifikasiTopUp')->name('topup.verifikasi')->middleware('hakakses:dompet,ubah')->whereNumber('id');
         Route::post('/topup/{id}/tolak', 'tolakTopUp')->name('topup.tolak')->middleware('hakakses:dompet,hapus')->whereNumber('id');
         Route::post('/pindah', 'pindah')->name('pindah')->middleware('hakakses:dompet,ubah');
+        Route::post('/tabungan/{id}/setujui', 'setujuiTabungan')->name('tabungan.setujui')->middleware('hakakses:dompet,ubah')->whereNumber('id');
+        Route::post('/tabungan/{id}/tolak', 'tolakTabungan')->name('tabungan.tolak')->middleware('hakakses:dompet,hapus')->whereNumber('id');
         Route::post('/tarik', 'tarik')->name('tarik')->middleware('hakakses:dompet,ubah');
         Route::post('/kunci/{idSantri}', 'kunci')->name('kunci')->middleware('hakakses:dompet,ubah')->whereNumber('idSantri');
         Route::get('/mutasi/{mutasi}/bukti', 'bukti')->name('mutasi.bukti')->middleware('hakakses:dompet,lihat')->whereNumber('mutasi');
@@ -981,10 +1055,11 @@ Route::middleware('auth')->group(function () {
             Route::put('/{idTagihan}', 'koreksi')->name('koreksi')->middleware('hakakses:outstanding-lain,ubah')->whereNumber('idTagihan');
         });
 
-    // Wali / Keluarga Santri.
-    Route::prefix('wali')->name('wali.')->group(function () {
+    // Wali / Keluarga Santri (staf). Alamat `/wali` dipakai Portal Wali.
+    Route::prefix('datawali')->name('wali.')->group(function () {
         $w = WaliController::class;
         Route::get('/', [$w, 'index'])->name('index')->middleware('hakakses:wali,lihat');
+        Route::get('/kesiapan-portal', [$w, 'kesiapanPortal'])->name('kesiapan_portal')->middleware('hakakses:wali,lihat');
         Route::get('/create', [$w, 'create'])->name('create')->middleware('hakakses:wali,buat');
         Route::post('/', [$w, 'store'])->name('store')->middleware('hakakses:wali,buat');
         Route::get('/{id}/edit', [$w, 'edit'])->name('edit')->middleware('hakakses:wali,ubah')->whereNumber('id');

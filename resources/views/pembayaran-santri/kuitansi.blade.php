@@ -142,7 +142,7 @@
             <div>
                 <div class="text-gray-500">Dicatat oleh</div>
                 <div class="flex h-12 items-center justify-center text-[10px] italic text-gray-400">tercatat digital</div>
-                <div class="border-t border-gray-400 pt-1 text-gray-900">{{ $p->pencatat?->nama ?? '—' }}</div>
+                <div class="border-t border-gray-400 pt-1 text-gray-900">{{ $p->namaPencatat() }}</div>
             </div>
             <div>
                 <div class="text-gray-500">Diverifikasi — Keuangan</div>

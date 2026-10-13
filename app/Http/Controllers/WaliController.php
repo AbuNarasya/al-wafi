@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
 use App\Http\Requests\WaliRequest;
+use App\Services\Modules\KesiapanPortalWaliService;
 use App\Services\Modules\WaliService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -56,7 +57,16 @@ class WaliController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('wali.index')->with('status', "Wali {$wali->nama} berhasil diperbarui.");
+        // Dibuka dari layar Kesiapan Portal: kembali ke sana, supaya petugas yang
+        // membereskan puluhan keluarga tak perlu mencari layarnya lagi tiap kali.
+        $kembali = $request->input('dari') === 'kesiapan' ? 'wali.kesiapan_portal' : 'wali.index';
+
+        return redirect()->route($kembali)->with('status', "Wali {$wali->nama} berhasil diperbarui.");
+    }
+
+    public function kesiapanPortal(KesiapanPortalWaliService $kesiapan): View
+    {
+        return view('wali.kesiapan-portal', $kesiapan->ringkasan());
     }
 
     public function destroy(int $id): RedirectResponse

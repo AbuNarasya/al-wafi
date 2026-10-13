@@ -2,6 +2,30 @@
 
 [x-cloak] { display: none !important; }
 
+/* MODE GELAP PORTAL WALI — kelas `wali-gelap` di <html>, hanya layouts.portal (pola SANAD Wali).
+   Lewat penimpaan warna umum di sini, bukan `dark:` di setiap halaman: halaman portal cukup
+   memakai kelas terang biasa (slate-*). Di luar @layer = menang atas utilitas Tailwind.
+   Biru brand & emas tetap — keduanya terbaca di atas latar gelap. */
+.wali-gelap { color-scheme: dark; }
+.wali-gelap body, .wali-gelap .bg-slate-100 { background-color: #0b1220; }
+.wali-gelap .bg-white, .wali-gelap .bg-white\/95 { background-color: #111827; }
+.wali-gelap .bg-slate-50, .wali-gelap .bg-slate-200 { background-color: #1f2937; }
+.wali-gelap .text-slate-900, .wali-gelap .text-slate-800 { color: #e5e7eb; }
+.wali-gelap .text-slate-700 { color: #d1d5db; }
+.wali-gelap .text-slate-600, .wali-gelap .text-slate-500 { color: #9ca3af; }
+.wali-gelap .ring-slate-200, .wali-gelap .ring-slate-300 { --tw-ring-color: #1f2937; }
+.wali-gelap .border-slate-200, .wali-gelap .border-slate-300, .wali-gelap .border-slate-100 { border-color: #334155; }
+.wali-gelap .divide-slate-100 > :not(:last-child) { border-color: #1f2937; }
+.wali-gelap .bg-emerald-50 { background-color: #052e1f; }
+.wali-gelap .bg-amber-50 { background-color: #3a2a06; }
+.wali-gelap .bg-red-50 { background-color: #3b0d0d; }
+.wali-gelap .bg-blue-50 { background-color: #0f2547; }
+.wali-gelap .text-emerald-800, .wali-gelap .text-emerald-700 { color: #6ee7b7; }
+.wali-gelap .text-amber-900, .wali-gelap .text-amber-800, .wali-gelap .text-amber-700 { color: #fcd34d; }
+.wali-gelap .text-red-800, .wali-gelap .text-red-700 { color: #fca5a5; }
+.wali-gelap .text-brand { color: #8fb4ee; }
+.wali-gelap input, .wali-gelap select, .wali-gelap textarea { background-color: #0f172a; color: #e5e7eb; border-color: #334155; }
+
 /* Border input LEBIH JELAS di semua modul.
    Tailwind preflight men-set border-width:0 → input yang hanya punya utilitas
    warna (mis. `border-gray-300` tanpa `border`) tampil TANPA garis. Karena itu

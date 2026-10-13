@@ -90,6 +90,11 @@ class InputRupiahTest extends TestCase
             }
             preg_match_all('/<input[^>]*inputmode="numeric"[^>]*>/', file_get_contents((string) $f), $m);
             foreach ($m[0] as $tag) {
+                // Kode OTP & PIN (portal wali) juga ber-papan-ketik angka, tapi bukan rupiah
+                // dan tak bertopeng — nilainya memang dikirim apa adanya.
+                if (str_contains($tag, 'autocomplete="one-time-code"') || str_contains($tag, 'type="password"')) {
+                    continue;
+                }
                 if (preg_match('/\s:?name="/', $tag)) {
                     $pelanggar[] = str_replace(resource_path('views').DIRECTORY_SEPARATOR, '', (string) $f);
                 }

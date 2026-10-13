@@ -40,7 +40,7 @@ final class Jejak
         $detail = $p['detail'] ?? null;
 
         return ActivityLog::create([
-            'id_pengguna' => $p['id_pengguna'] ?? Auth::id(),
+            'id_pengguna' => $p['id_pengguna'] ?? self::penggunaStaf(),
             'aksi' => $aksi,
             'modul' => $p['modul'] ?? null,
             'ref_jenis' => $p['ref_jenis'] ?? null,
@@ -49,6 +49,34 @@ final class Jejak
             'perubahan' => $p['perubahan'] ?? null,
             ...self::asalPermintaan(),
         ]);
+    }
+
+    /**
+     * Pengguna STAF pelaku tindakan, atau null.
+     *
+     * `activity_log.id_pengguna` ber-FK ke `users`. Dua jebakan sejak ada Portal Wali:
+     *  • `Auth::id()` membaca guard BAWAAN — bila guard `wali` yang jadi bawaan,
+     *    id WALI tercatat sebagai id staf. Insert-nya gagal karena FK (atau, lebih
+     *    buruk, menunjuk staf yang kebetulan ber-id sama), dan karena galat jejak
+     *    ditelan sementara PostgreSQL membatalkan transaksinya, seluruh pembayaran
+     *    ikut gagal tanpa pesan yang jelas.
+     *  • Staf yang juga membuka portal di browser yang sama: tindakan wali di
+     *    portal akan tercatat atas nama staf itu.
+     * Karena itu: guard `web` disebut tegas, dan permintaan dari portal tak pernah
+     * dianggap tindakan staf — pelakunya ada di kolom `dicatat_oleh_wali` transaksinya.
+     */
+    private static function penggunaStaf(): ?int
+    {
+        try {
+            if (request()->routeIs('portal.*')) {
+                return null;
+            }
+        } catch (\Throwable) {
+            // Tanpa permintaan HTTP (artisan, penjadwal) — lanjut ke guard web.
+        }
+        $id = Auth::guard('web')->id();
+
+        return $id === null ? null : (int) $id;
     }
 
     /**

@@ -29,6 +29,42 @@
             </div>
         </div>
 
+        {{-- Pengajuan tarik tabungan dari Portal Wali — diputus keuangan. Disetujui =
+             saldo pindah Tabungan → Dompet Wali dan jurnal reklasifikasinya terbit. --}}
+        @if ($pengajuanTabungan->isNotEmpty())
+            <div class="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
+                <div class="mb-2 text-sm font-semibold text-amber-900">Pengajuan tarik tabungan menunggu ({{ $pengajuanTabungan->count() }})</div>
+                <div class="space-y-2">
+                    @foreach ($pengajuanTabungan as $p)
+                        <div class="flex flex-wrap items-start justify-between gap-3 rounded-lg bg-white p-3 text-sm shadow-sm" x-data="{ tolak: false }">
+                            <div class="min-w-0">
+                                <div class="font-medium text-gray-900">{{ $p->santri?->nama }} &middot; Rp {{ number_format((float) $p->nominal, 0, ',', '.') }}</div>
+                                <div class="text-xs text-gray-500">{{ $p->nomor }} &middot; diajukan {{ $p->namaPengaju() }} &middot; {{ $p->created_at?->format('d/m/Y H:i') }}
+                                    &middot; saldo tabungan Rp {{ number_format((float) ($p->santri?->tabungan?->saldo ?? 0), 0, ',', '.') }}</div>
+                                <div class="mt-1 text-gray-700">&ldquo;{{ $p->alasan }}&rdquo;</div>
+                            </div>
+                            @if ($bolehVerif)
+                                <div class="flex shrink-0 flex-col items-end gap-2">
+                                    <div class="flex gap-2">
+                                        <form method="POST" action="{{ route('dompet.tabungan.setujui', $p->id) }}"
+                                              data-confirm="Setujui penarikan Rp {{ number_format((float) $p->nominal, 0, ',', '.') }} dari tabungan {{ $p->santri?->nama }} ke Dompet Wali? Jurnalnya terbit seketika.">
+                                            @csrf<button class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Setujui</button>
+                                        </form>
+                                        <button type="button" @click="tolak = ! tolak" class="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50">Tolak</button>
+                                    </div>
+                                    <form x-show="tolak" x-cloak method="POST" action="{{ route('dompet.tabungan.tolak', $p->id) }}" class="flex gap-2">
+                                        @csrf
+                                        <input name="alasan" required placeholder="Alasan penolakan" class="w-56 rounded-lg border border-gray-300 px-2 py-1 text-xs">
+                                        <button class="rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white">Kirim</button>
+                                    </form>
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         {{-- Pilih wali --}}
         <form method="GET" action="{{ route('dompet.index') }}" class="mb-4 flex items-end gap-2 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             {{-- Bisa dicari — daftarnya seratusan nama, dan menggulung <select>
@@ -73,6 +109,7 @@
                             <select name="ke" class="w-full rounded border-gray-300 text-sm">
                                 <option value="santri" x-show="dari === 'wali'">Dompet Santri (uang jajan)</option>
                                 <option value="tabungan">Tabungan Santri</option>
+                                <option value="wali" x-show="dari === 'santri'">Dompet Wali (tarik kembali)</option>
                             </select>
                             <label class="block text-xs text-gray-500">Santri</label>
                             <select name="id_santri" required class="w-full rounded border-gray-300 text-sm">@foreach ($santriKeluarga as $id => $nm)<option value="{{ $id }}">{{ $nm }}</option>@endforeach</select>

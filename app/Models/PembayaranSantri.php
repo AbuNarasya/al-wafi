@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** Satu setoran santri. Dicatat PPSB, diverifikasi Keuangan (pemisahan dua tangan). */
 class PembayaranSantri extends Model
 {
+    use Concerns\DicatatStafAtauWali;
+
     protected $table = 'pembayaran_santri';
 
     protected $guarded = ['id'];
@@ -29,11 +31,6 @@ class PembayaranSantri extends Model
     public function tagihan(): BelongsTo
     {
         return $this->belongsTo(TagihanSantri::class, 'id_tagihan', 'id');
-    }
-
-    public function pencatat(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'dicatat_oleh', 'id_pengguna');
     }
 
     public function pemverifikasi(): BelongsTo

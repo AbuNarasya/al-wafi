@@ -56,7 +56,33 @@ class DompetController extends Controller
                 ->mapWithKeys(fn ($r) => [$r->kode_coa => "{$r->nama_rekening} ({$r->kode_coa})"])->all(),
             'pending' => $pending,
             'mutasi' => $mutasi,
+            // Pengajuan tarik tabungan dari Portal Wali — diputus keuangan.
+            'pengajuanTabungan' => \App\Models\PengajuanTarikTabungan::with(['santri:id,nama', 'wali', 'santri.tabungan'])
+                ->where('status', 'menunggu')->orderBy('id')->get(),
         ]);
+    }
+
+    public function setujuiTabungan(Request $request, int $id): RedirectResponse
+    {
+        try {
+            $p = (new \App\Services\Modules\PengajuanTabunganService)->setujui($id, $request->user()->id_pengguna);
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('status', "Pengajuan {$p->nomor} disetujui — saldo pindah ke Dompet Wali dan jurnalnya terbit.");
+    }
+
+    public function tolakTabungan(Request $request, int $id): RedirectResponse
+    {
+        $data = $request->validate(['alasan' => ['required', 'string', 'max:255']]);
+        try {
+            $p = (new \App\Services\Modules\PengajuanTabunganService)->tolak($id, $data['alasan'], $request->user()->id_pengguna);
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('status', "Pengajuan {$p->nomor} ditolak. Wali menerima kabarnya di portal.");
     }
 
     /** Setor tunai langsung ke Dompet Santri (opsional; bisa dimatikan di Pengaturan Perusahaan). */
@@ -162,7 +188,7 @@ class DompetController extends Controller
     {
         $data = $request->validate([
             'dari' => ['required', Rule::in(['wali', 'santri'])],
-            'ke' => ['required', Rule::in(['santri', 'tabungan'])],
+            'ke' => ['required', Rule::in(['santri', 'tabungan', 'wali'])],
             'id_wali' => ['nullable', 'integer', 'exists:wali,id'],
             'id_santri' => ['nullable', 'integer', 'exists:santri,id'],
             'nominal' => ['required', 'numeric', 'gt:0'],

@@ -118,6 +118,9 @@ final class ModulRegistry
         // dibedakan per jalur.
         ['kode' => 'jalur-pendaftaran', 'nama' => 'Jalur Pendaftaran', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
         ['kode' => 'sumber-informasi', 'nama' => 'Sumber Informasi PPSB', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
+        // Modul sendiri, bukan menumpang PPSB: isinya mengikat wali seperti
+        // perjanjian, jadi penulisnya perlu bisa dibatasi ke orang tertentu.
+        ['kode' => 'surat-pernyataan', 'nama' => 'Surat Pernyataan Wali', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
         // Satu modul untuk master gelombang DAN matriks potongannya: memisahkan
         // haknya hanya melahirkan keadaan aneh — boleh mengisi potongan tapi tak
         // boleh melihat gelombang yang dipotongnya.

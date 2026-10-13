@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'hakakses' => \App\Http\Middleware\HakAksesModul::class,
+            'portal.wali' => \App\Http\Middleware\PortalWali::class,
         ]);
 
         // Di belakang proxy/tunnel (Render, Cloudflare Tunnel, Nginx) TLS diputus

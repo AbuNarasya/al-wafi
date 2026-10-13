@@ -6,9 +6,12 @@
     <div x-data="rowFilter" x-cloak>
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <x-filter-bar placeholder="Cari nama / telepon…" />
-        @if (\App\Support\Akses::boleh('wali', 'buat'))
-            <a href="{{ route('wali.create') }}" class="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">+ Tambah Wali</a>
-        @endif
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ route('wali.kesiapan_portal') }}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Kesiapan Portal Wali</a>
+            @if (\App\Support\Akses::boleh('wali', 'buat'))
+                <a href="{{ route('wali.create') }}" class="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">+ Tambah Wali</a>
+            @endif
+        </div>
     </div>
 
     <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">

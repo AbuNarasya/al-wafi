@@ -42,6 +42,12 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        // Portal Wali (/wali): masuk dengan email + kode OTP, tanpa sandi.
+        // Terpisah dari staf — sesi wali tak pernah membuka rute ber-`auth`.
+        'wali' => [
+            'driver' => 'session',
+            'provider' => 'wali',
+        ],
     ],
 
     /*
@@ -65,6 +71,11 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        'wali' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Wali::class,
         ],
 
         // 'users' => [

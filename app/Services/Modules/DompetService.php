@@ -50,7 +50,8 @@ class DompetService
     }
 
     /** TOP-UP Dompet Wali — langkah 1 (belum menyentuh saldo/buku besar). */
-    public function topUp(array $data, int $idPengguna): MutasiDompet
+    /** @param  array{id:int, peran:string}|null  $wali  pengirim dari Portal Wali (null = dicatat staf) */
+    public function topUp(array $data, ?int $idPengguna, ?array $wali = null): MutasiDompet
     {
         $dompet = $this->ambilDompetWali($data['id_wali']);
         $this->assertRekening($data['kode_rekening']);
@@ -63,8 +64,8 @@ class DompetService
             'nomor' => $this->nomorMutasi($data['tanggal']), 'pemilik' => 'wali', 'id_dompet' => $dompet->id,
             'jenis' => 'topup', 'nominal' => $nominal, 'saldo_setelah' => $dompet->saldo, 'tanggal' => $data['tanggal'],
             'keterangan' => $data['keterangan'] ?? 'Top-up Dompet Wali', 'status' => 'menunggu_verifikasi',
-            'kode_rekening' => $data['kode_rekening'], 'bukti_path' => $data['bukti_path'] ?? null, 'dicatat_oleh' => $idPengguna,
-        ]);
+            'kode_rekening' => $data['kode_rekening'], 'bukti_path' => $data['bukti_path'] ?? null,
+        ] + \App\Services\PortalWali\Pencatat::kolom($idPengguna, $wali));
 
         $this->notifKeuangan("{$mutasi->nomor} — {$nominal}. Pastikan dananya sudah masuk sebelum menyetujui.", (string) $mutasi->id);
 
@@ -168,19 +169,26 @@ class DompetService
             throw new AppException(422, "Top-up ini sudah berstatus \"{$mutasi->status}\".");
         }
         $mutasi->update(['status' => 'ditolak', 'alasan_tolak' => $alasan, 'diverifikasi_oleh' => $idPengguna, 'diverifikasi_pada' => Carbon::now()]);
-        (new NotificationService)->kirim([[
-            'id_pengguna' => $mutasi->dicatat_oleh, 'judul' => 'Top-up dompet ditolak keuangan',
+        // Ke PENCATATNYA — staf atau wali yang mengirim dari portal.
+        \App\Services\PortalWali\KabarWali::kePencatat($mutasi, [
+            'judul' => 'Top-up dompet ditolak keuangan',
             'pesan' => "{$mutasi->nomor} ditolak: {$alasan}", 'jenis' => 'topup_dompet_ditolak',
             'ref_jenis' => 'MutasiDompet', 'ref_id' => (string) $id,
-        ]]);
+        ]);
 
         return $mutasi;
     }
 
-    /** PEMINDAHAN antar-dompet (distribusi jajan / isi tabungan). Tanpa verifikasi. */
-    public function pindah(array $data, int $idPengguna): array
+    /**
+     * PEMINDAHAN antar-dompet (distribusi jajan / isi tabungan / tarik balik ke wali). Tanpa verifikasi.
+     *
+     * @param  array{id:int, peran:string}|null  $wali  pengirim dari Portal Wali (null = dicatat staf)
+     * @param  bool  $disetujui  pengajuan yang sudah disetujui keuangan (membuka Tabungan → Wali)
+     */
+    public function pindah(array $data, ?int $idPengguna, ?array $wali = null, bool $disetujui = false): array
     {
-        DompetPolicy::assertArahSah($data['dari'], $data['ke']);
+        DompetPolicy::assertArahSah($data['dari'], $data['ke'], $disetujui);
+        $pencatat = \App\Services\PortalWali\Pencatat::kolom($wali ? null : $idPengguna, $wali);
         $nominal = Money::of($data['nominal']);
         if (Money::lte($nominal, '0')) {
             throw new AppException(422, 'Nominal pemindahan harus lebih dari nol.');
@@ -191,13 +199,13 @@ class DompetService
             throw new AppException(422, 'Saldo '.DompetPolicy::labelDompet($data['dari'])." tidak cukup (tersedia {$asal->saldo}).");
         }
 
-        return DB::transaction(function () use ($data, $idPengguna, $nominal, $asal, $tujuan) {
+        return DB::transaction(function () use ($data, $nominal, $asal, $tujuan, $pencatat) {
             $saldoAsal = $this->kurangiSaldo($data['dari'], $asal->id, $nominal);
             $saldoTujuan = $this->tambahSaldo($data['ke'], $tujuan->id, $nominal);
             $nomorKeluar = $this->nomorMutasi($data['tanggal']);
 
             $entry = PostingService::postJournal([
-                'referensi' => $nomorKeluar, 'tanggal' => $data['tanggal'], 'sumber_modul' => self::SUMBER, 'id_pengguna' => $idPengguna,
+                'referensi' => $nomorKeluar, 'tanggal' => $data['tanggal'], 'sumber_modul' => self::SUMBER, 'id_pengguna' => $pencatat['dicatat_oleh'],
                 'keterangan' => $data['keterangan'] ?? DompetPolicy::labelDompet($data['dari']).' → '.DompetPolicy::labelDompet($data['ke']),
                 'lines' => [
                     ['kode_coa' => DompetPolicy::COA_TITIPAN[$data['dari']], 'debet' => $nominal, 'kredit' => '0'],
@@ -209,14 +217,14 @@ class DompetService
                 'nomor' => $nomorKeluar, 'pemilik' => $data['dari'], 'id_dompet' => $asal->id,
                 'jenis' => $data['ke'] === 'tabungan' ? 'tabung_keluar' : 'distribusi_keluar',
                 'nominal' => Money::sub('0', $nominal), 'saldo_setelah' => $saldoAsal, 'tanggal' => $data['tanggal'],
-                'keterangan' => $data['keterangan'] ?? null, 'dicatat_oleh' => $idPengguna, 'journal_entry_id' => $entry->id,
-            ]);
+                'keterangan' => $data['keterangan'] ?? null, 'journal_entry_id' => $entry->id,
+            ] + $pencatat);
             $masuk = MutasiDompet::create([
                 'nomor' => $this->nomorMutasi($data['tanggal']), 'pemilik' => $data['ke'], 'id_dompet' => $tujuan->id,
                 'jenis' => $data['ke'] === 'tabungan' ? 'tabung_masuk' : 'distribusi_masuk',
                 'nominal' => $nominal, 'saldo_setelah' => $saldoTujuan, 'tanggal' => $data['tanggal'],
-                'keterangan' => $data['keterangan'] ?? null, 'dicatat_oleh' => $idPengguna, 'id_pasangan' => $keluar->id, 'journal_entry_id' => $entry->id,
-            ]);
+                'keterangan' => $data['keterangan'] ?? null, 'id_pasangan' => $keluar->id, 'journal_entry_id' => $entry->id,
+            ] + $pencatat);
             $keluar->update(['id_pasangan' => $masuk->id]);
 
             return ['keluar' => $keluar, 'masuk' => $masuk];
