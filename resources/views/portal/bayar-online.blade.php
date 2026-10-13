@@ -45,12 +45,52 @@
     </div>
 
     @if ($t->status === 'menunggu' && $t->snap_token)
-        <button type="button" id="tombol-bayar" class="mt-4 w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white">
+      {{-- Halaman memantau dirinya sendiri (tiap 5 detik, ringan — lihat PortalBayarOnlineController::status)
+           supaya tak tampak macet: berganti sendiri begitu notifikasi Midtrans membukukan pembayarannya.
+           Berhenti saat tab tak dilihat & sesudah 10 menit, supaya database tak terus terbangun. --}}
+      <div x-data="{
+              memproses: false, lama: false, memeriksa: false, mulai: Date.now(), selesai: Date.now(),
+              async cek() {
+                  try {
+                      const r = await fetch(@js(route('portal.online.status', $t->order_id)), { headers: { Accept: 'application/json' } });
+                      if (r.ok && (await r.json()).status !== 'menunggu') location.reload();
+                  } catch (e) {}
+              },
+              init() {
+                  const putaran = setInterval(() => {
+                      if (Date.now() - this.mulai > 600000) return clearInterval(putaran);
+                      if (this.memproses && Date.now() - this.selesai > 45000) this.lama = true;
+                      if (! document.hidden) this.cek();
+                  }, 5000);
+                  window.addEventListener('midtrans-dibayar', () => { this.memproses = true; this.selesai = Date.now(); this.cek(); });
+              },
+           }">
+        <p class="mt-4 flex items-center justify-center gap-2 text-xs text-slate-500">
+            <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/><path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+            Menunggu pembayaran &mdash; halaman ini diperbarui otomatis
+        </p>
+
+        <button type="button" id="tombol-bayar" class="mt-3 w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white">
             {{ $t->nomor_va ? 'Lihat cara bayar' : 'Pilih bank & bayar' }}
         </button>
-        <a href="{{ route('portal.online.lihat', $t->order_id) }}" class="mt-3 block rounded-2xl bg-white py-3 text-center text-sm font-semibold text-brand shadow-sm ring-1 ring-slate-200">
-            Saya sudah bayar — cek status
+        <a href="{{ route('portal.online.lihat', $t->order_id) }}" @click="memeriksa = true"
+           class="mt-3 flex items-center justify-center gap-2 rounded-2xl bg-white py-3 text-center text-sm font-semibold text-brand shadow-sm ring-1 ring-slate-200">
+            <svg x-show="memeriksa" x-cloak class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/><path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+            <span x-text="memeriksa ? 'Memeriksa ke Midtrans…' : 'Saya sudah bayar — cek status'">Saya sudah bayar — cek status</span>
         </a>
+
+        {{-- Sesudah membayar di popup Midtrans: tanda "sedang diproses" sampai lunas tercatat. --}}
+        <div x-show="memproses" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-6">
+            <div class="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-xl">
+                <svg class="mx-auto h-10 w-10 animate-spin text-brand" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/><path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                <p class="mt-4 text-base font-bold text-slate-900">Pembayaran sedang diproses…</p>
+                <p class="mt-1 text-sm text-slate-500" x-show="! lama">Mohon tunggu sebentar, kami sedang menerima konfirmasi dari bank.</p>
+                <p class="mt-1 text-sm text-slate-500" x-show="lama" x-cloak>
+                    Konfirmasi dari Midtrans sedang dalam perjalanan. {{ $t->jenis === 'isi_dompet' ? 'Saldo' : 'Tagihan' }} akan diperbarui otomatis &mdash; halaman ini boleh ditutup.
+                </p>
+            </div>
+        </div>
+      </div>
         <form method="POST" action="{{ route('portal.online.batal', $t->order_id) }}" class="mt-3 text-center"
               data-confirm="Batalkan pesanan pembayaran ini? Nomor Virtual Account-nya tidak bisa dipakai lagi.">
             @csrf
@@ -62,7 +102,12 @@
             document.getElementById('tombol-bayar').addEventListener('click', function () {
                 if (! window.snap) { location.href = @js($t->snap_url); return; }
                 const muatUlang = () => location.reload();
-                window.snap.pay(@js($t->snap_token), { onSuccess: muatUlang, onPending: muatUlang, onError: muatUlang });
+                window.snap.pay(@js($t->snap_token), {
+                    // Lunas di Midtrans → tunggu pembukuannya dengan tanda "sedang diproses".
+                    onSuccess: () => window.dispatchEvent(new CustomEvent('midtrans-dibayar')),
+                    // VA baru terbit (belum dibayar) → muat ulang supaya nomornya tampil.
+                    onPending: muatUlang, onError: muatUlang,
+                });
             });
         </script>
     @elseif ($t->status === 'lunas')

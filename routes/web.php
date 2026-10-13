@@ -167,6 +167,7 @@ Route::prefix('wali/online')->name('portal.online.')->middleware('portal.wali')-
     Route::post('/dompet', 'isiDompet')->name('dompet')->middleware('throttle:10,1');
     Route::post('/tagihan/{id}', 'bayarTagihan')->name('tagihan')->whereNumber('id')->middleware('throttle:10,1');
     Route::get('/{order}', 'lihat')->name('lihat');
+    Route::get('/{order}/status', 'status')->name('status')->middleware('throttle:30,1');
     Route::post('/{order}/batal', 'batal')->name('batal')->middleware('throttle:10,1');
 });
 // Notifikasi Midtrans — tanpa sesi & dikecualikan dari CSRF (bootstrap/app.php).

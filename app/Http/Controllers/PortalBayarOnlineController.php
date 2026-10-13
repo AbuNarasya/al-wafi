@@ -8,7 +8,9 @@ use App\Models\TransaksiMidtrans;
 use App\Services\Midtrans\KlienMidtrans;
 use App\Services\Midtrans\PembayaranMidtrans;
 use App\Services\PortalWali\SesiWali;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
@@ -77,6 +79,25 @@ class PortalBayarOnlineController extends Controller
             'snapJs' => KlienMidtrans::urlSnapJs(),
             'clientKey' => (string) config('services.midtrans.client_key'),
         ]);
+    }
+
+    /**
+     * Dipantau halaman pesanan tiap beberapa detik. Biasanya cuma membaca basis data
+     * (notifikasi Midtrans yang membukukan); paling sering sekali per 20 detik ia
+     * bertanya sendiri ke Midtrans — cadangan bila notifikasinya tak kunjung datang.
+     */
+    public function status(string $orderId): JsonResponse
+    {
+        $t = $this->milikSaya($orderId);
+        if ($t->status === 'menunggu' && Cache::add('midtrans-sinkron:'.$t->id, 1, 20)) {
+            try {
+                $t = $this->midtrans->sinkron($t->order_id) ?? $t;
+            } catch (AppException) {
+                // Dicoba lagi pada putaran berikutnya.
+            }
+        }
+
+        return response()->json(['status' => $t->status]);
     }
 
     public function batal(string $orderId): RedirectResponse

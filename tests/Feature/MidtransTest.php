@@ -232,6 +232,27 @@ class MidtransTest extends TestCase
         $this->assertSame(0, JournalEntry::count());
     }
 
+    /** Alamat pantauan halaman pesanan: berganti sendiri begitu lunas; pesanan keluarga lain tak terlihat. */
+    public function test_pemantau_status_halaman_pesanan(): void
+    {
+        $this->santri('Ahmad', 'aktif');
+        $this->sebagaiIbu()->post(route('portal.online.dompet'), ['nominal' => 100000]);
+        $t = TransaksiMidtrans::sole();
+
+        $this->sebagaiIbu()->getJson(route('portal.online.status', $t->order_id))->assertExactJson(['status' => 'menunggu']);
+        $this->sebagaiIbu()->get(route('portal.online.lihat', $t->order_id))->assertSee('diperbarui otomatis')
+            ->assertSee('Pembayaran sedang diproses');
+
+        $this->apiMenjawab($t, 'settlement');
+        $this->notifikasi($t)->assertOk();
+        $this->sebagaiIbu()->getJson(route('portal.online.status', $t->order_id))->assertExactJson(['status' => 'lunas']);
+
+        $lain = Wali::create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Lain', 'telepon_ayah' => '0822', 'nama' => 'Lain',
+            'telepon' => '0822', 'status' => 'aktif']);
+        $this->actingAs($lain, 'wali')->withSession(['portal.peran' => 'ayah'])
+            ->getJson(route('portal.online.status', $t->order_id))->assertNotFound();
+    }
+
     public function test_kedaluwarsa_ditutup_tanpa_jurnal(): void
     {
         $this->santri('Ahmad', 'aktif');
