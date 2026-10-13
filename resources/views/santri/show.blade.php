@@ -165,6 +165,12 @@
         @php
             $bolehKoreksi = \App\Support\Akses::boleh('koreksi-tagihan', 'ubah');
             $adaKolomAksi = $bolehKoreksi || $bolehTunggakanAwal;
+            // Cetak kuitansi per pembayaran: lewat modul pembayaran yang boleh dilihat pengguna —
+            // PPSB didahulukan untuk calon, Kesantrian untuk santri lainnya. Tak punya keduanya = tanpa tombol.
+            $modulBayar = in_array($santri->status, \App\Models\Santri::CALON, true)
+                ? ['pembayaran-ppsb' => 'pembayaran_ppsb', 'pembayaran-kesantrian' => 'pembayaran_kesantrian']
+                : ['pembayaran-kesantrian' => 'pembayaran_kesantrian', 'pembayaran-ppsb' => 'pembayaran_ppsb'];
+            $ruteKuitansi = collect($modulBayar)->first(fn ($rute, $kode) => \App\Support\Akses::boleh($kode));
         @endphp
         <div class="mb-4 rounded-xl border border-gray-200 bg-white shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
@@ -323,6 +329,14 @@
                                         <div class="whitespace-nowrap text-[11px] tabular-nums text-gray-400">dicatat {{ $b->created_at?->format('d/m/Y H:i') }}</div>
                                         @if ($b->diverifikasi_pada)
                                             <div class="whitespace-nowrap text-[11px] tabular-nums text-gray-400">diverifikasi {{ $b->diverifikasi_pada->format('d/m/Y H:i') }}</div>
+                                        @endif
+                                        {{-- Kuitansi hanya untuk yang sudah diverifikasi — sama dengan penjaga di controllernya. --}}
+                                        @if ($ruteKuitansi && $b->status === 'terverifikasi')
+                                            <a href="{{ route($ruteKuitansi.'.kuitansi', $b->id) }}" target="_blank" rel="noopener"
+                                               class="mt-1 inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50">
+                                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>
+                                                Cetak kuitansi
+                                            </a>
                                         @endif
                                     </div>
                                 @empty

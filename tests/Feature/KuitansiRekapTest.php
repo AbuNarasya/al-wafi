@@ -95,6 +95,23 @@ class KuitansiRekapTest extends TestCase
         $res->assertSee('Kuitansi Pembayaran');
     }
 
+    /** Halaman detail santri: tombol Cetak kuitansi per pembayaran — hanya yang sudah diverifikasi. */
+    public function test_detail_santri_menautkan_kuitansi_per_pembayaran(): void
+    {
+        $this->actingAs(User::find($this->admin));
+        $santri = $this->santriDenganTagihan();
+        $bayar = $this->bayar($santri, '200000');
+        $tautan = route('pembayaran_ppsb.kuitansi', $bayar->id);
+
+        $this->get(route('santri.show', $santri->id))->assertOk()
+            ->assertSee($bayar->nomor)->assertDontSee($tautan, false);
+
+        (new PembayaranSantriService)->verifikasi($bayar->id, $this->admin);
+
+        $this->get(route('santri.show', $santri->id))->assertOk()
+            ->assertSee($tautan, false)->assertSee('Cetak kuitansi');
+    }
+
     public function test_rekap_menghitung_hanya_pembayaran_terverifikasi(): void
     {
         $santri = $this->santriDenganTagihan();
