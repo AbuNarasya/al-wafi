@@ -26,7 +26,8 @@
                      hint="Memindahkan santri ke wali lain sekaligus memindahkan tagihannya ke dompet wali itu." />
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-field name="nama" label="Nama Santri" :value="old('nama', $santri->nama)" required />
+                <x-field name="nama" label="Nama Santri" :value="old('nama', $santri->nama)" required
+                         class="uppercase" autocapitalize="characters" hint="Tersimpan dalam huruf kapital." />
                 <x-field name="jenis_kelamin" label="Jenis Kelamin" :value="old('jenis_kelamin', $santri->jenis_kelamin)"
                          :options="['L' => 'Laki-laki', 'P' => 'Perempuan']" required />
             </div>

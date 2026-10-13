@@ -260,7 +260,7 @@ class PendaftaranSatuLayarTest extends TestCase
             'gratis_registrasi' => '1', 'alasan_gratis_registrasi' => 'coba-coba',
         ]))->assertSessionMissing('error');
 
-        $santri = Santri::where('nama', 'Tanpa Hak')->firstOrFail();
+        $santri = Santri::where('nama', 'TANPA HAK')->firstOrFail();
         $this->assertFalse($santri->gratis_registrasi);
         $this->assertNull($santri->alasan_gratis_registrasi);
         $this->assertSame(1, TagihanSantri::where('id_santri', $santri->id)->where('perilaku', 'registrasi')->count());
@@ -272,7 +272,7 @@ class PendaftaranSatuLayarTest extends TestCase
             'gratis_registrasi' => '1', 'alasan_gratis_registrasi' => 'Dhuafa.',
         ]))->assertSessionMissing('error');
 
-        $dibebaskan = Santri::where('nama', 'Berhak')->firstOrFail();
+        $dibebaskan = Santri::where('nama', 'BERHAK')->firstOrFail();
         $this->assertTrue($dibebaskan->gratis_registrasi);
         $this->assertSame($berhak->id_pengguna, $dibebaskan->gratis_registrasi_oleh);
         $this->assertSame(0, TagihanSantri::where('id_santri', $dibebaskan->id)->where('perilaku', 'registrasi')->count());

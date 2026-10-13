@@ -524,7 +524,8 @@ class PemetaSantriLama implements Pemeta
                 // pendaftar PPSB dan tak mengacaukan penomoran PSB.
                 'no_pendaftaran' => 'LAMA-'.str_pad((string) (++$urut), 4, '0', STR_PAD_LEFT),
                 'nis' => trim($b['nis']),
-                'nama' => trim($b['nama']),
+                // `insert` melewati mutator model — kapitalnya ditegakkan di sini.
+                'nama' => Santri::rapikanNama($b['nama']),
                 'jenis_kelamin' => strtoupper(trim($b['jenis_kelamin'])),
                 'tempat_lahir' => $this->kosongJadiNull($b['tempat_lahir'] ?? ''),
                 'tanggal_lahir' => $this->kosongJadiNull($b['tanggal_lahir'] ?? ''),

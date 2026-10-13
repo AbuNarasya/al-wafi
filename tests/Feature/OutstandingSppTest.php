@@ -286,7 +286,7 @@ class OutstandingSppTest extends TestCase
 
         $this->actingAs($admin)->get(route('outstanding_spp.index'))->assertOk()
             ->assertSee('Daftar Outstanding SPP')
-            ->assertSee('Fatimah')
+            ->assertSee('FATIMAH')
             ->assertSee('Edit tagihan');
 
         $this->actingAs($admin)

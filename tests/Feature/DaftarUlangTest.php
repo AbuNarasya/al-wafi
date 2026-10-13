@@ -339,7 +339,7 @@ class DaftarUlangTest extends TestCase
 
         $this->assertCount(2, $semua['baris']);
         $this->assertCount(1, $disaring['baris']);
-        $this->assertSame('Angkatan Baru', $disaring['baris'][0]['nama']);
+        $this->assertSame('ANGKATAN BARU', $disaring['baris'][0]['nama']);
     }
 
     public function test_pembayaran_daftar_ulang_masuk_lingkup_kependidikan(): void

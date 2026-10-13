@@ -66,6 +66,26 @@ class Santri extends Model
             : $query->whereIn('status', $status);
     }
 
+    /**
+     * Nama santri selalu HURUF KAPITAL, spasi dirapikan (keputusan user 13 Okt 2026).
+     * Ditegakkan di model supaya semua pintu masuk — form staf, Santri Lama manual,
+     * pendaftaran Portal Wali — ikut tanpa disebut satu per satu. Jalur yang
+     * melewati model (`Santri::insert` di impor) wajib memanggil ini sendiri.
+     */
+    public static function rapikanNama(?string $nama): ?string
+    {
+        if ($nama === null) {
+            return null;
+        }
+
+        return mb_strtoupper(preg_replace('/\s+/u', ' ', trim($nama)));
+    }
+
+    protected function nama(): Attribute
+    {
+        return Attribute::make(set: fn ($nilai) => self::rapikanNama($nilai));
+    }
+
     /** Umur (tahun penuh) dari tanggal_lahir — dihitung, tidak disimpan. */
     protected function umur(): Attribute
     {

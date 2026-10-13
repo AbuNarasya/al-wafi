@@ -268,7 +268,7 @@ class OutstandingLainTest extends TestCase
 
         $this->actingAs($this->admin)->get(route('outstanding_lain.index'))
             ->assertOk()
-            ->assertSee('Santri Uji')
+            ->assertSee('SANTRI UJI')
             ->assertSee('Lain-lain Uji')
             ->assertSee('Laundry Agustus')
             ->assertSee('lewat 11 hari')
@@ -365,7 +365,7 @@ class OutstandingLainTest extends TestCase
         $t = $this->tagihan('LAIN-UJI', 'lain', '140000');
         $this->actingAs($staf)->get(route('outstanding_lain.index'))
             ->assertOk()
-            ->assertSee('Santri Uji')
+            ->assertSee('SANTRI UJI')
             ->assertDontSee('Edit tagihan');
 
         $this->actingAs($staf)->put(route('outstanding_lain.koreksi', $t->id), [

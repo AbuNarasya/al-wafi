@@ -86,7 +86,7 @@ class PortalKeluargaTest extends TestCase
 
         // Nomor anak keluarga lain di alamat tak membuka apa pun — jatuh ke anak sendiri.
         $this->sebagai($saya)->get(route('portal.tagihan', ['anak' => $anakLain->id]))
-            ->assertOk()->assertSee('Tagihan Saya')->assertDontSee('Tagihan Rahasia')->assertDontSee('Anak Lain');
+            ->assertOk()->assertSee('Tagihan Saya')->assertDontSee('Tagihan Rahasia')->assertDontSee('ANAK LAIN');
     }
 
     public function test_status_tagihan_dan_yang_batal_disembunyikan(): void
@@ -182,7 +182,7 @@ class PortalKeluargaTest extends TestCase
 
         $this->sebagai($wali)->get(route('portal.tagihan'))->assertOk()
             ->assertSee('Total sisa tagihan keluarga')->assertSee('Rp 5.700.000')
-            ->assertSee('Kakak')->assertSee('Adik')->assertDontSee('Daftar Ulang Adik');
+            ->assertSee('KAKAK')->assertSee('ADIK')->assertDontSee('Daftar Ulang Adik');
 
         // Rincian satu anak: nama tagihan untuk wali, tanpa catatan pembukuan.
         $this->sebagai($wali)->get(route('portal.tagihan', ['anak' => $kakak->id]))->assertOk()
@@ -200,7 +200,7 @@ class PortalKeluargaTest extends TestCase
 
         $this->sebagai($wali)->get(route('portal.tagihan.riwayat'))->assertOk()
             ->assertSee('Rp 600.000')->assertSee('Daftar Ulang Lunas')->assertSee('Laundry Belum')
-            ->assertSee('Kakak Riwayat')->assertDontSee('Tagihan Asing');
+            ->assertSee('KAKAK RIWAYAT')->assertDontSee('Tagihan Asing');
     }
 
     public function test_mutasi_anak_bisa_disaring_per_anak(): void
@@ -231,7 +231,7 @@ class PortalKeluargaTest extends TestCase
         $anakLain = $this->anak($lain, 'Anak Rahasia');
 
         $this->sebagai($saya)->get(route('portal.anak', $anakSaya->id))->assertOk()
-            ->assertSee('Anak Saya')->assertSee('Daftar Ulang Saya')->assertSee('Rp 750.000')->assertSee('Rp 85.000');
+            ->assertSee('ANAK SAYA')->assertSee('Daftar Ulang Saya')->assertSee('Rp 750.000')->assertSee('Rp 85.000');
         $this->sebagai($saya)->get(route('portal.anak', $anakLain->id))->assertNotFound();
 
         // Kartu anak di beranda menaut ke halaman detailnya.

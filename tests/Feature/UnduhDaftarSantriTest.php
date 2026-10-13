@@ -103,9 +103,9 @@ class UnduhDaftarSantriTest extends TestCase
         $this->santri('Sudah Alumni', 'alumni');
 
         $isi = $this->isi('aktif');
-        $this->assertStringContainsString('Santri Aktif', $isi);
-        $this->assertStringNotContainsString('Masih Calon', $isi);
-        $this->assertStringNotContainsString('Sudah Alumni', $isi);
+        $this->assertStringContainsString('SANTRI AKTIF', $isi);
+        $this->assertStringNotContainsString('MASIH CALON', $isi);
+        $this->assertStringNotContainsString('SUDAH ALUMNI', $isi);
         $this->assertStringContainsString('Sisa Tagihan', $isi);
     }
 
@@ -199,11 +199,11 @@ class UnduhDaftarSantriTest extends TestCase
         $this->santri('Siap Diaktifkan', 'siap_aktivasi');
 
         $isi = $this->isi('calon');
-        foreach (['Baru Daftar', 'Lolos Medcheck', 'Tidak Lulus'] as $nama) {
+        foreach (['BARU DAFTAR', 'LOLOS MEDCHECK', 'TIDAK LULUS'] as $nama) {
             $this->assertStringContainsString($nama, $isi);
         }
-        $this->assertStringNotContainsString('Sudah Aktif', $isi);
-        $this->assertStringNotContainsString('Siap Diaktifkan', $isi);
+        $this->assertStringNotContainsString('SUDAH AKTIF', $isi);
+        $this->assertStringNotContainsString('SIAP DIAKTIFKAN', $isi);
     }
 
     public function test_unduh_siap_aktivasi_hanya_berisi_yang_siap(): void
@@ -213,9 +213,9 @@ class UnduhDaftarSantriTest extends TestCase
         $this->santri('Sudah Aktif', 'aktif');
 
         $isi = $this->isi('siap_aktivasi');
-        $this->assertStringContainsString('Siap Diaktifkan', $isi);
-        $this->assertStringNotContainsString('Baru Daftar', $isi);
-        $this->assertStringNotContainsString('Sudah Aktif', $isi);
+        $this->assertStringContainsString('SIAP DIAKTIFKAN', $isi);
+        $this->assertStringNotContainsString('BARU DAFTAR', $isi);
+        $this->assertStringNotContainsString('SUDAH AKTIF', $isi);
     }
 
     // ---- Penyaring & paginasi ----
@@ -226,12 +226,12 @@ class UnduhDaftarSantriTest extends TestCase
         $this->santri('Anak SMP', 'aktif', 'SMP');
 
         $perJenjang = $this->isi('aktif', ['jenjang' => 'SMP']);
-        $this->assertStringContainsString('Anak SMP', $perJenjang);
-        $this->assertStringNotContainsString('Anak SD', $perJenjang);
+        $this->assertStringContainsString('ANAK SMP', $perJenjang);
+        $this->assertStringNotContainsString('ANAK SD', $perJenjang);
 
         $perCarian = $this->isi('aktif', ['q' => 'Anak SD']);
-        $this->assertStringContainsString('Anak SD', $perCarian);
-        $this->assertStringNotContainsString('Anak SMP', $perCarian);
+        $this->assertStringContainsString('ANAK SD', $perCarian);
+        $this->assertStringNotContainsString('ANAK SMP', $perCarian);
     }
 
     /** Daftarnya berpaginasi 25; berkasnya tidak boleh ikut terpotong. */
@@ -243,7 +243,7 @@ class UnduhDaftarSantriTest extends TestCase
 
         $isi = $this->isi('aktif');
         $this->assertSame(31, substr_count(trim($isi), "\n") + 1, 'header + 30 baris');
-        $this->assertStringContainsString('Santri Ke 30', $isi);
+        $this->assertStringContainsString('SANTRI KE 30', $isi);
     }
 
     // ---- Halaman Export Data ----
@@ -259,12 +259,12 @@ class UnduhDaftarSantriTest extends TestCase
 
         $calon = (new DatasetRegistry)->rows('calon-santri');
         $this->assertCount(1, $calon);
-        $this->assertSame('Baru Daftar', $calon[0]['Nama']);
+        $this->assertSame('BARU DAFTAR', $calon[0]['Nama']);
         $this->assertSame('Calon', $calon[0]['Status']);
 
         $siap = (new DatasetRegistry)->rows('siap-aktivasi');
         $this->assertCount(1, $siap);
-        $this->assertSame('Siap Diaktifkan', $siap[0]['Nama']);
+        $this->assertSame('SIAP DIAKTIFKAN', $siap[0]['Nama']);
         $this->assertSame('Siap Diaktifkan', $siap[0]['Status']);
 
         // Keduanya dapat diunduh dari halaman Export Data.

@@ -90,7 +90,7 @@ class KuitansiRekapTest extends TestCase
 
         $res = $this->get(route('pembayaran_ppsb.kuitansi', $bayar->id))->assertOk();
         $res->assertSee($bayar->nomor);
-        $res->assertSee('Ahmad');
+        $res->assertSee('AHMAD');
         $res->assertSee('dua ratus ribu rupiah');
         $res->assertSee('Kuitansi Pembayaran');
     }
@@ -122,7 +122,7 @@ class KuitansiRekapTest extends TestCase
         $bayar = $this->bayar($santri, '500000');
         (new PembayaranSantriService)->verifikasi($bayar->id, $this->admin);
 
-        $this->get(route('rekap_pembayaran.index'))->assertOk()->assertSee('Ahmad');
+        $this->get(route('rekap_pembayaran.index'))->assertOk()->assertSee('AHMAD');
         $this->get(route('rekap_pembayaran.show', $santri->id))->assertOk()
             ->assertSee('Riwayat Pembayaran')->assertSee($bayar->nomor);
         $this->get(route('rekap_pembayaran.cetak', $santri->id))->assertOk()

@@ -186,14 +186,14 @@ class PpsbTest extends TestCase
 
         // Belum ber-NIS (masih calon) → nomor pendaftarannya yang dipakai.
         $this->assertSame(
-            "{$santri->no_pendaftaran} - Ahmad Fauzan - SD Tahfizh - Tingkat 3",
+            "{$santri->no_pendaftaran} - AHMAD FAUZAN - SD Tahfizh - Tingkat 3",
             Referensi::labelSantri($santri),
         );
 
         // Sesudah ber-NIS, NIS-nya menang.
         $santri->update(['nis' => '260001']);
         $this->assertSame(
-            '260001 - Ahmad Fauzan - SD Tahfizh - Tingkat 3',
+            '260001 - AHMAD FAUZAN - SD Tahfizh - Tingkat 3',
             Referensi::labelSantri($santri->refresh()),
         );
 
@@ -203,7 +203,7 @@ class PpsbTest extends TestCase
 
         // Opsi dropdown berkunci id santri, dan hanya satu kueri master jenjang.
         $opsi = Referensi::santri();
-        $this->assertSame(['260001 - Ahmad Fauzan - SD Tahfizh - —'], array_values($opsi));
+        $this->assertSame(['260001 - AHMAD FAUZAN - SD Tahfizh - —'], array_values($opsi));
         $this->assertSame([$santri->id], array_keys($opsi));
     }
 

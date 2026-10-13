@@ -93,7 +93,7 @@ class EditSantriTest extends TestCase
     public function test_form_ubah_bisa_dibuka_dan_terisi_data_lama(): void
     {
         $this->actingAs($this->admin)->get(route('santri.edit', $this->santri->id))->assertOk()
-            ->assertSee('Zaid')
+            ->assertSee('ZAID')
             ->assertSee($this->santri->no_pendaftaran)
             ->assertSee('Simpan Perubahan');
     }
@@ -103,10 +103,32 @@ class EditSantriTest extends TestCase
         $this->simpan()->assertRedirect(route('santri.show', $this->santri->id))->assertSessionHas('status');
 
         $this->santri->refresh();
-        $this->assertSame('Zaid Abdullah', $this->santri->nama);
+        $this->assertSame('ZAID ABDULLAH', $this->santri->nama);
         $this->assertSame('Bogor', $this->santri->tempat_lahir);
         $this->assertSame('0071234567', $this->santri->nisn);
         $this->assertSame(6, $this->santri->tingkat);
+    }
+
+    /** Nama santri selalu kapital & berspasi rapi — dari pintu mana pun (13 Okt 2026). */
+    public function test_nama_santri_selalu_huruf_kapital(): void
+    {
+        $this->assertSame('ZAID', $this->santri->fresh()->nama, 'dibuat lewat SantriService');
+
+        $this->simpan(['nama' => "  muhammad   'ali  al-fātiḥ "]);
+        $this->assertSame("MUHAMMAD 'ALI AL-FĀTIḤ", $this->santri->fresh()->nama);
+
+        $this->assertNull(Santri::rapikanNama(null));
+    }
+
+    /** Migrasi 000057 menyeragamkan nama yang sudah tersimpan dengan aturan yang sama. */
+    public function test_migrasi_mengkapitalkan_nama_lama(): void
+    {
+        \Illuminate\Support\Facades\DB::table('santri')->where('id', $this->santri->id)
+            ->update(['nama' => ' zaid   bin  umar ']);
+
+        (require database_path('migrations/2025_01_10_000057_nama_santri_kapital.php'))->up();
+
+        $this->assertSame('ZAID BIN UMAR', $this->santri->fresh()->nama);
     }
 
     /** Inti penjagaannya: kolom penentu tarif & status tak tersentuh form ini. */

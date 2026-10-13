@@ -259,11 +259,11 @@ class TingkatJenjangTest extends TestCase
         Santri::query()->update(['status' => 'aktif']);
 
         $this->actingAs($this->admin)->get('/kesantrian/santri?jenjang=SDTQ')->assertOk()
-            ->assertSee('Umar')->assertDontSee('Zaid')
+            ->assertSee('UMAR')->assertDontSee('ZAID')
             ->assertSee('Tingkat 4');
 
         // Penyaring tingkat berdiri sendiri.
         $this->actingAs($this->admin)->get('/kesantrian/santri?tingkat=1')->assertOk()
-            ->assertSee('Zaid')->assertDontSee('Umar');
+            ->assertSee('ZAID')->assertDontSee('UMAR');
     }
 }

@@ -238,22 +238,22 @@ class KenaikanTingkatTest extends TestCase
 
         // Daftar Santri (Kependidikan) hanya yang AKTIF.
         $this->actingAs($this->admin)->get(route('santri.aktif'))->assertOk()
-            ->assertSee('Masih Sekolah')
-            ->assertDontSee('Sudah Lulus')
-            ->assertDontSee('Berhenti');
+            ->assertSee('MASIH SEKOLAH')
+            ->assertDontSee('SUDAH LULUS')
+            ->assertDontSee('BERHENTI');
 
         // Alumni punya daftarnya sendiri, lengkap dengan tanggal lulusnya.
         $this->actingAs($this->admin)->get(route('santri.alumni'))->assertOk()
-            ->assertSee('Sudah Lulus')
+            ->assertSee('SUDAH LULUS')
             ->assertSee('Tanggal Lulus')
-            ->assertDontSee('Masih Sekolah')
-            ->assertDontSee('Berhenti');
+            ->assertDontSee('MASIH SEKOLAH')
+            ->assertDontSee('BERHENTI');
 
         // Begitu pula yang keluar.
         $this->actingAs($this->admin)->get(route('santri.keluar'))->assertOk()
-            ->assertSee('Berhenti')
-            ->assertDontSee('Masih Sekolah')
-            ->assertDontSee('Sudah Lulus');
+            ->assertSee('BERHENTI')
+            ->assertDontSee('MASIH SEKOLAH')
+            ->assertDontSee('SUDAH LULUS');
     }
 
     /**
@@ -266,15 +266,15 @@ class KenaikanTingkatTest extends TestCase
         $santri = $this->santri('Calon Naik Jenjang', 3);
 
         $this->actingAs($this->admin)->get(route('santri.calon'))->assertOk()
-            ->assertDontSee('Calon Naik Jenjang');
+            ->assertDontSee('CALON NAIK JENJANG');
 
         $this->tetapkanLaluBerlaku(self::TA2, [$santri->id => KT::MELANJUTKAN], $this->admin->id_pengguna);
 
         $this->actingAs($this->admin)->get(route('santri.calon'))->assertOk()
-            ->assertSee('Calon Naik Jenjang');
+            ->assertSee('CALON NAIK JENJANG');
         // …dan TIDAK hilang dari daftar santri aktif: ia masih bersekolah.
         $this->actingAs($this->admin)->get(route('santri.aktif'))->assertOk()
-            ->assertSee('Calon Naik Jenjang');
+            ->assertSee('CALON NAIK JENJANG');
     }
 
     // ---- Eksekusi ----

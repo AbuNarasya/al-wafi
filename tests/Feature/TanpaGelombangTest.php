@@ -126,6 +126,6 @@ class TanpaGelombangTest extends TestCase
         // "Tanpa Gelombang" → lolos & tersimpan NULL, bukan kode sentinelnya.
         $this->post(route('santri.store'), $dasar + ['gelombang' => \App\Http\Controllers\SantriController::TANPA_GELOMBANG])
             ->assertSessionHasNoErrors();
-        $this->assertNull(Santri::where('nama', 'Zaid')->first()->gelombang);
+        $this->assertNull(Santri::where('nama', 'ZAID')->first()->gelombang);
     }
 }

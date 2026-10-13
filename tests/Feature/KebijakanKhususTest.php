@@ -298,7 +298,7 @@ class KebijakanKhususTest extends TestCase
             ->get(route('kebijakan_khusus.index'))
             ->assertOk()
             ->assertSee('Kebijakan Khusus Santri')
-            ->assertSee('Ahmad')
+            ->assertSee('AHMAD')
             ->assertSee('surat permohonan wali');
     }
 }

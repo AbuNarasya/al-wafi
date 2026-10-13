@@ -307,14 +307,14 @@ class BebasTanggunganTest extends TestCase
             ->get(route('bebas_tanggungan.index'))
             ->assertOk()
             ->assertSee('Bebas Tanggungan')
-            ->assertSee('Santri Bertitipan')
+            ->assertSee('SANTRI BERTITIPAN')
             // Yang sudah bersih disembunyikan secara bawaan — daftar ini gunanya
             // memperlihatkan pekerjaan yang tersisa, bukan seluruh santri.
-            ->assertDontSee('Santri Bersih');
+            ->assertDontSee('SANTRI BERSIH');
 
         $this->actingAs(User::find($this->admin))
             ->get(route('bebas_tanggungan.index', ['semua' => 1]))
             ->assertOk()
-            ->assertSee('Santri Bersih');
+            ->assertSee('SANTRI BERSIH');
     }
 }

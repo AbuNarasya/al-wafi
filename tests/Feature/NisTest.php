@@ -149,7 +149,7 @@ class NisTest extends TestCase
 
         $daftar = (new NisService)->pratinjau();
 
-        $this->assertSame(['Ahmad', 'Mahmud', 'Zulkifli'], array_column($daftar, 'nama'));
+        $this->assertSame(['AHMAD', 'MAHMUD', 'ZULKIFLI'],array_column($daftar, 'nama'));
         $this->assertSame(['262707001', '262707002', '262707003'], array_column($daftar, 'nis'));
     }
 
@@ -163,9 +163,9 @@ class NisTest extends TestCase
         $nis = collect((new NisService)->pratinjau())->pluck('nis', 'nama')->all();
 
         // Ketiganya bernomor urut 001 — deretnya sendiri-sendiri per jenjang.
-        $this->assertSame('262701001', $nis['Ahmad']);
-        $this->assertSame('262707001', $nis['Budi']);
-        $this->assertSame('262710001', $nis['Citra']);
+        $this->assertSame('262701001', $nis['AHMAD']);
+        $this->assertSame('262707001', $nis['BUDI']);
+        $this->assertSame('262710001', $nis['CITRA']);
     }
 
     /** Penyusul MELANJUTKAN nomor, walau abjadnya jadi tak berurutan. */
@@ -181,7 +181,7 @@ class NisTest extends TestCase
 
         $daftar = $svc->pratinjau();
         $this->assertCount(1, $daftar);
-        $this->assertSame('Abdul', $daftar[0]['nama']);
+        $this->assertSame('ABDUL', $daftar[0]['nama']);
         $this->assertSame('262707003', $daftar[0]['nis'], 'penyusul melanjutkan, tidak menyisip di 001');
 
         $svc->terbitkan([$abdul->id], $this->admin);
@@ -263,7 +263,7 @@ class NisTest extends TestCase
 
         // Dicari dengan nomor LAMA — yang tercetak di kartu wali.
         $this->actingAs(User::find($this->admin))
-            ->get(route('santri.aktif', ['q' => '262707001']))->assertOk()->assertSee('Ahmad');
+            ->get(route('santri.aktif', ['q' => '262707001']))->assertOk()->assertSee('AHMAD');
     }
 
     /** Alur HTTP: layarnya tampil & penerbitannya tersimpan. */

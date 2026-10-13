@@ -192,7 +192,7 @@ class PersiapanPortalWaliTest extends TestCase
         $this->assertSame(['sama@contoh.id'], array_column($r['kembar'], 'email'));
         $this->assertEqualsCanonicalizing([$kembarA->id, $kembarB->id], array_column($r['kembar'][0]['keluarga'], 'id'));
         $this->assertSame([$tanpa->id], array_column($r['tanpa_email'], 'id'));
-        $this->assertSame('Anak Tanpa Email', $r['tanpa_email'][0]['anak'][0]['nama']);
+        $this->assertSame('ANAK TANPA EMAIL', $r['tanpa_email'][0]['anak'][0]['nama']);
     }
 
     public function test_layar_kesiapan_dan_kembali_ke_sana_setelah_menyunting(): void
@@ -201,7 +201,7 @@ class PersiapanPortalWaliTest extends TestCase
         $this->anak($tanpa, 'Anak Tanpa Email');
 
         $this->actingAs($this->admin)->get(route('wali.kesiapan_portal'))
-            ->assertOk()->assertSee('Keluarga Tanpa Email')->assertSee('Anak Tanpa Email');
+            ->assertOk()->assertSee('Keluarga Tanpa Email')->assertSee('ANAK TANPA EMAIL');
 
         $this->actingAs($this->admin)->put(route('wali.update', $tanpa->id), [
             'dari' => 'kesiapan', 'kontak_utama' => 'wali', 'nama_wali' => 'Keluarga Tanpa Email',

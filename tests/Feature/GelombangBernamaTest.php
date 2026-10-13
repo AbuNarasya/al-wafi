@@ -171,7 +171,7 @@ class GelombangBernamaTest extends TestCase
             'jalur' => 'reguler', 'gelombang' => self::KODE,
         ])->assertSessionHasNoErrors();
 
-        $this->assertSame(self::KODE, Santri::where('nama', 'Zaid')->first()->gelombang);
+        $this->assertSame(self::KODE, Santri::where('nama', 'ZAID')->first()->gelombang);
     }
 
     // ---- 3. Potongan diperoleh dengan membayar registrasi ----

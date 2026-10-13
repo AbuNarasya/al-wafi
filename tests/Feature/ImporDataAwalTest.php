@@ -411,7 +411,7 @@ class ImporDataAwalTest extends TestCase
         $hasil = app(ImporSaldoAwal::class)->jalankan('santri-lama', $path, $this->param());
 
         $this->assertSame(1, $hasil['tersimpan']['santri']);
-        $this->assertSame('Süleyman Çelebi', Santri::where('nis', '230023')->value('nama'));
+        $this->assertSame('SÜLEYMAN ÇELEBI', Santri::where('nis', '230023')->value('nama'));
     }
 
     /**

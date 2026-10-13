@@ -129,10 +129,10 @@ class KepesertaanLainTest extends TestCase
         $this->assertLessThanOrEqual($sedikitTanpaTarif, $banyakTanpaTarif);
 
         $nominal = collect($peserta)->mapWithKeys(fn ($p) => [$p['rec']->santri->nama => $p['nominal']]);
-        $this->assertSame('28500000.00', $nominal['Awal SMP']);
-        $this->assertSame('24000000.00', $nominal['Awal SMA'], 'Keringanan menang atas tarif jenjang.');
-        $this->assertSame('31000000.00', $nominal['Tambahan 2']);
-        $this->assertTrue(collect($peserta)->firstWhere(fn ($p) => $p['rec']->santri->nama === 'Awal SMA')['keringanan']);
+        $this->assertSame('28500000.00', $nominal['AWAL SMP']);
+        $this->assertSame('24000000.00', $nominal['AWAL SMA'], 'Keringanan menang atas tarif jenjang.');
+        $this->assertSame('31000000.00', $nominal['TAMBAHAN 2']);
+        $this->assertTrue(collect($peserta)->firstWhere(fn ($p) => $p['rec']->santri->nama === 'AWAL SMA')['keringanan']);
     }
 
     public function test_jenjang_tanpa_sel_tarif_tidak_bisa_didaftarkan(): void
@@ -190,7 +190,7 @@ class KepesertaanLainTest extends TestCase
         $hasil = $this->svc()->simpanGrid(['UMR' => ['SMP' => '', 'SMA' => '31000000']]);
 
         $this->assertSame(1, $hasil['dihapus']);
-        $this->assertSame(['Endra Wijaya (Program Umroh 2026)'], $hasil['peserta_menggantung']);
+        $this->assertSame(['ENDRA WIJAYA (Program Umroh 2026)'], $hasil['peserta_menggantung']);
     }
 
     public function test_penerbitan_menagih_tiap_jenjang_sebesar_tarifnya_sendiri(): void
@@ -248,7 +248,7 @@ class KepesertaanLainTest extends TestCase
 
         $this->assertSame(1, $hasil['terbit']);
         $this->assertCount(1, $hasil['gugur']);
-        $this->assertStringContainsString('Kevin Anwar', $hasil['gugur'][0]);
+        $this->assertStringContainsString('KEVIN ANWAR',$hasil['gugur'][0]);
         $this->assertStringContainsString('belum punya tarif', $hasil['gugur'][0]);
     }
 

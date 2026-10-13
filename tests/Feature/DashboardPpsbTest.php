@@ -403,7 +403,7 @@ class DashboardPpsbTest extends TestCase
         $rincian = (new PpsbDashboardService)->rincian(self::TA, 'outstanding');
 
         $this->assertSame(1, $rincian->total());
-        $this->assertSame('SudahMulai', $rincian[0]->nama);
+        $this->assertSame('SUDAHMULAI', $rincian[0]->nama);
         $this->assertSame('6000000.00', $rincian[0]->sisa);
         $this->assertSame('6000000.00', (string) $rincian[0]->sisa);
         $this->assertSame(4000000.0, (float) $rincian[0]->terbayar);
@@ -419,7 +419,7 @@ class DashboardPpsbTest extends TestCase
             $s = $this->calon('Calon '.$i);
             $this->bayar($s, 'registrasi', '1000000', '2026-09-10');
         }
-        $dicari = Santri::where('nama', 'Calon 30')->firstOrFail();
+        $dicari = Santri::where('nama', 'CALON 30')->firstOrFail();
 
         $svc = new PpsbDashboardService;
         $halaman1 = $svc->rincian(self::TA, 'registrasi');
@@ -431,12 +431,12 @@ class DashboardPpsbTest extends TestCase
         // Cari nomor pendaftaran santri yang berada di HALAMAN KEDUA.
         $hasil = $svc->rincian(self::TA, 'registrasi', $dicari->no_pendaftaran);
         $this->assertSame(1, $hasil->total());
-        $this->assertSame('Calon 30', $hasil[0]->nama);
+        $this->assertSame('CALON 30', $hasil[0]->nama);
 
         // Lewat halaman: pencarian & pilihan kartu ikut terbawa saat pindah halaman.
         $this->actingAs($this->admin)
             ->get('/dashboard?tab=ppsb&detail=registrasi&cari='.$dicari->no_pendaftaran)
-            ->assertOk()->assertSee('Calon 30')->assertDontSee('Calon 1<');
+            ->assertOk()->assertSee('CALON 30')->assertDontSee('CALON 1<', false);
 
         $this->actingAs($this->admin)->get('/dashboard?tab=ppsb&detail=registrasi&page=2')
             ->assertOk()->assertSee('30 santri');

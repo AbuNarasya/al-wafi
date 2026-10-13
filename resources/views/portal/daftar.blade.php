@@ -100,7 +100,7 @@
                 <h2 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span>Data anak</h2>
                 <div>
                     <label for="nama" class="{{ $kelasLabel }}">Nama lengkap anak <span class="text-red-500">*</span></label>
-                    <input id="nama" name="nama" required value="{{ old('nama') }}" class="{{ $kelasInput }}">
+                    <input id="nama" name="nama" required value="{{ old('nama') }}" autocapitalize="characters" class="{{ $kelasInput }} uppercase">
                     @error('nama')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div>

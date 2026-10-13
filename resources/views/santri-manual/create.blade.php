@@ -49,7 +49,8 @@
             <div class="grid gap-4 sm:grid-cols-3">
                 <x-field name="nis" label="NIS" :value="old('nis')" required hint="NIS aslinya dari sekolah/sistem lama." />
                 <div class="sm:col-span-2">
-                    <x-field name="nama" label="Nama Lengkap" :value="old('nama')" required />
+                    <x-field name="nama" label="Nama Lengkap" :value="old('nama')" required
+                             class="uppercase" autocapitalize="characters" hint="Tersimpan dalam huruf kapital." />
                 </div>
             </div>
 

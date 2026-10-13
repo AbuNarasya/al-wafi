@@ -122,7 +122,7 @@ class PortalWaliTest extends TestCase
 
         $this->assertSame('ibu', session('portal.peran'));
         $this->get(route('portal.beranda'))->assertOk()
-            ->assertSee('Ibu Hasanah')->assertSee('Anak Hasan')->assertSee('Berkas Terverifikasi');
+            ->assertSee('Ibu Hasanah')->assertSee('ANAK HASAN')->assertSee('Berkas Terverifikasi');
     }
 
     public function test_kode_salah_lima_kali_menghanguskan_kodenya(): void
@@ -218,7 +218,7 @@ class PortalWaliTest extends TestCase
 
         // Langsung masuk — beranda menampilkan anaknya.
         $this->assertSame('ibu', session('portal.peran'));
-        $this->get(route('portal.beranda'))->assertOk()->assertSee('Ahmad Faqih')->assertSee('Rp 500.000');
+        $this->get(route('portal.beranda'))->assertOk()->assertSee('AHMAD FAQIH')->assertSee('Rp 500.000');
     }
 
     /** Celah pengambilalihan: nomor HP keluarga lain tak boleh menempelkan pendaftar ke keluarga itu. */

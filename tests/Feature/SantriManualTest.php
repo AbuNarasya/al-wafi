@@ -339,7 +339,7 @@ class SantriManualTest extends TestCase
         $this->actingAs($this->admin)->get(route('santri_manual.create'))
             ->assertOk()
             ->assertSee('Input Manual Santri Aktif')
-            ->assertSee('Santri Pindahan')
+            ->assertSee('SANTRI PINDAHAN')
             ->assertSee('Akrual sekarang');
     }
 }

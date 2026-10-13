@@ -82,7 +82,7 @@ class PilihKolomUnduhanTest extends TestCase
         $this->assertContains('Nama', $kolom);
         $this->assertContains('Nama Ibu', $kolom);
         // Hanya NAMA kolomnya — datanya tidak ikut terkirim.
-        $this->assertStringNotContainsString('Ahmad Fauzi', $r->getContent());
+        $this->assertStringNotContainsString('AHMAD FAUZI', $r->getContent());
     }
 
     public function test_daftar_kolom_juga_dijawab_export_data_dan_dashboard(): void
@@ -110,7 +110,7 @@ class PilihKolomUnduhanTest extends TestCase
 
         // Urutan mengikuti SUMBER (NIS lebih dulu dari Nama), bukan urutan centang.
         $this->assertSame(['NIS', 'Nama', 'Nama Ibu'], $this->header($csv));
-        $this->assertStringContainsString('Ahmad Fauzi', $csv);
+        $this->assertStringContainsString('AHMAD FAUZI', $csv);
         $this->assertStringNotContainsString('No. Pendaftaran', $csv);
     }
 

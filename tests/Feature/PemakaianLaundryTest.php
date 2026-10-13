@@ -172,7 +172,7 @@ class PemakaianLaundryTest extends TestCase
         ], $this->petugas->id_pengguna);
 
         $this->assertSame(1, $hasil['terbit'], 'Hanya yang melewati kuota.');
-        $this->assertSame(['Bilal Ramadhan'], $hasil['di_bawah_kuota']);
+        $this->assertSame(['BILAL RAMADHAN'], $hasil['di_bawah_kuota']);
         $this->assertSame(0, TagihanSantri::where('id_santri', $bawah->id)->count(),
             'Bukan tagihan Rp 0 — memang tak ada tagihan.');
         $this->assertSame(0, bccomp(TagihanSantri::where('id_santri', $lewat->id)->value('nominal'), '87500', 2));

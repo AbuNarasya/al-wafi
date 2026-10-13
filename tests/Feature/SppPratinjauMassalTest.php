@@ -155,17 +155,17 @@ class SppPratinjauMassalTest extends TestCase
 
         // Dan angkanya memang yang diharapkan, bukan sekadar sama-sama keliru.
         $nominal = collect($pratinjau)->pluck('nominal', 'nama');
-        $this->assertSame('400000.00', $nominal['A Biasa']);
-        $this->assertSame('200000.00', $nominal['B Persen']);
-        $this->assertSame('100000.00', $nominal['C Nominal Khusus']);
-        $this->assertSame('325000.00', $nominal['D Dua Kebijakan']);
-        $this->assertSame('400000.00', $nominal['E Kebijakan Tahun Lain']);
-        $this->assertSame('250000.00', $nominal['F Cara Lama']);
-        $this->assertNull($nominal['G Bebas']);
-        $this->assertSame('50000.00', $nominal['H Bebas Tapi Khusus']);
-        $this->assertNull($nominal['I Sel Kosong']);
-        $this->assertSame('120000.00', $nominal['J Sel Kosong Berkebijakan']);
-        $this->assertNull($nominal['K Tanpa Jenis']);
+        $this->assertSame('400000.00', $nominal['A BIASA']);
+        $this->assertSame('200000.00', $nominal['B PERSEN']);
+        $this->assertSame('100000.00', $nominal['C NOMINAL KHUSUS']);
+        $this->assertSame('325000.00', $nominal['D DUA KEBIJAKAN']);
+        $this->assertSame('400000.00', $nominal['E KEBIJAKAN TAHUN LAIN']);
+        $this->assertSame('250000.00', $nominal['F CARA LAMA']);
+        $this->assertNull($nominal['G BEBAS']);
+        $this->assertSame('50000.00', $nominal['H BEBAS TAPI KHUSUS']);
+        $this->assertNull($nominal['I SEL KOSONG']);
+        $this->assertSame('120000.00', $nominal['J SEL KOSONG BERKEBIJAKAN']);
+        $this->assertNull($nominal['K TANPA JENIS']);
     }
 
     public function test_jumlah_kueri_tidak_tumbuh_bersama_jumlah_santri(): void

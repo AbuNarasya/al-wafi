@@ -161,13 +161,13 @@ class StatusBayarDaftarTest extends TestCase
         $this->bayar($menunggu, '250000');
 
         $this->actingAs($this->admin)->get('/ppsb/calon-santri?bayar=menunggu')->assertOk()
-            ->assertSee('SiMenunggu')->assertDontSee('SiLunas')->assertDontSee('SiBelum');
+            ->assertSee('SIMENUNGGU')->assertDontSee('SILUNAS')->assertDontSee('SIBELUM');
 
         $this->actingAs($this->admin)->get('/ppsb/calon-santri?bayar=lunas')->assertOk()
-            ->assertSee('SiLunas')->assertDontSee('SiMenunggu');
+            ->assertSee('SILUNAS')->assertDontSee('SIMENUNGGU');
 
         $this->actingAs($this->admin)->get('/ppsb/calon-santri?bayar=belum')->assertOk()
-            ->assertSee('SiBelum')->assertDontSee('SiMenunggu');
+            ->assertSee('SIBELUM')->assertDontSee('SIMENUNGGU');
     }
 
     /** Detail santri menunjukkan setoran yang belum diverifikasi per tagihan. */

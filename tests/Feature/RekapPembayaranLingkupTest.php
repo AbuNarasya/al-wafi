@@ -102,12 +102,12 @@ class RekapPembayaranLingkupTest extends TestCase
         $svc = new RekapPembayaranService;
 
         $ppsb = $svc->opsiSantri('', 'ppsb')->pluck('nama')->all();
-        $this->assertSame(['Ahmad Menunggak'], $ppsb);
+        $this->assertSame(['AHMAD MENUNGGAK'], $ppsb);
 
         // Kependidikan tetap memuat keduanya — riwayatnya tak pernah hilang.
         $semua = $svc->opsiSantri('', 'semua')->pluck('nama')->all();
-        $this->assertContains('Ahmad Menunggak', $semua);
-        $this->assertContains('Budi Lunas', $semua);
+        $this->assertContains('AHMAD MENUNGGAK', $semua);
+        $this->assertContains('BUDI LUNAS', $semua);
     }
 
     /** Perlengkapan sendirian pun cukup menahan santrinya di lingkup PPSB. */
@@ -125,7 +125,7 @@ class RekapPembayaranLingkupTest extends TestCase
             'nominal' => '2000000', 'sisa' => '2000000', 'status' => 'belum_bayar',
         ]);
 
-        $this->assertSame(['Citra'], (new RekapPembayaranService)->opsiSantri('', 'ppsb')->pluck('nama')->all());
+        $this->assertSame(['CITRA'],(new RekapPembayaranService)->opsiSantri('', 'ppsb')->pluck('nama')->all());
     }
 
     /**
@@ -172,11 +172,11 @@ class RekapPembayaranLingkupTest extends TestCase
 
         $this->actingAs($admin)->get(route('rekap_pembayaran.ppsb'))->assertOk()
             ->assertSee('masih punya kewajiban uang pangkal atau perlengkapan', false)
-            ->assertSee('Ahmad Menunggak')
-            ->assertDontSee('Budi Lunas');
+            ->assertSee('AHMAD MENUNGGAK')
+            ->assertDontSee('BUDI LUNAS');
 
         $this->actingAs($admin)->get(route('rekap_pembayaran.index'))->assertOk()
-            ->assertSee('Ahmad Menunggak')
-            ->assertSee('Budi Lunas');
+            ->assertSee('AHMAD MENUNGGAK')
+            ->assertSee('BUDI LUNAS');
     }
 }

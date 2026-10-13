@@ -169,7 +169,7 @@ class TagihanLainTest extends TestCase
 
         $this->assertStringContainsString('1 tagihan terbit', $pesan);
         $this->assertStringContainsString('Rp 75.000', $pesan);
-        $this->assertStringContainsString('Rizky Pratama', $pesan);
+        $this->assertStringContainsString('RIZKY PRATAMA', $pesan);
         $this->assertStringNotContainsString('berhasil diterbitkan', $pesan);
     }
 

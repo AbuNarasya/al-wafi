@@ -199,7 +199,7 @@ class SaldoDompetTest extends TestCase
         $this->actingAs($this->admin)->get(route('saldo_dompet.index'))
             ->assertOk()
             ->assertSee('Ahmad Fauzi')
-            ->assertSee('Luthfi Hakim')
+            ->assertSee('LUTHFI HAKIM')
             ->assertSee('Dompet Wali')
             ->assertSee('Dompet &amp; Tabungan Santri', false);
     }
