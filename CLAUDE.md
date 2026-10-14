@@ -23,7 +23,14 @@ C:/php/php.exe -l <berkas.php>                  # wajib setelah menyunting PHP
 C:/php/php.exe artisan view:cache               # wajib setelah menyunting Blade
 npm run build                                   # wajib setelah menyunting app.js / app.css
 serve.bat                                       # jalankan server dev (port 8123)
+bash deploy/ke-dev.sh                           # kirim commit HEAD ke dev.erp (lihat di bawah)
 ```
+
+**"Commit" dari user = commit LALU `bash deploy/ke-dev.sh`** (keputusan 14 Okt 2026). Skripnya
+membangun aset, mem-push cabang kerja + menimpa paksa cabang `dev-coba`, mengirim `public/build`,
+lalu di server menyamakan kode ke `dev-coba` + migrate + cache. dev.erp = tempat coba-coba;
+**`main` disisihkan untuk rilis ERP sungguhan** — jangan dimajukan tanpa diminta. Push gagal
+"Could not resolve host" = internet putus sesaat, cukup ulangi.
 
 Angka terukur di mesin ini (4 core), supaya tak salah pilih:
 
