@@ -31,7 +31,7 @@ class DokumenSantriController extends Controller
         return view('dokumen-santri.index', [
             'santri' => $santri,
             'dokumen' => $this->service->list($id),
-            'kelengkapan' => $this->service->kelengkapan($id),
+            'statusBerkas' => $this->service->statusBerkas($santri),
             'jenisOptions' => collect(self::JENIS)->mapWithKeys(fn ($j) => [$j => DokumenPolicy::LABEL_DOKUMEN[$j] ?? $j])->all(),
         ]);
     }
@@ -53,6 +53,56 @@ class DokumenSantriController extends Controller
         }
 
         return redirect()->route('dokumen_santri.index', $id)->with('status', 'Berkas berhasil diunggah.');
+    }
+
+    /**
+     * Staf memutus satu jenis berkas: "diterima" (boleh tanpa unggahan — diserahkan fisik),
+     * "perlu_diganti" (wajib alasan; wali dikabari di portal), atau "batal" (kembali belum diputus).
+     */
+    public function putuskan(Request $request, int $id, string $jenis): RedirectResponse
+    {
+        $santri = Santri::findOrFail($id);
+        abort_unless(isset(DokumenPolicy::TAHAP_DOKUMEN[$jenis]), 404);
+        $data = $request->validate([
+            'status' => ['required', Rule::in(['diterima', 'perlu_diganti', 'batal'])],
+            'catatan' => ['nullable', 'string', 'max:500'],
+        ]);
+        $label = DokumenPolicy::LABEL_DOKUMEN[$jenis];
+
+        if ($data['status'] === 'batal') {
+            $this->service->batalkanPutusan($id, $jenis);
+
+            return back()->with('status', "Keputusan atas {$label} dibatalkan.");
+        }
+        try {
+            $this->service->putuskan($id, $jenis, $data['status'], $data['catatan'] ?? null, $request->user()->id_pengguna);
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        if ($data['status'] === 'perlu_diganti') {
+            $this->kabariWali($santri, "{$label} perlu diganti", "{$label} untuk {$santri->nama} perlu diunggah ulang: {$data['catatan']}");
+        }
+
+        return back()->with('status', $data['status'] === 'diterima' ? "{$label} ditandai diterima." : "{$label} ditandai perlu diganti — wali dikabari.");
+    }
+
+    /** Kabar ke setiap orang di keluarga yang bisa masuk portal (punya email). */
+    private function kabariWali(Santri $santri, string $judul, string $pesan): void
+    {
+        $wali = $santri->wali;
+        if (! $wali) {
+            return;
+        }
+        foreach (array_keys(\App\Models\Wali::PERAN) as $p) {
+            if (filled($wali->{"email_{$p}"})) {
+                \App\Models\NotifikasiWali::create([
+                    'id_wali' => $wali->id, 'peran' => $p, 'id_santri' => $santri->id,
+                    'judul' => $judul, 'pesan' => $pesan, 'jenis' => 'berkas_perlu_diganti',
+                    'ref_jenis' => 'BerkasSantri', 'ref_id' => (string) $santri->id,
+                ]);
+            }
+        }
     }
 
     /**

@@ -117,6 +117,12 @@
                                 <span class="font-semibold">Bayar &rarr;</span>
                             </a>
                         @endif
+                        @if ($a['berkas_kurang'] > 0)
+                            <a href="{{ route('portal.berkas', $a['id']) }}" class="mt-2 flex items-center justify-between rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                                <span><b>{{ $a['berkas_kurang'] }}</b> berkas registrasi belum lengkap</span>
+                                <span class="font-semibold">Unggah &rarr;</span>
+                            </a>
+                        @endif
                     @endif
                 </div>
             @empty

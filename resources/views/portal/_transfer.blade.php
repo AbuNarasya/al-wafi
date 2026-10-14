@@ -69,43 +69,5 @@
         </div>
     </section>
 
-    @once
-        <script>
-            // Kecilkan foto bukti di HP sampai di bawah batas unggahan (lihat komentar di atas).
-            window.unggahBukti = (maks) => ({
-                nama: '', keterangan: 'Foto dikecilkan otomatis sebelum dikirim.', pratinjau: null, galat: '',
-                async pilih(e) {
-                    const input = e.target, berkas = input.files[0];
-                    this.galat = ''; this.pratinjau = null;
-                    if (! berkas) return;
-                    this.nama = berkas.name;
-                    if (! berkas.type.startsWith('image/')) {
-                        this.keterangan = Math.round(berkas.size / 1024) + ' KB';
-                        if (berkas.size > maks) { this.galat = 'PDF terlalu besar (maks ' + Math.round(maks / 1024) + ' KB). Kirim foto layar bukti transfer saja.'; input.value = ''; this.nama = ''; }
-                        return;
-                    }
-                    try {
-                        const hasil = berkas.size <= maks * 0.95 ? berkas : await this.kecilkan(berkas, maks);
-                        const dt = new DataTransfer(); dt.items.add(hasil); input.files = dt.files;
-                        this.pratinjau = URL.createObjectURL(hasil);
-                        this.keterangan = Math.round(hasil.size / 1024) + ' KB';
-                    } catch (_) {
-                        this.galat = 'Foto tidak bisa diproses. Coba foto lain.'; input.value = ''; this.nama = '';
-                    }
-                },
-                async kecilkan(berkas, maks) {
-                    const gambar = await createImageBitmap(berkas);
-                    for (const [sisi, mutu] of [[1600, .75], [1400, .6], [1200, .5], [1000, .45], [800, .4]]) {
-                        const skala = Math.min(1, sisi / Math.max(gambar.width, gambar.height));
-                        const kanvas = document.createElement('canvas');
-                        kanvas.width = Math.round(gambar.width * skala); kanvas.height = Math.round(gambar.height * skala);
-                        kanvas.getContext('2d').drawImage(gambar, 0, 0, kanvas.width, kanvas.height);
-                        const blob = await new Promise(r => kanvas.toBlob(r, 'image/jpeg', mutu));
-                        if (blob && blob.size <= maks * 0.95) return new File([blob], 'bukti-transfer.jpg', { type: 'image/jpeg' });
-                    }
-                    throw new Error('terlalu besar');
-                },
-            });
-        </script>
-    @endonce
+    {{-- window.unggahBukti (pengecil foto) kini di layouts/portal — dipakai juga halaman Berkas. --}}
 @endif

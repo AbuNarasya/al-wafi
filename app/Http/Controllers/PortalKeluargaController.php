@@ -293,7 +293,15 @@ class PortalKeluargaController extends Controller
                 ]);
         }
 
+        // Daftar periksa berkas PSB — pengingat, bukan penghalang (keputusan user 15 Okt 2026).
+        $registrasi = collect((new \App\Services\Modules\DokumenSantriService)->statusBerkas($s))->where('kelompok', 'registrasi');
+
         return view('portal.anak', [
+            'berkas' => \App\Services\Ppsb\Tahap::isFinal((string) $s->status) ? null : [
+                'total' => $registrasi->count(),
+                'kurang' => $registrasi->whereIn('status', ['belum', 'perlu_diganti'])->count(),
+                'diganti' => $registrasi->where('status', 'perlu_diganti')->count(),
+            ],
             'santri' => $s, 'aktif' => $aktif, 'tahapPsb' => $tahapPsb === false ? null : $tahapPsb,
             'label' => \App\Services\Ppsb\Tahap::labelStatus((string) $s->status),
             'sisa' => $belum->sum(fn ($t) => (float) $t->sisa),

@@ -207,6 +207,13 @@ Route::prefix('wali/data')->name('portal.')->middleware('portal.wali')->controll
     Route::get('/email/{peran}', 'formEmail')->name('data.email')->whereIn('peran', ['ayah', 'ibu', 'wali']);
     Route::post('/email/{peran}', 'kirimKodeEmail')->whereIn('peran', ['ayah', 'ibu', 'wali'])->middleware('throttle:5,1');
 });
+// Berkas PSB anak — wali mengunggah, staf memeriksa di halaman Dokumen santri.
+Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalBerkasController::class)->group(function () {
+    Route::get('/anak/{id}/berkas', 'index')->name('berkas')->whereNumber('id');
+    Route::post('/anak/{id}/berkas', 'unggah')->whereNumber('id')->middleware('throttle:20,1');
+    Route::delete('/berkas/{dokumen}', 'hapus')->name('berkas.hapus')->whereNumber('dokumen');
+    Route::get('/berkas/{dokumen}', 'lihat')->name('berkas.lihat')->whereNumber('dokumen');
+});
 // Password Portal Wali (KataSandiWali). /wali/sandi* tetap terbuka saat WAJIB_SANDI.
 Route::prefix('wali/sandi')->name('portal.sandi.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalSandiController::class)->group(function () {
     Route::get('/buat', 'formBuat')->name('buat');
@@ -945,6 +952,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/santri/{id}/dokumen', 'index')->name('dokumen_santri.index')->middleware('hakakses:dokumen-santri,lihat')->whereNumber('id');
         Route::post('/santri/{id}/dokumen', 'store')->name('dokumen_santri.store')->middleware('hakakses:dokumen-santri,buat')->whereNumber('id');
         Route::put('/santri/{id}/dokumen/wali-kelas', 'waliKelas')->name('dokumen_santri.wali_kelas')->middleware('hakakses:dokumen-santri,buat')->whereNumber('id');
+        // Status per jenis berkas — "diterima" boleh tanpa unggahan (diserahkan fisik).
+        Route::post('/santri/{id}/dokumen/status/{jenis}', 'putuskan')->name('dokumen_santri.putuskan')->middleware('hakakses:dokumen-santri,buat')
+            ->whereNumber('id')->where('jenis', '[a-z_]+');
         Route::delete('/dokumen-santri/{dokumen}', 'destroy')->name('dokumen_santri.destroy')->middleware('hakakses:dokumen-santri,hapus')->whereNumber('dokumen');
         Route::get('/dokumen-santri/{dokumen}/download', 'download')->name('dokumen_santri.download')->middleware('hakakses:dokumen-santri,lihat')->whereNumber('dokumen');
         Route::get('/dokumen-santri/{dokumen}/berkas', 'berkas')->name('dokumen_santri.berkas')->middleware('hakakses:dokumen-santri,lihat')->whereNumber('dokumen');

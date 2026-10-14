@@ -40,6 +40,27 @@
         </section>
     @endif
 
+    {{-- Berkas pendaftaran — daftar periksa yang diingatkan, bukan penghalang tahap. --}}
+    @if ($berkas)
+        <a href="{{ route('portal.berkas', $santri->id) }}" @class(['mt-5 flex items-center gap-3 rounded-3xl p-4 shadow-sm ring-1',
+            'bg-amber-50 ring-amber-200' => $berkas['kurang'] > 0, 'bg-white ring-slate-200' => $berkas['kurang'] === 0])>
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-brand ring-1 ring-slate-200"><x-portal.ikon nama="unggah" kelas="h-5 w-5" /></span>
+            <span class="min-w-0 flex-1 text-sm">
+                <span class="block font-semibold text-slate-900">Berkas pendaftaran</span>
+                <span @class(['block text-xs', 'text-amber-900' => $berkas['kurang'] > 0, 'text-slate-500' => $berkas['kurang'] === 0])>
+                    @if ($berkas['diganti'] > 0)
+                        {{ $berkas['diganti'] }} berkas perlu diganti · {{ $berkas['kurang'] }} dari {{ $berkas['total'] }} belum diterima
+                    @elseif ($berkas['kurang'] > 0)
+                        {{ $berkas['kurang'] }} dari {{ $berkas['total'] }} berkas registrasi belum diterima — unggah di sini
+                    @else
+                        Berkas registrasi lengkap diterima
+                    @endif
+                </span>
+            </span>
+            <x-portal.ikon nama="kanan" kelas="h-4 w-4 text-slate-400" />
+        </a>
+    @endif
+
     {{-- Tagihan --}}
     <section class="mt-5">
         <div class="mb-2 flex items-center justify-between">

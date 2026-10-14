@@ -63,6 +63,48 @@
             },
             hapus() { this.pin = this.pin.slice(0, -1); },
         });
+
+        // Pemilih berkas (bukti transfer, berkas PSB): FOTO DIKECILKAN DI HP sebelum dikirim.
+        // Batas unggahan aplikasi 500 KB (App\Support\Unggahan), sedangkan foto kamera HP
+        // lazimnya 2–4 MB — tanpa ini hampir setiap wali ditolak. PDF tak bisa dikecilkan,
+        // jadi yang terlalu besar diberi tahu sebelum terkirim. `kirim` = langsung kirim
+        // formulirnya begitu berkas siap (dipakai di halaman Berkas).
+        window.unggahBukti = (maks, kirim = false) => ({
+            nama: '', keterangan: 'Foto dikecilkan otomatis sebelum dikirim.', pratinjau: null, galat: '', sibuk: false,
+            async pilih(e) {
+                const input = e.target, berkas = input.files[0];
+                this.galat = ''; this.pratinjau = null;
+                if (! berkas) return;
+                this.nama = berkas.name;
+                if (! berkas.type.startsWith('image/')) {
+                    this.keterangan = Math.round(berkas.size / 1024) + ' KB';
+                    if (berkas.size > maks) { this.galat = 'PDF terlalu besar (maks ' + Math.round(maks / 1024) + ' KB). Kirim fotonya saja.'; input.value = ''; this.nama = ''; return; }
+                } else {
+                    try {
+                        const hasil = berkas.size <= maks * 0.95 ? berkas : await this.kecilkan(berkas, maks);
+                        const dt = new DataTransfer(); dt.items.add(hasil); input.files = dt.files;
+                        this.pratinjau = URL.createObjectURL(hasil);
+                        this.keterangan = Math.round(hasil.size / 1024) + ' KB';
+                    } catch (_) {
+                        this.galat = 'Foto tidak bisa diproses. Coba foto lain.'; input.value = ''; this.nama = ''; return;
+                    }
+                }
+                if (kirim && input.form.reportValidity()) { this.sibuk = true; input.form.submit(); }
+            },
+            async kecilkan(berkas, maks) {
+                const gambar = await createImageBitmap(berkas);
+                const namaJpg = (berkas.name.replace(/\.[^.]+$/, '') || 'berkas') + '.jpg';
+                for (const [sisi, mutu] of [[1600, .75], [1400, .6], [1200, .5], [1000, .45], [800, .4]]) {
+                    const skala = Math.min(1, sisi / Math.max(gambar.width, gambar.height));
+                    const kanvas = document.createElement('canvas');
+                    kanvas.width = Math.round(gambar.width * skala); kanvas.height = Math.round(gambar.height * skala);
+                    kanvas.getContext('2d').drawImage(gambar, 0, 0, kanvas.width, kanvas.height);
+                    const blob = await new Promise(r => kanvas.toBlob(r, 'image/jpeg', mutu));
+                    if (blob && blob.size <= maks * 0.95) return new File([blob], namaJpg, { type: 'image/jpeg' });
+                }
+                throw new Error('terlalu besar');
+            },
+        });
     </script>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])

@@ -182,6 +182,11 @@ class PortalWaliController extends Controller
                     'langkah' => self::LANGKAH[$s->status] ?? null,
                     'registrasi' => $s->status === 'calon' ? $s->tagihan->sum(fn ($t) => (float) $t->sisa) : null,
                     'final' => Tahap::isFinal((string) $s->status),
+                    // Pengingat berkas PSB (bukan penghalang) — hanya untuk yang masih dalam proses pendaftaran.
+                    'berkas_kurang' => $tahap !== false && $s->status !== 'aktif'
+                        ? collect((new \App\Services\Modules\DokumenSantriService)->statusBerkas($s))->where('kelompok', 'registrasi')
+                            ->whereIn('status', ['belum', 'perlu_diganti'])->count()
+                        : 0,
                 ];
             });
 

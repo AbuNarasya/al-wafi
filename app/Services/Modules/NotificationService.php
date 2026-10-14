@@ -182,6 +182,8 @@ class NotificationService
             // Wali mengubah datanya sendiri lewat portal (UbahDataWali).
             'Santri' => '/santri/'.$n->ref_id,
             'Wali' => '/datawali/'.$n->ref_id.'/edit',
+            // Wali mengunggah berkas PSB lewat portal — ref_id = id santri.
+            'BerkasSantri' => '/santri/'.$n->ref_id.'/dokumen',
             PengajuanPembayaranService::SUMBER => $n->jenis === 'approval_menunggu'
                 ? '/approvals' : '/pengajuan-pembayaran/'.$n->ref_id,
             default => $n->jenis === 'approval_menunggu' ? '/approvals' : null,

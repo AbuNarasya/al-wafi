@@ -3,7 +3,12 @@
 @section('title', 'Berkas — ' . $santri->nama)
 
 @php
-    $perKelompok = collect($kelengkapan)->groupBy('kelompok');
+    $perKelompok = collect($statusBerkas)->groupBy('kelompok');
+    $bolehPutus = \App\Support\Akses::boleh('dokumen-santri', 'buat');
+    $warnaStatus = [
+        'belum' => 'bg-gray-100 text-gray-500', 'menunggu' => 'bg-amber-100 text-amber-700',
+        'diterima' => 'bg-emerald-100 text-emerald-700', 'perlu_diganti' => 'bg-red-100 text-red-700',
+    ];
 @endphp
 
 @section('content')
@@ -25,14 +30,44 @@
                             @if ($kelompok === 'pindahan')
                                 <p class="mb-1 text-[11px] text-gray-400">Hanya untuk calon pindahan — boleh dikosongkan bila mendaftar dari jenjang awal.</p>
                             @endif
-                            <ul class="space-y-1.5 text-sm">
+                            {{-- Status per jenis (15 Okt 2026): "Diterima" boleh TANPA unggahan — berkas
+                                 bisa diserahkan fisik; "Perlu diganti" wajib beralasan & dikabarkan ke wali. --}}
+                            <ul class="space-y-2 text-sm">
                                 @foreach ($isi as $k)
-                                    <li class="{{ $k['ada'] ? 'text-emerald-700' : 'text-gray-400' }}">
-                                        {{ $k['ada'] ? '✓' : '○' }} {{ $k['label'] }}
-                                        @if ($kelompok === 'pindahan')
-                                            <span class="rounded bg-amber-50 px-1 text-[10px] text-amber-600">opsional</span>
-                                        @elseif ($kelompok === 'pasca_lulus')
-                                            <span class="rounded bg-blue-50 px-1 text-[10px] text-blue-600">pasca lulus</span>
+                                    <li x-data="{ ganti: false }">
+                                        <div class="flex flex-wrap items-center gap-1.5">
+                                            <span class="text-gray-800">{{ $k['label'] }}</span>
+                                            <span class="whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-semibold {{ $warnaStatus[$k['status']] }}">{{ \App\Services\Modules\DokumenSantriService::STATUS[$k['status']] }}</span>
+                                            @if ($kelompok === 'pindahan')
+                                                <span class="rounded bg-amber-50 px-1 text-[10px] text-amber-600">opsional</span>
+                                            @endif
+                                        </div>
+                                        @if ($k['catatan'])
+                                            <p class="text-[11px] text-red-600">{{ $k['catatan'] }}</p>
+                                        @endif
+                                        @if ($bolehPutus)
+                                            <div class="mt-0.5 flex flex-wrap gap-2 text-[11px]">
+                                                @if ($k['status'] !== 'diterima')
+                                                    <form method="POST" action="{{ route('dokumen_santri.putuskan', [$santri->id, $k['jenis']]) }}" data-no-confirm>
+                                                        @csrf <input type="hidden" name="status" value="diterima">
+                                                        <button class="font-semibold text-emerald-700 hover:underline">Terima{{ $k['status'] === 'belum' ? ' (fisik)' : '' }}</button>
+                                                    </form>
+                                                @endif
+                                                @if ($k['status'] !== 'perlu_diganti')
+                                                    <button type="button" @click="ganti = ! ganti" class="font-semibold text-red-600 hover:underline">Perlu diganti</button>
+                                                @endif
+                                                @if (in_array($k['status'], ['diterima', 'perlu_diganti'], true))
+                                                    <form method="POST" action="{{ route('dokumen_santri.putuskan', [$santri->id, $k['jenis']]) }}" data-no-confirm>
+                                                        @csrf <input type="hidden" name="status" value="batal">
+                                                        <button class="text-gray-500 hover:underline">Batalkan</button>
+                                                    </form>
+                                                @endif
+                                            </div>
+                                            <form x-show="ganti" x-cloak method="POST" action="{{ route('dokumen_santri.putuskan', [$santri->id, $k['jenis']]) }}" class="mt-1 flex gap-1" data-no-confirm>
+                                                @csrf <input type="hidden" name="status" value="perlu_diganti">
+                                                <input name="catatan" required maxlength="500" placeholder="Alasan, mis. foto buram" class="min-w-0 flex-1 rounded border-gray-300 px-2 py-1 text-xs">
+                                                <button class="rounded bg-red-600 px-2 text-xs font-semibold text-white">Kirim</button>
+                                            </form>
                                         @endif
                                     </li>
                                 @endforeach
@@ -89,7 +124,11 @@
                     @forelse ($dokumen as $d)
                         @php $dokJs = ['id' => $d->id, 'nama' => $d->nama_asli, 'mime' => $d->mime, 'url' => route('dokumen_santri.berkas', $d->id)]; @endphp
                         <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-2">{{ \App\Services\Ppsb\DokumenPolicy::LABEL_DOKUMEN[$d->jenis] ?? $d->jenis }}@if ($d->keterangan)<div class="text-xs text-gray-400">{{ $d->keterangan }}</div>@endif</td>
+                            <td class="px-4 py-2">{{ \App\Services\Ppsb\DokumenPolicy::LABEL_DOKUMEN[$d->jenis] ?? $d->jenis }}@if ($d->keterangan)<div class="text-xs text-gray-400">{{ $d->keterangan }}</div>@endif
+                                @if ($d->diunggah_wali)
+                                    <div class="text-[11px] text-indigo-600">diunggah {{ strtolower(\App\Models\Wali::PERAN[$d->diunggah_peran] ?? 'wali') }} lewat portal · {{ $d->created_at?->format('d/m/Y H:i') }}</div>
+                                @endif
+                            </td>
                             <td class="px-4 py-2">
                                 <button type="button" class="max-w-full truncate text-left text-brand underline hover:text-brand-dark" @click='buka(@json($dokJs))'>{{ $d->nama_asli }}</button>
                             </td>
