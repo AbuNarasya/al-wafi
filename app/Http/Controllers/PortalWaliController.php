@@ -6,6 +6,7 @@ use App\Exceptions\AppException;
 use App\Models\Santri;
 use App\Models\SumberInformasi;
 use App\Models\Wali;
+use App\Services\PortalWali\KataSandiWali;
 use App\Services\PortalWali\MasukWali;
 use App\Services\PortalWali\PendaftaranPortal;
 use App\Services\PortalWali\SesiWali;
@@ -53,9 +54,13 @@ class PortalWaliController extends Controller
         return view('portal.masuk');
     }
 
+    /**
+     * Kode email — HANYA untuk pertama kali masuk / mendaftar dan lupa password
+     * (keputusan user 14 Okt 2026). Keduanya berakhir di layar membuat password.
+     */
     public function kirimKode(Request $request): RedirectResponse
     {
-        $data = $request->validate(['email' => ['required', 'email', 'max:255']]);
+        $data = $request->validate(['email' => ['required', 'email', 'max:255'], 'lupa' => ['nullable', 'boolean']]);
 
         try {
             $kodeUji = $this->masuk->mintaKode($data['email'], 'masuk', $request->ip());
@@ -63,8 +68,32 @@ class PortalWaliController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
         $request->session()->put(SesiWali::MENUNGGU, MasukWali::normalEmail($data['email']));
+        $request->session()->put(SesiWali::LUPA_SANDI, $request->boolean('lupa'));
 
         return redirect()->route('portal.kode')->with('kode_uji', $kodeUji);
+    }
+
+    /** Masuk sehari-hari: email + password. Pesan galatnya tak pernah menyebut email terdaftar atau tidak. */
+    public function masukSandi(Request $request, KataSandiWali $sandi): RedirectResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email', 'max:255'], 'sandi' => ['required', 'string', 'max:255'], 'ingat' => ['nullable', 'boolean'],
+        ], ['sandi.required' => 'Isi password Anda.']);
+
+        try {
+            $hasil = $sandi->masuk($data['email'], $data['sandi'], $request->ip());
+        } catch (AppException $e) {
+            return back()->withInput($request->except('sandi'))->with('error', $e->getMessage());
+        }
+        $this->sesi->masuk($hasil['wali'], $hasil['peran'], $request, $request->boolean('ingat'));
+        $request->session()->put(SesiWali::PUNYA_SANDI, true);
+
+        return redirect()->route('portal.beranda');
+    }
+
+    public function formLupa(): View
+    {
+        return view('portal.lupa-sandi');
     }
 
     public function formKode(Request $request): View|RedirectResponse
@@ -102,7 +131,15 @@ class PortalWaliController extends Controller
 
     private function masukKeluarga(Wali $wali, string $peran, Request $request, bool $ingat): RedirectResponse
     {
+        $lupa = (bool) $request->session()->pull(SesiWali::LUPA_SANDI);
         $this->sesi->masuk($wali, $peran, $request, $ingat);
+
+        // Kode email cukup sekali: belum punya password, atau lupa password → buat dulu.
+        if ($lupa || ! KataSandiWali::punya($wali, $peran)) {
+            $request->session()->put(SesiWali::WAJIB_SANDI, true);
+
+            return redirect()->route('portal.sandi.buat');
+        }
 
         return redirect()->route('portal.beranda');
     }
@@ -243,8 +280,13 @@ class PortalWaliController extends Controller
         }
 
         if ($baru) {
-            // Keluarganya baru saja lahir — pendaftar kini masuk sebagai wali biasa.
+            // Keluarganya baru saja lahir — pendaftar kini masuk sebagai wali biasa, dan
+            // membuat password untuk masuk berikutnya (kode email cukup sekali).
             $this->sesi->masuk($santri->wali, $peran, $request, false);
+            $request->session()->put(SesiWali::WAJIB_SANDI, true);
+
+            return redirect()->route('portal.sandi.buat')
+                ->with('status', "Pendaftaran {$santri->nama} diterima dengan nomor {$santri->no_pendaftaran}. Buat password untuk masuk berikutnya.");
         }
 
         return redirect()->route('portal.beranda')

@@ -23,7 +23,7 @@
         <label class="mt-4 flex items-start gap-3 text-sm text-slate-700">
             <input type="checkbox" name="ingat" value="1" class="mt-0.5 rounded border-slate-300 text-brand focus:ring-brand">
             <span>Ingat perangkat ini
-                <span class="block text-xs text-slate-500">Tak perlu kode lagi selama 90 hari. Jangan dicentang di HP orang lain.</span>
+                <span class="block text-xs text-slate-500">Tetap masuk di perangkat ini. Jangan dicentang di HP orang lain.</span>
             </span>
         </label>
 

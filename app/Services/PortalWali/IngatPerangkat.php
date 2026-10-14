@@ -12,15 +12,19 @@ use Illuminate\Support\Str;
  * "Ingat perangkat ini" — wali tak diminta kode tiap kali sesinya habis.
  *
  * Token acak di cookie httpOnly (dienkripsi Laravel); di basis data hanya
- * sha256-nya, jadi bocornya tabel tak membuka perangkat siapa pun. Berlaku 90
- * hari sejak TERAKHIR dipakai. Gugur bila wali keluar, perangkatnya dicabut,
- * atau email keluarganya diubah staf (Wali::booted).
+ * sha256-nya, jadi bocornya tabel tak membuka perangkat siapa pun.
+ *
+ * Diingat SELAMANYA (keputusan user 14 Okt 2026; dulu 90 hari): gugur hanya bila
+ * wali keluar, perangkatnya dicabut, password-nya diganti, atau email keluarganya
+ * diubah (Wali::booted). Browser membatasi umur cookie ±400 hari, jadi cookie-nya
+ * diperpanjang tiap dipakai — perangkat yang dibuka sekali setahun tak pernah lepas.
  */
 class IngatPerangkat
 {
     public const COOKIE = 'alwafi_wali';
 
-    public const HARI = 90;
+    /** Umur cookie (hari) — batas browser modern; diperbarui tiap perangkat dipakai. */
+    public const HARI = 400;
 
     public function ingat(Wali $wali, string $peran, Request $request): PerangkatWali
     {
@@ -30,7 +34,7 @@ class IngatPerangkat
             'nama_perangkat' => self::namaPerangkat((string) $request->userAgent()),
             'user_agent' => mb_substr((string) $request->userAgent(), 0, 500),
             'ip_terakhir' => $request->ip(), 'terakhir_dipakai' => now(),
-            'kedaluwarsa_pada' => now()->addDays(self::HARI),
+            'kedaluwarsa_pada' => null,   // selamanya
         ]);
         $this->pasangCookie($token);
 
@@ -52,8 +56,7 @@ class IngatPerangkat
         }
         // Diperpanjang paling sering sekali sejam — tidak menulis ke basis data tiap permintaan.
         if ($perangkat->terakhir_dipakai === null || $perangkat->terakhir_dipakai->lt(now()->subHour())) {
-            $perangkat->update(['terakhir_dipakai' => now(), 'ip_terakhir' => $request->ip(),
-                'kedaluwarsa_pada' => now()->addDays(self::HARI)]);
+            $perangkat->update(['terakhir_dipakai' => now(), 'ip_terakhir' => $request->ip()]);
             $this->pasangCookie($token);
         }
 
@@ -74,6 +77,19 @@ class IngatPerangkat
     public static function cabutSemua(int $idWali): void
     {
         PerangkatWali::where('id_wali', $idWali)->whereNull('dicabut_pada')
+            ->update(['dicabut_pada' => now(), 'updated_at' => now()]);
+    }
+
+    /**
+     * Password ORANG ini diganti / disetel ulang: perangkatnya yang lain dicabut —
+     * perangkat yang diingat selamanya tak boleh tetap terbuka bagi pemegang HP lama.
+     * Perangkat yang sedang dipakai (cookie permintaan ini) dibiarkan.
+     */
+    public function cabutLainnya(int $idWali, string $peran, Request $request): void
+    {
+        $token = (string) $request->cookie(self::COOKIE);
+        PerangkatWali::where('id_wali', $idWali)->where('peran', $peran)->whereNull('dicabut_pada')
+            ->when($token !== '', fn ($q) => $q->where('token_hash', '!=', hash('sha256', $token)))
             ->update(['dicabut_pada' => now(), 'updated_at' => now()]);
     }
 

@@ -110,7 +110,7 @@ class PortalBayarTest extends TestCase
 
     protected function sebagaiIbu(): static
     {
-        return $this->actingAs($this->wali, 'wali')->withSession(['portal.peran' => 'ibu']);
+        return $this->actingAs($this->wali, 'wali')->withSession(['portal.peran' => 'ibu', 'portal.punya_sandi' => true]);
     }
 
     private function bukti(): UploadedFile
@@ -276,7 +276,7 @@ class PortalBayarTest extends TestCase
         DompetWali::create(['id_wali' => $baru->id, 'saldo' => 1000000]);
         $reg = $this->tagihan($this->santri('Calon Baru', 'calon', $baru), 'REG', 'registrasi', 500000);
 
-        $this->actingAs($baru, 'wali')->withSession(['portal.peran' => 'ayah'])
+        $this->actingAs($baru, 'wali')->withSession(['portal.peran' => 'ayah', 'portal.punya_sandi' => true])
             ->post(route('portal.bayar.dompet', $reg->id), ['nominal' => 500000, 'pin' => self::PIN])->assertSessionHas('error');
         $this->assertSame(0, PembayaranSantri::count());
     }

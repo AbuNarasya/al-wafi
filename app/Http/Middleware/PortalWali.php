@@ -37,6 +37,19 @@ class PortalWali
             return $this->modeVerifikasi($request, $next, $idLink, $sesi);
         }
 
+        // Masuk dengan kode email (pertama kali / lupa password) → buat password dulu. Juga
+        // menjaring sesi yang dipulihkan dari perangkat yang diingat SEBELUM ada password:
+        // tiap orang akhirnya punya password. "Sudah punya" diingat di sesi — tak ditanya tiap halaman.
+        if ($wali && ($peran = SesiWali::peran($request)) && ! $request->session()->get(SesiWali::PUNYA_SANDI)) {
+            if (\App\Services\PortalWali\KataSandiWali::punya($wali, $peran) && ! $request->session()->get(SesiWali::WAJIB_SANDI)) {
+                $request->session()->put(SesiWali::PUNYA_SANDI, true);
+            } elseif (! $request->is('wali/sandi', 'wali/sandi/*')) {
+                $request->session()->put(SesiWali::WAJIB_SANDI, true);
+
+                return redirect()->route('portal.sandi.buat');
+            }
+        }
+
         if (($wali && SesiWali::peran($request)) || ($mode === 'pendaftar' && SesiWali::emailPendaftar($request))) {
             return $this->tanpaCache($next($request));
         }

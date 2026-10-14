@@ -161,7 +161,12 @@ class VerifikasiWaliTest extends TestCase
         $kode = $this->kodeTerkirimKe('aminah@contoh.id');
         $this->post(route('portal.verifikasi.kode'), ['kode' => $kode])->assertRedirect(route('portal.verifikasi.ringkasan'));
 
-        $this->post(route('portal.verifikasi.selesai'), ['setuju' => '1'])->assertRedirect(route('portal.verifikasi.terima_kasih'));
+        // Password sekalian dibuat di langkah Selesai (keputusan user 14 Okt 2026).
+        $this->post(route('portal.verifikasi.selesai'), ['setuju' => '1', 'sandi' => 'pendek', 'sandi_ulang' => 'pendek'])
+            ->assertSessionHas('error');
+        $this->post(route('portal.verifikasi.selesai'), ['setuju' => '1', 'sandi' => 'rahasia123', 'sandi_ulang' => 'rahasia123'])
+            ->assertRedirect(route('portal.verifikasi.terima_kasih'));
+        $this->assertTrue(\App\Services\PortalWali\KataSandiWali::punya($this->wali, 'ibu'));
         $v->refresh();
         $this->assertNotNull($v->selesai_pada);
         $this->assertSame('ibu', $v->selesai_peran);
@@ -187,7 +192,8 @@ class VerifikasiWaliTest extends TestCase
         $kode = $this->kodeTerkirimKe('hasan@contoh.id');
         $this->post(route('portal.data.email.kode'), ['kode' => $kode])->assertRedirect(route('portal.verifikasi.ringkasan'));
 
-        $this->post(route('portal.verifikasi.selesai'), ['setuju' => '1'])->assertRedirect(route('portal.verifikasi.terima_kasih'));
+        $this->post(route('portal.verifikasi.selesai'), ['setuju' => '1', 'sandi' => 'rahasia123', 'sandi_ulang' => 'rahasia123'])
+            ->assertRedirect(route('portal.verifikasi.terima_kasih'));
         $this->assertSame('hasan@contoh.id', $this->wali->fresh()->email_ayah);
     }
 

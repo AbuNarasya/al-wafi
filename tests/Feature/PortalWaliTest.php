@@ -91,6 +91,12 @@ class PortalWaliTest extends TestCase
         return $this->post(route('portal.kode'), ['kode' => $kode, 'ingat' => $ingat ? '1' : null]);
     }
 
+    /** Sesudah masuk dengan kode PERTAMA KALI: wajib membuat password (keputusan user 14 Okt 2026). */
+    private function buatSandi(string $sandi = 'rahasia123')
+    {
+        return $this->post(route('portal.sandi.buat'), ['sandi' => $sandi, 'sandi_ulang' => $sandi]);
+    }
+
     private function keluarga(array $kolom = []): Wali
     {
         return Wali::create($kolom + [
@@ -119,7 +125,10 @@ class PortalWaliTest extends TestCase
             'kode_jenjang' => 'J001', 'jalur' => '001', 'status' => 'terverifikasi', 'id_wali' => $wali->id]);
 
         // Email ibu, huruf besar & spasi — tetap dikenali sebagai IBU di keluarga ini.
-        $this->masukSebagai('  HASANAH@contoh.id ')->assertRedirect(route('portal.beranda'));
+        // Pertama kali masuk dengan kode → wajib membuat password dulu.
+        $this->masukSebagai('  HASANAH@contoh.id ')->assertRedirect(route('portal.sandi.buat'));
+        $this->get(route('portal.beranda'))->assertRedirect(route('portal.sandi.buat'));
+        $this->buatSandi()->assertRedirect(route('portal.beranda'));
 
         $this->assertSame('ibu', session('portal.peran'));
         $this->get(route('portal.beranda'))->assertOk()
@@ -208,7 +217,9 @@ class PortalWaliTest extends TestCase
     {
         $wali = $this->keluarga();
         $this->masukSebagai('hasan@contoh.id', ingat: true);
+        $this->buatSandi();
         $perangkat = PerangkatWali::sole();
+        $this->assertNull($perangkat->kedaluwarsa_pada, 'diingat selamanya');
         $this->assertSame('ayah', $perangkat->peran);
 
         // Token aslinya tak disimpan — buat ulang perangkat bertoken diketahui untuk mensimulasikan cookie.
@@ -230,7 +241,9 @@ class PortalWaliTest extends TestCase
     {
         $this->masukSebagai('aminah@contoh.id');
 
-        $this->post(route('portal.daftar'), $this->isianDaftar())->assertRedirect(route('portal.beranda'));
+        // Pendaftar baru → keluarga lahir → membuat password untuk masuk berikutnya.
+        $this->post(route('portal.daftar'), $this->isianDaftar())->assertRedirect(route('portal.sandi.buat'));
+        $this->buatSandi()->assertRedirect(route('portal.beranda'));
 
         $santri = Santri::sole();
         $wali = $santri->wali;
@@ -275,7 +288,7 @@ class PortalWaliTest extends TestCase
             'telepon_ayah' => '0813 7777 0002', 'email_ayah' => ' Faqih@Contoh.id ',
             'pekerjaan_ayah' => 'Lainnya', 'pekerjaan_lain_ayah' => 'Penerjemah', 'pendapatan_ayah' => 'juta_5_10',
             'pekerjaan_ibu' => 'Guru / Dosen', 'nik' => '3201010101010001', 'alamat' => 'Bogor',
-        ]))->assertRedirect(route('portal.beranda'));
+        ]))->assertRedirect(route('portal.sandi.buat'));
 
         $wali = Santri::sole()->wali;
         $this->assertSame('aminah@contoh.id', $wali->email_ibu);
@@ -347,6 +360,7 @@ class PortalWaliTest extends TestCase
     {
         $wali = $this->keluarga();
         $this->masukSebagai('hasan@contoh.id');
+        $this->buatSandi();
 
         // Isian wali yang ikut terkirim diabaikan — keluarga diambil dari sesi, bukan dari form.
         $this->post(route('portal.daftar'), $this->isianDaftar(['nama' => 'Adik Hasan']))

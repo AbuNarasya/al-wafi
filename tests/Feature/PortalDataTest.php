@@ -63,7 +63,7 @@ class PortalDataTest extends TestCase
 
     private function sebagai(string $peran = 'ibu'): static
     {
-        return $this->actingAs($this->wali, 'wali')->withSession(['portal.peran' => $peran]);
+        return $this->actingAs($this->wali, 'wali')->withSession(['portal.peran' => $peran, 'portal.punya_sandi' => true]);
     }
 
     /** @return array<string,mixed> isian lengkap form santri, ditimpa sebagian */
@@ -243,7 +243,7 @@ class PortalDataTest extends TestCase
         $this->assertSame('aminah@contoh.id', $this->wali->fresh()->email_ibu, 'belum berubah sebelum kode benar');
 
         $kode = $this->kodeTerkirimKe('aminah.baru@contoh.id');
-        $sesi = ['portal.peran' => 'ibu', 'portal.email_baru' => ['ibu', 'aminah.baru@contoh.id']];
+        $sesi = ['portal.peran' => 'ibu', 'portal.punya_sandi' => true, 'portal.email_baru' => ['ibu', 'aminah.baru@contoh.id']];
 
         $this->actingAs($this->wali, 'wali')->withSession($sesi)->post(route('portal.data.email.kode'), ['kode' => $kode === '000000' ? '111111' : '000000'])
             ->assertSessionHas('error');

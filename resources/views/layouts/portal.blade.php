@@ -4,8 +4,10 @@
     $masuk = \App\Services\PortalWali\SesiWali::wali() !== null;
     // Mode verifikasi (masuk lewat link dari staf): hanya layar verifikasi & data yang terbuka.
     $verifikasi = $masuk && \App\Services\PortalWali\SesiWali::modeVerifikasi(request()) !== null;
-    $diBeranda = request()->routeIs('portal.beranda', 'portal.masuk', 'portal.kode', 'portal.verifikasi.ringkasan');
-    $menu = $verifikasi ? [
+    // Wajib membuat password dulu: menu disembunyikan — semua tujuannya dialihkan kembali ke sini.
+    $wajibSandi = $masuk && (bool) request()->session()->get(\App\Services\PortalWali\SesiWali::WAJIB_SANDI);
+    $diBeranda = request()->routeIs('portal.beranda', 'portal.masuk', 'portal.kode', 'portal.verifikasi.ringkasan', 'portal.sandi.buat');
+    $menu = $wajibSandi ? [] : ($verifikasi ? [
         ['portal.verifikasi.ringkasan', 'portal.verifikasi.*', 'Verifikasi', 'absensi'],
         ['portal.data', 'portal.data*', 'Data Wali & Santri', 'data'],
     ] : ($masuk ? array_values(array_filter([
@@ -14,8 +16,8 @@
         \App\Http\Controllers\PortalKeluargaController::punyaDompet() ? ['portal.dompet', 'portal.dompet*', 'Dompet', 'dompet'] : null,
         ['portal.data', 'portal.data*', 'Data Wali & Santri', 'data'],
         ['portal.akun', 'portal.akun', 'Akun', 'profil'],
-    ])) : []);
-    $belumDibaca = $masuk && ! $verifikasi ? \App\Http\Controllers\PortalKeluargaController::kabarBelumDibaca() : 0;
+    ])) : []));
+    $belumDibaca = $masuk && ! $verifikasi && ! $wajibSandi ? \App\Http\Controllers\PortalKeluargaController::kabarBelumDibaca() : 0;
     $namaMasuk = $masuk ? (\App\Services\PortalWali\SesiWali::wali()->{'nama_'.\App\Services\PortalWali\SesiWali::peran(request())} ?: \App\Services\PortalWali\SesiWali::wali()->nama) : '';
 @endphp
 <!DOCTYPE html>
@@ -86,7 +88,7 @@
                     </span>
                 </a>
             @endif
-            @if ($verifikasi)
+            @if ($verifikasi || $wajibSandi)
                 <span class="w-10 shrink-0"></span>
             @elseif ($masuk)
                 <a href="{{ route('portal.kabar') }}" class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"

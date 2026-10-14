@@ -118,7 +118,7 @@ class MidtransTest extends TestCase
 
     private function sebagaiIbu(): static
     {
-        return $this->actingAs($this->wali, 'wali')->withSession(['portal.peran' => 'ibu']);
+        return $this->actingAs($this->wali, 'wali')->withSession(['portal.peran' => 'ibu', 'portal.punya_sandi' => true]);
     }
 
     /** Midtrans mencatat status ini untuk pesanan tsb (yang dijawab API status). */
@@ -249,7 +249,7 @@ class MidtransTest extends TestCase
 
         $lain = Wali::create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Lain', 'telepon_ayah' => '0822', 'nama' => 'Lain',
             'telepon' => '0822', 'status' => 'aktif']);
-        $this->actingAs($lain, 'wali')->withSession(['portal.peran' => 'ayah'])
+        $this->actingAs($lain, 'wali')->withSession(['portal.peran' => 'ayah', 'portal.punya_sandi' => true])
             ->getJson(route('portal.online.status', $t->order_id))->assertNotFound();
     }
 

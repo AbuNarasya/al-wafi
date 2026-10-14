@@ -132,6 +132,9 @@ Route::prefix('wali')->name('portal.')->controller(PortalWaliController::class)-
     Route::get('/', fn () => redirect()->route('portal.beranda'));
     Route::get('/masuk', 'formMasuk')->name('masuk');
     Route::post('/masuk', 'kirimKode')->middleware('throttle:10,1');
+    // Masuk sehari-hari dengan password; kode email hanya pertama kali & lupa password.
+    Route::post('/masuk/sandi', 'masukSandi')->name('masuk.sandi')->middleware('throttle:20,1');
+    Route::get('/lupa-password', 'formLupa')->name('lupa_sandi');
     Route::get('/kode', 'formKode')->name('kode');
     Route::post('/kode', 'periksaKode')->middleware('throttle:20,1');
     Route::post('/keluar', 'keluar')->name('keluar');
@@ -203,6 +206,13 @@ Route::prefix('wali/data')->name('portal.')->middleware('portal.wali')->controll
     Route::post('/email/kode', 'konfirmasiEmail')->middleware('throttle:10,1');
     Route::get('/email/{peran}', 'formEmail')->name('data.email')->whereIn('peran', ['ayah', 'ibu', 'wali']);
     Route::post('/email/{peran}', 'kirimKodeEmail')->whereIn('peran', ['ayah', 'ibu', 'wali'])->middleware('throttle:5,1');
+});
+// Password Portal Wali (KataSandiWali). /wali/sandi* tetap terbuka saat WAJIB_SANDI.
+Route::prefix('wali/sandi')->name('portal.sandi.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalSandiController::class)->group(function () {
+    Route::get('/buat', 'formBuat')->name('buat');
+    Route::post('/buat', 'buat')->middleware('throttle:10,1');
+    Route::get('/ganti', 'formGanti')->name('ganti');
+    Route::post('/ganti', 'ganti')->middleware('throttle:10,1');
 });
 // Verifikasi data lewat link dari staf (LinkVerifikasi). /wali/v* TANPA sesi: link-nya
 // sendiri kuncinya; sesudah peran dipilih, sesinya MODE VERIFIKASI (lihat PortalWali).

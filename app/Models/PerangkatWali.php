@@ -28,8 +28,9 @@ class PerangkatWali extends Model
         return $this->belongsTo(Wali::class, 'id_wali');
     }
 
+    /** `kedaluwarsa_pada` kosong = diingat SELAMANYA (keputusan user 14 Okt 2026), sampai dicabut. */
     public function berlaku(): bool
     {
-        return $this->dicabut_pada === null && $this->kedaluwarsa_pada->isFuture();
+        return $this->dicabut_pada === null && ($this->kedaluwarsa_pada === null || $this->kedaluwarsa_pada->isFuture());
     }
 }

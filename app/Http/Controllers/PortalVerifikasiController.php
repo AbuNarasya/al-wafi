@@ -162,6 +162,8 @@ class PortalVerifikasiController extends Controller
             'email' => $email,
             'emailKembar' => $email !== '' && PendaftaranPortal::emailTerdaftar($email, $wali->id),
             'terbukti' => $email !== '' && $request->session()->get(SesiWali::VERIFIKASI_EMAIL) === $email,
+            // Belum punya password → dibuat sekalian di langkah Selesai (keputusan user 14 Okt 2026).
+            'perluSandi' => ! \App\Services\PortalWali\KataSandiWali::punya($wali, $peran),
         ]);
     }
 
@@ -221,11 +223,24 @@ class PortalVerifikasiController extends Controller
         if ($email === '' || $request->session()->get(SesiWali::VERIFIKASI_EMAIL) !== $email) {
             return back()->with('error', 'Buktikan dulu email Anda dengan kode sebelum menyelesaikan verifikasi.');
         }
-        $data = $request->validate(['setuju' => ['accepted']], ['setuju.accepted' => 'Centang pernyataan bahwa data sudah benar.']);
+        $perluSandi = ! \App\Services\PortalWali\KataSandiWali::punya($wali, $peran);
+        $data = $request->validate([
+            'setuju' => ['accepted'],
+            'sandi' => [$perluSandi ? 'required' : 'nullable', 'string', 'max:255'],
+            'sandi_ulang' => [$perluSandi ? 'required' : 'nullable', 'string'],
+        ], ['setuju.accepted' => 'Centang pernyataan bahwa data sudah benar.', 'sandi.required' => 'Buat password untuk masuk Portal Wali.',
+            'sandi_ulang.required' => 'Ulangi password.']);
 
         $link = $this->linkAktif($request);
         try {
+            // Password dulu (bisa ditolak: terlalu pendek / tak sama), baru tandai selesai.
+            if ($perluSandi) {
+                \App\Services\PortalWali\KataSandiWali::assertSah($data['sandi'], $data['sandi_ulang']);
+            }
             $this->link->selesai($link, $peran, $email);
+            if ($perluSandi) {
+                (new \App\Services\PortalWali\KataSandiWali)->simpan($wali, $peran, $data['sandi'], $data['sandi_ulang']);
+            }
         } catch (AppException $e) {
             return back()->with('error', $e->getMessage());
         }

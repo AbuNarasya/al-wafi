@@ -66,7 +66,7 @@ class PortalPinTest extends TestCase
 
     private function sebagai(string $peran = 'ibu'): static
     {
-        return $this->actingAs($this->wali, 'wali')->withSession(['portal.peran' => $peran]);
+        return $this->actingAs($this->wali, 'wali')->withSession(['portal.peran' => $peran, 'portal.punya_sandi' => true]);
     }
 
     private function pinIbu(): void

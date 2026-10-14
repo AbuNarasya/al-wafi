@@ -374,7 +374,7 @@ class PortalKeluargaController extends Controller
             'email' => MasukWali::samarkanEmail((string) $wali->{"email_{$peran}"}),
             'telepon' => $wali->{"telepon_{$peran}"} ?: $wali->telepon,
             'perangkat' => PerangkatWali::where('id_wali', $wali->id)->where('peran', $peran)
-                ->whereNull('dicabut_pada')->where('kedaluwarsa_pada', '>', now())
+                ->whereNull('dicabut_pada')->where(fn ($q) => $q->whereNull('kedaluwarsa_pada')->orWhere('kedaluwarsa_pada', '>', now()))
                 ->orderByDesc('terakhir_dipakai')->get()
                 ->map(fn (PerangkatWali $p) => ['id' => $p->id, 'nama' => $p->nama_perangkat,
                     'terakhir' => $p->terakhir_dipakai,

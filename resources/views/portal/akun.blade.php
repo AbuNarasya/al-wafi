@@ -20,6 +20,15 @@
         <x-portal.ikon nama="kanan" kelas="h-4 w-4 text-slate-400" />
     </a>
 
+    <a href="{{ route('portal.sandi.ganti') }}" class="mt-4 flex items-center gap-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"><x-portal.ikon nama="kartu" kelas="h-5 w-5" /></span>
+        <span class="min-w-0 flex-1 text-sm">
+            <span class="block font-semibold text-slate-900">Password masuk</span>
+            <span class="block text-xs text-slate-500">Ganti password untuk masuk Portal Wali</span>
+        </span>
+        <x-portal.ikon nama="kanan" kelas="h-4 w-4 text-slate-400" />
+    </a>
+
     <a href="{{ route('portal.pin') }}" class="mt-4 flex items-center gap-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"><x-portal.ikon nama="kartu" kelas="h-5 w-5" /></span>
         <span class="min-w-0 flex-1 text-sm">

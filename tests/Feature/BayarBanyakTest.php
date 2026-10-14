@@ -117,7 +117,7 @@ class BayarBanyakTest extends TestCase
 
     private function sebagaiIbu(): static
     {
-        return $this->actingAs($this->wali, 'wali')->withSession(['portal.peran' => 'ibu']);
+        return $this->actingAs($this->wali, 'wali')->withSession(['portal.peran' => 'ibu', 'portal.punya_sandi' => true]);
     }
 
     /** @param  list<TagihanSantri>  $tagihan */

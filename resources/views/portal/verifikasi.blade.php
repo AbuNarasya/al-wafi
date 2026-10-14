@@ -60,7 +60,11 @@
         <div class="flex items-start gap-3">
             <span class="{{ $langkah($terbukti) }}">{!! $terbukti ? '&#10003;' : '3' !!}</span>
             <div class="min-w-0 flex-1">
-                <p class="font-semibold text-slate-900">Email aktif Anda ({{ strtolower($label) }})</p>
+                <p class="font-semibold text-slate-900">Email aktif Anda ({{ strtolower($label) }})
+                    @unless ($terbukti)
+                        <span class="ml-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">wajib</span>
+                    @endunless
+                </p>
                 <p class="text-sm text-slate-500">Dipakai untuk masuk Portal Wali: kode masuk dikirim ke email ini.</p>
                 @if ($email === '')
                     <p class="mt-2 text-sm font-medium text-amber-700">Belum ada email tercatat.</p>
@@ -95,11 +99,21 @@
             <span>Saya sudah memeriksa data keluarga dan santri di atas, dan datanya <b>sudah benar &amp; sesuai Kartu Keluarga</b>.</span>
         </label>
         @error('setuju')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
-        <button @disabled(! $terbukti) class="mt-3 w-full rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300">
-            Selesai — data sudah benar
+
+        @if ($perluSandi && $terbukti)
+            {{-- Password sekalian dibuat — login berikutnya langsung email + password, tanpa kode. --}}
+            <div class="mt-4 space-y-3 rounded-2xl bg-slate-50 p-3">
+                <p class="text-sm font-semibold text-slate-900">Buat password untuk masuk Portal Wali</p>
+                @include('portal._sandi', ['nama' => 'sandi', 'label' => 'Password (minimal '.\App\Services\PortalWali\KataSandiWali::MIN.' karakter)',
+                    'autocomplete' => 'new-password', 'min' => \App\Services\PortalWali\KataSandiWali::MIN])
+                @include('portal._sandi', ['nama' => 'sandi_ulang', 'label' => 'Ulangi password', 'autocomplete' => 'new-password'])
+            </div>
+        @endif
+        {{-- Data yang sudah benar tak perlu diubah — satu-satunya syarat adalah email terbukti.
+             Labelnya menyebut syarat itu, supaya tombol abu-abu tak dikira "harus mengubah sesuatu". --}}
+        <button @disabled(! $terbukti) class="mt-3 w-full rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600">
+            {{ $terbukti ? 'Selesai — data sudah benar' : 'Buktikan email dulu (langkah 3)' }}
         </button>
-        @unless ($terbukti)
-            <p class="mt-2 text-center text-xs text-slate-500">Buktikan email Anda (langkah 3) untuk menyelesaikan.</p>
-        @endunless
+        <p class="mt-2 text-center text-xs text-slate-500">Data yang sudah benar tidak perlu diubah.</p>
     </form>
 @endsection

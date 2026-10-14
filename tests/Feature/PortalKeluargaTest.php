@@ -71,7 +71,7 @@ class PortalKeluargaTest extends TestCase
 
     private function sebagai(Wali $wali, string $peran = 'ayah'): static
     {
-        return $this->actingAs($wali, 'wali')->withSession(['portal.peran' => $peran]);
+        return $this->actingAs($wali, 'wali')->withSession(['portal.peran' => $peran, 'portal.punya_sandi' => true]);
     }
 
     public function test_tagihan_hanya_milik_anak_keluarga_sendiri(): void
