@@ -26,7 +26,8 @@
             <a href="{{ route('portal.beranda') }}" class="mt-5 block text-center text-sm text-brand hover:underline">Kembali ke beranda</a>
         @endif
     @else
-        <p class="mb-5 text-sm text-slate-500">Isian bertanda <span class="text-red-500">*</span> wajib diisi.</p>
+        <p class="mb-3 text-sm text-slate-500">Isian bertanda <span class="text-red-500">*</span> wajib diisi.</p>
+        <x-peringatan-kk portal class="mb-5" />
 
         <form method="POST" action="{{ route('portal.daftar') }}" class="space-y-6"
               data-confirm="Kirim pendaftaran ini? Pastikan data anak sudah benar."

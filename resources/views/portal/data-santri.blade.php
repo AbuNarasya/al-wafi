@@ -19,7 +19,8 @@
 @endphp
 
 @section('content')
-    <p class="mb-4 text-sm text-slate-500">Perubahan langsung tersimpan dan bagian kesantrian diberi tahu. Isian bertanda <span class="text-red-500">*</span> wajib diisi.</p>
+    <p class="mb-3 text-sm text-slate-500">Perubahan langsung tersimpan dan bagian kesantrian diberi tahu. Isian bertanda <span class="text-red-500">*</span> wajib diisi.</p>
+    <x-peringatan-kk portal class="mb-4" />
 
     <form method="POST" action="{{ route('portal.data.santri', $santri->id) }}" class="space-y-5"
           data-confirm="Simpan perubahan data {{ $santri->nama }}?">

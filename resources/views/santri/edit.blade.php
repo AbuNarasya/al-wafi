@@ -9,6 +9,7 @@
         <form method="POST" action="{{ route('santri.update', $santri->id) }}"
               class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             @csrf @method('PUT')
+            <x-peringatan-kk />
 
             {{-- Identitas dokumen: dirujuk tagihan, kuitansi, dan berkas cetak. --}}
             <div class="grid gap-4 sm:grid-cols-2">

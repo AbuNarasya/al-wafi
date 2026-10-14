@@ -16,6 +16,7 @@
         <form method="POST" action="{{ $baru ? route('wali.store') : route('wali.update', $wali->id) }}"
               class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             @csrf @unless ($baru) @method('PUT') @endunless
+            <x-peringatan-kk />
             @if ($dariKesiapan)
                 <input type="hidden" name="dari" value="kesiapan">
             @endif

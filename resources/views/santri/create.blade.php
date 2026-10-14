@@ -38,6 +38,7 @@
               }"
               x-init="$watch('jenjang', () => { if (!tingkatOpsi.includes(Number(tingkat))) tingkat = '' })">
             @csrf
+            <x-peringatan-kk />
 
             {{-- WALI: dipilih dari yang sudah terdaftar, ATAU ditulis sekalian di
                  sini. Sebelumnya petugas harus meninggalkan form ini, membuat

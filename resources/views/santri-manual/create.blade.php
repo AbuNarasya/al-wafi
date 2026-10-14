@@ -41,6 +41,7 @@
     <form method="POST" action="{{ route('santri_manual.store') }}" class="space-y-5"
           x-data="santriManual(@js($jenisJson), @js(old('tagihan', [])), @js((bool) old('id_wali')))">
         @csrf
+        <x-peringatan-kk />
 
         {{-- ── Identitas santri ─────────────────────────────────────────── --}}
         <div class="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
