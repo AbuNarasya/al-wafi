@@ -7,6 +7,7 @@
         ['portal.beranda', 'portal.beranda', 'Beranda', 'beranda'],
         ['portal.tagihan', 'portal.tagihan', 'Tagihan', 'tagihan'],
         \App\Http\Controllers\PortalKeluargaController::punyaDompet() ? ['portal.dompet', 'portal.dompet*', 'Dompet', 'dompet'] : null,
+        ['portal.data', 'portal.data*', 'Data Wali & Santri', 'data'],
         ['portal.akun', 'portal.akun', 'Akun', 'profil'],
     ])) : [];
     $belumDibaca = $masuk ? \App\Http\Controllers\PortalKeluargaController::kabarBelumDibaca() : 0;
@@ -116,7 +117,7 @@
                 @foreach ($menu as [$rute, $pola, $label, $ikon])
                     @php $aktif = request()->routeIs($pola); @endphp
                     <a href="{{ route($rute) }}" @if ($aktif) aria-current="page" @endif
-                       @class(['flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px]', 'font-semibold text-brand' => $aktif, 'text-slate-500' => ! $aktif])>
+                       @class(['flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-2 text-center text-[11px] leading-tight', 'font-semibold text-brand' => $aktif, 'text-slate-500' => ! $aktif])>
                         <x-portal.ikon :nama="$ikon" />
                         {{ $label }}
                     </a>

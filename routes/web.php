@@ -192,6 +192,18 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(Po
     Route::post('/dompet/tabungan', 'ajukanTabungan')->middleware('throttle:10,1');
     Route::post('/dompet/tabungan/{id}/batal', 'batalTabungan')->name('dompet.tabungan.batal')->whereNumber('id');
 });
+// Menu "Data Wali & Santri" — lihat & betulkan data pribadi sendiri (UbahDataWali).
+Route::prefix('wali/data')->name('portal.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalDataController::class)->group(function () {
+    Route::get('/', 'index')->name('data');
+    Route::get('/santri/{id}', 'formSantri')->name('data.santri')->whereNumber('id');
+    Route::put('/santri/{id}', 'simpanSantri')->whereNumber('id')->middleware('throttle:20,1');
+    Route::get('/keluarga', 'formKeluarga')->name('data.keluarga');
+    Route::put('/keluarga', 'simpanKeluarga')->middleware('throttle:20,1');
+    Route::get('/email/kode', 'formKodeEmail')->name('data.email.kode');
+    Route::post('/email/kode', 'konfirmasiEmail')->middleware('throttle:10,1');
+    Route::get('/email/{peran}', 'formEmail')->name('data.email')->whereIn('peran', ['ayah', 'ibu', 'wali']);
+    Route::post('/email/{peran}', 'kirimKodeEmail')->whereIn('peran', ['ayah', 'ibu', 'wali'])->middleware('throttle:5,1');
+});
 
 // ---- Aplikasi (wajib login) ----
 Route::middleware('auth')->group(function () {

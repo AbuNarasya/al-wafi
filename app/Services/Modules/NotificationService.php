@@ -179,6 +179,9 @@ class NotificationService
             // Pengingat menunjuk DAFTAR batch, bukan sebuah batch: yang diminta
             // justru menyusun yang belum ada.
             'JadwalPengingatTerbit' => '/kesantrian/batch-tagihan',
+            // Wali mengubah datanya sendiri lewat portal (UbahDataWali).
+            'Santri' => '/santri/'.$n->ref_id,
+            'Wali' => '/datawali/'.$n->ref_id.'/edit',
             PengajuanPembayaranService::SUMBER => $n->jenis === 'approval_menunggu'
                 ? '/approvals' : '/pengajuan-pembayaran/'.$n->ref_id,
             default => $n->jenis === 'approval_menunggu' ? '/approvals' : null,

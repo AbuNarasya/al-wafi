@@ -83,7 +83,8 @@ class PendaftaranPortal
         return str_starts_with($angka, '62') ? '0'.substr($angka, 2) : $angka;
     }
 
-    public static function teleponTerdaftar(string $telepon): bool
+    /** @param  ?int  $kecualiWali  keluarga yang sedang mengubah datanya sendiri — tak bentrok dengan dirinya */
+    public static function teleponTerdaftar(string $telepon, ?int $kecualiWali = null): bool
     {
         $normal = self::normalTelepon($telepon);
         $ekspresi = fn (string $kol) => "regexp_replace(regexp_replace(COALESCE({$kol}, ''), '\\D', '', 'g'), '^62', '0')";
@@ -92,16 +93,16 @@ class PendaftaranPortal
             foreach (['telepon', 'telepon_ayah', 'telepon_ibu', 'telepon_wali'] as $kol) {
                 $q->orWhereRaw($ekspresi($kol).' = ?', [$normal]);
             }
-        })->exists();
+        })->when($kecualiWali, fn ($q) => $q->where('id', '!=', $kecualiWali))->exists();
     }
 
-    public static function emailTerdaftar(string $email): bool
+    public static function emailTerdaftar(string $email, ?int $kecualiWali = null): bool
     {
         return Wali::where(function ($q) use ($email) {
             foreach (MasukWali::PERAN as $p) {
                 $q->orWhereRaw("lower(trim(email_{$p})) = ?", [MasukWali::normalEmail($email)]);
             }
-        })->exists();
+        })->when($kecualiWali, fn ($q) => $q->where('id', '!=', $kecualiWali))->exists();
     }
 
     /**
