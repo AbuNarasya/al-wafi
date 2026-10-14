@@ -164,13 +164,15 @@
              menyunting tunggakan awal — dua wewenang berbeda, satu kolom. --}}
         @php
             $bolehKoreksi = \App\Support\Akses::boleh('koreksi-tagihan', 'ubah');
-            $adaKolomAksi = $bolehKoreksi || $bolehTunggakanAwal;
             // Cetak kuitansi per pembayaran: lewat modul pembayaran yang boleh dilihat pengguna —
             // PPSB didahulukan untuk calon, Kesantrian untuk santri lainnya. Tak punya keduanya = tanpa tombol.
             $modulBayar = in_array($santri->status, \App\Models\Santri::CALON, true)
                 ? ['pembayaran-ppsb' => 'pembayaran_ppsb', 'pembayaran-kesantrian' => 'pembayaran_kesantrian']
                 : ['pembayaran-kesantrian' => 'pembayaran_kesantrian', 'pembayaran-ppsb' => 'pembayaran_ppsb'];
             $ruteKuitansi = collect($modulBayar)->first(fn ($rute, $kode) => \App\Support\Akses::boleh($kode));
+            // Seluruh aksi per tagihan (koreksi, ubah/hapus tunggakan awal, kuitansi) dihimpun
+            // dalam satu menu ⋮ — tombol berderet membuat tabel melebar melewati tepi kartu.
+            $adaKolomAksi = $bolehKoreksi || $bolehTunggakanAwal || $ruteKuitansi;
         @endphp
         <div class="mb-4 rounded-xl border border-gray-200 bg-white shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
@@ -274,7 +276,7 @@
                              mengurangi `sisa`. Tanpa ditampilkan, tagihan yang baru dibayar
                              tampak seolah belum tersentuh — petugas bisa menagih dua kali. --}}
                         @php $tunggu = $menungguPerTagihan[$t->id] ?? null; @endphp
-                        <tr><td class="px-4 py-2">{{ $t->kode_jenis }}</td>
+                        <tr><td class="whitespace-nowrap px-4 py-2">{{ $t->kode_jenis }}</td>
                             <td class="px-4 py-2 text-gray-600">{{ $t->keterangan }}
                                 {{-- Ditandai di layar, bukan hanya di kolom database: baris
                                      ini berakrual TANPA jurnal, dan siapa pun yang mengadu
@@ -330,35 +332,87 @@
                                         @if ($b->diverifikasi_pada)
                                             <div class="whitespace-nowrap text-[11px] tabular-nums text-gray-400">diverifikasi {{ $b->diverifikasi_pada->format('d/m/Y H:i') }}</div>
                                         @endif
-                                        {{-- Kuitansi hanya untuk yang sudah diverifikasi — sama dengan penjaga di controllernya. --}}
-                                        @if ($ruteKuitansi && $b->status === 'terverifikasi')
-                                            <a href="{{ route($ruteKuitansi.'.kuitansi', $b->id) }}" target="_blank" rel="noopener"
-                                               class="mt-1 inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50">
-                                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>
-                                                Cetak kuitansi
-                                            </a>
-                                        @endif
                                     </div>
                                 @empty
                                     <span class="text-gray-400">—</span>
                                 @endforelse
                             </td>
                             <td class="px-4 py-2">
-                                <span class="rounded-full px-2 py-0.5 text-xs {{ $t->status === 'lunas' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">{{ ucfirst(str_replace('_',' ',$t->status)) }}</span>
+                                <span class="whitespace-nowrap rounded-full px-2 py-0.5 text-xs {{ $t->status === 'lunas' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">{{ ucfirst(str_replace('_',' ',$t->status)) }}</span>
                                 @if ($tunggu && (float) $tunggu > 0)
                                     <div class="mt-0.5 text-[11px] text-gray-500">sudah disetor, menunggu keuangan</div>
                                 @endif
                             </td>
                             @if ($adaKolomAksi)
-                                <td class="px-4 py-2 text-right">
-                                    <div class="flex items-center justify-end gap-1">
-                                    @if ($bolehKoreksi && $t->status !== 'batal')
-                                        <div x-data="{ buka: false }" class="relative inline-block">
-                                            <button type="button" @click="buka = ! buka"
-                                                    class="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50">Koreksi</button>
-                                            <form x-show="buka" x-cloak @click.outside="buka = false" method="POST"
-                                                  action="{{ route('tagihan.koreksi', $t->id) }}"
-                                                  class="absolute right-0 z-20 mt-1 w-80 space-y-2 rounded-lg border border-gray-200 bg-white p-3 text-left shadow-lg">
+                                <td class="px-3 py-2 text-right">
+                                    @php
+                                        $bisaKoreksi = $bolehKoreksi && $t->status !== 'batal';
+                                        // Sunting & hapus TANPA jurnal — hanya untuk baris saldo awal
+                                        // yang belum tersentuh sama sekali. Halangannya dihitung di
+                                        // controller lewat TunggakanAwalService::halangan(), sumber yang
+                                        // sama dengan yang dipakai service menolak, supaya menu yang
+                                        // terlihat tak pernah menjanjikan lebih dari yang diterima.
+                                        $bisaSunting = $bolehTunggakanAwal && $t->saldo_awal && ($halanganTunggakanAwal[$t->id] ?? []) === [];
+                                        // Kuitansi hanya untuk yang sudah diverifikasi — sama dengan penjaga di controllernya.
+                                        $bisaKuitansi = $ruteKuitansi
+                                            ? $t->pembayaran->where('status', 'terverifikasi')
+                                            : collect();
+                                    @endphp
+                                    @if ($bisaKoreksi || $bisaSunting || $bisaKuitansi->isNotEmpty())
+                                    <div x-data="{ menu: false, koreksi: false, ubah: false }" class="relative inline-block text-left"
+                                         @keydown.escape.window="menu = false; koreksi = false; ubah = false">
+                                        <button type="button" @click="menu = ! menu" title="Aksi" aria-label="Aksi"
+                                                class="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800">
+                                            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"/></svg>
+                                        </button>
+                                        <div x-show="menu" x-cloak @click.outside="menu = false"
+                                             class="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 text-sm shadow-lg">
+                                            @if ($bisaKoreksi)
+                                                <button type="button" @click="menu = false; koreksi = true"
+                                                        class="block w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50">Koreksi nominal</button>
+                                            @endif
+                                            @if ($bisaSunting)
+                                                <button type="button" @click="menu = false; ubah = true"
+                                                        class="block w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50">Ubah tunggakan awal</button>
+                                                {{-- @rp() TIDAK dipakai di dalam atribut: ia mengeluarkan
+                                                     <span class="rp">, dan kutipnya menutup atributnya lebih awal. --}}
+                                                <form method="POST" action="{{ route('tunggakan_awal.destroy', $t->id) }}"
+                                                      data-confirm="Hapus tunggakan awal Rp {{ number_format((float) $t->nominal, 0, ',', '.') }}? Tak ada jurnal yang dibalik — baris ini memang belum pernah menyentuh buku besar.">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button class="block w-full px-3 py-2 text-left text-red-600 hover:bg-red-50">Hapus</button>
+                                                </form>
+                                            @endif
+                                            @if ($bisaKuitansi->isNotEmpty())
+                                                @if ($bisaKoreksi || $bisaSunting)
+                                                    <div class="my-1 border-t border-gray-100"></div>
+                                                @endif
+                                                @foreach ($bisaKuitansi as $b)
+                                                    <a href="{{ route($ruteKuitansi.'.kuitansi', $b->id) }}" target="_blank" rel="noopener" @click="menu = false"
+                                                       class="flex items-center gap-2 px-3 py-2 text-gray-700 hover:bg-gray-50">
+                                                        <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>
+                                                        <span>Cetak kuitansi
+                                                            @if ($bisaKuitansi->count() > 1)
+                                                                <span class="block text-[11px] text-gray-400">{{ $b->nomor }}</span>
+                                                            @endif
+                                                        </span>
+                                                    </a>
+                                                @endforeach
+                                            @endif
+                                        </div>
+
+                                    @if ($bisaKoreksi)
+                                        {{-- Modal, sebentuk dengan Ubah Tunggakan Awal — panel gantung
+                                             selebar 20rem tak muat di bawah tombol ⋮ di tepi tabel. --}}
+                                        <div x-show="koreksi" x-cloak
+                                             class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+                                             @click.self="koreksi = false">
+                                            <div class="my-10 w-full max-w-md rounded-xl bg-white text-left shadow-xl">
+                                                <div class="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+                                                    <h3 class="font-semibold text-gray-800">Koreksi Tagihan</h3>
+                                                    <button type="button" @click="koreksi = false" class="text-gray-400 hover:text-gray-700">&times;</button>
+                                                </div>
+                                            <form method="POST" action="{{ route('tagihan.koreksi', $t->id) }}" class="space-y-3 p-5">
                                                 @csrf
                                                 <p class="text-xs text-gray-600">
                                                     Nominal sekarang <b>@rp($t->nominal)</b>, sudah dibayar
@@ -394,23 +448,20 @@
                                                     yang sudah dibayar dikembalikan ke Dompet Wali sebagai titipan.
                                                     Tagihannya tak lagi dihitung sebagai piutang di laporan mana pun.
                                                 </p>
-                                                <button class="w-full rounded bg-brand px-2 py-1.5 text-xs font-semibold text-white hover:bg-brand-dark">Simpan Koreksi</button>
+                                                <div class="flex justify-end gap-2 border-t border-gray-100 pt-3">
+                                                    <button type="button" @click="koreksi = false" class="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">Batal</button>
+                                                    <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Simpan Koreksi</button>
+                                                </div>
                                             </form>
+                                            </div>
                                         </div>
                                     @endif
 
-                                    {{-- Sunting & hapus TANPA jurnal — hanya untuk baris saldo awal
-                                         yang belum tersentuh sama sekali. Halangannya dihitung di
-                                         controller lewat TunggakanAwalService::halangan(), sumber yang
-                                         sama dengan yang dipakai service menolak, supaya tombol yang
-                                         terlihat tak pernah menjanjikan lebih dari yang diterima. --}}
-                                    @if ($bolehTunggakanAwal && $t->saldo_awal && ($halanganTunggakanAwal[$t->id] ?? []) === [])
+                                    @if ($bisaSunting)
                                         {{-- Modal juga, sebentuk dengan tombol Tunggakan Awal di
                                              kepala blok — bukan panel gantung yang menyempit. --}}
-                                        <div x-data="{ ubah: false }" class="inline-block">
-                                            <button type="button" @click="ubah = true"
-                                                    class="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50">Ubah</button>
-                                            <div x-show="ubah" x-cloak @keydown.escape.window="ubah = false"
+                                        <div>
+                                            <div x-show="ubah" x-cloak
                                                  class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
                                                  @click.self="ubah = false">
                                                 <div class="my-10 w-full max-w-md rounded-xl bg-white text-left shadow-xl">
@@ -456,16 +507,9 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        {{-- @rp() TIDAK dipakai di dalam atribut: ia mengeluarkan
-                                             <span class="rp">, dan kutipnya menutup atributnya lebih awal. --}}
-                                        <form method="POST" action="{{ route('tunggakan_awal.destroy', $t->id) }}" class="inline"
-                                              data-confirm="Hapus tunggakan awal Rp {{ number_format((float) $t->nominal, 0, ',', '.') }}? Tak ada jurnal yang dibalik — baris ini memang belum pernah menyentuh buku besar.">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button class="rounded border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50">Hapus</button>
-                                        </form>
                                     @endif
                                     </div>
+                                    @endif
                                 </td>
                             @endif
                         </tr>
