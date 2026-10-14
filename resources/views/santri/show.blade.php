@@ -268,6 +268,10 @@
                     </div>
                 @endif
             </div>
+            {{-- Digeser ke samping DI DALAM kartu bila layarnya sempit: kolom tanggal &
+                 pembayaran sengaja tak dilipat, jadi tabel punya lebar minimum yang bisa
+                 melampaui kartu. Menu ⋮ berposisi `fixed` supaya tak ikut terpotong. --}}
+            <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="px-4 py-2">Jenis</th><th class="px-4 py-2">Keterangan</th><th class="px-4 py-2">Diterbitkan</th><th class="px-4 py-2 text-right">Nominal</th><th class="px-4 py-2 text-right">Sisa</th><th class="px-4 py-2">Pembayaran</th><th class="px-4 py-2">Status</th>@if ($adaKolomAksi)<th class="px-4 py-2"></th>@endif</tr></thead>
                 <tbody class="divide-y divide-gray-100">
@@ -359,14 +363,27 @@
                                             : collect();
                                     @endphp
                                     @if ($bisaKoreksi || $bisaSunting || $bisaKuitansi->isNotEmpty())
-                                    <div x-data="{ menu: false, koreksi: false, ubah: false }" class="relative inline-block text-left"
-                                         @keydown.escape.window="menu = false; koreksi = false; ubah = false">
-                                        <button type="button" @click="menu = ! menu" title="Aksi" aria-label="Aksi"
+                                    {{-- Letak menu dihitung dari tombolnya terhadap LAYAR (fixed): di dalam
+                                         area geser, menu `absolute` akan terpotong. Dibuka ke atas bila
+                                         tombolnya dekat dasar layar; ditutup saat halaman bergulir. --}}
+                                    <div x-data="{ menu: false, koreksi: false, ubah: false, letak: '',
+                                                   buka(el) {
+                                                       const r = el.getBoundingClientRect();
+                                                       const kanan = 'right:' + Math.max(8, document.documentElement.clientWidth - r.right) + 'px;';
+                                                       this.letak = kanan + (r.bottom + 240 > innerHeight
+                                                           ? 'bottom:' + (innerHeight - r.top + 4) + 'px'
+                                                           : 'top:' + (r.bottom + 4) + 'px');
+                                                       this.menu = ! this.menu;
+                                                   } }"
+                                         class="inline-block text-left"
+                                         @keydown.escape.window="menu = false; koreksi = false; ubah = false"
+                                         @scroll.window="menu = false" @resize.window="menu = false">
+                                        <button type="button" @click="buka($el)" title="Aksi" aria-label="Aksi"
                                                 class="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800">
                                             <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 5.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"/></svg>
                                         </button>
-                                        <div x-show="menu" x-cloak @click.outside="menu = false"
-                                             class="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 text-sm shadow-lg">
+                                        <div x-show="menu" x-cloak @click.outside="menu = false" :style="letak"
+                                             class="fixed z-30 w-56 rounded-lg border border-gray-200 bg-white py-1 text-sm shadow-lg">
                                             @if ($bisaKoreksi)
                                                 <button type="button" @click="menu = false; koreksi = true"
                                                         class="block w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-50">Koreksi nominal</button>
@@ -518,6 +535,7 @@
                     @endforelse
                 </tbody>
             </table>
+            </div>
         </div>
 
         {{-- Aksi lifecycle --}}
