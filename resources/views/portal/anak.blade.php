@@ -59,6 +59,7 @@
                         <a href="{{ route('portal.bayar', $t['id']) }}" class="flex items-center justify-between gap-2 px-4 py-3">
                             <span class="min-w-0">
                                 <span class="block truncate text-sm font-medium text-slate-900">{{ $t['nama'] }}</span>
+                                @if ($t['keterangan'])<span class="block truncate text-xs text-slate-600">{{ $t['keterangan'] }}</span>@endif
                                 @if ($t['jatuh_tempo'])<span class="block text-xs text-slate-500">Jatuh tempo {{ $t['jatuh_tempo']->format('d/m/Y') }}</span>@endif
                             </span>
                             <span class="shrink-0 text-sm font-semibold tabular-nums text-slate-900">{{ $rp($t['sisa']) }}</span>
@@ -118,6 +119,9 @@
                     <div class="flex items-start justify-between gap-2 px-4 py-3">
                         <div class="min-w-0">
                             <p class="text-sm font-medium text-slate-900">{{ $p->tagihan ? \App\Http\Controllers\PortalKeluargaController::namaTagihan($p->tagihan) : 'Pembayaran' }}</p>
+                            @if ($p->tagihan && ($ket = \App\Http\Controllers\PortalKeluargaController::keteranganTagihan($p->tagihan)))
+                                <p class="text-xs text-slate-600">{{ $ket }}</p>
+                            @endif
                             <p class="text-xs text-slate-500">{{ $p->tanggal->format('d/m/Y') }}</p>
                             @if ($p->status === 'menunggu_verifikasi')<p class="text-xs font-medium text-amber-700">Menunggu verifikasi</p>@endif
                         </div>

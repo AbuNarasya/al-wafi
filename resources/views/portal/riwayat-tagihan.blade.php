@@ -40,6 +40,7 @@
                 <div class="flex items-start justify-between gap-2 px-4 py-3">
                     <div class="min-w-0">
                         <p class="text-sm font-medium text-slate-900">{{ $t['nama'] }}</p>
+                        @if ($t['keterangan'])<p class="text-xs text-slate-600">{{ $t['keterangan'] }}</p>@endif
                         <p class="text-xs text-slate-500">{{ $t['anak'] }} &middot; terbit {{ $t['terbit']?->format('d/m/Y') }}</p>
                         <span class="mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold {{ $warna[$t['status']] }}">{{ $label[$t['status']] }}</span>
                     </div>
@@ -58,6 +59,7 @@
                 <div class="flex items-start justify-between gap-2 px-4 py-3">
                     <div class="min-w-0">
                         <p class="text-sm font-medium text-slate-900">{{ $p['tagihan'] }}</p>
+                        @if ($p['keterangan'])<p class="text-xs text-slate-600">{{ $p['keterangan'] }}</p>@endif
                         <p class="text-xs text-slate-500">{{ $p['anak'] }} &middot; {{ $p['tanggal']->format('d/m/Y') }} &middot; {{ $p['sumber'] }}</p>
                         @if ($p['menunggu'])<p class="text-xs font-medium text-amber-700">Menunggu verifikasi</p>@endif
                     </div>

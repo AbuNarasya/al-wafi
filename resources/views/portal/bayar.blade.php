@@ -12,6 +12,9 @@
     <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
         <p class="text-sm text-slate-500">{{ $tagihan->santri->nama }}</p>
         <p class="font-semibold text-slate-900">{{ $nama }}</p>
+        @if ($ket = \App\Http\Controllers\PortalKeluargaController::keteranganTagihan($tagihan))
+            <p class="text-sm text-slate-600">{{ $ket }}</p>
+        @endif
         <p class="mt-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Sisa tagihan</p>
         <p class="text-3xl font-bold tabular-nums text-slate-900">{{ $rp($tagihan->sisa) }}</p>
         @if ((float) $ruang < (float) $tagihan->sisa)

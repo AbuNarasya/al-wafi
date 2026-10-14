@@ -76,6 +76,9 @@
                                 @if ($p && ! str_contains(mb_strtolower($t['nama']), mb_strtolower($p)))
                                     <span class="font-normal text-slate-500">&middot; {{ $p }}</span>
                                 @endif
+                                @if ($t['keterangan'])
+                                    <span class="block text-sm font-normal text-slate-500">{{ $t['keterangan'] }}</span>
+                                @endif
                             </p>
                             <span class="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $warna[$t['status']] }}">{{ $label[$t['status']] }}</span>
                         </div>
@@ -131,6 +134,9 @@
                     <div class="flex items-start justify-between gap-2 px-4 py-3">
                         <div class="min-w-0">
                             <p class="text-sm font-medium text-slate-900">{{ $r['tagihan'] }}</p>
+                            @if ($r['keterangan'])
+                                <p class="text-xs text-slate-600">{{ $r['keterangan'] }}</p>
+                            @endif
                             <p class="text-xs text-slate-500">{{ $r['tanggal']->format('d/m/Y') }} &middot; {{ $r['sumber'] }}</p>
                             @if ($r['status'] === 'menunggu_verifikasi')
                                 <p class="text-xs font-medium text-amber-700">Menunggu verifikasi</p>

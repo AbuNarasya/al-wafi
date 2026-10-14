@@ -25,6 +25,9 @@
                     <div class="flex items-start justify-between gap-2">
                         <div class="min-w-0">
                             <p class="font-semibold text-slate-900">{{ \App\Http\Controllers\PortalKeluargaController::namaTagihan($t) }}</p>
+                            @if ($ket = \App\Http\Controllers\PortalKeluargaController::keteranganTagihan($t))
+                                <p class="text-xs text-slate-600">{{ $ket }}</p>
+                            @endif
                             <p class="text-xs text-slate-500">{{ $t->santri->nama }} &middot; sisa {{ $rp($t->sisa) }}</p>
                         </div>
                         @if ($wajibPenuh)

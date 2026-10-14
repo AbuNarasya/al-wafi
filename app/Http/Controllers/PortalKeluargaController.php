@@ -62,23 +62,52 @@ class PortalKeluargaController extends Controller
     }
 
     /**
-     * Nama tagihan untuk WALI: jenis biaya + periode ("SPP SMP · November 2026").
-     *
-     * `keterangan` sering memuat catatan pembukuan ("SPP SMP 2026-11 · akrual
-     * SPP-2610-0002") yang tak bermakna bagi wali. Hanya tagihan lain-lain yang
-     * memakai keterangannya — di sana keterangan itulah nama tagihannya.
+     * Nama tagihan untuk WALI: jenis biaya + periode ("SPP SMP · November 2026"),
+     * untuk SEMUA perilaku — tagihan lain-lain bulanan pun butuh bulannya, kalau
+     * tidak empat baris "Excul Robotic" tak bisa dibedakan. Keterangan yang ditulis
+     * petugas tampil terpisah lewat keteranganTagihan().
      */
     public static function namaTagihan(TagihanSantri $t): string
     {
-        if ($t->perilaku === 'lain' && $t->keterangan) {
-            return $t->keterangan;
-        }
-        $nama = $t->jenis?->nama ?? ($t->keterangan ?: $t->kode_jenis);
-        if ($t->periode && preg_match('/^\d{4}-\d{2}$/', $t->periode)) {
-            $nama .= ' · '.\Illuminate\Support\Carbon::createFromFormat('Y-m-d', $t->periode.'-01')->locale('id')->translatedFormat('F Y');
+        $nama = $t->jenis?->nama ?? (self::keteranganTagihan($t) ?? $t->kode_jenis);
+        $periode = trim((string) $t->periode);
+        if (preg_match('/^\d{4}-\d{2}$/', $periode)) {
+            $nama .= ' · '.\Illuminate\Support\Carbon::createFromFormat('Y-m-d', $periode.'-01')->locale('id')->translatedFormat('F Y');
+        } elseif ($periode !== '' && ! str_contains(mb_strtolower($nama), mb_strtolower($periode))) {
+            // Tagihan lain-lain boleh berperiode teks bebas ("Semester Ganjil").
+            $nama .= ' · '.$periode;
         }
 
         return $nama;
+    }
+
+    /**
+     * Keterangan tagihan yang BERMAKNA bagi wali ("Tunggakan SPP 3 bulan"), atau null.
+     *
+     * `keterangan` juga dipakai sistem untuk catatan pembukuan ("SPP SMP 2026-11 ·
+     * akrual SPP-2610-0002", "… · koreksi KR-…: alasan"). Potongan pembukuan itu
+     * dibuang, dan keterangan bawaan yang hanya mengulang nama jenis (+ periode /
+     * T.A / tingkat) disembunyikan — isinya sudah tampil di judul.
+     */
+    public static function keteranganTagihan(TagihanSantri $t): ?string
+    {
+        $bagian = array_filter(
+            array_map('trim', explode(' · ', (string) $t->keterangan)),
+            fn ($b) => $b !== '' && ! preg_match('/^(akrual|koreksi|bebas \(nominal nol\)|hangus|dibatalkan)\b/iu', $b),
+        );
+        $ket = implode(' · ', $bagian);
+        if ($ket === '') {
+            return null;
+        }
+        $nama = (string) ($t->jenis?->nama ?? '');
+        if ($nama !== '' && preg_match('/^'.preg_quote($nama, '/').'(\s+(\d{4}-\d{2}|periode\s.*|T\.A\s.*))?$/iu', $ket)) {
+            return null;
+        }
+        if ($t->periode && mb_strtolower($ket) === mb_strtolower(trim($nama.' '.$t->periode))) {
+            return null;
+        }
+
+        return $ket;
     }
 
     // ---- Tagihan ----
@@ -131,7 +160,7 @@ class PortalKeluargaController extends Controller
             'alur' => $alur = \App\Services\PortalWali\PembayaranPortal::alur($t->setRelation('santri', $dipilih))[0],
             // Masih ada setoran yang menunggu & menutup seluruh sisanya → tak ada lagi yang perlu dibayar.
             'bisa_bayar' => $alur !== null && (float) \App\Support\Money::sub($t->sisa, $menunggu[$t->id] ?? '0') > 0,
-            'nama' => self::namaTagihan($t),
+            'nama' => self::namaTagihan($t), 'keterangan' => self::keteranganTagihan($t),
             'periode' => $t->periode, 'jatuh_tempo' => $t->jatuh_tempo,
             'nominal' => Money::of($t->nominal), 'sisa' => Money::of($t->sisa),
             'terbayar' => $diakui[$t->id] ?? '0', 'menunggu' => $menunggu[$t->id] ?? '0',
@@ -145,6 +174,7 @@ class PortalKeluargaController extends Controller
         $data['riwayat'] = $bayar->map(fn (PembayaranSantri $p) => [
             'tanggal' => $p->tanggal, 'nominal' => Money::of($p->nominal), 'status' => $p->status,
             'tagihan' => $p->tagihan ? self::namaTagihan($p->tagihan) : 'Pembayaran',
+            'keterangan' => $p->tagihan ? self::keteranganTagihan($p->tagihan) : null,
             'sumber' => self::LABEL_SUMBER[$p->sumber] ?? 'Transfer / tunai',
         ]);
 
@@ -175,12 +205,14 @@ class PortalKeluargaController extends Controller
             ],
             'tagihan' => $tagihan->map(fn (TagihanSantri $t) => [
                 'id' => $t->id, 'anak' => $nama[$t->id_santri] ?? '', 'nama' => self::namaTagihan($t),
+                'keterangan' => self::keteranganTagihan($t),
                 'nominal' => (float) $t->nominal, 'sisa' => (float) $t->sisa, 'terbit' => $t->created_at,
                 'status' => (float) $t->sisa <= 0 ? 'lunas' : ((float) $t->sisa < (float) $t->nominal ? 'sebagian' : 'belum'),
             ]),
             'bayar' => $bayar->map(fn (PembayaranSantri $p) => [
                 'anak' => $nama[$p->id_santri] ?? '', 'tanggal' => $p->tanggal, 'nominal' => (float) $p->nominal,
                 'tagihan' => $p->tagihan ? self::namaTagihan($p->tagihan) : 'Pembayaran',
+                'keterangan' => $p->tagihan ? self::keteranganTagihan($p->tagihan) : null,
                 'sumber' => self::LABEL_SUMBER[$p->sumber] ?? 'Transfer / tunai', 'menunggu' => $p->status === 'menunggu_verifikasi',
             ]),
         ]);
@@ -266,7 +298,7 @@ class PortalKeluargaController extends Controller
             'label' => \App\Services\Ppsb\Tahap::labelStatus((string) $s->status),
             'sisa' => $belum->sum(fn ($t) => (float) $t->sisa),
             'belum' => $belum->take(5)->map(fn (TagihanSantri $t) => [
-                'id' => $t->id, 'nama' => self::namaTagihan($t),
+                'id' => $t->id, 'nama' => self::namaTagihan($t), 'keterangan' => self::keteranganTagihan($t),
                 'sisa' => (float) $t->sisa, 'jatuh_tempo' => $t->jatuh_tempo,
             ]),
             'jumlahBelum' => $belum->count(),
