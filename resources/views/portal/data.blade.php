@@ -19,6 +19,13 @@
         </div>
     </div>
 
+    @if (\App\Services\PortalWali\SesiWali::modeVerifikasi(request()))
+        <a href="{{ route('portal.verifikasi.ringkasan') }}" class="mb-4 flex items-center justify-between gap-2 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-semibold text-brand ring-1 ring-blue-100">
+            <span>Sudah diperiksa? Kembali ke langkah verifikasi</span>
+            <x-portal.ikon nama="kanan" kelas="h-4 w-4" />
+        </a>
+    @endif
+
     <div class="mb-4 grid grid-cols-2 gap-1 rounded-2xl bg-slate-200 p-1 text-center text-sm">
         <a href="{{ route('portal.data', ['tab' => 'santri']) }}" @class(['rounded-xl py-2', 'bg-white font-semibold text-slate-900 shadow-sm' => $tab === 'santri', 'text-slate-600' => $tab !== 'santri'])>Data Santri</a>
         <a href="{{ route('portal.data', ['tab' => 'wali']) }}" @class(['rounded-xl py-2', 'bg-white font-semibold text-slate-900 shadow-sm' => $tab === 'wali', 'text-slate-600' => $tab !== 'wali'])>Data Wali</a>

@@ -21,6 +21,16 @@ class SesiWali
 
     public const MENUNGGU = 'portal.email_menunggu';
 
+    /**
+     * MODE VERIFIKASI: masuk lewat link verifikasi data (LinkVerifikasi), bukan email.
+     * Berisi id link-nya. Selama ada, middleware PortalWali hanya membuka layar
+     * verifikasi & Data Wali & Santri — dompet dan pembayaran tetap tertutup.
+     */
+    public const VERIFIKASI = 'portal.verifikasi';
+
+    /** Email peran ini yang sudah terbukti dengan kode selama mode verifikasi. */
+    public const VERIFIKASI_EMAIL = 'portal.verifikasi_email';
+
     public function __construct(private readonly IngatPerangkat $perangkat = new IngatPerangkat) {}
 
     public static function wali(): ?Wali
@@ -49,12 +59,36 @@ class SesiWali
         return $request->session()->get(self::PENDAFTAR);
     }
 
+    public static function modeVerifikasi(Request $request): ?int
+    {
+        $id = $request->session()->get(self::VERIFIKASI);
+
+        return $id ? (int) $id : null;
+    }
+
+    /** Masuk TERBATAS lewat link verifikasi — tanpa "ingat perangkat". */
+    public function masukVerifikasi(Wali $wali, string $peran, int $idLink, Request $request): void
+    {
+        Auth::guard('wali')->login($wali);
+        $request->session()->regenerate();
+        $request->session()->forget([self::PENDAFTAR, self::MENUNGGU, self::VERIFIKASI_EMAIL]);
+        $request->session()->put(self::PERAN, $peran);
+        $request->session()->put(self::VERIFIKASI, $idLink);
+    }
+
+    /** Verifikasi selesai: sesi terbatas naik menjadi sesi portal penuh. */
+    public function akhiriVerifikasi(Request $request): void
+    {
+        $request->session()->regenerate();
+        $request->session()->forget([self::VERIFIKASI, self::VERIFIKASI_EMAIL]);
+    }
+
     public function masuk(Wali $wali, string $peran, Request $request, bool $ingat): void
     {
         Auth::guard('wali')->login($wali);
         // Sesi baru — mencegah session fixation, dan membuang sisa keadaan pendaftar.
         $request->session()->regenerate();
-        $request->session()->forget([self::PENDAFTAR, self::MENUNGGU]);
+        $request->session()->forget([self::PENDAFTAR, self::MENUNGGU, self::VERIFIKASI, self::VERIFIKASI_EMAIL]);
         $request->session()->put(self::PERAN, $peran);
         if ($ingat) {
             $this->perangkat->ingat($wali, $peran, $request);
@@ -86,7 +120,7 @@ class SesiWali
     {
         $this->perangkat->lupakan($request);
         Auth::guard('wali')->logout();
-        $request->session()->forget([self::PERAN, self::PENDAFTAR, self::MENUNGGU]);
+        $request->session()->forget([self::PERAN, self::PENDAFTAR, self::MENUNGGU, self::VERIFIKASI, self::VERIFIKASI_EMAIL]);
         $request->session()->regenerateToken();
     }
 }

@@ -204,6 +204,22 @@ Route::prefix('wali/data')->name('portal.')->middleware('portal.wali')->controll
     Route::get('/email/{peran}', 'formEmail')->name('data.email')->whereIn('peran', ['ayah', 'ibu', 'wali']);
     Route::post('/email/{peran}', 'kirimKodeEmail')->whereIn('peran', ['ayah', 'ibu', 'wali'])->middleware('throttle:5,1');
 });
+// Verifikasi data lewat link dari staf (LinkVerifikasi). /wali/v* TANPA sesi: link-nya
+// sendiri kuncinya; sesudah peran dipilih, sesinya MODE VERIFIKASI (lihat PortalWali).
+Route::prefix('wali')->name('portal.verifikasi.')->controller(\App\Http\Controllers\PortalVerifikasiController::class)->group(function () {
+    Route::get('/v', 'formCari')->name('cari');
+    Route::post('/v', 'cari')->middleware('throttle:5,1');
+    Route::get('/v/{kode}', 'buka')->name('buka')->where('kode', '[A-Za-z0-9]{32}')->middleware('throttle:30,1');
+    Route::post('/v/{kode}', 'pilihPeran')->where('kode', '[A-Za-z0-9]{32}')->middleware('throttle:10,1');
+
+    Route::middleware('portal.wali')->group(function () {
+        Route::get('/verifikasi', 'ringkasan')->name('ringkasan');
+        Route::post('/verifikasi/email', 'kirimKode')->name('email')->middleware('throttle:5,1');
+        Route::get('/verifikasi/kode', 'formKode')->name('kode');
+        Route::post('/verifikasi/kode', 'konfirmasiKode')->middleware('throttle:10,1');
+        Route::post('/verifikasi/selesai', 'selesai')->name('selesai')->middleware('throttle:10,1');
+    });
+});
 
 // ---- Aplikasi (wajib login) ----
 Route::middleware('auth')->group(function () {
@@ -1094,6 +1110,13 @@ Route::middleware('auth')->group(function () {
         $w = WaliController::class;
         Route::get('/', [$w, 'index'])->name('index')->middleware('hakakses:wali,lihat');
         Route::get('/kesiapan-portal', [$w, 'kesiapanPortal'])->name('kesiapan_portal')->middleware('hakakses:wali,lihat');
+        // Verifikasi data lewat link WhatsApp (LinkVerifikasi).
+        $v = \App\Http\Controllers\WaliVerifikasiController::class;
+        Route::get('/verifikasi', [$v, 'index'])->name('verifikasi')->middleware('hakakses:wali,lihat');
+        Route::post('/verifikasi/massal', [$v, 'buatMassal'])->name('verifikasi.massal')->middleware('hakakses:wali,ubah');
+        Route::post('/verifikasi/keluarga/{idWali}', [$v, 'buat'])->name('verifikasi.buat')->middleware('hakakses:wali,ubah')->whereNumber('idWali');
+        Route::get('/verifikasi/{id}/wa', [$v, 'kirimWa'])->name('verifikasi.wa')->middleware('hakakses:wali,ubah')->whereNumber('id');
+        Route::post('/verifikasi/{id}/cabut', [$v, 'cabut'])->name('verifikasi.cabut')->middleware('hakakses:wali,ubah')->whereNumber('id');
         Route::get('/create', [$w, 'create'])->name('create')->middleware('hakakses:wali,buat');
         Route::post('/', [$w, 'store'])->name('store')->middleware('hakakses:wali,buat');
         Route::get('/{id}/edit', [$w, 'edit'])->name('edit')->middleware('hakakses:wali,ubah')->whereNumber('id');

@@ -2,15 +2,20 @@
     // Portal Wali — bingkai bergaya SANAD Wali (bilah atas + bilah bawah, isi berkartu),
     // dengan palet ERP: biru brand #164a9e + aksen emas #f8c400.
     $masuk = \App\Services\PortalWali\SesiWali::wali() !== null;
-    $diBeranda = request()->routeIs('portal.beranda', 'portal.masuk', 'portal.kode');
-    $menu = $masuk ? array_values(array_filter([
+    // Mode verifikasi (masuk lewat link dari staf): hanya layar verifikasi & data yang terbuka.
+    $verifikasi = $masuk && \App\Services\PortalWali\SesiWali::modeVerifikasi(request()) !== null;
+    $diBeranda = request()->routeIs('portal.beranda', 'portal.masuk', 'portal.kode', 'portal.verifikasi.ringkasan');
+    $menu = $verifikasi ? [
+        ['portal.verifikasi.ringkasan', 'portal.verifikasi.*', 'Verifikasi', 'absensi'],
+        ['portal.data', 'portal.data*', 'Data Wali & Santri', 'data'],
+    ] : ($masuk ? array_values(array_filter([
         ['portal.beranda', 'portal.beranda', 'Beranda', 'beranda'],
         ['portal.tagihan', 'portal.tagihan', 'Tagihan', 'tagihan'],
         \App\Http\Controllers\PortalKeluargaController::punyaDompet() ? ['portal.dompet', 'portal.dompet*', 'Dompet', 'dompet'] : null,
         ['portal.data', 'portal.data*', 'Data Wali & Santri', 'data'],
         ['portal.akun', 'portal.akun', 'Akun', 'profil'],
-    ])) : [];
-    $belumDibaca = $masuk ? \App\Http\Controllers\PortalKeluargaController::kabarBelumDibaca() : 0;
+    ])) : []);
+    $belumDibaca = $masuk && ! $verifikasi ? \App\Http\Controllers\PortalKeluargaController::kabarBelumDibaca() : 0;
     $namaMasuk = $masuk ? (\App\Services\PortalWali\SesiWali::wali()->{'nama_'.\App\Services\PortalWali\SesiWali::peran(request())} ?: \App\Services\PortalWali\SesiWali::wali()->nama) : '';
 @endphp
 <!DOCTYPE html>
@@ -67,13 +72,13 @@
                 {{-- Ke halaman INDUK yang tetap (section `kembali` di tiap halaman; bawaan: beranda),
                      BUKAN history.back(): riwayat browser mengulang halaman yang sudah dilewati —
                      sesudah membayar, ia membuka lagi halaman Bayar beserta papan PIN-nya. --}}
-                <a href="@yield('kembali', route('portal.beranda'))"
+                <a href="@yield('kembali', $verifikasi ? route('portal.verifikasi.ringkasan') : route('portal.beranda'))"
                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100" aria-label="Kembali">
                     <x-portal.ikon nama="kembali" />
                 </a>
                 <p class="min-w-0 flex-1 truncate text-center font-semibold text-slate-900">@yield('title', 'Portal Wali')</p>
             @else
-                <a href="{{ $masuk ? route('portal.beranda') : route('portal.masuk') }}" class="flex min-w-0 flex-1 items-center gap-2">
+                <a href="{{ $verifikasi ? route('portal.verifikasi.ringkasan') : ($masuk ? route('portal.beranda') : route('portal.masuk')) }}" class="flex min-w-0 flex-1 items-center gap-2">
                     <x-logo class="h-9 w-9 shrink-0 rounded-xl text-sm" />
                     <span class="min-w-0 leading-tight">
                         <span class="block truncate text-sm font-semibold text-slate-900">AL Wafi Islamic Boarding School</span>
@@ -81,7 +86,9 @@
                     </span>
                 </a>
             @endif
-            @if ($masuk)
+            @if ($verifikasi)
+                <span class="w-10 shrink-0"></span>
+            @elseif ($masuk)
                 <a href="{{ route('portal.kabar') }}" class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
                    aria-label="Kabar{{ $belumDibaca ? ', '.$belumDibaca.' belum dibaca' : '' }}">
                     <x-portal.ikon nama="lonceng" />

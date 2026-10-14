@@ -221,6 +221,13 @@ class PortalDataController extends Controller
             return redirect()->route('portal.data', ['tab' => 'wali'])->with('error', $e->getMessage());
         }
         $request->session()->forget(self::EMAIL_BARU);
+        // Mode verifikasi: email baru milik orang yang sedang masuk baru saja terbukti
+        // lewat kode ke alamat itu — langkah "buktikan email" tak perlu diulang.
+        if (SesiWali::modeVerifikasi($request) && $peran === SesiWali::peran($request)) {
+            $request->session()->put(SesiWali::VERIFIKASI_EMAIL, $email);
+
+            return redirect()->route('portal.verifikasi.ringkasan')->with('status', 'Email diganti dan terbukti aktif.');
+        }
         if ($diingat) {
             $perangkat->ingat(SesiWali::wali()->refresh(), (string) SesiWali::peran($request), $request);
         }
