@@ -31,6 +31,18 @@
             @endforeach
         </div>
         @error('peran')<p class="mt-2 text-xs text-red-600">{{ $message }}</p>@enderror
+
+        @if ($butuhNis)
+            {{-- Langkah kedua: link yang diteruskan ke orang lain tak cukup untuk membuka data. --}}
+            <div class="mt-4">
+                <label for="nis" class="mb-1 block text-sm font-semibold text-slate-900">NIS salah satu anak Anda</label>
+                <input id="nis" name="nis" inputmode="numeric" data-bukan-rupiah required autocomplete="off" value="{{ old('nis') }}"
+                       class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base focus:border-brand focus:ring-brand">
+                <p class="mt-1 text-xs text-slate-500">Tertera di rapor atau kartu santri. Bila punya lebih dari satu anak, cukup salah satu.</p>
+                @error('nis')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+            </div>
+        @endif
+
         <button class="mt-4 w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white">Lanjut periksa data</button>
     </form>
     <p class="mt-4 px-2 text-center text-xs text-slate-500">Link ini khusus untuk keluarga Anda. Mohon tidak dibagikan.</p>

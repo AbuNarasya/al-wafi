@@ -280,10 +280,13 @@ class SantriController extends Controller
     public function update(Request $request, int $id): RedirectResponse
     {
         $santri = Santri::findOrFail($id);
+        // Nama santri hanya bisa diubah ADMIN (keputusan user 14 Okt 2026). Dari staf lain
+        // nama tak diterima sama sekali — dibuang walau ikut terkirim.
+        $admin = (bool) $request->user()?->is_admin;
 
         $data = $request->validate([
             'id_wali' => ['required', 'integer', 'exists:wali,id'],
-            'nama' => ['required', 'string', 'max:255'],
+            'nama' => [$admin ? 'required' : 'nullable', 'string', 'max:255'],
             'jenis_kelamin' => ['required', 'in:L,P'],
             'tempat_lahir' => ['nullable', 'string', 'max:255'],
             'tanggal_lahir' => ['nullable', 'date'],
@@ -300,6 +303,10 @@ class SantriController extends Controller
             'sumber_informasi' => ['nullable', Rule::exists('sumber_informasi', 'kode')->where('status', 'aktif')],
             'sumber_informasi_lain' => ['nullable', 'string', 'max:255'],
         ]);
+
+        if (! $admin) {
+            unset($data['nama']);
+        }
 
         try {
             $this->service->update($id, $data);

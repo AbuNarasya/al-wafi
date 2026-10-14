@@ -49,6 +49,13 @@ class UbahDataWali
         'wali_kelas_asal' => 'Wali kelas asal', 'cp_wali_kelas_asal' => 'Kontak wali kelas asal',
     ];
 
+    /**
+     * Kolom santri yang TAK boleh diubah wali walau tampil di KOLOM_SANTRI (keputusan user
+     * 14 Okt 2026): nama tercetak di kuitansi, tagihan & berkas PSB — hanya admin yang
+     * boleh mengubahnya (lihat SantriController::update). Diabaikan diam-diam bila dikirim.
+     */
+    public const KOLOM_SANTRI_TERKUNCI = ['nama'];
+
     /** Kolom keluarga per peran (nama_ayah, telepon_ayah, …). Email lewat gantiEmail(). */
     public const KOLOM_PERAN = ['nama' => 'Nama', 'telepon' => 'No. HP', 'pekerjaan' => 'Pekerjaan', 'pendapatan' => 'Pendapatan'];
 
@@ -105,7 +112,7 @@ class UbahDataWali
 
         $baru = [];
         foreach (array_keys(self::KOLOM_SANTRI) as $kolom) {
-            if (array_key_exists($kolom, $data)) {
+            if (array_key_exists($kolom, $data) && ! in_array($kolom, self::KOLOM_SANTRI_TERKUNCI, true)) {
                 $baru[$kolom] = self::teks($data[$kolom]);
             }
         }

@@ -29,11 +29,15 @@ class WaliVerifikasiController extends Controller
             ->with(['santri' => fn ($q) => $q->whereNotIn('status', Tahap::STATUS_FINAL)->orderBy('nama')->select('id', 'id_wali', 'nama', 'nis', 'kode_jenjang')])
             ->orderBy('nama')->get();
         $link = VerifikasiWali::whereNull('dicabut_pada')->whereIn('id_wali', $wali->pluck('id'))->get()->keyBy('id_wali');
+        // Riwayat: verifikasi ulang mencabut link yang SELESAI — tanggal terakhir selesainya tetap ditampilkan.
+        $pernahSelesai = VerifikasiWali::whereNotNull('selesai_pada')->whereIn('id_wali', $wali->pluck('id'))
+            ->groupBy('id_wali')->selectRaw('id_wali, max(selesai_pada) AS terakhir')->pluck('terakhir', 'id_wali');
 
         $baris = $wali->map(fn (Wali $w) => [
             'wali' => $w, 'link' => $link[$w->id] ?? null,
             'status' => isset($link[$w->id]) ? $link[$w->id]->status() : 'tanpa_link',
             'wa' => LinkVerifikasi::nomorWa($w) !== null,
+            'pernah_selesai' => isset($pernahSelesai[$w->id]) ? Carbon::parse($pernahSelesai[$w->id]) : null,
         ]);
         $hitung = $baris->countBy('status');
 
@@ -52,10 +56,22 @@ class WaliVerifikasiController extends Controller
                 ['path' => $request->url(), 'query' => $request->query()]),
             'total' => $baris->count(), 'hitung' => $hitung, 'status' => $status, 'q' => $q,
             'aktif' => LinkVerifikasi::aktif(),
+            'saklar' => LinkVerifikasi::pengaturan(),
         ]);
     }
 
-    private const MATI = 'Fitur verifikasi data sedang dimatikan (VERIFIKASI_WALI_AKTIF). Nyalakan dulu di pengaturan server.';
+    private const MATI = 'Verifikasi data sedang nonaktif. Aktifkan dulu lewat saklar di atas.';
+
+    /** Saklar kampanye — pemegang hak ubah Wali (keputusan user 14 Okt 2026). */
+    public function saklar(Request $request): RedirectResponse
+    {
+        $aktif = $request->boolean('aktif');
+        $this->link->aturAktif($aktif, Auth::id());
+
+        return back()->with('status', $aktif
+            ? 'Verifikasi data diaktifkan. Link yang masih dalam masa berlaku bisa dibuka wali.'
+            : 'Verifikasi data dinonaktifkan. Link tak bisa dibuka sampai diaktifkan lagi (link tidak dicabut).');
+    }
 
     /**
      * Akhiri kampanye: cabut semua link yang belum selesai. Sengaja tetap bisa saat
@@ -73,8 +89,8 @@ class WaliVerifikasiController extends Controller
         if (! LinkVerifikasi::aktif()) {
             return back()->with('error', self::MATI);
         }
-        $data = $request->validate(['mulai' => ['required', 'date']], ['mulai.required' => 'Tanggal mulai wajib diisi.']);
-        $jumlah = $this->link->buatMassal(Carbon::parse($data['mulai']), Auth::id());
+        $data = $request->validate(['mulai' => ['required', 'date'], 'ulang' => ['nullable', 'boolean']], ['mulai.required' => 'Tanggal mulai wajib diisi.']);
+        $jumlah = $this->link->buatMassal(Carbon::parse($data['mulai']), Auth::id(), $request->boolean('ulang'));
 
         return back()->with('status', $jumlah > 0
             ? "{$jumlah} link verifikasi dibuat, berlaku mulai ".Carbon::parse($data['mulai'])->locale('id')->translatedFormat('j F Y').' selama '.LinkVerifikasi::HARI.' hari.'

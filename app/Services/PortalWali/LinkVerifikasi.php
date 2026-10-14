@@ -33,10 +33,34 @@ class LinkVerifikasi
 {
     public const HARI = 30;
 
-    /** Saklar `VERIFIKASI_WALI_AKTIF` — mati = link, jalur cadangan & tombol staf tak berfungsi. */
+    /**
+     * Saklar kampanye, ditekan staf di layar Verifikasi Data Wali (tabel tunggal
+     * `pengaturan_verifikasi_wali`). Mati = link & jalur cadangan ditolak, sesi mode
+     * verifikasi ditutup — link TIDAK dicabut, jadi menyalakan lagi menghidupkannya.
+     */
     public static function aktif(): bool
     {
-        return (bool) config('app.verifikasi_wali_aktif');
+        return (bool) DB::table('pengaturan_verifikasi_wali')->where('id', 1)->value('aktif');
+    }
+
+    public function aturAktif(bool $aktif, ?int $idPengguna): void
+    {
+        DB::table('pengaturan_verifikasi_wali')->updateOrInsert(['id' => 1],
+            ['aktif' => $aktif, 'diubah_oleh' => $idPengguna, 'updated_at' => now()]);
+        try {
+            \App\Support\Audit\Jejak::catat($aktif ? 'verifikasi_wali_dinyalakan' : 'verifikasi_wali_dimatikan', [
+                'modul' => UbahDataWali::MODUL_JEJAK, 'id_pengguna' => $idPengguna,
+                'detail' => 'Saklar verifikasi data wali '.($aktif ? 'dinyalakan' : 'dimatikan').'.',
+            ]);
+        } catch (\Throwable) {
+            // jejak tak boleh menggagalkan saklar
+        }
+    }
+
+    /** @return object{aktif:bool, diubah_oleh:?int, updated_at:?string}|null */
+    public static function pengaturan(): ?object
+    {
+        return DB::table('pengaturan_verifikasi_wali')->where('id', 1)->first();
     }
 
     /**
@@ -90,12 +114,16 @@ class LinkVerifikasi
      * selesai & belum kedaluwarsa). Yang sudah punya tidak disentuh — link yang
      * sudah terkirim tak boleh mati diam-diam karena staf menekan tombol massal.
      *
+     * `$ulang` = kampanye berikutnya (mis. tahun ajaran baru): keluarga yang SUDAH selesai
+     * ikut dibuatkan link baru. Riwayat selesainya tetap tersimpan di baris link lamanya.
+     *
      * @return int jumlah link yang dibuat
      */
-    public function buatMassal(Carbon $mulai, ?int $idPengguna): int
+    public function buatMassal(Carbon $mulai, ?int $idPengguna, bool $ulang = false): int
     {
         $sudah = VerifikasiWali::whereNull('dicabut_pada')
-            ->where(fn ($q) => $q->whereNotNull('selesai_pada')->orWhere('berlaku_sampai', '>', now()))
+            ->where(fn ($q) => $q->where(fn ($w) => $w->whereNull('selesai_pada')->where('berlaku_sampai', '>', now()))
+                ->when(! $ulang, fn ($w) => $w->orWhereNotNull('selesai_pada')))
             ->pluck('id_wali')->map(fn ($id) => (int) $id);
         $sasaran = self::keluargaPerlu()->diff($sudah)
             ->intersect(Wali::where('status', 'aktif')->pluck('id')->map(fn ($id) => (int) $id));
@@ -105,6 +133,30 @@ class LinkVerifikasi
         }
 
         return $sasaran->count();
+    }
+
+    /**
+     * VERIFIKASI DUA LANGKAH saat link dibuka (keputusan user 14 Okt 2026): selain memilih
+     * penanggung jawab, wali mengetik NIS salah satu anaknya — link yang diteruskan ke orang
+     * lain tak cukup untuk membuka data. Hanya anak yang SUDAH ber-NIS dan BUKAN calon yang
+     * dihitung; keluarga yang semua anaknya calon / belum ber-NIS melewati langkah ini.
+     */
+    public static function butuhNis(Wali $wali): bool
+    {
+        return self::anakBerNis($wali)->exists();
+    }
+
+    public static function nisCocok(Wali $wali, string $nis): bool
+    {
+        $nis = trim($nis);
+
+        return $nis !== '' && self::anakBerNis($wali)->where('nis', $nis)->exists();
+    }
+
+    private static function anakBerNis(Wali $wali): \Illuminate\Database\Eloquent\Builder
+    {
+        return Santri::where('id_wali', $wali->id)->whereNotNull('nis')->where('nis', '!=', '')
+            ->whereNotIn('status', Santri::CALON);
     }
 
     public function cabut(VerifikasiWali $v): void

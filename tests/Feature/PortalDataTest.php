@@ -112,22 +112,22 @@ class PortalDataTest extends TestCase
         ]))->assertRedirect(route('portal.data', ['tab' => 'santri']))->assertSessionHas('status');
 
         $s = $this->ahmad->fresh();
-        $this->assertSame('AHMAD FAUZAN', $s->nama);
+        $this->assertSame('AHMAD FAUZI', $s->nama, 'nama santri dikunci — hanya admin yang boleh mengubah');
         $this->assertSame('2013-05-02', $s->tanggal_lahir->format('Y-m-d'));
         $this->assertSame('SDN 1 Bandung', $s->asal_sekolah);
 
         $jejak = ActivityLog::where('modul', UbahDataWali::MODUL_JEJAK)->sole();
         $this->assertNull($jejak->id_pengguna);
         // assertEquals: kolom jsonb tak menjaga urutan kunci.
-        $this->assertEquals(['lama' => 'AHMAD FAUZI', 'baru' => 'AHMAD FAUZAN'], $jejak->perubahan['Nama lengkap']);
+        $this->assertArrayNotHasKey('Nama lengkap', $jejak->perubahan);
         $this->assertEquals(['lama' => null, 'baru' => '02/05/2013'], $jejak->perubahan['Tanggal lahir']);
         $this->assertStringContainsString('Ibu Aminah (Ibu)', $jejak->detail);
-        $this->assertCount(3, $jejak->perubahan, 'kolom yang tak berubah tak ikut dicatat');
+        $this->assertCount(2, $jejak->perubahan, 'kolom yang tak berubah tak ikut dicatat');
 
         // Staf: pemegang hak UBAH santri saja.
         $notif = NotifikasiStaf::where('jenis', UbahDataWali::JENIS_NOTIF)->get();
         $this->assertSame([$this->kesantrian->id_pengguna], $notif->pluck('id_pengguna')->all());
-        $this->assertStringContainsString('AHMAD FAUZI → AHMAD FAUZAN', $notif->first()->pesan);
+        $this->assertStringContainsString('Sekolah asal: — → SDN 1 Bandung', $notif->first()->pesan);
         $this->assertSame('/santri/'.$this->ahmad->id, (new \App\Services\Modules\NotificationService)->tautan($notif->first()));
 
         // Keluarga: ayah (punya email) tahu; ibu yang mengubah tidak dikabari dirinya sendiri.
@@ -158,8 +158,8 @@ class PortalDataTest extends TestCase
     public function test_isian_santri_divalidasi(): void
     {
         $this->sebagai()->put(route('portal.data.santri', $this->ahmad->id), $this->isianSantri([
-            'nama' => '', 'nisn' => '12AB', 'tanggal_lahir' => now()->addDay()->format('Y-m-d'),
-        ]))->assertSessionHasErrors(['nama', 'nisn', 'tanggal_lahir']);
+            'nisn' => '12AB', 'tanggal_lahir' => now()->addDay()->format('Y-m-d'),
+        ]))->assertSessionHasErrors(['nisn', 'tanggal_lahir']);
     }
 
     // ---- Ubah keluarga ----

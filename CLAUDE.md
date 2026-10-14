@@ -89,7 +89,8 @@ proyek baru di sana alih-alih memasang ke sini.
 
 ## Portal Wali — mode verifikasi
 
-Masuk lewat link verifikasi WhatsApp (`LinkVerifikasi`, saklar `VERIFIKASI_WALI_AKTIF`) membuka
+Masuk lewat link verifikasi WhatsApp (`LinkVerifikasi`; saklarnya di layar staf Verifikasi Data Wali,
+tabel `pengaturan_verifikasi_wali` — `.env` `VERIFIKASI_WALI_AKTIF` hanya nilai awal migrasi 000062) membuka
 sesi TERBATAS: middleware `PortalWali` hanya meloloskan alamat **`wali/data*` dan `wali/verifikasi*`**
 (dicocokkan lewat alamat, bukan nama rute). **Jangan pernah menaruh fitur uang / PIN / transaksi di
 bawah `/wali/data`** — pemegang link (belum membuktikan email) otomatis ikut bisa membukanya.

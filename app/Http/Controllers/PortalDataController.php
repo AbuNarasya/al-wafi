@@ -70,8 +70,8 @@ class PortalDataController extends Controller
     public function simpanSantri(Request $request, int $id): RedirectResponse
     {
         $santri = $this->anak($id);
+        // Nama santri TIDAK diterima dari wali — hanya admin (UbahDataWali::KOLOM_SANTRI_TERKUNCI).
         $data = $request->validate([
-            'nama' => ['required', 'string', 'max:255'],
             'jenis_kelamin' => ['required', Rule::in(array_keys(UbahDataWali::JENIS_KELAMIN))],
             'tempat_lahir' => ['nullable', 'string', 'max:255'],
             'tanggal_lahir' => ['nullable', 'date', 'before:today'],

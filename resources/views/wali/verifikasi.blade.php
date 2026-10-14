@@ -28,12 +28,34 @@
         Yang dihitung hanya keluarga dengan anak aktif atau masih dalam proses PSB.
     </p>
 
-    @unless ($aktif)
-        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <b>Verifikasi data sedang dimatikan.</b> Link &amp; jalur cadangan tak bisa dibuka wali, dan link baru tak bisa dibuat.
-            Riwayat di bawah tetap tersimpan. Menyalakannya lagi: <code>VERIFIKASI_WALI_AKTIF=true</code> di <code>.env</code> server, lalu <code>php artisan config:cache</code>.
+    {{-- SAKLAR kampanye (permintaan user 14 Okt 2026): ditutup staf sendiri bila tuntas lebih
+         cepat dari masa berlaku link. Mati ≠ dicabut — menyalakannya lagi menghidupkan link lama. --}}
+    <div @class(['mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 shadow-sm',
+                 'border-emerald-200 bg-emerald-50' => $aktif, 'border-amber-200 bg-amber-50' => ! $aktif])>
+        <div class="text-sm">
+            <p @class(['font-semibold', 'text-emerald-800' => $aktif, 'text-amber-900' => ! $aktif])>
+                Verifikasi data: {{ $aktif ? 'AKTIF' : 'NONAKTIF' }}
+            </p>
+            <p @class(['text-xs', 'text-emerald-700' => $aktif, 'text-amber-800' => ! $aktif])>
+                {{ $aktif ? 'Wali bisa membuka link yang masih dalam masa berlaku.' : 'Link & jalur cadangan tak bisa dibuka wali; link baru tak bisa dibuat. Link lama tidak dicabut.' }}
+                @if ($saklar?->updated_at)
+                    · diubah {{ \Illuminate\Support\Carbon::parse($saklar->updated_at)->locale('id')->translatedFormat('j M Y H:i') }}
+                @endif
+            </p>
         </div>
-    @endunless
+        @if ($bolehUbah)
+            <form method="POST" action="{{ route('wali.verifikasi.saklar') }}"
+                  data-confirm="{{ $aktif ? 'Nonaktifkan verifikasi data? Wali tak bisa membuka link sampai diaktifkan lagi.' : 'Aktifkan verifikasi data? Link yang masih dalam masa berlaku bisa dibuka wali lagi.' }}">
+                @csrf
+                <input type="hidden" name="aktif" value="{{ $aktif ? 0 : 1 }}">
+                <button @class(['rounded-lg px-4 py-2 text-sm font-semibold',
+                                'border border-amber-300 bg-white text-amber-800 hover:bg-amber-50' => $aktif,
+                                'bg-emerald-600 text-white hover:bg-emerald-700' => ! $aktif])>
+                    {{ $aktif ? 'Nonaktifkan' : 'Aktifkan' }}
+                </button>
+            </form>
+        @endif
+    </div>
 
     {{-- Ringkasan --}}
     <div class="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -66,6 +88,10 @@
                 <input type="date" name="mulai" x-model="mulai" required class="rounded-lg border-gray-300 text-sm">
             </div>
             <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Buat link untuk semua yang belum punya</button>
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" name="ulang" value="1" class="rounded border-gray-300 text-brand focus:ring-brand">
+                Termasuk keluarga yang sudah selesai (verifikasi ulang)
+            </label>
             <p class="w-full text-xs text-gray-500 sm:w-auto sm:flex-1">Link yang sudah ada &amp; masih berlaku tidak disentuh. Tanggal ini juga dipakai tombol "Buat link" per keluarga di bawah.</p>
         </form>
     @endif
@@ -118,26 +144,44 @@
                                     @endif
                                 </div>
                             @endif
+                            @if ($r['pernah_selesai'] && $r['status'] !== 'selesai')
+                                <div class="mt-0.5 text-[11px] text-emerald-700">pernah selesai {{ $tgl($r['pernah_selesai']) }}</div>
+                            @endif
                         </td>
                         @if ($bolehUbah)
                             <td class="px-4 py-3 text-right">
                                 <div class="flex flex-wrap items-center justify-end gap-1.5">
                                     @if ($v && ! in_array($r['status'], ['selesai', 'kedaluwarsa'], true))
-                                        @if ($r['wa'])
+                                        @if (! $aktif)
+                                            {{-- Nonaktif: kirim & salin disembunyikan — link tak bisa dibuka wali. --}}
+                                        @elseif ($r['wa'])
                                             <a href="{{ route('wali.verifikasi.wa', $v->id) }}" target="_blank" rel="noopener"
                                                class="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700">Kirim WA</a>
                                         @else
                                             <span class="text-xs text-red-600">Nomor HP tak sah</span>
                                         @endif
-                                        <button type="button" x-data="{ ok: false }"
-                                                @click="navigator.clipboard.writeText(@js(\App\Services\PortalWali\LinkVerifikasi::url($v))); ok = true; setTimeout(() => ok = false, 1500)"
-                                                class="rounded-lg border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50" x-text="ok ? 'Tersalin' : 'Salin link'">Salin link</button>
+                                        @if ($aktif)
+                                            {{-- Menyalin PESAN LENGKAP (sama dengan tombol Kirim WA), bukan link
+                                                 telanjang — staf tinggal menempelkannya di WhatsApp. --}}
+                                            <button type="button" x-data="{ ok: false }" title="Salin pesan WhatsApp beserta link-nya"
+                                                    @click="navigator.clipboard.writeText(@js(\App\Services\PortalWali\LinkVerifikasi::pesanWa($v))); ok = true; setTimeout(() => ok = false, 1500)"
+                                                    class="rounded-lg border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50" x-text="ok ? 'Tersalin' : 'Salin pesan'">Salin pesan</button>
+                                        @endif
                                         <form method="POST" action="{{ route('wali.verifikasi.cabut', $v->id) }}" class="inline"
                                               data-confirm="Cabut link verifikasi keluarga {{ $w->nama }}? Link yang sudah terkirim tak bisa dibuka lagi.">
                                             @csrf
                                             <button class="rounded-lg border border-red-200 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50">Cabut</button>
                                         </form>
-                                    @elseif ($r['status'] !== 'selesai')
+                                    @elseif ($aktif && $r['status'] === 'selesai')
+                                        {{-- Data perlu diperbarui lagi: link baru, link selesai ditutup. Riwayat
+                                             selesainya tetap ada ("pernah selesai"), akun portalnya tetap berlaku. --}}
+                                        <form method="POST" action="{{ route('wali.verifikasi.buat', $w->id) }}" class="inline"
+                                              data-confirm="Verifikasi ulang keluarga {{ $w->nama }}? Link baru dibuat; mereka tetap bisa masuk portal seperti biasa.">
+                                            @csrf
+                                            <input type="hidden" name="mulai" :value="mulai">
+                                            <button class="rounded-lg border border-brand px-2.5 py-1 text-xs font-semibold text-brand hover:bg-blue-50">Verifikasi ulang</button>
+                                        </form>
+                                    @elseif ($aktif)
                                         <form method="POST" action="{{ route('wali.verifikasi.buat', $w->id) }}" class="inline">
                                             @csrf
                                             <input type="hidden" name="mulai" :value="mulai">

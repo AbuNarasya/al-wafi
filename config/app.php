@@ -37,10 +37,9 @@ return [
     'otp_tampil_di_layar' => (bool) env('OTP_TAMPIL_DI_LAYAR', false),
 
     /*
-    | Verifikasi data wali lewat link WhatsApp (LinkVerifikasi). Dimatikan begitu
-    | kampanye selesai: link & jalur cadangan ditolak, sesi mode verifikasi yang
-    | masih terbuka ditutup, tombol staf disembunyikan — riwayatnya tetap utuh.
-    | Bawaan MATI, jadi ERP tak menampilkannya sampai sengaja dinyalakan.
+    | Verifikasi data wali — HANYA nilai AWAL untuk migrasi 000062. Sejak itu saklarnya
+    | ada di layar staf (tabel `pengaturan_verifikasi_wali`, LinkVerifikasi::aktif());
+    | mengubah baris ini sesudah migrasi berjalan tak berpengaruh apa-apa.
     */
     'verifikasi_wali_aktif' => (bool) env('VERIFIKASI_WALI_AKTIF', false),
 

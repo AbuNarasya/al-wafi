@@ -29,11 +29,11 @@
 
         <section class="space-y-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <h2 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span>Identitas</h2>
+            {{-- Nama dikunci: hanya admin pesantren yang boleh mengubahnya (keputusan user 14 Okt 2026). --}}
             <div>
-                <label for="nama" class="{{ $kelasLabel }}">Nama lengkap <span class="text-red-500">*</span></label>
-                <input id="nama" name="nama" value="{{ old('nama', $santri->nama) }}" required maxlength="255" class="{{ $kelasInput }} uppercase">
-                <p class="mt-1 text-xs text-slate-500">Sesuai akta kelahiran. Disimpan dengan huruf kapital.</p>
-                @error('nama')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                <p class="{{ $kelasLabel }}">Nama lengkap</p>
+                <div class="rounded-2xl bg-slate-50 px-4 py-3 text-base font-semibold text-slate-900">{{ $santri->nama }}</div>
+                <p class="mt-1 text-xs text-slate-500">Nama hanya bisa diubah oleh admin pesantren. Bila keliru, hubungi bagian kesantrian dengan membawa Kartu Keluarga.</p>
             </div>
             <div>
                 <label class="{{ $kelasLabel }}">Jenis kelamin <span class="text-red-500">*</span></label>

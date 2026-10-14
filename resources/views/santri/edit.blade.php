@@ -27,8 +27,18 @@
                      hint="Memindahkan santri ke wali lain sekaligus memindahkan tagihannya ke dompet wali itu." />
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <x-field name="nama" label="Nama Santri" :value="old('nama', $santri->nama)" required
-                         class="uppercase" autocapitalize="characters" hint="Tersimpan dalam huruf kapital." />
+                {{-- Nama hanya bisa diubah ADMIN (keputusan user 14 Okt 2026): tercetak di kuitansi,
+                     tagihan & berkas PSB. Penjaganya di SantriController::update, bukan hanya di sini. --}}
+                @if (auth()->user()?->is_admin)
+                    <x-field name="nama" label="Nama Santri" :value="old('nama', $santri->nama)" required
+                             class="uppercase" autocapitalize="characters" hint="Tersimpan dalam huruf kapital. Hanya admin yang bisa mengubah." />
+                @else
+                    <div>
+                        <p class="mb-1 block text-sm font-medium text-gray-700">Nama Santri</p>
+                        <div class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">{{ $santri->nama }}</div>
+                        <p class="mt-1 text-xs text-gray-400">Terkunci — hanya admin yang bisa mengubah nama santri.</p>
+                    </div>
+                @endif
                 <x-field name="jenis_kelamin" label="Jenis Kelamin" :value="old('jenis_kelamin', $santri->jenis_kelamin)"
                          :options="['L' => 'Laki-laki', 'P' => 'Perempuan']" required />
             </div>
