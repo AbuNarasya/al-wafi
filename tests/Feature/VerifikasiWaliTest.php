@@ -37,6 +37,7 @@ class VerifikasiWaliTest extends TestCase
         parent::setUp();
         Notification::fake();
         RateLimiter::clear('verifikasi-cadangan:2425001');
+        config(['app.verifikasi_wali_aktif' => true]);
 
         Level::create(['kode_level' => 'L1', 'nama_level' => 'L1', 'max_transaksi' => null]);
         $this->admin = User::create(['username' => 'zzvw_admin', 'nama' => 'Admin', 'password_hash' => 'x',
@@ -194,6 +195,51 @@ class VerifikasiWaliTest extends TestCase
         $this->get(route('portal.verifikasi.ringkasan'))->assertSee('juga tercatat di keluarga lain');
         $this->post(route('portal.verifikasi.email'))->assertSessionHas('error');
         Notification::assertNothingSent();
+    }
+
+    public function test_mode_verifikasi_tanpa_kabar_staf_tapi_jejak_tetap(): void
+    {
+        $this->masukLewatLink($this->link());
+        $isi = ['nik' => '', 'alamat' => 'Jl. Baru 9'];
+        foreach (['ayah', 'ibu', 'wali'] as $p) {
+            $isi += ["nama_{$p}" => (string) $this->wali->{"nama_{$p}"}, "telepon_{$p}" => (string) $this->wali->{"telepon_{$p}"},
+                "pekerjaan_{$p}" => '', "pekerjaan_lain_{$p}" => '', "pendapatan_{$p}" => ''];
+        }
+        $this->put(route('portal.data.keluarga'), $isi)->assertSessionHas('status');
+
+        $this->assertSame('Jl. Baru 9', $this->wali->fresh()->alamat);
+        $this->assertSame(0, \App\Models\Notification::where('jenis', \App\Services\PortalWali\UbahDataWali::JENIS_NOTIF)->count());
+        $this->assertSame(1, \App\Models\ActivityLog::where('modul', \App\Services\PortalWali\UbahDataWali::MODUL_JEJAK)->count());
+    }
+
+    // ---- Saklar & akhiri ----
+
+    public function test_saklar_mati_menolak_link_cadangan_dan_menutup_sesi(): void
+    {
+        $v = $this->link();
+        $this->masukLewatLink($v);
+        config(['app.verifikasi_wali_aktif' => false]);
+
+        $this->get(route('portal.data'))->assertRedirect(route('portal.masuk'));
+        $this->assertGuest('wali');
+        $this->get(route('portal.verifikasi.buka', LinkVerifikasi::kode($v)))->assertSee('sedang tidak dibuka');
+        $this->get(route('portal.verifikasi.cari'))->assertSee('sedang tidak dibuka');
+
+        $this->actingAs($this->admin)->post(route('wali.verifikasi.massal'), ['mulai' => now()->format('Y-m-d')])->assertSessionHas('error');
+        $this->actingAs($this->admin)->get(route('wali.index'))->assertDontSee(route('wali.verifikasi'));
+    }
+
+    public function test_akhiri_mencabut_yang_belum_selesai_saja(): void
+    {
+        $belum = $this->link();
+        $lain = Wali::create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Selesai', 'telepon_ayah' => '0844', 'nama' => 'Selesai', 'telepon' => '0844', 'status' => 'aktif']);
+        $selesai = (new LinkVerifikasi)->buat($lain->id, now(), null);
+        $selesai->update(['selesai_pada' => now(), 'selesai_peran' => 'ayah', 'selesai_email' => 'x@contoh.id']);
+
+        $this->actingAs($this->admin)->post(route('wali.verifikasi.akhiri'))->assertSessionHas('status');
+
+        $this->assertNotNull($belum->fresh()->dicabut_pada);
+        $this->assertNull($selesai->fresh()->dicabut_pada, 'riwayat selesai dibiarkan');
     }
 
     // ---- Jalur cadangan ----

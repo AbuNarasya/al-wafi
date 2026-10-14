@@ -37,6 +37,14 @@ return [
     'otp_tampil_di_layar' => (bool) env('OTP_TAMPIL_DI_LAYAR', false),
 
     /*
+    | Verifikasi data wali lewat link WhatsApp (LinkVerifikasi). Dimatikan begitu
+    | kampanye selesai: link & jalur cadangan ditolak, sesi mode verifikasi yang
+    | masih terbuka ditutup, tombol staf disembunyikan — riwayatnya tetap utuh.
+    | Bawaan MATI, jadi ERP tak menampilkannya sampai sengaja dinyalakan.
+    */
+    'verifikasi_wali_aktif' => (bool) env('VERIFIKASI_WALI_AKTIF', false),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------

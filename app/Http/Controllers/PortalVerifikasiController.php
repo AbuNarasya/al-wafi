@@ -61,10 +61,13 @@ class PortalVerifikasiController extends Controller
         return redirect()->route('portal.verifikasi.ringkasan');
     }
 
+    private const TUTUP = 'Verifikasi data keluarga sedang tidak dibuka. Bila ada data yang perlu dibetulkan, silakan masuk Portal Wali atau hubungi bagian kesantrian.';
+
     /** Pesan untuk link yang tak bisa dipakai, atau null bila bisa. */
     private function halangan(?VerifikasiWali $v): ?string
     {
         return match (true) {
+            ! LinkVerifikasi::aktif() => self::TUTUP,
             $v === null => 'Link ini tidak dikenal atau sudah diganti dengan link baru. Silakan hubungi bagian kesantrian.',
             $v->wali?->status !== 'aktif' => 'Data keluarga ini sedang dinonaktifkan. Silakan hubungi bagian kesantrian.',
             $v->selesai_pada !== null => 'Verifikasi data keluarga ini sudah selesai. Silakan masuk Portal Wali dengan email yang sudah diverifikasi.',
@@ -78,11 +81,14 @@ class PortalVerifikasiController extends Controller
 
     public function formCari(): View
     {
-        return view('portal.verifikasi-cari');
+        return LinkVerifikasi::aktif() ? view('portal.verifikasi-cari') : view('portal.verifikasi-tolak', ['pesan' => self::TUTUP]);
     }
 
     public function cari(Request $request): View|RedirectResponse
     {
+        if (! LinkVerifikasi::aktif()) {
+            return view('portal.verifikasi-tolak', ['pesan' => self::TUTUP]);
+        }
         $data = $request->validate([
             'nis' => ['required', 'string', 'max:30'],
             'tanggal_lahir' => ['required', 'date'],

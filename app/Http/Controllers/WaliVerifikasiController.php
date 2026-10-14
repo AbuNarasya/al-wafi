@@ -51,11 +51,28 @@ class WaliVerifikasiController extends Controller
             'rows' => new LengthAwarePaginator($tersaring->forPage($halaman, $per)->values(), $tersaring->count(), $per, $halaman,
                 ['path' => $request->url(), 'query' => $request->query()]),
             'total' => $baris->count(), 'hitung' => $hitung, 'status' => $status, 'q' => $q,
+            'aktif' => LinkVerifikasi::aktif(),
         ]);
+    }
+
+    private const MATI = 'Fitur verifikasi data sedang dimatikan (VERIFIKASI_WALI_AKTIF). Nyalakan dulu di pengaturan server.';
+
+    /**
+     * Akhiri kampanye: cabut semua link yang belum selesai. Sengaja tetap bisa saat
+     * saklar mati — justru saat itulah link yang tersebar perlu dipastikan mati.
+     */
+    public function akhiri(): RedirectResponse
+    {
+        $jumlah = $this->link->akhiriSemua();
+
+        return back()->with('status', "{$jumlah} link yang belum selesai dicabut. Riwayat keluarga yang sudah selesai tetap tersimpan.");
     }
 
     public function buatMassal(Request $request): RedirectResponse
     {
+        if (! LinkVerifikasi::aktif()) {
+            return back()->with('error', self::MATI);
+        }
         $data = $request->validate(['mulai' => ['required', 'date']], ['mulai.required' => 'Tanggal mulai wajib diisi.']);
         $jumlah = $this->link->buatMassal(Carbon::parse($data['mulai']), Auth::id());
 
@@ -67,6 +84,9 @@ class WaliVerifikasiController extends Controller
     /** Buat (atau buat ulang) link satu keluarga — link lama dicabut. */
     public function buat(Request $request, int $idWali): RedirectResponse
     {
+        if (! LinkVerifikasi::aktif()) {
+            return back()->with('error', self::MATI);
+        }
         $data = $request->validate(['mulai' => ['required', 'date']]);
         $wali = Wali::where('status', 'aktif')->findOrFail($idWali);
         $this->link->buat($wali->id, Carbon::parse($data['mulai']), Auth::id());
@@ -77,6 +97,9 @@ class WaliVerifikasiController extends Controller
     /** Buka WhatsApp dengan pesan + link yang sudah terisi, sekaligus menandai "terkirim". */
     public function kirimWa(int $id): RedirectResponse
     {
+        if (! LinkVerifikasi::aktif()) {
+            return back()->with('error', self::MATI);
+        }
         $v = VerifikasiWali::with('wali')->whereNull('dicabut_pada')->findOrFail($id);
         $nomor = LinkVerifikasi::nomorWa($v->wali);
         if ($nomor === null) {

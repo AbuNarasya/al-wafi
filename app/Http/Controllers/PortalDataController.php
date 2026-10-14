@@ -30,7 +30,8 @@ class PortalDataController extends Controller
 
     private function ubah(Request $request): UbahDataWali
     {
-        return new UbahDataWali(SesiWali::wali(), (string) SesiWali::peran($request));
+        return new UbahDataWali(SesiWali::wali(), (string) SesiWali::peran($request),
+            tanpaKabarStaf: SesiWali::modeVerifikasi($request) !== null);
     }
 
     private function anak(int $id): Santri

@@ -33,6 +33,24 @@ class LinkVerifikasi
 {
     public const HARI = 30;
 
+    /** Saklar `VERIFIKASI_WALI_AKTIF` — mati = link, jalur cadangan & tombol staf tak berfungsi. */
+    public static function aktif(): bool
+    {
+        return (bool) config('app.verifikasi_wali_aktif');
+    }
+
+    /**
+     * Akhiri kampanye: semua link yang belum selesai dicabut sekaligus — link yang
+     * sudah tersebar di WhatsApp mati saat itu juga, tak menunggu kedaluwarsa.
+     * Link yang SELESAI dibiarkan: ia catatan siapa memverifikasi & kapan.
+     *
+     * @return int jumlah link yang dicabut
+     */
+    public function akhiriSemua(): int
+    {
+        return VerifikasiWali::whereNull('dicabut_pada')->whereNull('selesai_pada')->update(['dicabut_pada' => now()]);
+    }
+
     public static function sidik(string $kode): string
     {
         return hash('sha256', $kode);

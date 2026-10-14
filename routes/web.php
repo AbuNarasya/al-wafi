@@ -1114,6 +1114,7 @@ Route::middleware('auth')->group(function () {
         $v = \App\Http\Controllers\WaliVerifikasiController::class;
         Route::get('/verifikasi', [$v, 'index'])->name('verifikasi')->middleware('hakakses:wali,lihat');
         Route::post('/verifikasi/massal', [$v, 'buatMassal'])->name('verifikasi.massal')->middleware('hakakses:wali,ubah');
+        Route::post('/verifikasi/akhiri', [$v, 'akhiri'])->name('verifikasi.akhiri')->middleware('hakakses:wali,ubah');
         Route::post('/verifikasi/keluarga/{idWali}', [$v, 'buat'])->name('verifikasi.buat')->middleware('hakakses:wali,ubah')->whereNumber('idWali');
         Route::get('/verifikasi/{id}/wa', [$v, 'kirimWa'])->name('verifikasi.wa')->middleware('hakakses:wali,ubah')->whereNumber('id');
         Route::post('/verifikasi/{id}/cabut', [$v, 'cabut'])->name('verifikasi.cabut')->middleware('hakakses:wali,ubah')->whereNumber('id');

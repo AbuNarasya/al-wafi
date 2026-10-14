@@ -7,7 +7,9 @@
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <x-filter-bar placeholder="Cari nama / telepon…" />
         <div class="flex flex-wrap items-center gap-2">
-            <a href="{{ route('wali.verifikasi') }}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Verifikasi Data Wali</a>
+            @if (\App\Services\PortalWali\LinkVerifikasi::aktif())
+                <a href="{{ route('wali.verifikasi') }}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Verifikasi Data Wali</a>
+            @endif
             <a href="{{ route('wali.kesiapan_portal') }}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Kesiapan Portal Wali</a>
             @if (\App\Support\Akses::boleh('wali', 'buat'))
                 <a href="{{ route('wali.create') }}" class="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">+ Tambah Wali</a>

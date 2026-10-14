@@ -5,6 +5,7 @@
 @section('content')
     @php
         $bolehUbah = \App\Support\Akses::boleh('wali', 'ubah');
+        $bolehKirim = $bolehUbah && $aktif;
         $label = ['tanpa_link' => 'Belum ada link'] + \App\Models\VerifikasiWali::STATUS;
         $warna = [
             'tanpa_link' => 'bg-gray-100 text-gray-600', 'belum_mulai' => 'bg-sky-100 text-sky-700',
@@ -26,6 +27,13 @@
         Link berlaku <b>{{ \App\Services\PortalWali\LinkVerifikasi::HARI }} hari</b> sejak tanggal mulai yang dipilih.
         Yang dihitung hanya keluarga dengan anak aktif atau masih dalam proses PSB.
     </p>
+
+    @unless ($aktif)
+        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <b>Verifikasi data sedang dimatikan.</b> Link &amp; jalur cadangan tak bisa dibuka wali, dan link baru tak bisa dibuat.
+            Riwayat di bawah tetap tersimpan. Menyalakannya lagi: <code>VERIFIKASI_WALI_AKTIF=true</code> di <code>.env</code> server, lalu <code>php artisan config:cache</code>.
+        </div>
+    @endunless
 
     {{-- Ringkasan --}}
     <div class="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -49,7 +57,7 @@
     </div>
 
     {{-- Buat link massal --}}
-    @if ($bolehUbah)
+    @if ($bolehKirim)
         <form method="POST" action="{{ route('wali.verifikasi.massal') }}" class="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
               data-confirm="Buat link verifikasi untuk semua keluarga yang belum punya link berlaku?">
             @csrf
@@ -59,6 +67,16 @@
             </div>
             <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Buat link untuk semua yang belum punya</button>
             <p class="w-full text-xs text-gray-500 sm:w-auto sm:flex-1">Link yang sudah ada &amp; masih berlaku tidak disentuh. Tanggal ini juga dipakai tombol "Buat link" per keluarga di bawah.</p>
+        </form>
+    @endif
+
+    {{-- Akhiri kampanye — tetap tersedia saat saklar mati: justru saat itu link yang tersebar perlu dipastikan mati. --}}
+    @if ($bolehUbah && (($hitung['dibuat'] ?? 0) + ($hitung['terkirim'] ?? 0) + ($hitung['dibuka'] ?? 0) + ($hitung['belum_mulai'] ?? 0)) > 0)
+        <form method="POST" action="{{ route('wali.verifikasi.akhiri') }}" class="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-100 bg-white p-4 shadow-sm"
+              data-confirm="Akhiri verifikasi? Semua link yang belum selesai dicabut dan tak bisa dibuka lagi, termasuk yang sudah terkirim lewat WhatsApp.">
+            @csrf
+            <p class="text-sm text-gray-600">Kampanye selesai? Cabut sekaligus semua link yang belum diselesaikan wali.</p>
+            <button class="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">Akhiri verifikasi</button>
         </form>
     @endif
 

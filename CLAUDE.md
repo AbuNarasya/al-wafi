@@ -87,6 +87,13 @@ proyek baru di sana alih-alih memasang ke sini.
 - Urutan dalam satu migrasi penting: sisipkan baris baru **sebelum** kolom NOT NULL-nya dibuang,
   tapi susun rencananya **selagi** kolom lama masih ada.
 
+## Portal Wali — mode verifikasi
+
+Masuk lewat link verifikasi WhatsApp (`LinkVerifikasi`, saklar `VERIFIKASI_WALI_AKTIF`) membuka
+sesi TERBATAS: middleware `PortalWali` hanya meloloskan alamat **`wali/data*` dan `wali/verifikasi*`**
+(dicocokkan lewat alamat, bukan nama rute). **Jangan pernah menaruh fitur uang / PIN / transaksi di
+bawah `/wali/data`** — pemegang link (belum membuktikan email) otomatis ikut bisa membukanya.
+
 ## Primary key yang bukan `id`
 
 Kebanyakan master ber-PK **string** bernama `kode`/`kode_*`, bukan `id` auto-increment. Yang paling

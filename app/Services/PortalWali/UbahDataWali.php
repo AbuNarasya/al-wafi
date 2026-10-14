@@ -56,7 +56,16 @@ class UbahDataWali
 
     public const JENIS_KELAMIN = ['L' => 'Laki-laki', 'P' => 'Perempuan'];
 
-    public function __construct(private readonly Wali $wali, private readonly string $peran) {}
+    /**
+     * @param  bool  $tanpaKabarStaf  MODE VERIFIKASI: ±1.100 keluarga yang serentak membetulkan
+     *                                datanya akan membanjiri lonceng staf dengan ribuan kabar. Jejak
+     *                                audit tetap ditulis; staf memantau lewat layar Verifikasi Data Wali.
+     */
+    public function __construct(
+        private readonly Wali $wali,
+        private readonly string $peran,
+        private readonly bool $tanpaKabarStaf = false,
+    ) {}
 
     public static function bolehUbahSantri(Santri $s): bool
     {
@@ -273,15 +282,17 @@ class UbahDataWali
             // sengaja dibiarkan — lihat docblock
         }
 
-        try {
-            (new NotificationService)->kirim(array_map(fn (int $id) => [
-                'id_pengguna' => $id,
-                'judul' => 'Wali mengubah '.$apa,
-                'pesan' => mb_strimwidth("{$this->namaPengubah()} mengubah {$apa} lewat Portal Wali. {$rincian}", 0, 1000, '…'),
-                'jenis' => self::JENIS_NOTIF, 'ref_jenis' => $refJenis, 'ref_id' => (string) $refId,
-            ], self::penerimaStaf()));
-        } catch (\Throwable) {
-            // sengaja dibiarkan
+        if (! $this->tanpaKabarStaf) {
+            try {
+                (new NotificationService)->kirim(array_map(fn (int $id) => [
+                    'id_pengguna' => $id,
+                    'judul' => 'Wali mengubah '.$apa,
+                    'pesan' => mb_strimwidth("{$this->namaPengubah()} mengubah {$apa} lewat Portal Wali. {$rincian}", 0, 1000, '…'),
+                    'jenis' => self::JENIS_NOTIF, 'ref_jenis' => $refJenis, 'ref_id' => (string) $refId,
+                ], self::penerimaStaf()));
+            } catch (\Throwable) {
+                // sengaja dibiarkan
+            }
         }
 
         // Anggota keluarga lain yang bisa masuk portal ikut tahu — terutama bila

@@ -59,7 +59,8 @@ class PortalWali
     private function modeVerifikasi(Request $request, Closure $next, int $idLink, SesiWali $sesi): Response
     {
         $link = \App\Models\VerifikasiWali::find($idLink);
-        if (! $link || ! $link->bisaDipakai() || (int) $link->id_wali !== (int) SesiWali::wali()->id) {
+        if (! \App\Services\PortalWali\LinkVerifikasi::aktif() || ! $link || ! $link->bisaDipakai()
+            || (int) $link->id_wali !== (int) SesiWali::wali()->id) {
             $sesi->keluar($request);
 
             return redirect()->route('portal.masuk')->with('error', 'Link verifikasi sudah tidak berlaku. Hubungi bagian kesantrian untuk link baru.');
