@@ -268,19 +268,20 @@
                     </div>
                 @endif
             </div>
-            {{-- Digeser ke samping DI DALAM kartu bila layarnya sempit: kolom tanggal &
-                 pembayaran sengaja tak dilipat, jadi tabel punya lebar minimum yang bisa
-                 melampaui kartu. Menu ⋮ berposisi `fixed` supaya tak ikut terpotong. --}}
-            <div class="overflow-x-auto">
+            {{-- TANPA geser ke samping (permintaan user 14 Okt 2026). Kolom tanggal &
+                 pembayaran sengaja tak dilipat, jadi bila kartunya sempit kolom Jenis (kode,
+                 mis. SMP-REG) yang dikorbankan — namanya sudah ada di Keterangan. Diukur
+                 dari lebar KARTU (container query), bukan layar: lebar kartu ikut menu samping. --}}
+            <div class="@container">
             <table class="min-w-full text-sm">
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="px-4 py-2">Jenis</th><th class="px-4 py-2">Keterangan</th><th class="px-4 py-2">Diterbitkan</th><th class="px-4 py-2 text-right">Nominal</th><th class="px-4 py-2 text-right">Sisa</th><th class="px-4 py-2">Pembayaran</th><th class="px-4 py-2">Status</th>@if ($adaKolomAksi)<th class="px-4 py-2"></th>@endif</tr></thead>
+                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="hidden px-4 py-2 @4xl:table-cell">Jenis</th><th class="px-4 py-2">Keterangan</th><th class="px-4 py-2">Diterbitkan</th><th class="px-4 py-2 text-right">Nominal</th><th class="px-4 py-2 text-right">Sisa</th><th class="px-4 py-2">Pembayaran</th><th class="px-4 py-2">Status</th>@if ($adaKolomAksi)<th class="px-4 py-2"></th>@endif</tr></thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse ($santri->tagihan as $t)
                         {{-- Setoran yang sudah dicatat tapi belum diverifikasi keuangan tidak
                              mengurangi `sisa`. Tanpa ditampilkan, tagihan yang baru dibayar
                              tampak seolah belum tersentuh — petugas bisa menagih dua kali. --}}
                         @php $tunggu = $menungguPerTagihan[$t->id] ?? null; @endphp
-                        <tr><td class="whitespace-nowrap px-4 py-2">{{ $t->kode_jenis }}</td>
+                        <tr><td class="hidden whitespace-nowrap px-4 py-2 @4xl:table-cell">{{ $t->kode_jenis }}</td>
                             <td class="px-4 py-2 text-gray-600">{{ $t->keterangan }}
                                 {{-- Ditandai di layar, bukan hanya di kolom database: baris
                                      ini berakrual TANPA jurnal, dan siapa pun yang mengadu
@@ -292,7 +293,7 @@
                             {{-- Waktu tagihan LAHIR di sistem. Tanggal jurnal akrualnya bisa
                                  berbeda (batch terjadwal memakai tanggal rilis) — nomor
                                  jurnalnya sudah ada di kolom Keterangan. --}}
-                            <td class="whitespace-nowrap px-4 py-2 text-xs text-gray-600">
+                            <td class="px-4 py-2 text-xs text-gray-600 @3xl:whitespace-nowrap">
                                 @if ($t->created_at)
                                     <div class="tabular-nums">{{ $t->created_at->format('d/m/Y H:i') }}</div>
                                 @else
@@ -316,7 +317,7 @@
                             <td class="px-4 py-2 text-xs">
                                 @forelse ($t->pembayaran as $b)
                                     <div class="{{ $loop->first ? '' : 'mt-1.5 border-t border-gray-100 pt-1.5' }}">
-                                        <div class="whitespace-nowrap">
+                                        <div class="@3xl:whitespace-nowrap">
                                             <span class="tabular-nums text-gray-700">{{ $b->tanggal->format('d/m/Y') }}</span>
                                             <span class="text-gray-400">·</span>
                                             <span class="tabular-nums font-medium text-gray-800">@rp($b->nominal)</span>
@@ -332,9 +333,9 @@
                                                 · {{ $namaRekening[$b->kode_rekening] ?? $b->kode_rekening }}
                                             @endif
                                         </div>
-                                        <div class="whitespace-nowrap text-[11px] tabular-nums text-gray-400">dicatat {{ $b->created_at?->format('d/m/Y H:i') }}</div>
+                                        <div class="text-[11px] tabular-nums text-gray-400 @3xl:whitespace-nowrap">dicatat {{ $b->created_at?->format('d/m/Y H:i') }}</div>
                                         @if ($b->diverifikasi_pada)
-                                            <div class="whitespace-nowrap text-[11px] tabular-nums text-gray-400">diverifikasi {{ $b->diverifikasi_pada->format('d/m/Y H:i') }}</div>
+                                            <div class="text-[11px] tabular-nums text-gray-400 @3xl:whitespace-nowrap">diverifikasi {{ $b->diverifikasi_pada->format('d/m/Y H:i') }}</div>
                                         @endif
                                     </div>
                                 @empty
