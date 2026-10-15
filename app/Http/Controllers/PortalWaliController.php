@@ -45,6 +45,30 @@ class PortalWaliController extends Controller
 
     // ---- Masuk ----
 
+    /**
+     * Halaman depan (permintaan user 15 Okt 2026): dua kartu supaya wali yang belum punya
+     * akun langsung tahu harus ke mana — "Masuk Aplikasi" dan "Buat Akun & Daftarkan
+     * Calon Santri". Yang sudah masuk langsung ke beranda.
+     */
+    public function depan(Request $request): View|RedirectResponse
+    {
+        if (SesiWali::wali() && SesiWali::peran($request)) {
+            return redirect()->route('portal.beranda');
+        }
+
+        return view('portal.depan');
+    }
+
+    /** Pendaftaran baru: email → kode → formulir pendaftaran (alur kirimKode yang sama). */
+    public function formDaftarBaru(Request $request): View|RedirectResponse
+    {
+        if (SesiWali::wali() && SesiWali::peran($request)) {
+            return redirect()->route('portal.daftar');
+        }
+
+        return view('portal.daftar-baru');
+    }
+
     public function formMasuk(Request $request): View|RedirectResponse
     {
         if (SesiWali::wali() && SesiWali::peran($request)) {

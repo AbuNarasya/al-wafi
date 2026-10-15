@@ -122,7 +122,7 @@
                 </a>
                 <p class="min-w-0 flex-1 truncate text-center font-semibold text-slate-900">@yield('title', 'Portal Wali')</p>
             @else
-                <a href="{{ $verifikasi ? route('portal.verifikasi.ringkasan') : ($masuk ? route('portal.beranda') : route('portal.masuk')) }}" class="flex min-w-0 flex-1 items-center gap-2">
+                <a href="{{ $verifikasi ? route('portal.verifikasi.ringkasan') : ($masuk ? route('portal.beranda') : route('portal.depan')) }}" class="flex min-w-0 flex-1 items-center gap-2">
                     <x-logo class="h-9 w-9 shrink-0 rounded-xl text-sm" />
                     <span class="min-w-0 leading-tight">
                         <span class="block truncate text-sm font-semibold text-slate-900">AL Wafi Islamic Boarding School</span>

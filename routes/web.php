@@ -129,7 +129,9 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 // Alamat `/wali` milik portal; layar staf Wali / Keluarga pindah ke `/datawali`.
 // Nama rute sengaja tetap `portal.*` (wali) dan `wali.*` (staf) — hanya alamatnya yang ditukar.
 Route::prefix('wali')->name('portal.')->controller(PortalWaliController::class)->group(function () {
-    Route::get('/', fn () => redirect()->route('portal.beranda'));
+    // Halaman depan: dua pintu — Masuk Aplikasi / Buat Akun & Daftarkan Calon Santri.
+    Route::get('/', 'depan')->name('depan');
+    Route::get('/daftar-baru', 'formDaftarBaru')->name('daftar_baru');
     Route::get('/masuk', 'formMasuk')->name('masuk');
     Route::post('/masuk', 'kirimKode')->middleware('throttle:10,1');
     // Masuk sehari-hari dengan password; kode email hanya pertama kali & lupa password.

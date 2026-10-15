@@ -116,6 +116,21 @@ class PortalWaliTest extends TestCase
         ];
     }
 
+    // ---- Halaman depan ----
+
+    public function test_halaman_depan_dua_pintu_dan_yang_sudah_masuk_ke_beranda(): void
+    {
+        $this->get(route('portal.depan'))->assertOk()
+            ->assertSee('Masuk Aplikasi')->assertSee('Buat Akun &amp; Daftarkan Calon Santri', false)
+            ->assertSee(route('portal.masuk'), false)->assertSee(route('portal.daftar_baru'), false);
+        $this->get(route('portal.daftar_baru'))->assertOk()->assertSee('Kirim kode ke email');
+        $this->get(route('portal.masuk'))->assertOk()->assertSee('Belum punya akun?');
+
+        $wali = $this->keluarga();
+        $this->actingAs($wali, 'wali')->withSession(['portal.peran' => 'ayah', 'portal.punya_sandi' => true])
+            ->get(route('portal.depan'))->assertRedirect(route('portal.beranda'));
+    }
+
     // ---- Masuk ----
 
     public function test_wali_terdaftar_masuk_dengan_kode_dan_melihat_anaknya(): void

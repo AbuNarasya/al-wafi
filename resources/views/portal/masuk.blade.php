@@ -7,7 +7,9 @@
 @endphp
 
 @section('content')
-    <div class="mb-6 mt-6 text-center">
+    <a href="{{ route('portal.depan') }}" class="mt-2 inline-block text-sm font-semibold text-brand">&larr; Kembali</a>
+
+    <div class="mb-6 mt-4 text-center">
         <x-logo class="mx-auto mb-3 h-16 w-16 rounded-2xl text-2xl" />
         <h1 class="text-2xl font-bold text-slate-900">Portal Wali</h1>
         <p class="mt-1 text-sm text-slate-500">Masuk dengan email dan password Anda.</p>
@@ -33,11 +35,11 @@
         <a href="{{ route('portal.lupa_sandi') }}" class="block text-center text-sm font-semibold text-brand">Lupa password?</a>
     </form>
 
-    {{-- Pertama kali / mendaftar: kode email SEKALI, lalu membuat password. --}}
-    <details class="mt-4 rounded-3xl bg-white p-4 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200" @if ($errors->has('email_kode') || old('lewat_kode')) open @endif>
-        <summary class="cursor-pointer font-semibold text-slate-900">Pertama kali masuk, atau mendaftarkan anak baru?</summary>
-        <p class="mt-2">Masukkan email Anda — kami kirim kode 6 angka. Sesudah kodenya benar, Anda membuat password untuk masuk berikutnya.
-            Wali yang sudah terdaftar: pakai email yang tercatat di data keluarga.</p>
+    {{-- Wali TERDAFTAR yang baru pertama kali masuk: kode email SEKALI, lalu membuat password.
+         Pendaftaran santri baru punya pintunya sendiri di halaman depan (portal.daftar_baru). --}}
+    <details class="mt-4 rounded-3xl bg-white p-4 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200" @if (old('lewat_kode')) open @endif>
+        <summary class="cursor-pointer font-semibold text-slate-900">Wali terdaftar, baru pertama kali masuk?</summary>
+        <p class="mt-2">Masukkan email yang tercatat di data keluarga — kami kirim kode 6 angka. Sesudah kodenya benar, Anda membuat password untuk masuk berikutnya.</p>
         <form method="POST" action="{{ route('portal.masuk') }}" data-no-confirm class="mt-3 space-y-3">
             @csrf
             <input type="hidden" name="lewat_kode" value="1">
@@ -45,4 +47,9 @@
             <button class="w-full rounded-2xl bg-white py-3 text-sm font-bold text-brand ring-1 ring-slate-300">Kirim kode ke email</button>
         </form>
     </details>
+
+    <a href="{{ route('portal.daftar_baru') }}" class="mt-3 flex items-center justify-between gap-2 rounded-3xl bg-amber-50 p-4 text-sm ring-2 ring-amber-300">
+        <span><b class="text-slate-900">Belum punya akun?</b> <span class="text-slate-600">Buat akun &amp; daftarkan calon santri</span></span>
+        <x-portal.ikon nama="kanan" kelas="h-4 w-4 text-slate-500" />
+    </a>
 @endsection
