@@ -91,16 +91,29 @@ class PwaTest extends TestCase
     {
         $publik = public_path();
 
-        foreach (['manifest.json', 'sw.js', 'luring.html', 'ikon/ikon-192.png', 'ikon/ikon-512.png', 'ikon/apple-touch-icon.png'] as $berkas) {
+        foreach (['manifest.json', 'sw.js', 'luring.html', 'ikon/ikon-192.png', 'ikon/ikon-512.png', 'ikon/apple-touch-icon.png',
+            'ikon/ikon-any-192.png', 'ikon/ikon-any-512.png'] as $berkas) {
             $this->assertFileExists("{$publik}/{$berkas}");
         }
 
         $manifest = json_decode(file_get_contents("{$publik}/manifest.json"), true);
         $this->assertSame('standalone', $manifest['display']);
         $this->assertSame('/dashboard', $manifest['start_url']);
-        // Ikon `maskable` wajib: tanpa itu Android memberi ikon kita bingkai
-        // putih sendiri, dan lambangnya jadi kotak kecil di tengah tempelan.
-        $this->assertSame(['any maskable', 'any maskable'], array_column($manifest['icons'], 'purpose'));
+        $this->assertSusunanIkon($manifest);
+    }
+
+    /**
+     * Logo LENGKAP dengan tulisan "AL WAFI ERP" (permintaan user 15 Okt 2026), dua jenis:
+     *  • `any` (ikon-any-*) — logo utuh, untuk layar pembuka;
+     *  • `maskable` (ikon-*) WAJIB ada: tanpa itu Android memberi ikon kita bingkai putih
+     *    sendiri. Lambang+tulisannya diletakkan di dalam lingkaran aman 80% supaya tak terpotong.
+     * Tak lagi "any maskable" dalam satu berkas: logo bertulisan tak muat di zona aman bila utuh.
+     */
+    private function assertSusunanIkon(array $manifest): void
+    {
+        $this->assertSame(
+            ['/ikon/ikon-any-192.png any', '/ikon/ikon-any-512.png any', '/ikon/ikon-192.png maskable', '/ikon/ikon-512.png maskable'],
+            array_map(fn ($i) => $i['src'].' '.$i['purpose'], $manifest['icons']));
     }
 
     /**
@@ -112,7 +125,7 @@ class PwaTest extends TestCase
         $m = json_decode(file_get_contents(public_path('manifest-wali.json')), true, flags: JSON_THROW_ON_ERROR);
         $this->assertSame(['/wali/', '/wali/beranda', '/wali/', 'standalone', 'Al Wafi Wali'],
             [$m['id'], $m['start_url'], $m['scope'], $m['display'], $m['name']]);
-        $this->assertSame(['any maskable', 'any maskable'], array_column($m['icons'], 'purpose'));
+        $this->assertSusunanIkon($m);
 
         $this->get(route('portal.masuk'))->assertOk()
             ->assertSee('<link rel="manifest" href="/manifest-wali.json">', false)

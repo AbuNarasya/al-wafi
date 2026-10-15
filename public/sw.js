@@ -29,6 +29,9 @@
 //
 // v4 — getaran pada notifikasi.
 // v5 — kegagalan menyimpan halaman luring tak lagi membatalkan pemasangan.
+// v6 — ikon diganti logo LENGKAP dengan tulisan "AL WAFI ERP" (permintaan user
+//      15 Okt 2026): ikon-any-* untuk layar pembuka, ikon-* maskable dengan
+//      lambang+tulisan di dalam lingkaran aman 80%.
 //
 // ⚠️ TIAP KENAIKAN NOMOR MEMAKSA SETIAP PERANGKAT MEMASANG ULANG pekerja
 // layanannya, dan sampai itu terjadi ia masih menjalankan versi lama. Untuk dua
@@ -36,7 +39,7 @@
 // puluh orang yang notifikasinya tertinggal sampai aplikasinya ditutup total.
 // Jadi kumpulkan perubahan `sw.js` dan naikkan nomornya sekali, bukan sekali
 // per perubahan kecil.
-const VERSI = 'alwafi-v5';
+const VERSI = 'alwafi-v6';
 const LURING = '/luring.html';
 
 self.addEventListener('install', (e) => {
