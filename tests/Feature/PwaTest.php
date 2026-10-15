@@ -39,7 +39,7 @@ class PwaTest extends TestCase
             '<meta name="pwa" content="aktif">',
             '<link rel="manifest" href="/manifest.json">',
             '<meta name="theme-color" content="#164a9e">',
-            '<link rel="apple-touch-icon" href="/ikon/apple-touch-icon.png">',
+            '<link rel="apple-touch-icon" href="/ikon/apple-touch-icon.png?v=6">',
             '<meta name="apple-mobile-web-app-title" content="Al Wafi ERP">',
         ];
     }
@@ -108,11 +108,14 @@ class PwaTest extends TestCase
      *  • `maskable` (ikon-*) WAJIB ada: tanpa itu Android memberi ikon kita bingkai putih
      *    sendiri. Lambang+tulisannya diletakkan di dalam lingkaran aman 80% supaya tak terpotong.
      * Tak lagi "any maskable" dalam satu berkas: logo bertulisan tak muat di zona aman bila utuh.
+     *
+     * `?v=` WAJIB: server mengirim /ikon/ dengan max-age 7 hari, dan nama berkas yang sama
+     * membuat HP yang memasang ulang tetap memakai gambar lama dari cache-nya (terjadi 15 Okt).
      */
     private function assertSusunanIkon(array $manifest): void
     {
         $this->assertSame(
-            ['/ikon/ikon-any-192.png any', '/ikon/ikon-any-512.png any', '/ikon/ikon-192.png maskable', '/ikon/ikon-512.png maskable'],
+            ['/ikon/ikon-any-192.png?v=6 any', '/ikon/ikon-any-512.png?v=6 any', '/ikon/ikon-192.png?v=6 maskable', '/ikon/ikon-512.png?v=6 maskable'],
             array_map(fn ($i) => $i['src'].' '.$i['purpose'], $manifest['icons']));
     }
 

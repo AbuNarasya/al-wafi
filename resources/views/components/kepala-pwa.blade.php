@@ -20,7 +20,9 @@
 <meta name="pwa" content="{{ config('app.pwa_aktif') ? 'aktif' : 'mati' }}">
 <meta name="theme-color" content="#164a9e">
 <link rel="manifest" href="{{ $manifest }}">
-<link rel="apple-touch-icon" href="/ikon/apple-touch-icon.png">
+{{-- `?v=` = versi ikon: server mengirim /ikon/ dengan max-age 7 hari, jadi nama yang sama
+     membuat HP memakai gambar lama. Naikkan bersama manifest*.json tiap ikon diganti. --}}
+<link rel="apple-touch-icon" href="/ikon/apple-touch-icon.png?v=6">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="{{ $judul }}">
