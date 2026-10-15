@@ -131,6 +131,18 @@ class PortalWaliTest extends TestCase
             ->get(route('portal.depan'))->assertRedirect(route('portal.beranda'));
     }
 
+    /** Halaman depan = alamat awal aplikasi terpasang: perangkat yang diingat langsung masuk. */
+    public function test_halaman_depan_memulihkan_perangkat_yang_diingat(): void
+    {
+        $wali = $this->keluarga();
+        PerangkatWali::create(['id_wali' => $wali->id, 'peran' => 'ayah', 'token_hash' => hash('sha256', 'TOKEN-DEPAN'),
+            'terakhir_dipakai' => now(), 'kedaluwarsa_pada' => null]);
+
+        $this->withCookie(IngatPerangkat::COOKIE, 'TOKEN-DEPAN')->get(route('portal.depan'))
+            ->assertRedirect(route('portal.beranda'));
+        $this->assertSame('ayah', session('portal.peran'));
+    }
+
     // ---- Masuk ----
 
     public function test_wali_terdaftar_masuk_dengan_kode_dan_melihat_anaknya(): void

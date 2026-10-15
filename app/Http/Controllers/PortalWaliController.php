@@ -52,7 +52,10 @@ class PortalWaliController extends Controller
      */
     public function depan(Request $request): View|RedirectResponse
     {
-        if (SesiWali::wali() && SesiWali::peran($request)) {
+        // Juga alamat awal aplikasi terpasang (manifest-wali.json start_url). Halaman ini di
+        // luar middleware portal.wali, jadi perangkat yang diingat dipulihkan DI SINI —
+        // kalau tidak, wali yang sudah "ingat perangkat" justru disodori pilihan masuk tiap membuka aplikasi.
+        if ((SesiWali::wali() && SesiWali::peran($request)) || $this->sesi->pulihkan($request)) {
             return redirect()->route('portal.beranda');
         }
 

@@ -120,13 +120,14 @@ class PwaTest extends TestCase
     }
 
     /**
-     * Portal Wali = aplikasi TERPISAH "Al Wafi Wali" (13 Okt 2026): manifest sendiri yang
-     * membuka beranda wali, sementara halaman staf tetap memakai manifest staf.
+     * Portal Wali = aplikasi TERPISAH "Al Wafi Wali" (13 Okt 2026): manifest sendiri, sementara
+     * halaman staf tetap memakai manifest staf. Alamat awalnya HALAMAN DEPAN (15 Okt 2026) —
+     * tamu melihat pilihan Masuk / Buat Akun, yang sudah masuk atau diingat langsung ke beranda.
      */
     public function test_portal_wali_punya_manifest_sendiri(): void
     {
         $m = json_decode(file_get_contents(public_path('manifest-wali.json')), true, flags: JSON_THROW_ON_ERROR);
-        $this->assertSame(['/wali/', '/wali/beranda', '/wali/', 'standalone', 'Al Wafi Wali'],
+        $this->assertSame(['/wali/', '/wali/', '/wali/', 'standalone', 'Al Wafi Wali'],
             [$m['id'], $m['start_url'], $m['scope'], $m['display'], $m['name']]);
         $this->assertSusunanIkon($m);
 

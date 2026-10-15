@@ -5,7 +5,7 @@
     "description": "Portal wali santri AL Wafi Islamic Boarding School — tagihan, dompet, dan pendaftaran",
     "lang": "id",
     "dir": "ltr",
-    "start_url": "/wali/beranda",
+    "start_url": "/wali/",
     "scope": "/wali/",
     "display": "standalone",
     "orientation": "portrait-primary",
