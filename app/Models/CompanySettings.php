@@ -31,6 +31,7 @@ class CompanySettings extends Model
         'bulan_awal_anggaran',
         'topup_tunai_dompet_santri',
         'kode_unit_neraca',
+        'kode_coa_grni',
         'keterangan',
     ];
 

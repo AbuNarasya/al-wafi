@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Validasi Invoice Vendor (pengakuan hutang usaha). Jurnal: Debit tiap akun
@@ -39,6 +40,11 @@ class InvoiceRequest extends FormRequest
             'details.*.kode_persediaan' => ['nullable', 'string', 'exists:inventory,kode_persediaan'],
             // Perlakuan aset: '' (bukan aset), '__new__' (buat draft), atau kode_aset.
             'details.*.aset_pilih' => ['nullable', 'string'],
+            // Baris PO yang ditagih (dari "Muat dari PO") & baris penerimaan barang yang ditagih.
+            'details.*.id_po_detail' => ['nullable', 'integer', 'exists:purchase_order_details,id'],
+            'details.*.id_penerimaan_detail' => ['nullable', 'integer', 'exists:penerimaan_barang_detail,id'],
+            // Lokasi stok untuk baris barang yang dibeli TANPA penerimaan. Kosong = lokasi bawaan.
+            'kode_lokasi' => ['nullable', 'string', Rule::exists('lokasi_persediaan', 'kode')->where('status', 'aktif')],
         ];
     }
 
@@ -63,6 +69,8 @@ class InvoiceRequest extends FormRequest
                 'kode_bagian' => ($d['kode_bagian'] ?? '') ?: null,
                 'keterangan' => $d['keterangan'] ?? null,
                 'kode_persediaan' => ($d['kode_persediaan'] ?? '') ?: null,
+                'id_po_detail' => ($d['id_po_detail'] ?? '') ?: null,
+                'id_penerimaan_detail' => ($d['id_penerimaan_detail'] ?? '') ?: null,
                 // Perlakuan aset (kapitalisasi): __new__ → buat draft; kode aset → tambah nilai.
                 'buat_aset' => $aset === '__new__',
                 'kode_aset' => ($aset && $aset !== '__new__') ? $aset : null,

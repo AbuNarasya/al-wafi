@@ -27,6 +27,9 @@ class PurchaseOrderRequest extends FormRequest
             'details.*.kuantiti' => ['required', 'numeric', 'gt:0'],
             'details.*.harga_satuan' => ['required', 'numeric', 'gt:0'],
             'details.*.keterangan' => ['nullable', 'string'],
+            // Barang yang dipesan — dulu kolomnya ada di tabel tetapi tak pernah bisa
+            // diisi dari layar, sehingga penerimaan & invoice tak tahu barang apa yang dimaksud.
+            'details.*.kode_persediaan' => ['nullable', 'string', 'exists:inventory,kode_persediaan'],
         ];
     }
 
@@ -47,6 +50,7 @@ class PurchaseOrderRequest extends FormRequest
                 'kuantiti' => $d['kuantiti'],
                 'harga_satuan' => $d['harga_satuan'],
                 'keterangan' => $d['keterangan'] ?? null,
+                'kode_persediaan' => ($d['kode_persediaan'] ?? '') ?: null,
             ];
         }
 

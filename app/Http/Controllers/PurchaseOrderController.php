@@ -71,7 +71,12 @@ class PurchaseOrderController extends Controller
     {
         $purchase_order->load(['details', 'vendor', 'unit']);
 
-        return view('purchase-orders.show', ['po' => $purchase_order]);
+        return view('purchase-orders.show', [
+            'po' => $purchase_order,
+            'penerimaan' => \App\Models\PenerimaanBarang::where('id_po', $purchase_order->id_po)->orderBy('tanggal')->get(),
+            'namaBarang' => \App\Models\Inventory::whereIn('kode_persediaan', $purchase_order->details->pluck('kode_persediaan')->filter())
+                ->pluck('nama_persediaan', 'kode_persediaan')->all(),
+        ]);
     }
 
     /** Halaman cetak PO (standalone, auto window.print()). */
@@ -111,6 +116,9 @@ class PurchaseOrderController extends Controller
                 ->mapWithKeys(fn ($u) => [$u->kode_unit => "{$u->kode_unit} — {$u->nama_unit}"])->all(),
             'coaOptions' => CoaDetail::where('status', 'aktif')->orderBy('kode_coa')->get()
                 ->map(fn ($c) => ['v' => $c->kode_coa, 'l' => "{$c->kode_coa} — {$c->nama_coa}"])->values()->all(),
+            // Pilihan barang: memilih barang mengisi akunnya otomatis (akun persediaan barang itu).
+            'itemOptions' => \App\Models\Inventory::where('status', 'aktif')->orderBy('nama_persediaan')->get()
+                ->map(fn ($i) => ['v' => $i->kode_persediaan, 'l' => "{$i->nama_persediaan} ({$i->satuan})", 'coa' => $i->kode_coa])->values()->all(),
         ];
     }
 }

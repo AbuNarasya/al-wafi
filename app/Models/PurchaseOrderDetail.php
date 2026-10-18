@@ -14,7 +14,7 @@ class PurchaseOrderDetail extends Model
 
     protected $fillable = [
         'id_po', 'kode_coa', 'nama_coa', 'keterangan',
-        'kuantiti', 'harga_satuan', 'total', 'qty_invoiced', 'kode_persediaan',
+        'kuantiti', 'harga_satuan', 'total', 'qty_invoiced', 'qty_diterima', 'kode_persediaan',
     ];
 
     protected function casts(): array
@@ -24,6 +24,7 @@ class PurchaseOrderDetail extends Model
             'harga_satuan' => 'decimal:2',
             'total' => 'decimal:2',
             'qty_invoiced' => 'decimal:4',
+            'qty_diterima' => 'decimal:4',
         ];
     }
 

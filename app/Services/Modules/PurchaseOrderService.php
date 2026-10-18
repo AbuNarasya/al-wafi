@@ -5,6 +5,7 @@ namespace App\Services\Modules;
 use App\Exceptions\AppException;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
+use App\Models\Inventory;
 use App\Models\PurchaseOrder;
 use App\Models\Vendor;
 use App\Services\Ledger\DocNumber;
@@ -31,6 +32,19 @@ class PurchaseOrderService
         $total = '0';
         $details = [];
         foreach ($input['details'] as $l) {
+            // Baris BARANG memakai akun persediaan barangnya sendiri — penerimaan &
+            // invoice-nya kelak juga didebet ke akun itu, jadi PO tak boleh berbeda.
+            if (! empty($l['kode_persediaan'])) {
+                $item = Inventory::find($l['kode_persediaan']);
+                if (! $item) {
+                    throw new AppException(400, "Barang {$l['kode_persediaan']} tidak ditemukan.");
+                }
+                if (! $item->kode_coa) {
+                    throw new AppException(422, "{$item->nama_persediaan} belum punya Akun Persediaan. Lengkapi dulu di master Persediaan.");
+                }
+                $l['kode_coa'] = $item->kode_coa;
+                $l['keterangan'] = ($l['keterangan'] ?? null) ?: $item->nama_persediaan;
+            }
             $coa = CoaDetail::find($l['kode_coa']);
             if (! $coa) {
                 throw new AppException(400, "Akun COA {$l['kode_coa']} tidak ditemukan.");
@@ -89,6 +103,9 @@ class PurchaseOrderService
         }
         if ($po->details->contains(fn ($d) => Money::gtZero($d->qty_invoiced, 4))) {
             throw new AppException(409, 'PO sudah sebagian di-invoice; tidak dapat dibatalkan.');
+        }
+        if ($po->details->contains(fn ($d) => Money::gtZero($d->qty_diterima, 4))) {
+            throw new AppException(409, 'Sebagian barang PO sudah diterima gudang; batalkan penerimaannya dulu.');
         }
 
         $po->update(['status' => 'batal']);

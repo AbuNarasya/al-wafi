@@ -21,7 +21,7 @@ class Invoice extends Model
 
     protected $fillable = [
         'nomor_invoice', 'nomor_ref_internal', 'tanggal_invoice', 'tanggal_jatuh_tempo',
-        'kode_vendor', 'kode_unit', 'kode_coa_hutang', 'id_po', 'nomor_po',
+        'kode_vendor', 'kode_unit', 'kode_coa_hutang', 'id_po', 'nomor_po', 'kode_lokasi',
         'keterangan', 'total', 'sisa_hutang', 'status', 'id_pengguna',
     ];
 

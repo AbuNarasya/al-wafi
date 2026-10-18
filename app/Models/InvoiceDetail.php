@@ -15,6 +15,7 @@ class InvoiceDetail extends Model
     protected $fillable = [
         'id_invoice', 'kode_coa', 'nama_coa', 'keterangan',
         'kuantiti', 'harga_satuan', 'total', 'kode_persediaan',
+        'id_po_detail', 'id_penerimaan_detail', 'nilai_penerimaan',
     ];
 
     protected function casts(): array

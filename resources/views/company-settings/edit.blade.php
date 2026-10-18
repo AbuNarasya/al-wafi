@@ -53,6 +53,16 @@
                 </p>
             </div>
 
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <x-field name="kode_coa_grni" label="Akun Barang Diterima Belum Ditagih"
+                         :value="$s->kode_coa_grni"
+                         :options="['' => '— belum ditetapkan —'] + $opsiGrni" />
+                <p class="mt-2 text-xs text-gray-500">
+                    Dikredit saat <b>Penerimaan Barang</b> menambah stok, lalu didebet saat invoice vendor menagihnya.
+                    Saldonya = nilai barang yang sudah di gudang tetapi tagihannya belum datang. Wajib diisi sebelum penerimaan pertama.
+                </p>
+            </div>
+
             <x-field name="keterangan" label="Keterangan" :value="$s->keterangan" textarea />
 
             <div class="flex justify-end border-t border-gray-100 pt-4">

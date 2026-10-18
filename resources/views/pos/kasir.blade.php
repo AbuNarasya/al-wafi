@@ -1,0 +1,206 @@
+@extends('layouts.pos')
+
+@section('title', 'Kasir')
+@section('kepala', 'Kasir — '.$shift->lokasi->nama)
+@section('subkepala', 'Shift '.$shift->nomor.' · dibuka '.$shift->dibuka_pada->format('d/m H:i'))
+
+@section('aksi')
+    <a href="{{ route('pos.riwayat') }}" class="rounded border border-white/30 px-2 py-1 text-xs hover:bg-white/10">Riwayat Struk</a>
+@endsection
+
+@section('content')
+    <div x-data="kasir(@js(['cari' => route('pos.cari'), 'jual' => route('pos.jual')]), @js($ringkas))"
+         @keydown.window.f2.prevent="$refs.cari.focus()"
+         @keydown.window.f9.prevent="simpan()"
+         class="grid gap-4 lg:grid-cols-3">
+
+        {{-- Kiri: scan & keranjang --}}
+        <section class="space-y-3 lg:col-span-2">
+            <div class="relative">
+                <input x-ref="cari" x-model="q" @input.debounce.250ms="cariNama()" @keydown.enter.prevent="enter()" @keydown.escape="q = ''; hasil = []"
+                       autofocus autocomplete="off" placeholder="Scan barcode atau ketik nama barang…  (F2)"
+                       class="w-full rounded-xl border-2 border-brand/40 bg-white px-4 py-3 text-lg shadow-sm focus:border-brand focus:ring-0">
+                <div x-show="hasil.length" x-cloak @click.outside="hasil = []"
+                     class="absolute z-20 mt-1 max-h-80 w-full overflow-auto rounded-xl border border-gray-200 bg-white shadow-xl">
+                    <template x-for="(h, i) in hasil" :key="h.kode">
+                        <button type="button" @click="tambah(h)" class="flex w-full items-center justify-between gap-3 px-4 py-2 text-left hover:bg-brand-soft">
+                            <span><span class="font-medium" x-text="h.nama"></span> <span class="text-xs text-gray-400" x-text="h.kode"></span></span>
+                            <span class="text-right text-sm">
+                                <span class="font-semibold tabular-nums" x-text="rp(h.opsi[0].harga)"></span>
+                                <span class="block text-xs" :class="h.stok > 0 ? 'text-gray-500' : 'text-red-600'" x-text="'stok ' + h.stok + ' ' + h.satuan_dasar"></span>
+                            </span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <div x-show="pesan" x-cloak class="rounded-lg px-4 py-2 text-sm" :class="pesanJenis === 'galat' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-800'" x-text="pesan"></div>
+
+            <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <tr><th class="px-3 py-2">Barang</th><th class="px-3 py-2">Satuan</th><th class="px-3 py-2 text-center">Jumlah</th><th class="px-3 py-2 text-right">Harga</th><th class="px-3 py-2 text-right">Subtotal</th><th></th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        <template x-for="(r, i) in keranjang" :key="r.kode + '|' + r.satuan">
+                            {{-- data-label ditulis di templat: tabelTumpuk (app.js) hanya melabeli baris yang
+                                 sudah ada saat halaman dimuat, sedangkan baris keranjang lahir belakangan. --}}
+                            <tr :class="kurang(r) ? 'bg-red-50' : ''">
+                                <td class="px-3 py-2" data-label="Barang" data-tumpuk-judul>
+                                    <div class="font-medium" x-text="r.nama"></div>
+                                    <div class="text-xs" :class="kurang(r) ? 'text-red-600' : 'text-gray-400'" x-text="'stok ' + r.stok + ' ' + r.satuan_dasar"></div>
+                                </td>
+                                <td class="px-3 py-2" data-label="Satuan">
+                                    <select x-model="r.satuan" @change="gantiSatuan(r)" class="rounded border-gray-300 py-1 text-sm" x-show="r.opsi.length > 1">
+                                        <template x-for="o in r.opsi" :key="o.satuan"><option :value="o.satuan" x-text="o.satuan" :selected="o.satuan === r.satuan"></option></template>
+                                    </select>
+                                    <span x-show="r.opsi.length === 1" x-text="r.satuan"></span>
+                                </td>
+                                <td class="px-3 py-2" data-label="Jumlah">
+                                    <div class="flex items-center gap-1 sm:justify-center">
+                                        <button type="button" @click="ubahQty(r, -1)" class="h-8 w-8 rounded bg-gray-100 text-lg leading-none hover:bg-gray-200">−</button>
+                                        <input type="number" min="1" step="1" x-model.number="r.qty" class="w-14 rounded border-gray-300 py-1 text-center text-sm">
+                                        <button type="button" @click="ubahQty(r, 1)" class="h-8 w-8 rounded bg-gray-100 text-lg leading-none hover:bg-gray-200">+</button>
+                                    </div>
+                                </td>
+                                <td class="px-3 py-2 text-right tabular-nums" data-label="Harga" x-text="rp(r.harga)"></td>
+                                <td class="px-3 py-2 text-right font-semibold tabular-nums" data-label="Subtotal" x-text="rp(r.harga * r.qty)"></td>
+                                <td class="px-2 py-2 text-center" data-tumpuk-aksi><button type="button" @click="keranjang.splice(i, 1); fokus()" class="text-red-500 hover:text-red-700" title="Hapus">&times;</button></td>
+                            </tr>
+                        </template>
+                        <tr x-show="!keranjang.length"><td colspan="6" class="px-4 py-12 text-center text-gray-400">Keranjang kosong — scan barcode untuk mulai.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        {{-- Kanan: pembayaran --}}
+        <aside class="space-y-3">
+            <div class="rounded-xl bg-brand-dark p-5 text-white shadow">
+                <div class="text-sm text-white/70">Total belanja</div>
+                <div class="text-4xl font-bold tabular-nums" x-text="rp(total)"></div>
+                <div class="mt-1 text-xs text-white/60" x-text="jumlahBarang + ' barang'"></div>
+            </div>
+
+            <div class="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                <label class="block text-sm font-medium text-gray-700">Uang diterima</label>
+                <input x-ref="bayar" type="text" inputmode="numeric" :value="fmtRupiah(bayar)" @input="bayar = ketikRupiah($event)" @keydown.enter.prevent="simpan()"
+                       placeholder="0" class="w-full rounded-lg border-gray-300 text-right text-2xl tabular-nums">
+                <div class="grid grid-cols-3 gap-2 text-sm">
+                    <button type="button" @click="bayar = String(total)" class="rounded-lg bg-gray-100 py-2 hover:bg-gray-200">Uang pas</button>
+                    <template x-for="n in [20000, 50000, 100000]" :key="n">
+                        <button type="button" @click="bayar = String(n)" class="rounded-lg bg-gray-100 py-2 tabular-nums hover:bg-gray-200" x-text="(n / 1000) + 'rb'"></button>
+                    </template>
+                </div>
+                <div class="flex items-center justify-between border-t border-gray-100 pt-3">
+                    <span class="text-sm text-gray-600">Kembalian</span>
+                    <span class="text-2xl font-bold tabular-nums" :class="kembalian < 0 ? 'text-red-600' : 'text-emerald-700'" x-text="kembalian < 0 ? 'kurang ' + rp(-kembalian) : rp(kembalian)"></span>
+                </div>
+                <button type="button" @click="simpan()" :disabled="sibuk || !keranjang.length || kembalian < 0"
+                        class="w-full rounded-xl bg-emerald-600 py-4 text-lg font-bold text-white shadow hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40">
+                    <span x-text="sibuk ? 'Menyimpan…' : 'BAYAR  (F9)'"></span>
+                </button>
+                <button type="button" x-show="keranjang.length" @click="if (confirm('Kosongkan keranjang?')) { keranjang = []; bayar = ''; fokus(); }"
+                        class="w-full text-xs text-gray-500 hover:text-red-600">Kosongkan keranjang</button>
+            </div>
+
+            <div x-show="terakhir" x-cloak class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+                <div class="font-semibold text-emerald-900">Tersimpan <span class="font-mono" x-text="terakhir?.nomor"></span></div>
+                <div class="mt-1 text-emerald-800">Kembalian <b class="text-lg tabular-nums" x-text="rp(terakhir?.kembalian || 0)"></b></div>
+                <button type="button" @click="cetak(terakhir.struk)" class="mt-2 text-xs font-medium text-emerald-700 underline">Cetak ulang struk</button>
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm">
+                Shift ini: <b x-text="ringkas.struk"></b> struk · <b class="tabular-nums" x-text="rp(ringkas.omzet)"></b>
+            </div>
+        </aside>
+
+        {{-- Struk dicetak lewat iframe tersembunyi: jendela baru sesudah fetch diblokir peramban. --}}
+        <iframe x-ref="cetakan" class="hidden" title="Struk"></iframe>
+    </div>
+
+    <script>
+        function kasir(url, ringkas) {
+            return {
+                q: '', hasil: [], keranjang: [], bayar: '', sibuk: false, pesan: '', pesanJenis: '', terakhir: null, ringkas,
+
+                get total() { return this.keranjang.reduce((s, r) => s + r.harga * (r.qty || 0), 0); },
+                get kembalian() { return (parseInt(this.bayar || 0, 10)) - this.total; },
+                get jumlahBarang() { return this.keranjang.reduce((s, r) => s + (r.qty || 0), 0); },
+                rp(n) { return 'Rp ' + Math.round(n || 0).toLocaleString('id-ID'); },
+                fokus() { this.$nextTick(() => this.$refs.cari.focus()); },
+                beri(teks, jenis = 'galat') { this.pesan = teks; this.pesanJenis = jenis; if (teks) setTimeout(() => { if (this.pesan === teks) this.pesan = ''; }, 5000); },
+
+                async ambil(params) {
+                    const r = await fetch(url.cari + '?' + new URLSearchParams(params), { headers: { Accept: 'application/json' } });
+                    if (!r.ok) throw new Error('Gagal mencari barang (' + r.status + ').');
+                    return (await r.json()).items;
+                },
+                async cariNama() {
+                    const q = this.q.trim();
+                    if (q.length < 2 || /^\d{6,}$/.test(q)) { this.hasil = []; return; }
+                    try { this.hasil = await this.ambil({ q }); } catch (e) { this.beri(e.message); }
+                },
+                // Enter = hasil pemindai (barcode + Enter) atau memilih satu-satunya hasil ketikan.
+                async enter() {
+                    const q = this.q.trim();
+                    if (!q) { this.$refs.bayar.focus(); return; }
+                    try {
+                        const pindai = await this.ambil({ barcode: q });
+                        if (pindai.length) { this.tambah(pindai[0]); return; }
+                        if (this.hasil.length === 1) { this.tambah(this.hasil[0]); return; }
+                        if (!this.hasil.length) this.hasil = await this.ambil({ q });
+                        if (this.hasil.length === 1) { this.tambah(this.hasil[0]); return; }
+                        if (!this.hasil.length) this.beri('Barang "' + q + '" tidak ditemukan atau belum dijual di toko.');
+                    } catch (e) { this.beri(e.message); }
+                },
+                tambah(h) {
+                    const satuan = h.satuan_dipilih || h.opsi[0].satuan;
+                    const o = h.opsi.find(x => x.satuan === satuan) || h.opsi[0];
+                    const ada = this.keranjang.find(r => r.kode === h.kode && r.satuan === o.satuan);
+                    if (ada) { ada.qty += 1; ada.stok = h.stok; }
+                    else this.keranjang.push({ kode: h.kode, nama: h.nama, satuan: o.satuan, isi: o.isi, harga: o.harga, qty: 1,
+                        stok: h.stok, satuan_dasar: h.satuan_dasar, opsi: h.opsi, barcode: h.barcode });
+                    const r = this.keranjang.find(x => x.kode === h.kode && x.satuan === o.satuan);
+                    if (this.kurang(r)) this.beri('Stok ' + h.nama + ' di toko tidak cukup.', 'peringatan');
+                    this.q = ''; this.hasil = []; this.fokus();
+                },
+                gantiSatuan(r) { const o = r.opsi.find(x => x.satuan === r.satuan); if (o) { r.isi = o.isi; r.harga = o.harga; } },
+                ubahQty(r, d) { r.qty = Math.max(1, (parseInt(r.qty, 10) || 1) + d); },
+                // Stok dicek per BARANG (dus + pcs barang yang sama dijumlahkan dalam satuan dasar).
+                kurang(r) {
+                    const pakai = this.keranjang.filter(x => x.kode === r.kode).reduce((s, x) => s + (x.qty || 0) * x.isi, 0);
+                    return pakai > r.stok;
+                },
+                cetak(alamat) { this.$refs.cetakan.src = alamat; },
+
+                async simpan() {
+                    if (this.sibuk || !this.keranjang.length) return;
+                    if (this.kembalian < 0) { this.beri('Uang diterima kurang dari total.'); this.$refs.bayar.focus(); return; }
+                    this.sibuk = true;
+                    try {
+                        const r = await fetch(url.jual, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', Accept: 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                            body: JSON.stringify({
+                                bayar: parseInt(this.bayar || 0, 10),
+                                baris: this.keranjang.map(x => ({ kode_persediaan: x.kode, satuan: x.satuan, kuantiti: x.qty, barcode: x.barcode })),
+                            }),
+                        });
+                        const data = await r.json();
+                        if (!r.ok) { this.beri(data.message || 'Gagal menyimpan.'); return; }
+                        this.terakhir = data; this.ringkas = data.ringkas;
+                        this.keranjang = []; this.bayar = '';
+                        this.cetak(data.struk);
+                        this.fokus();
+                    } catch (e) {
+                        this.beri('Koneksi ke server terputus — struk BELUM tersimpan. Coba lagi.');
+                    } finally {
+                        this.sibuk = false;
+                    }
+                },
+            };
+        }
+    </script>
+@endsection

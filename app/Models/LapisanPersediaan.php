@@ -18,7 +18,7 @@ class LapisanPersediaan extends Model
     protected $table = 'lapisan_persediaan';
 
     protected $fillable = [
-        'kode_persediaan', 'tanggal', 'kuantiti_awal', 'kuantiti_sisa',
+        'kode_persediaan', 'kode_lokasi', 'tanggal', 'kuantiti_awal', 'kuantiti_sisa',
         'harga_satuan', 'mutasi_id', 'sumber_modul', 'sumber_ref',
     ];
 

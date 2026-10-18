@@ -48,6 +48,11 @@ use App\Http\Controllers\KoreksiTagihanController;
 use App\Http\Controllers\LampiranController;
 use App\Http\Controllers\LevelController;
 use App\Http\Controllers\LevelPengajuanController;
+use App\Http\Controllers\LokasiPersediaanController;
+use App\Http\Controllers\OpnamePersediaanController;
+use App\Http\Controllers\PenerimaanBarangController;
+use App\Http\Controllers\PosController;
+use App\Http\Controllers\TransferPersediaanController;
 use App\Http\Controllers\NisController;
 use App\Http\Controllers\NotifikasiController;
 use App\Http\Controllers\OpeningBalanceController;
@@ -375,6 +380,34 @@ Route::middleware('auth')->group(function () {
 
     // Persediaan (CRUD + pemakaian/opname berjurnal + kartu stok).
     crudModul('inventory', InventoryController::class, 'inventory');
+    // Wafi Mart tahap 1a: tempat stok, pengelompok barang toko.
+    crudModul('lokasi-persediaan', LokasiPersediaanController::class, 'lokasi');
+    crudModul('kategori-barang', SimpleMasterController::class, 'id');
+    crudModul('merk-barang', SimpleMasterController::class, 'id');
+    // Wafi Mart tahap 1c: transfer antar lokasi (kirim → terima → putus selisih).
+    Route::prefix('transfer-persediaan')->name('transfer_persediaan.')->group(function () {
+        $t = TransferPersediaanController::class;
+        Route::get('/', [$t, 'index'])->name('index')->middleware('hakakses:transfer-persediaan,lihat');
+        Route::get('/create', [$t, 'create'])->name('create')->middleware('hakakses:transfer-persediaan,buat');
+        Route::post('/', [$t, 'store'])->name('store')->middleware('hakakses:transfer-persediaan,buat');
+        Route::get('/{transfer}', [$t, 'show'])->name('show')->middleware('hakakses:transfer-persediaan,lihat')->whereNumber('transfer');
+        Route::post('/{transfer}/terima', [$t, 'terima'])->name('terima')->middleware('hakakses:transfer-persediaan,ubah')->whereNumber('transfer');
+        Route::post('/{transfer}/putus', [$t, 'putus'])->name('putus')->middleware('hakakses:persetujuan-persediaan,ubah')->whereNumber('transfer');
+        Route::delete('/{transfer}', [$t, 'batal'])->name('batal')->middleware('hakakses:transfer-persediaan,hapus')->whereNumber('transfer');
+    });
+
+    // Stok opname berdokumen (hitung → ajukan → setujui oleh orang lain).
+    Route::prefix('opname-persediaan')->name('opname_persediaan.')->group(function () {
+        $o = OpnamePersediaanController::class;
+        Route::get('/', [$o, 'index'])->name('index')->middleware('hakakses:opname-persediaan,lihat');
+        Route::get('/create', [$o, 'create'])->name('create')->middleware('hakakses:opname-persediaan,buat');
+        Route::post('/', [$o, 'store'])->name('store')->middleware('hakakses:opname-persediaan,buat');
+        Route::get('/{opname}', [$o, 'show'])->name('show')->middleware('hakakses:opname-persediaan,lihat')->whereNumber('opname');
+        Route::post('/{opname}/hitung', [$o, 'hitung'])->name('hitung')->middleware('hakakses:opname-persediaan,buat')->whereNumber('opname');
+        Route::post('/{opname}/putus', [$o, 'putus'])->name('putus')->middleware('hakakses:persetujuan-persediaan,ubah')->whereNumber('opname');
+        Route::delete('/{opname}', [$o, 'batal'])->name('batal')->middleware('hakakses:opname-persediaan,hapus')->whereNumber('opname');
+    });
+
     Route::post('/inventory/{inventory}/mutasi', [InventoryController::class, 'mutasi'])->name('inventory.mutasi')->middleware('hakakses:inventory,ubah');
     Route::get('/inventory/{inventory}/kartu', [InventoryController::class, 'kartu'])->name('inventory.kartu')->middleware('hakakses:inventory,lihat');
 
@@ -681,6 +714,27 @@ Route::middleware('auth')->group(function () {
         Route::get('/{purchase_order}/print', [$p, 'print'])->name('print')->middleware('hakakses:purchase-orders,lihat');
         Route::get('/{purchase_order}', [$p, 'show'])->name('show')->middleware('hakakses:purchase-orders,lihat');
         Route::delete('/{purchase_order}', [$p, 'cancel'])->name('cancel')->middleware('hakakses:purchase-orders,hapus');
+    });
+
+    // Layar kasir Wafi Mart — layout penuh sendiri. Struk & cari = JSON/halaman ringan.
+    Route::prefix('pos')->name('pos.')->group(function () {
+        $k = PosController::class;
+        Route::get('/', [$k, 'index'])->name('index')->middleware('hakakses:pos,lihat');
+        Route::post('/shift', [$k, 'bukaShift'])->name('buka_shift')->middleware('hakakses:pos,buat');
+        Route::get('/cari', [$k, 'cari'])->name('cari')->middleware('hakakses:pos,buat');
+        Route::post('/jual', [$k, 'jual'])->name('jual')->middleware('hakakses:pos,buat');
+        Route::get('/riwayat', [$k, 'riwayat'])->name('riwayat')->middleware('hakakses:pos,lihat');
+        Route::get('/struk/{penjualan}', [$k, 'struk'])->name('struk')->middleware('hakakses:pos,lihat')->whereNumber('penjualan');
+    });
+
+    // Penerimaan Barang (D Persediaan / K Barang Diterima Belum Ditagih; stok masuk per lokasi).
+    Route::prefix('penerimaan-barang')->name('penerimaan_barang.')->group(function () {
+        $t = PenerimaanBarangController::class;
+        Route::get('/', [$t, 'index'])->name('index')->middleware('hakakses:penerimaan-barang,lihat');
+        Route::get('/create', [$t, 'create'])->name('create')->middleware('hakakses:penerimaan-barang,buat');
+        Route::post('/', [$t, 'store'])->name('store')->middleware('hakakses:penerimaan-barang,buat');
+        Route::get('/{penerimaan}', [$t, 'show'])->name('show')->middleware('hakakses:penerimaan-barang,lihat')->whereNumber('penerimaan');
+        Route::delete('/{penerimaan}', [$t, 'batal'])->name('batal')->middleware('hakakses:penerimaan-barang,hapus')->whereNumber('penerimaan');
     });
 
     // Invoice Vendor (Debit rincian; Kredit hutang usaha).

@@ -8,11 +8,15 @@ use App\Models\Asset;
 use App\Models\Bagian;
 use App\Models\BusinessUnit;
 use App\Models\CoaDetail;
+use App\Models\CompanySettings;
 use App\Models\Inventory;
 use App\Models\Invoice;
+use App\Models\LokasiPersediaan;
+use App\Models\PenerimaanBarang;
 use App\Models\PurchaseOrder;
 use App\Models\Vendor;
 use App\Services\Modules\InvoiceService;
+use App\Support\Money;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -65,6 +69,7 @@ class InvoiceController extends Controller
                 'kode_vendor' => $request->input('kode_vendor'),
                 'kode_unit' => $request->input('kode_unit'),
                 'kode_coa_hutang' => $request->input('kode_coa_hutang'),
+                'kode_lokasi' => $request->input('kode_lokasi') ?: null,
                 'keterangan' => $request->input('keterangan'),
                 'details' => $request->details(),
             ], $request->user()->id_pengguna);
@@ -95,6 +100,40 @@ class InvoiceController extends Controller
         return redirect()->route('invoices.index')->with('status', "Invoice {$invoice->nomor_invoice} berhasil di-void.");
     }
 
+    /**
+     * Penerimaan barang yang masih punya baris belum ditagih — bahan "Muat dari Penerimaan".
+     * Harga yang dimuat = harga terima; petugas menimpanya bila invoice berbeda, dan
+     * selisihnya dibukukan ke akun Selisih Persediaan barangnya.
+     */
+    private function penerimaanBelumDitagih(): array
+    {
+        $grni = CompanySettings::find(1)?->kode_coa_grni;
+
+        return PenerimaanBarang::with(['details.persediaan', 'vendor'])
+            ->where('status', 'aktif')
+            ->whereHas('details', fn ($q) => $q->whereColumn('qty_ditagih', '<', 'kuantiti'))
+            ->orderByDesc('tanggal')->orderByDesc('id_penerimaan')->limit(200)->get()
+            ->map(fn ($p) => [
+                'id' => $p->id_penerimaan,
+                'label' => "{$p->nomor} — {$p->vendor?->nama_vendor} ({$p->tanggal->format('d/m/Y')})",
+                'kode_vendor' => $p->kode_vendor,
+                'kode_unit' => $p->kode_unit,
+                'details' => $p->details
+                    ->filter(fn ($d) => Money::gtZero($d->sisaQty(), 4))
+                    ->map(fn ($d) => [
+                        'kode_coa' => (string) $grni,
+                        'keterangan' => "{$d->persediaan->nama_persediaan} ({$p->nomor})",
+                        'kode_bagian' => '',
+                        'kuantiti' => $d->sisaQty(),
+                        'harga_satuan' => Money::div($d->sisaNilai(), $d->sisaQty()),
+                        'kode_persediaan' => $d->kode_persediaan,
+                        'id_penerimaan_detail' => $d->id,
+                        'dari_penerimaan' => "{$p->nomor} · {$d->persediaan->nama_persediaan} ({$d->persediaan->satuan})",
+                        'aset_pilih' => '',
+                    ])->values()->all(),
+            ])->values()->all();
+    }
+
     private function opsi(): array
     {
         // PO status open/sebagian → dropdown referensi + data untuk auto-isi baris.
@@ -113,18 +152,28 @@ class InvoiceController extends Controller
                 'id_po' => $p->id_po,
                 'kode_vendor' => $p->kode_vendor,
                 'kode_unit' => $p->kode_unit,
-                'details' => $p->details->map(fn ($d) => [
-                    'kode_coa' => $d->kode_coa,
-                    'keterangan' => $d->keterangan,
-                    'kode_bagian' => '',
-                    'kuantiti' => (string) $d->kuantiti,
-                    'harga_satuan' => (string) $d->harga_satuan,
-                    // Item persediaan ikut terbawa dari baris PO — dulu berhenti
-                    // di PO dan tak pernah sampai ke invoice.
-                    'kode_persediaan' => (string) ($d->kode_persediaan ?? ''),
-                    'aset_pilih' => '',
-                ])->all(),
+                // Yang dimuat SISA yang belum ditagih (dulu jumlah penuh PO, sehingga PO
+                // yang ditagih bertahap membuat petugas menghitung ulang sendiri).
+                'details' => $p->details
+                    ->filter(fn ($d) => Money::gtZero(Money::sub($d->kuantiti, $d->qty_invoiced, 4), 4)
+                        // Baris barang yang sudah lewat Penerimaan ditagih dari penerimaannya.
+                        && ! ($d->kode_persediaan && Money::gtZero($d->qty_diterima, 4)))
+                    ->map(fn ($d) => [
+                        'kode_coa' => $d->kode_coa,
+                        'keterangan' => $d->keterangan,
+                        'kode_bagian' => '',
+                        'kuantiti' => Money::sub($d->kuantiti, $d->qty_invoiced, 4),
+                        'harga_satuan' => (string) $d->harga_satuan,
+                        // Item persediaan ikut terbawa dari baris PO — dulu berhenti
+                        // di PO dan tak pernah sampai ke invoice.
+                        'kode_persediaan' => (string) ($d->kode_persediaan ?? ''),
+                        'id_po_detail' => $d->id,
+                        'aset_pilih' => '',
+                    ])->values()->all(),
             ])->values()->all(),
+            'penerimaanData' => $this->penerimaanBelumDitagih(),
+            'lokasiOptions' => LokasiPersediaan::pilihan(),
+            'itemCoa' => Inventory::where('status', 'aktif')->whereNotNull('kode_coa')->pluck('kode_coa', 'kode_persediaan')->all(),
             'vendorOptions' => ['' => '— pilih vendor —'] + Vendor::where('status', 'aktif')->orderBy('kode_vendor')->get()
                 ->mapWithKeys(fn ($v) => [$v->kode_vendor => "{$v->kode_vendor} — {$v->nama_vendor}"])->all(),
             'unitOptions' => ['' => '— pilih unit —'] + BusinessUnit::where('status', 'aktif')->orderBy('kode_unit')->get()

@@ -25,11 +25,17 @@ class MutasiPersediaan extends Model
         'pemakaian' => 'Pemakaian',
         'opname' => 'Penyesuaian Opname',
         'pembatalan' => 'Pembatalan Transaksi',
+        // Pindah lokasi — tak berjurnal (barang & akunnya sama).
+        'transfer' => 'Transfer Lokasi',
+        // Selisih transfer yang diputus hilang — lawannya akun Selisih Persediaan.
+        'kehilangan' => 'Kehilangan Transfer',
+        // Kasir toko — jurnal HPP-nya ringkas per shift (KasirService::tutupShift).
+        'penjualan' => 'Penjualan Kasir',
     ];
 
     protected $fillable = [
-        'kode_persediaan', 'tanggal', 'arah', 'alasan', 'kuantiti', 'nilai',
-        'saldo_kuantiti', 'saldo_nilai', 'sumber_modul', 'sumber_ref',
+        'kode_persediaan', 'kode_lokasi', 'tanggal', 'arah', 'alasan', 'kuantiti', 'nilai',
+        'saldo_kuantiti', 'saldo_nilai', 'saldo_kuantiti_lokasi', 'sumber_modul', 'sumber_ref',
         'journal_entry_id', 'rincian_lapisan', 'keterangan', 'id_pengguna',
     ];
 
@@ -41,8 +47,14 @@ class MutasiPersediaan extends Model
             'nilai' => 'decimal:2',
             'saldo_kuantiti' => 'decimal:4',
             'saldo_nilai' => 'decimal:2',
+            'saldo_kuantiti_lokasi' => 'decimal:4',
             'rincian_lapisan' => 'array',
         ];
+    }
+
+    public function lokasi(): BelongsTo
+    {
+        return $this->belongsTo(LokasiPersediaan::class, 'kode_lokasi', 'kode');
     }
 
     public function persediaan(): BelongsTo

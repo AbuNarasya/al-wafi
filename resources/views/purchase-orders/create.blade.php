@@ -3,9 +3,9 @@
 @section('title', 'Purchase Order Baru')
 
 @php
-    $kosong = ['kode_coa' => '', 'keterangan' => '', 'kuantiti' => '1', 'harga_satuan' => ''];
+    $kosong = ['kode_persediaan' => '', 'kode_coa' => '', 'keterangan' => '', 'kuantiti' => '1', 'harga_satuan' => ''];
     $initRows = array_values(old('details', [$kosong]));
-    $opts = ['coa' => $coaOptions];
+    $opts = ['coa' => $coaOptions, 'item' => $itemOptions];
 @endphp
 
 @section('content')
@@ -39,12 +39,27 @@
                 <table class="w-full min-w-[48rem] text-sm">
                     <colgroup><col style="width:34%"><col style="width:28%"><col style="width:11%"><col style="width:13%"><col style="width:12%"><col style="width:2%"></colgroup>
                     <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        <tr><th class="px-2 py-2">Akun / Item</th><th class="px-2 py-2">Keterangan</th><th class="px-2 py-2 text-right">Qty</th><th class="px-2 py-2 text-right">Harga</th><th class="px-2 py-2 text-right">Subtotal</th><th></th></tr>
+                        <tr><th class="px-2 py-2">Barang / Akun</th><th class="px-2 py-2">Keterangan</th><th class="px-2 py-2 text-right">Qty</th><th class="px-2 py-2 text-right">Harga</th><th class="px-2 py-2 text-right">Subtotal</th><th></th></tr>
                     </thead>
                     <tbody>
                         <template x-for="(row, i) in rows" :key="i">
                             <tr class="border-t border-gray-100 align-top">
-                                <td class="px-2 py-1.5"><x-search-cell name="`details[${i}][kode_coa]`" model="row.kode_coa" options="coaOpts" placeholder="— pilih akun —" /></td>
+                                {{-- Barang dulu: memilihnya mengisi & mengunci akun ke akun persediaan barang itu.
+                                     Kosongkan untuk pembelian jasa / non-persediaan, lalu pilih akunnya. --}}
+                                <td class="space-y-1 px-2 py-1.5"
+                                    x-effect="if (row.kode_persediaan) { const it = itemOpts.find(o => o.v === row.kode_persediaan); if (it && it.coa) row.kode_coa = it.coa; }">
+                                    <x-search-cell name="`details[${i}][kode_persediaan]`" model="row.kode_persediaan" options="itemOpts" placeholder="— barang (opsional) —" />
+                                    <template x-if="!row.kode_persediaan">
+                                        <x-search-cell name="`details[${i}][kode_coa]`" model="row.kode_coa" options="coaOpts" placeholder="— pilih akun —" />
+                                    </template>
+                                    <template x-if="row.kode_persediaan">
+                                        <div class="flex items-center justify-between gap-1 text-[11px] text-gray-500">
+                                            <span class="truncate" x-text="'Akun: ' + ((coaOpts.find(o => o.v === row.kode_coa) || {}).l || row.kode_coa || '—')"></span>
+                                            <button type="button" @click="row.kode_persediaan = ''" class="shrink-0 text-red-500 hover:underline">lepas</button>
+                                            <input type="hidden" :name="`details[${i}][kode_coa]`" :value="row.kode_coa">
+                                        </div>
+                                    </template>
+                                </td>
                                 <td class="px-2 py-1.5"><input type="text" :name="`details[${i}][keterangan]`" x-model="row.keterangan" class="w-full rounded border border-gray-400 px-2 py-1.5 text-sm focus:border-brand focus:ring-1 focus:ring-brand"></td>
                                 <td class="px-2 py-1.5"><input type="number" step="0.01" min="0" :name="`details[${i}][kuantiti]`" x-model="row.kuantiti" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm focus:border-brand focus:ring-1 focus:ring-brand"></td>
                                 <td class="px-2 py-1.5"><input type="text" inputmode="numeric" :value="fmtRupiah(row.harga_satuan)" @input="row.harga_satuan = ketikRupiah($event)" class="w-full rounded border border-gray-400 px-2 py-1.5 text-right text-sm tabular-nums focus:border-brand focus:ring-1 focus:ring-brand"><input type="hidden" :name="`details[${i}][harga_satuan]`" :value="row.harga_satuan"></td>
@@ -75,7 +90,8 @@
             return {
                 rows: initRows.length ? initRows : [{}],
                 coaOpts: opts.coa || [],
-                tambah() { this.rows.push({ kode_coa: '', keterangan: '', kuantiti: '1', harga_satuan: '' }); },
+                itemOpts: opts.item || [],
+                tambah() { this.rows.push({ kode_persediaan: '', kode_coa: '', keterangan: '', kuantiti: '1', harga_satuan: '' }); },
                 hapus(i) { if (this.rows.length > 1) this.rows.splice(i, 1); },
                 get total() { return this.rows.reduce((s, r) => s + (parseFloat(r.kuantiti) || 0) * (parseFloat(r.harga_satuan) || 0), 0); },
                 fmt(n) { return 'Rp ' + (n || 0).toLocaleString('id-ID'); },

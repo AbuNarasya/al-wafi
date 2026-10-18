@@ -42,6 +42,17 @@ Angka terukur di mesin ini (4 core), supaya tak salah pilih:
 `--parallel` (paratest) hanya menguntungkan untuk suite penuh — untuk satu berkas ia malah lebih
 lambat karena menyiapkan 4 database pekerja (`al_wafi_php_test_test_1` … `_4`). Lari paralel PERTAMA
 setelah migrasi baru lebih lambat (±2 mnt 15 s) karena keempat database dimigrasi ulang.
+
+**Sejak 18 Okt 2026 (±100 tabel, 1343 test) `--parallel` gagal ±7 test** dengan `SQLSTATE[53200]
+out of shared memory … max_locks_per_transaction`: keempat pekerja men-drop seluruh tabel serentak
+dan PostgreSQL lokal (bawaan 64) kehabisan lock. BUKAN bug kode. Obatnya di sisi user (butuh restart
+layanan PostgreSQL): `ALTER SYSTEM SET max_locks_per_transaction = 256;`. Sampai itu dilakukan, suite
+penuh dijalankan SERIAL, langsung lewat phpunit supaya batas memori ikut (`artisan test` memanggil
+subproses yang kembali ke 128 MB dan mati ±test ke-1300):
+
+```bash
+C:/php/php.exe -d memory_limit=1G vendor/phpunit/phpunit/phpunit   # ~7 mnt 15 s (1343 test)
+```
 **Jalankan `composer` & `artisan` dari folder proyek** — dijalankan dari home, composer akan membuat
 proyek baru di sana alih-alih memasang ke sini.
 

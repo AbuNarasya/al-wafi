@@ -64,10 +64,26 @@ final class ModulRegistry
         ['kode' => 'customers', 'nama' => 'Customer', 'grup' => 'KEUANGAN', 'sub' => 'Vendor & Customer'],
 
         ['kode' => 'inventory', 'nama' => 'Persediaan', 'grup' => 'KEUANGAN', 'sub' => 'Aset & Persediaan'],
+        ['kode' => 'lokasi-persediaan', 'nama' => 'Lokasi Persediaan (gudang / toko)', 'grup' => 'KEUANGAN', 'sub' => 'Aset & Persediaan'],
+        ['kode' => 'kategori-barang', 'nama' => 'Kategori Barang', 'grup' => 'KEUANGAN', 'sub' => 'Aset & Persediaan'],
+        ['kode' => 'merk-barang', 'nama' => 'Merk Barang', 'grup' => 'KEUANGAN', 'sub' => 'Aset & Persediaan'],
+        // buat = kirim, ubah = terima di tujuan, hapus = batalkan kiriman yang belum diterima.
+        ['kode' => 'transfer-persediaan', 'nama' => 'Transfer Antar Lokasi (kirim / terima / batal)', 'grup' => 'KEUANGAN', 'sub' => 'Aset & Persediaan'],
+        // buat = membuat lembar, menghitung, mengajukan; hapus = membatalkan.
+        ['kode' => 'opname-persediaan', 'nama' => 'Stok Opname (hitung & ajukan)', 'grup' => 'KEUANGAN', 'sub' => 'Aset & Persediaan'],
+        // TANPA MENU sendiri: tombolnya ada di halaman transfer & opname. Dipisah supaya
+        // yang menghitung/menerima bukan orang yang memutus selisihnya (dua tangan).
+        ['kode' => 'persetujuan-persediaan', 'nama' => 'Persetujuan Persediaan (putus selisih transfer, setujui opname)', 'grup' => 'KEUANGAN', 'sub' => 'Aset & Persediaan'],
         ['kode' => 'asset-categories', 'nama' => 'Kategori Aset', 'grup' => 'KEUANGAN', 'sub' => 'Aset & Persediaan'],
         ['kode' => 'assets', 'nama' => 'Aset Tetap', 'grup' => 'KEUANGAN', 'sub' => 'Aset & Persediaan'],
 
         ['kode' => 'purchase-orders', 'nama' => 'Purchase Order', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
+        // Layar kasir Wafi Mart (/pos): `lihat` = membuka layar & riwayat struk,
+        // `buat` = buka shift & berjualan. Pembatalan struk & penerimaan setoran
+        // sengaja di modul lain — kasir tak memutus atas uangnya sendiri.
+        ['kode' => 'pos', 'nama' => 'Kasir Toko / POS (buka shift & berjualan)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
+        // Pekerjaan gudang/toko: `buat` = mencatat barang datang, `hapus` = membatalkan.
+        ['kode' => 'penerimaan-barang', 'nama' => 'Penerimaan Barang (stok masuk dari vendor)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Perintah Pembayaran mendahului Kas Keluar dalam urutan kerja: rencana
         // dulu, realisasi kemudian. Urutan menu mengikuti urutan itu.
         ['kode' => 'perintah-pembayaran', 'nama' => 'Perintah Pembayaran', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],

@@ -12,6 +12,15 @@
             </h1>
         </div>
         <form method="GET" class="flex flex-wrap items-end gap-2">
+            @if (count($lokasiOptions) > 1)
+                <div><label class="mb-1 block text-xs font-medium text-gray-500">Lokasi</label>
+                    <select name="lokasi" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+                        <option value="">Semua lokasi</option>
+                        @foreach ($lokasiOptions as $kodeLok => $namaLok)
+                            <option value="{{ $kodeLok }}" @selected($lokasi === $kodeLok)>{{ $namaLok }}</option>
+                        @endforeach
+                    </select></div>
+            @endif
             <div><label class="mb-1 block text-xs font-medium text-gray-500">Dari</label>
                 <input type="date" name="from" value="{{ $from }}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"></div>
             <div><label class="mb-1 block text-xs font-medium text-gray-500">Sampai</label>
@@ -37,6 +46,34 @@
             <div class="text-lg font-semibold tabular-nums text-gray-900">@rp($item->harga_perolehan)</div>
         </div>
     </div>
+
+    @if (count($lokasiOptions) > 1 && $stokLokasi)
+        <div class="mb-4 flex flex-wrap gap-2 text-xs">
+            @foreach ($stokLokasi as $kodeLok => $jml)
+                <a href="{{ route('inventory.kartu', [$item->kode_persediaan, 'lokasi' => $kodeLok]) }}"
+                   class="rounded-full border px-3 py-1 {{ $lokasi === $kodeLok ? 'border-brand bg-brand-soft text-brand' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50' }}">
+                    {{ $lokasiOptions[$kodeLok] ?? $kodeLok }}: <b class="tabular-nums">{{ rtrim(rtrim(number_format((float) $jml, 4, '.', ''), '0'), '.') }}</b> {{ $item->satuan }}
+                </a>
+            @endforeach
+        </div>
+    @endif
+
+    @if ($item->satuanLain->isNotEmpty() || $item->barcode->isNotEmpty())
+        <div class="mb-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-xs text-gray-600 shadow-sm">
+            @if ($item->satuanLain->isNotEmpty())
+                <div><span class="font-medium text-gray-800">Satuan:</span>
+                    @foreach ($item->satuanLain as $s)
+                        1 {{ $s->satuan }} = {{ rtrim(rtrim((string) $s->isi, '0'), '.') }} {{ $item->satuan }}@if (! $loop->last), @endif
+                    @endforeach
+                </div>
+            @endif
+            @if ($item->barcode->isNotEmpty())
+                <div class="mt-1"><span class="font-medium text-gray-800">Barcode:</span>
+                    <span class="font-mono">{{ $item->barcode->map(fn ($b) => $b->barcode.($b->satuan ? " ({$b->satuan})" : ''))->join(', ') }}</span>
+                </div>
+            @endif
+        </div>
+    @endif
 
     {{-- Lapisan FIFO yang masih hidup: inilah yang akan tergerus pada
          pengeluaran berikutnya, dan urutan inilah yang menentukan harga pokoknya. --}}
@@ -79,8 +116,10 @@
                     <th class="px-3 py-2.5 text-right">Masuk</th>
                     <th class="px-3 py-2.5 text-right">Keluar</th>
                     <th class="px-3 py-2.5 text-right">Nilai</th>
-                    <th class="border-l border-gray-200 px-3 py-2.5 text-right">Saldo</th>
-                    <th class="px-3 py-2.5 text-right">Nilai Saldo</th>
+                    <th class="border-l border-gray-200 px-3 py-2.5 text-right">{{ $lokasi ? 'Saldo Lokasi' : 'Saldo' }}</th>
+                    @unless ($lokasi)
+                        <th class="px-3 py-2.5 text-right">Nilai Saldo</th>
+                    @endunless
                     <th class="px-3 py-2.5">Oleh</th>
                 </tr>
             </thead>
@@ -96,6 +135,9 @@
                         </td>
                         <td class="px-3 py-1.5 text-gray-500">
                             {{ $m->sumber_modul }}{{ $m->sumber_ref ? " · {$m->sumber_ref}" : '' }}
+                            @if (! $lokasi && count($lokasiOptions) > 1)
+                                <div class="text-[11px] text-gray-500">{{ $lokasiOptions[$m->kode_lokasi] ?? $m->kode_lokasi }}</div>
+                            @endif
                             @if ($m->keterangan)
                                 <div class="text-[11px] text-gray-400">{{ $m->keterangan }}</div>
                             @endif
@@ -103,12 +145,14 @@
                         <td class="px-3 py-1.5 text-right tabular-nums text-emerald-700">{{ $m->arah === 'masuk' ? $qty : '' }}</td>
                         <td class="px-3 py-1.5 text-right tabular-nums text-red-700">{{ $m->arah === 'keluar' ? $qty : '' }}</td>
                         <td class="px-3 py-1.5 text-right tabular-nums">@rp($m->nilai)</td>
-                        <td class="border-l border-gray-100 px-3 py-1.5 text-right font-medium tabular-nums">{{ rtrim(rtrim(number_format((float) $m->saldo_kuantiti, 4, '.', ''), '0'), '.') }}</td>
-                        <td class="px-3 py-1.5 text-right font-medium tabular-nums">@rp($m->saldo_nilai)</td>
+                        <td class="border-l border-gray-100 px-3 py-1.5 text-right font-medium tabular-nums">{{ rtrim(rtrim(number_format((float) ($lokasi ? $m->saldo_kuantiti_lokasi : $m->saldo_kuantiti), 4, '.', ''), '0'), '.') }}</td>
+                        @unless ($lokasi)
+                            <td class="px-3 py-1.5 text-right font-medium tabular-nums">@rp($m->saldo_nilai)</td>
+                        @endunless
                         <td class="px-3 py-1.5 text-gray-500">{{ $m->pengguna?->nama ?? '—' }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="9" class="px-4 py-10 text-center text-gray-400">Belum ada pergerakan untuk barang ini.</td></tr>
+                    <tr><td colspan="{{ $lokasi ? 8 : 9 }}" class="px-4 py-10 text-center text-gray-400">Belum ada pergerakan untuk barang ini.</td></tr>
                 @endforelse
             </tbody>
         </table>

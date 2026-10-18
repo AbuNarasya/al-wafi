@@ -79,6 +79,11 @@ final class Navigation
         ['url' => '/customers', 'label' => 'Customer', 'group' => 'KEUANGAN', 'sub' => 'Vendor & Customer', 'modul' => 'customers'],
 
         ['url' => '/inventory', 'label' => 'Persediaan', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'inventory'],
+        ['url' => '/transfer-persediaan', 'label' => 'Transfer Antar Lokasi', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'transfer-persediaan'],
+        ['url' => '/opname-persediaan', 'label' => 'Stok Opname', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'opname-persediaan'],
+        ['url' => '/lokasi-persediaan', 'label' => 'Lokasi Persediaan', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'lokasi-persediaan'],
+        ['url' => '/kategori-barang', 'label' => 'Kategori Barang', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'kategori-barang'],
+        ['url' => '/merk-barang', 'label' => 'Merk Barang', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'merk-barang'],
         ['url' => '/asset-categories', 'label' => 'Kategori Aset', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'asset-categories'],
         ['url' => '/assets', 'label' => 'Aset Tetap', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'assets'],
         // Menyusul Aset Tetap: ia pintu keluarnya, dan sejak ada di sini tombol
@@ -86,6 +91,8 @@ final class Navigation
         ['url' => '/assets/pelepasan', 'label' => 'Pelepasan Aset', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'assets'],
 
         ['url' => '/purchase-orders', 'label' => 'Purchase Order', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'purchase-orders'],
+        ['url' => '/pos', 'label' => 'Kasir (POS)', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'pos'],
+        ['url' => '/penerimaan-barang', 'label' => 'Penerimaan Barang', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'penerimaan-barang'],
         ['url' => '/perintah-pembayaran', 'label' => 'Perintah Pembayaran', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'perintah-pembayaran'],
         ['url' => '/cash-in', 'label' => 'Kas Masuk', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'cash-in'],
         ['url' => '/cash-out', 'label' => 'Kas Keluar', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'cash-out'],

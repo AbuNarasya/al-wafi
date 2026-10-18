@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\AssetCategory;
 use App\Models\CustomerType;
+use App\Models\KategoriBarang;
+use App\Models\MerkBarang;
 use App\Models\VendorType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -24,6 +26,9 @@ class SimpleMasterController extends Controller
         'vendor-types' => ['model' => VendorType::class, 'pk' => 'kode_jenis_vendor', 'label' => 'Jenis Vendor', 'route' => 'vendor_types', 'keterangan' => false],
         'customer-types' => ['model' => CustomerType::class, 'pk' => 'kode_jenis_customer', 'label' => 'Jenis Customer', 'route' => 'customer_types', 'keterangan' => false],
         'asset-categories' => ['model' => AssetCategory::class, 'pk' => 'kode_kategori', 'label' => 'Kategori Aset', 'route' => 'asset_categories', 'keterangan' => true],
+        // Wafi Mart tahap 1a — pengelompok barang toko di master Persediaan.
+        'kategori-barang' => ['model' => KategoriBarang::class, 'pk' => 'kode', 'label' => 'Kategori Barang', 'route' => 'kategori_barang', 'keterangan' => false],
+        'merk-barang' => ['model' => MerkBarang::class, 'pk' => 'kode', 'label' => 'Merk Barang', 'route' => 'merk_barang', 'keterangan' => false],
     ];
 
     private function conf(Request $request): array

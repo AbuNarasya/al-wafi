@@ -50,6 +50,13 @@ final class SumberModul
         // dihapus dari daftar tanpa jurnal sama sekali, sehingga register aset
         // dan buku besar bercerai diam-diam.
         'PelepasanAset',
+        // Wafi Mart: barang diterima gudang (D Persediaan / K Barang Diterima Belum
+        // Ditagih), jurnal ringkas shift kasir (kas, pendapatan, HPP, selisih kas),
+        // dan setoran laci kasir ke kas keuangan. Opname dokumen & kehilangan transfer
+        // menumpang 'Persediaan' lewat PersediaanService::sesuaikan().
+        'PenerimaanBarang',
+        'Penjualan',
+        'SetoranKasir',
     ];
 
     public static function isValid(string $v): bool

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BusinessUnit;
+use App\Models\CoaDetail;
 use App\Models\CompanySettings;
 use App\Services\Ledger\PostingService;
 use Illuminate\Http\RedirectResponse;
@@ -24,6 +25,9 @@ class CompanySettingsController extends Controller
         return view('company-settings.edit', [
             's' => $s,
             'opsiUnit' => BusinessUnit::orderBy('kode_unit')->pluck('nama_unit', 'kode_unit')->all(),
+            // Akun liabilitas saja (kelompok 2) — penampung barang diterima belum ditagih.
+            'opsiGrni' => CoaDetail::where('status', 'aktif')->where('kode_coa', 'like', '2%')->orderBy('kode_coa')->get()
+                ->mapWithKeys(fn ($c) => [$c->kode_coa => "{$c->kode_coa} — {$c->nama_coa}"])->all(),
         ]);
     }
 
@@ -41,10 +45,12 @@ class CompanySettingsController extends Controller
             'bulan_awal_anggaran' => ['required', 'integer', 'between:1,12'],
             'topup_tunai_dompet_santri' => ['nullable', 'boolean'],
             'kode_unit_neraca' => ['nullable', 'string', 'exists:business_units,kode_unit'],
+            'kode_coa_grni' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
             'keterangan' => ['nullable', 'string'],
         ]);
+        $data['kode_coa_grni'] = ($data['kode_coa_grni'] ?? null) ?: null;
         $data['topup_tunai_dompet_santri'] = $request->boolean('topup_tunai_dompet_santri');
-        $data['kode_unit_neraca'] = $data['kode_unit_neraca'] ?: null;
+        $data['kode_unit_neraca'] = ($data['kode_unit_neraca'] ?? null) ?: null;
 
         CompanySettings::updateOrCreate(['id' => self::ID], $data);
 

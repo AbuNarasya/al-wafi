@@ -5,6 +5,7 @@ namespace App\Services\Ledger;
 use App\Exceptions\AppException;
 use App\Models\Inventory;
 use App\Models\LapisanPersediaan;
+use App\Models\LokasiPersediaan;
 use App\Models\MutasiPersediaan;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,12 @@ use Illuminate\Support\Facades\DB;
  *
  * Kolom `stok_masuk`, `stok_keluar`, `harga_perolehan`, `nilai_persediaan` di
  * master adalah turunan; `segarkanTurunan()` yang memeliharanya.
+ *
+ * LOKASI (Wafi Mart tahap 1a, 18 Okt 2026): tiap lapisan & baris kartu stok milik satu
+ * lokasi, dan FIFO dihitung PER LOKASI — `keluar()` hanya menggerus lapisan di lokasi
+ * yang disebut. Tanpa `kode_lokasi` pergerakan jatuh ke `LokasiPersediaan::BAWAAN`,
+ * jadi pemanggil lama tetap berjalan seperti dulu. Harga & nilai di master tetap TOTAL
+ * seluruh lokasi.
  */
 final class InventoryMovement
 {
@@ -34,13 +41,14 @@ final class InventoryMovement
      *
      * @param  array{
      *     kode_persediaan:string, kuantiti:string|int|float, nilai:string|int|float,
-     *     tanggal?:string, alasan?:string, sumber_modul:string, sumber_ref?:?string,
-     *     journal_entry_id?:?int, keterangan?:?string, id_pengguna?:?int
+     *     kode_lokasi?:?string, tanggal?:string, alasan?:string, sumber_modul:string,
+     *     sumber_ref?:?string, journal_entry_id?:?int, keterangan?:?string, id_pengguna?:?int
      * }  $p  `nilai` = TOTAL rupiah yang masuk (bukan harga satuan).
      */
     public static function masuk(array $p): MutasiPersediaan
     {
         $item = self::item($p['kode_persediaan']);
+        $lokasi = self::lokasi($p['kode_lokasi'] ?? null);
         $qty = Money::of($p['kuantiti'], 4);
         $nilai = Money::of($p['nilai']);
 
@@ -53,8 +61,9 @@ final class InventoryMovement
 
         $tanggal = $p['tanggal'] ?? now()->toDateString();
 
-        return DB::transaction(function () use ($item, $qty, $nilai, $tanggal, $p) {
+        return DB::transaction(function () use ($item, $lokasi, $qty, $nilai, $tanggal, $p) {
             $mutasi = self::catat($item, [
+                'kode_lokasi' => $lokasi,
                 'tanggal' => $tanggal,
                 'arah' => 'masuk',
                 'alasan' => $p['alasan'] ?? 'pembelian',
@@ -69,6 +78,7 @@ final class InventoryMovement
 
             LapisanPersediaan::create([
                 'kode_persediaan' => $item->kode_persediaan,
+                'kode_lokasi' => $lokasi,
                 'tanggal' => $tanggal,
                 'kuantiti_awal' => $qty,
                 'kuantiti_sisa' => $qty,
@@ -89,29 +99,43 @@ final class InventoryMovement
      * hitungan, tersedia di `$mutasi->nilai` setelah pemanggilan.
      *
      * @param  array{
-     *     kode_persediaan:string, kuantiti:string|int|float, tanggal?:string,
-     *     alasan?:string, sumber_modul:string, sumber_ref?:?string,
-     *     journal_entry_id?:?int, keterangan?:?string, id_pengguna?:?int
-     * }  $p
+     *     kode_persediaan:string, kuantiti:string|int|float, kode_lokasi?:?string,
+     *     tanggal?:string, alasan?:string, sumber_modul:string, sumber_ref?:?string,
+     *     journal_entry_id?:?int, keterangan?:?string, id_pengguna?:?int,
+     *     lapisan_sumber?:array{0:string,1:string}
+     * }  $p  `lapisan_sumber` = [sumber_modul, sumber_ref]: hanya lapisan yang lahir dari
+     *        dokumen itu yang boleh digerus. Dipakai lokasi TRANSIT, tempat barang beberapa
+     *        transfer bisa bercampur — tanpa ini, menerima transfer A bisa memakan harga
+     *        pokok milik transfer B.
      */
     public static function keluar(array $p): MutasiPersediaan
     {
         $item = self::item($p['kode_persediaan']);
+        $lokasi = self::lokasi($p['kode_lokasi'] ?? null);
         $qty = Money::of($p['kuantiti'], 4);
+        $sumber = $p['lapisan_sumber'] ?? null;
 
         if (! Money::gtZero($qty, 4)) {
             throw new AppException(422, 'Kuantiti keluar harus lebih besar dari nol.');
         }
 
-        $tersedia = self::stok($item->kode_persediaan);
+        $tersedia = $sumber
+            ? Money::of(LapisanPersediaan::where('kode_persediaan', $item->kode_persediaan)->where('kode_lokasi', $lokasi)
+                ->where('sumber_modul', $sumber[0])->where('sumber_ref', $sumber[1])->sum('kuantiti_sisa'), 4)
+            : self::stok($item->kode_persediaan, $lokasi);
         if (Money::gt($qty, $tersedia, 4)) {
-            throw new AppException(422, "Stok {$item->nama_persediaan} tidak cukup: diminta {$qty}, tersedia {$tersedia}.");
+            // Nama lokasi disebut hanya bila memang ada lebih dari satu — pesan lama
+            // tetap utuh bagi pesantren yang cuma punya gudang utama.
+            $di = LokasiPersediaan::where('jenis', '!=', 'transit')->count() > 1 || $lokasi === LokasiPersediaan::TRANSIT
+                ? ' di '.LokasiPersediaan::whereKey($lokasi)->value('nama') : '';
+            throw new AppException(422, "Stok {$item->nama_persediaan}{$di} tidak cukup: diminta {$qty}, tersedia {$tersedia}.");
         }
 
-        return DB::transaction(function () use ($item, $qty, $p) {
-            [$nilai, $rincian] = self::gerusLapisan($item->kode_persediaan, $qty);
+        return DB::transaction(function () use ($item, $lokasi, $qty, $p, $sumber) {
+            [$nilai, $rincian] = self::gerusLapisan($item->kode_persediaan, $lokasi, $qty, $sumber);
 
             $mutasi = self::catat($item, [
+                'kode_lokasi' => $lokasi,
                 'tanggal' => $p['tanggal'] ?? now()->toDateString(),
                 'arah' => 'keluar',
                 'alasan' => $p['alasan'] ?? 'pemakaian',
@@ -187,6 +211,7 @@ final class InventoryMovement
             // menyegarkan sebelum barisnya ada membuat pembatalan seolah tak
             // pernah terjadi di master.
             $pembalik = self::catat($m->persediaan, [
+                'kode_lokasi' => $m->kode_lokasi,
                 'tanggal' => now()->toDateString(),
                 'arah' => 'keluar',
                 'alasan' => 'pembatalan',
@@ -223,6 +248,7 @@ final class InventoryMovement
             // Urutan sama seperti pembatalan pemasukan: baris pembalik dulu,
             // kolom turunan menyusul.
             $pembalik = self::catat($m->persediaan, [
+                'kode_lokasi' => $m->kode_lokasi,
                 'tanggal' => now()->toDateString(),
                 'arah' => 'masuk',
                 'alasan' => 'pembatalan',
@@ -244,13 +270,15 @@ final class InventoryMovement
      *
      * @return array{0:string,1:list<array{lapisan_id:int,kuantiti:string,harga_satuan:string,nilai:string}>}
      */
-    private static function gerusLapisan(string $kodePersediaan, string $qty): array
+    private static function gerusLapisan(string $kodePersediaan, string $lokasi, string $qty, ?array $sumber = null): array
     {
         $sisaDiminta = $qty;
         $nilai = '0';
         $rincian = [];
 
         $lapisan = LapisanPersediaan::where('kode_persediaan', $kodePersediaan)
+            ->where('kode_lokasi', $lokasi)
+            ->when($sumber, fn ($q) => $q->where('sumber_modul', $sumber[0])->where('sumber_ref', $sumber[1]))
             ->where('kuantiti_sisa', '>', 0)
             ->orderBy('tanggal')->orderBy('id')
             ->lockForUpdate()
@@ -287,20 +315,44 @@ final class InventoryMovement
         return [$nilai, $rincian];
     }
 
-    /** Stok saat ini = jumlah sisa seluruh lapisan. */
-    public static function stok(string $kodePersediaan): string
+    /** Stok saat ini = jumlah sisa lapisan — seluruh lokasi, atau satu lokasi bila disebut. */
+    public static function stok(string $kodePersediaan, ?string $kodeLokasi = null): string
     {
         return Money::of(
-            LapisanPersediaan::where('kode_persediaan', $kodePersediaan)->sum('kuantiti_sisa'),
+            LapisanPersediaan::where('kode_persediaan', $kodePersediaan)
+                ->when($kodeLokasi, fn ($q) => $q->where('kode_lokasi', $kodeLokasi))
+                ->sum('kuantiti_sisa'),
             4,
         );
     }
 
+    /**
+     * Stok per lokasi untuk banyak barang sekaligus (satu kueri, untuk daftar).
+     *
+     * @param  list<string>|null  $kodePersediaan  null = semua barang
+     * @return array<string,array<string,string>> [kode_persediaan][kode_lokasi] => stok
+     */
+    public static function stokPerLokasi(?array $kodePersediaan = null): array
+    {
+        $hasil = [];
+        LapisanPersediaan::query()
+            ->when($kodePersediaan !== null, fn ($q) => $q->whereIn('kode_persediaan', $kodePersediaan))
+            ->groupBy('kode_persediaan', 'kode_lokasi')
+            ->selectRaw('kode_persediaan, kode_lokasi, SUM(kuantiti_sisa) AS stok')
+            ->get()
+            ->each(function ($r) use (&$hasil) {
+                $hasil[$r->kode_persediaan][$r->kode_lokasi] = Money::of($r->stok, 4);
+            });
+
+        return $hasil;
+    }
+
     /** Nilai persediaan saat ini = Σ (sisa × harga) tiap lapisan. */
-    public static function nilai(string $kodePersediaan): string
+    public static function nilai(string $kodePersediaan, ?string $kodeLokasi = null): string
     {
         $nilai = '0';
         foreach (LapisanPersediaan::where('kode_persediaan', $kodePersediaan)
+            ->when($kodeLokasi, fn ($q) => $q->where('kode_lokasi', $kodeLokasi))
             ->get(['kuantiti_sisa', 'harga_satuan']) as $l) {
             $nilai = Money::add($nilai, Money::mul($l->kuantiti_sisa, $l->harga_satuan));
         }
@@ -354,9 +406,25 @@ final class InventoryMovement
         $mutasi->update([
             'saldo_kuantiti' => self::stok($mutasi->kode_persediaan),
             'saldo_nilai' => self::nilai($mutasi->kode_persediaan),
+            'saldo_kuantiti_lokasi' => self::stok($mutasi->kode_persediaan, $mutasi->kode_lokasi),
         ]);
 
         return $mutasi->refresh();
+    }
+
+    /** Lokasi yang disebut (wajib ada & aktif), atau lokasi bawaan bila tak disebut. */
+    private static function lokasi(?string $kode): string
+    {
+        $kode = $kode ?: LokasiPersediaan::BAWAAN;
+        $status = LokasiPersediaan::whereKey($kode)->value('status');
+        if ($status === null) {
+            throw new AppException(404, "Lokasi persediaan {$kode} tidak ditemukan.");
+        }
+        if ($status !== 'aktif') {
+            throw new AppException(422, 'Lokasi '.LokasiPersediaan::whereKey($kode)->value('nama').' sudah nonaktif — stok tidak bisa digerakkan di sana.');
+        }
+
+        return $kode;
     }
 
     private static function item(string $kodePersediaan): Inventory
