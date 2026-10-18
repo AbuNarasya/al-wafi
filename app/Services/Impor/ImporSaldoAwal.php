@@ -18,6 +18,8 @@ use App\Models\TagihanSantri;
 use App\Models\Wali;
 use App\Services\Impor\Pemeta\PemetaAccruePrepaid;
 use App\Services\Impor\Pemeta\PemetaAsetTetap;
+use App\Services\Impor\Pemeta\PemetaBarangToko;
+use App\Services\Impor\Pemeta\PemetaStokAwalBarang;
 use App\Services\Impor\Pemeta\PemetaInvoiceVendor;
 use App\Services\Impor\Pemeta\PemetaPengajuanBelumDibayar;
 use App\Services\Impor\Pemeta\PemetaPinjamanBank;
@@ -52,6 +54,9 @@ class ImporSaldoAwal
         PemetaAccruePrepaid::class,
         PemetaAsetTetap::class,
         PemetaPengajuanBelumDibayar::class,
+        // Wafi Mart: master barang toko lebih dulu, baru stok awal per lokasinya.
+        PemetaBarangToko::class,
+        PemetaStokAwalBarang::class,
     ];
 
     /** @return array<string,class-string<Pemeta>> */
@@ -303,6 +308,12 @@ class ImporSaldoAwal
             return ['Batch ini sudah dibatalkan pada '.$batch->dibatalkan_pada->format('d M Y H:i').'.'];
         }
 
+        // Jenis impor yang membawa aturan batalnya sendiri (barang toko, stok awal, …).
+        $pemeta = isset(self::daftar()[$batch->kunci]) ? self::pemeta($batch->kunci) : null;
+        if ($pemeta instanceof PemetaBisaDibatalkan) {
+            return $pemeta->halanganBatal($batch);
+        }
+
         $idSantri = Santri::where('id_batch', $batch->id)->pluck('id');
         if ($idSantri->isEmpty()) {
             return ['Tidak ada baris yang bisa dibatalkan dari batch ini.'];
@@ -375,6 +386,16 @@ class ImporSaldoAwal
         $halangan = $this->halanganBatalBatch($batch);
         if ($halangan !== []) {
             throw new AppException(422, 'Batch ini tidak bisa dibatalkan lagi. '.implode(' ', $halangan));
+        }
+
+        $pemeta = self::pemeta($batch->kunci);
+        if ($pemeta instanceof PemetaBisaDibatalkan) {
+            return DB::transaction(function () use ($pemeta, $batch, $alasan, $idPengguna) {
+                $pemeta->batalkan($batch, $idPengguna);
+                $batch->update(['dibatalkan_pada' => now(), 'dibatalkan_oleh' => $idPengguna, 'alasan_batal' => $alasan]);
+
+                return $batch->refresh();
+            });
         }
 
         return DB::transaction(function () use ($batch, $alasan, $idPengguna) {

@@ -7,8 +7,10 @@
         <h2 class="text-xl font-semibold text-gray-900">Impor Data Awal</h2>
         <p class="mt-1 max-w-3xl text-sm text-gray-500">
             Memasukkan keadaan yang sudah berjalan <b>sebelum</b> aplikasi ini dipakai — bukan alat pemasukan harian.
-            Dokumen yang dibuat di sini sengaja <b>tidak menerbitkan jurnal</b>; total saldonya masuk sekali lewat
+            Kebanyakan jenis <b>tidak menerbitkan jurnal</b>; total saldonya masuk sekali lewat
             <a href="{{ route('opening_balance.index') }}" class="text-brand hover:underline">Saldo Awal</a>.
+            Jenis yang berjurnal (Hutang Vendor, Stok Awal Barang) membukukannya ke <b>akun perantara saldo awal</b> —
+            saldo akun perantara itulah yang diseimbangkan di Saldo Awal.
         </p>
     </div>
 

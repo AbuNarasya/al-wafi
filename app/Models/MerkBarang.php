@@ -20,5 +20,5 @@ class MerkBarang extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['kode', 'nama', 'status'];
+    protected $fillable = ['kode', 'nama', 'status', 'id_batch'];
 }

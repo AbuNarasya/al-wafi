@@ -916,6 +916,8 @@ class ImporDataAwalTest extends TestCase
             [
                 'santri-lama', 'invoice-vendor', 'pinjaman-bank', 'pinjaman-karyawan',
                 'uang-muka-operasional', 'accrue-prepaid', 'aset-tetap', 'pengajuan-belum-dibayar',
+                // Wafi Mart (19 Okt 2026): master barang dulu, stok awal sesudahnya.
+                'barang-toko', 'stok-awal-barang',
             ],
             array_keys(ImporSaldoAwal::daftar()),
         );

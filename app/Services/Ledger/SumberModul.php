@@ -57,6 +57,8 @@ final class SumberModul
         'PenerimaanBarang',
         'Penjualan',
         'SetoranKasir',
+        // Stok awal barang dari Impor Data Awal (D Persediaan / K akun perantara).
+        'ImporDataAwal',
     ];
 
     public static function isValid(string $v): bool

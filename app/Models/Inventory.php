@@ -59,6 +59,7 @@ class Inventory extends Model
         'kode_coa_beban',
         'kode_coa_selisih',
         'status',
+        'id_batch',
     ];
 
     protected function casts(): array

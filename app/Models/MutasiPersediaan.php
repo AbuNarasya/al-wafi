@@ -31,6 +31,8 @@ class MutasiPersediaan extends Model
         'kehilangan' => 'Kehilangan Transfer',
         // Kasir toko — jurnal HPP-nya ringkas per shift (KasirService::tutupShift).
         'penjualan' => 'Penjualan Kasir',
+        // Stok pembuka dari Impor Data Awal (lapisan FIFO pertama).
+        'saldo_awal' => 'Saldo Awal',
     ];
 
     protected $fillable = [
