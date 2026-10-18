@@ -122,7 +122,9 @@ class LokasiPersediaanController extends Controller
             'kode_coa_hpp' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
             'kode_coa_selisih_kas' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
             'kode_bagian' => ['nullable', 'string', 'exists:bagian,kode_bagian'],
+            'batas_hari_retur' => ['nullable', 'integer', 'min:0', 'max:365'],
         ]);
+        $data['batas_hari_retur'] = (int) ($data['batas_hari_retur'] ?? 7);
         foreach (array_keys(LokasiPersediaan::AKUN_KASIR) as $k) {
             $data[$k] = ($data[$k] ?? null) ?: null;
         }

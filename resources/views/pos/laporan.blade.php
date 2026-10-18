@@ -12,7 +12,7 @@
 @section('content')
     @php
         $rp = fn ($v) => 'Rp '.number_format((float) $v, 0, ',', '.');
-        $seharusnya = (float) $shift->modal_awal + (float) $shift->total_tunai;
+        $seharusnya = (float) $shift->modal_awal + (float) $shift->total_tunai - (float) $shift->total_retur;
     @endphp
     <div class="mx-auto max-w-md space-y-4">
         <div class="rounded-xl border border-gray-200 bg-white p-5 text-sm shadow-sm">
@@ -26,6 +26,9 @@
             <dl class="grid grid-cols-2 gap-y-2 tabular-nums">
                 <dt class="text-gray-500">Modal awal</dt><dd class="text-right">{{ $rp($shift->modal_awal) }}</dd>
                 <dt class="text-gray-500">Penjualan tunai</dt><dd class="text-right">{{ $rp($shift->total_tunai) }}</dd>
+                @if ((float) $shift->total_retur > 0)
+                    <dt class="text-gray-500">Uang retur dikembalikan</dt><dd class="text-right">− {{ $rp($shift->total_retur) }}</dd>
+                @endif
                 <dt class="font-medium">Seharusnya di laci</dt><dd class="text-right font-medium">{{ $rp($seharusnya) }}</dd>
                 <dt class="font-medium">Uang dihitung</dt><dd class="text-right font-medium">{{ $rp($shift->uang_dihitung) }}</dd>
                 <dt class="font-semibold">Selisih</dt>

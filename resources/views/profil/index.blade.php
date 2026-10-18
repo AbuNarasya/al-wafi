@@ -63,6 +63,41 @@
             </div>
         </form>
 
+        {{-- PIN pengawas kasir: hanya bagi pemegang hak Shift Kasir & Setoran (ubah). Diketik di
+             perangkat kasir untuk menyetujui diskon & retur — jadi BUKAN kata sandi akun. --}}
+        @if (\App\Support\Akses::boleh('shift-kasir', 'ubah'))
+            <form method="POST" action="{{ route('profil.pin_pengawas') }}" class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                @csrf
+                @method('PUT')
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-900">PIN Pengawas Kasir</h2>
+                    <p class="mt-1 text-xs text-gray-500">
+                        Diketik di layar kasir Wafi Mart untuk menyetujui diskon dan retur.
+                        {{ $punyaPin ? 'PIN sudah terpasang — isi di bawah untuk menggantinya.' : 'Belum terpasang: Anda belum bisa menyetujui apa pun di kasir.' }}
+                    </p>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-3">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Kata sandi akun</label>
+                        <input type="password" name="password_akun" required autocomplete="current-password" class="w-full rounded-lg border-gray-300 text-sm">
+                        @error('password_akun')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">PIN baru (6 angka)</label>
+                        <input type="password" inputmode="numeric" name="pin" required maxlength="6" autocomplete="new-password" class="w-full rounded-lg border-gray-300 text-sm tracking-widest">
+                        @error('pin')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Ulangi PIN</label>
+                        <input type="password" inputmode="numeric" name="pin_confirmation" required maxlength="6" autocomplete="new-password" class="w-full rounded-lg border-gray-300 text-sm tracking-widest">
+                    </div>
+                </div>
+                <div class="flex justify-end border-t border-gray-100 pt-4">
+                    <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Simpan PIN</button>
+                </div>
+            </form>
+        @endif
+
         {{-- Notifikasi perangkat. Sengaja PER PERANGKAT, bukan per akun: izinnya
              memang melekat pada peramban di ponsel/laptop ini, bukan pada akun. --}}
         <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"

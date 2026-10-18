@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AppException;
+use App\Services\Modules\PinPengawasService;
 use App\Services\Modules\PushService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,7 +30,28 @@ class ProfilController extends Controller
             // perangkat tak bisa mendaftar ke layanan push. Kosong bila fiturnya
             // belum disiapkan di lingkungan ini, dan tombolnya ikut diam.
             'pushKunci' => (new PushService)->kunciPublik() ?? '',
+            'punyaPin' => PinPengawasService::punya(Auth::user()),
         ]);
+    }
+
+    /** PIN pengawas kasir milik sendiri — kata sandi akun wajib, supaya sesi yang ditinggal terbuka tak cukup. */
+    public function setelPinPengawas(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'password_akun' => ['required', 'string', 'current_password'],
+            'pin' => ['required', 'string', 'confirmed'],
+        ], [
+            'password_akun.current_password' => 'Kata sandi akun tidak cocok.',
+            'pin.confirmed' => 'Ulangi PIN tidak sama.',
+        ]);
+
+        try {
+            (new PinPengawasService)->setel($request->user(), $data['pin']);
+        } catch (AppException $e) {
+            return back()->withErrors(['pin' => $e->getMessage()]);
+        }
+
+        return redirect()->route('profil.index')->with('status', 'PIN pengawas kasir tersimpan.');
     }
 
     public function ubahKataSandi(Request $request): RedirectResponse

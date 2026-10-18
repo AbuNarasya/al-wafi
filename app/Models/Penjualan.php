@@ -22,6 +22,7 @@ class Penjualan extends Model
     protected $fillable = [
         'nomor', 'id_shift', 'kode_lokasi', 'waktu', 'metode', 'total', 'bayar', 'kembalian', 'hpp',
         'status', 'id_kasir', 'alasan_batal', 'dibatalkan_oleh', 'dibatalkan_pada',
+        'diskon_struk', 'disetujui_oleh', 'alasan_diskon',
     ];
 
     protected function casts(): array
@@ -29,7 +30,13 @@ class Penjualan extends Model
         return [
             'waktu' => 'datetime', 'dibatalkan_pada' => 'datetime',
             'total' => 'decimal:2', 'bayar' => 'decimal:2', 'kembalian' => 'decimal:2', 'hpp' => 'decimal:2',
+            'diskon_struk' => 'decimal:2',
         ];
+    }
+
+    public function penyetuju(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'disetujui_oleh', 'id_pengguna');
     }
 
     public function details(): HasMany

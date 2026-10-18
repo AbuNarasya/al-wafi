@@ -70,6 +70,7 @@ class ShiftKasirController extends Controller
         return view('shift-kasir.show', [
             'shift' => $shift,
             'struk' => Penjualan::with('details.persediaan')->where('id_shift', $shift->id_shift)->orderByDesc('id_penjualan')->get(),
+            'retur' => \App\Models\ReturPenjualan::with(['details.persediaan', 'penjualan', 'penyetuju'])->where('id_shift', $shift->id_shift)->orderByDesc('id_retur')->get(),
             'kasOptions' => BankAccount::where('status', 'aktif')->where('kode_coa', '!=', $shift->lokasi->kode_coa_kas)
                 ->orderBy('kode_coa')->get()->mapWithKeys(fn ($b) => [$b->kode_coa => "{$b->kode_coa} — {$b->nama_rekening}"])->all(),
         ]);

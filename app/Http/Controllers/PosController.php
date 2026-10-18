@@ -43,6 +43,7 @@ class PosController extends Controller
         return view('pos.kasir', [
             'shift' => $shift->load('lokasi'),
             'ringkas' => $this->ringkas($shift),
+            'pengawas' => $this->pengawas($request),
         ]);
     }
 
@@ -98,7 +99,9 @@ class PosController extends Controller
                 'barcode' => $barcode !== '' ? $barcode : null,
                 'opsi' => collect([[$i->satuan, '1']])
                     ->merge($i->satuanLain->map(fn ($s) => [$s->satuan, Money::of($s->isi, 4)]))
-                    ->map(fn ($s) => ['satuan' => $s[0], 'isi' => (float) $s[1], 'harga' => (float) KasirService::hargaJual($i, $s[0], $s[1])])
+                    ->map(fn ($s) => ['satuan' => $s[0], 'isi' => (float) $s[1],
+                        'harga' => (float) KasirService::hargaJual($i, $s[0], $s[1]),
+                        'normal' => (float) KasirService::hargaNormal($i, $s[0], $s[1])])
                     ->values()->all(),
             ])->all(),
         ]);
@@ -112,7 +115,12 @@ class PosController extends Controller
             'baris.*.satuan' => ['nullable', 'string', 'max:50'],
             'baris.*.barcode' => ['nullable', 'string', 'max:64'],
             'baris.*.kuantiti' => ['required', 'numeric', 'gt:0'],
+            'baris.*.diskon' => ['nullable', 'numeric', 'min:0'],
             'bayar' => ['required', 'numeric', 'min:0'],
+            'diskon_struk' => ['nullable', 'numeric', 'min:0'],
+            'alasan_diskon' => ['nullable', 'string', 'max:255'],
+            'id_pengawas' => ['nullable', 'integer'],
+            'pin' => ['nullable', 'string', 'max:6'],
         ]);
         $shift = $this->shiftTerbuka($request);
         if (! $shift) {
@@ -122,10 +130,16 @@ class PosController extends Controller
         // Barcode hanya catatan baris; barang & satuannya sudah ditentukan saat dipindai.
         $baris = array_map(fn ($b) => [
             'kode_persediaan' => $b['kode_persediaan'], 'satuan' => $b['satuan'] ?? null, 'kuantiti' => $b['kuantiti'],
+            'diskon' => $b['diskon'] ?? 0,
         ], $data['baris']);
 
         try {
-            $jual = $this->kasir->jual($shift->id_shift, $baris, $data['bayar'], $request->user()->id_pengguna);
+            $jual = $this->kasir->jual($shift->id_shift, $baris, $data['bayar'], $request->user()->id_pengguna, [
+                'struk' => $data['diskon_struk'] ?? 0,
+                'alasan' => $data['alasan_diskon'] ?? null,
+                'id_pengawas' => $data['id_pengawas'] ?? null,
+                'pin' => $data['pin'] ?? null,
+            ]);
         } catch (AppException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -143,7 +157,7 @@ class PosController extends Controller
     /** Struk 58 mm. Kasir hanya bisa membuka struk shift-nya sendiri; pemegang hak lihat lain (admin) semua. */
     public function struk(Request $request, Penjualan $penjualan): View
     {
-        $penjualan->load(['details.persediaan', 'kasir', 'shift.lokasi']);
+        $penjualan->load(['details.persediaan', 'kasir', 'shift.lokasi', 'penyetuju']);
         abort_unless($penjualan->id_kasir === $request->user()->id_pengguna || $request->user()->is_admin, 403);
 
         return view('pos.struk', [
@@ -209,6 +223,82 @@ class PosController extends Controller
         abort_unless($milikSendiri || \App\Support\Akses::boleh('shift-kasir', 'lihat'), 403);
 
         return view('pos.laporan', ['shift' => $shift->load(['lokasi', 'kasir', 'penerima'])]);
+    }
+
+    /** Layar retur: cari struk asal, lalu pilih barang & kondisinya. */
+    public function formRetur(Request $request): View|RedirectResponse
+    {
+        $shift = $this->shiftTerbuka($request);
+        if (! $shift) {
+            return redirect()->route('pos.index')->with('error', 'Buka shift dulu — uang retur keluar dari laci shift yang sedang buka.');
+        }
+        $nomor = trim((string) $request->query('struk', ''));
+        $jual = $nomor !== '' ? Penjualan::with('details.persediaan', 'kasir')->where('nomor', $nomor)->first() : null;
+
+        $sudah = $jual ? \App\Models\ReturPenjualanDetail::whereIn('id_penjualan_detail', $jual->details->pluck('id'))
+            ->groupBy('id_penjualan_detail')->selectRaw('id_penjualan_detail, SUM(kuantiti_input) AS qty')
+            ->pluck('qty', 'id_penjualan_detail')->all() : [];
+
+        return view('pos.retur', [
+            'shift' => $shift->load('lokasi'),
+            'nomor' => $nomor,
+            'jual' => $jual,
+            'sudah' => $sudah,
+            'pengawas' => $this->pengawas($request),
+        ]);
+    }
+
+    public function retur(Request $request): RedirectResponse
+    {
+        $shift = $this->shiftTerbuka($request);
+        if (! $shift) {
+            return redirect()->route('pos.index')->with('error', 'Tidak ada shift terbuka.');
+        }
+        $data = $request->validate([
+            'nomor_struk' => ['required', 'string'],
+            'baris' => ['required', 'array'],
+            'baris.*.id_penjualan_detail' => ['required', 'integer'],
+            'baris.*.kuantiti' => ['nullable', 'numeric', 'min:0'],
+            // Baris yang sudah habis diretur terkirim tanpa jumlah & kondisi (isiannya dimatikan).
+            'baris.*.kondisi' => ['nullable', 'in:layak,rusak'],
+            'alasan' => ['required', 'string', 'max:255'],
+            'id_pengawas' => ['required', 'integer'],
+            'pin' => ['required', 'string', 'max:6'],
+        ]);
+
+        try {
+            $retur = $this->kasir->retur($shift->id_shift, $data['nomor_struk'], array_values($data['baris']), $data['alasan'],
+                (int) $data['id_pengawas'], $data['pin'], $request->user()->id_pengguna);
+        } catch (AppException $e) {
+            return back()->withInput($request->except('pin'))->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('pos.index')->with('status',
+            "Retur {$retur->nomor} tersimpan — kembalikan uang Rp ".number_format((float) $retur->total, 0, ',', '.').' ke pembeli.')
+            ->with('cetak_retur', route('pos.struk_retur', ['retur' => $retur->id_retur, 'cetak' => 1]));
+    }
+
+    public function strukRetur(Request $request, \App\Models\ReturPenjualan $retur): View
+    {
+        $retur->load(['details.persediaan', 'details.baris', 'penjualan', 'kasir', 'penyetuju', 'shift.lokasi']);
+        abort_unless($retur->id_kasir === $request->user()->id_pengguna || \App\Support\Akses::boleh('shift-kasir', 'lihat'), 403);
+
+        return view('pos.struk-retur', ['retur' => $retur, 'perusahaan' => CompanySettings::find(1), 'cetak' => $request->boolean('cetak')]);
+    }
+
+    /**
+     * Pengawas yang bisa menyetujui di layar ini: sudah memasang PIN, masih berhak
+     * shift-kasir/ubah, dan bukan kasirnya sendiri.
+     *
+     * @return list<array{id:int,nama:string}>
+     */
+    private function pengawas(Request $request): array
+    {
+        return \App\Models\User::whereIn('id_pengguna', \App\Models\PinPengawas::pluck('id_pengguna'))
+            ->where('id_pengguna', '!=', $request->user()->id_pengguna)
+            ->where('status', 'aktif')->orderBy('nama')->get()
+            ->filter(fn ($u) => \App\Support\Akses::bolehUntuk($u, 'shift-kasir', 'ubah'))
+            ->map(fn ($u) => ['id' => $u->id_pengguna, 'nama' => $u->nama])->values()->all();
     }
 
     private function shiftTerbuka(Request $request): ?ShiftKasir

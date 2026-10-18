@@ -314,6 +314,9 @@ Route::middleware('auth')->group(function () {
     Route::put('/profil/kata-sandi', [ProfilController::class, 'ubahKataSandi'])
         ->middleware('throttle:10,1')
         ->name('profil.kata_sandi');
+    Route::put('/profil/pin-pengawas', [ProfilController::class, 'setelPinPengawas'])
+        ->middleware('throttle:10,1')
+        ->name('profil.pin_pengawas');
 
     // Langganan push notification milik sendiri — alasannya sama dengan di atas:
     // memutuskan apakah ponsel sendiri berbunyi bukan kewenangan modul mana pun.
@@ -726,6 +729,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/jual', [$k, 'jual'])->name('jual')->middleware('hakakses:pos,buat');
         Route::get('/riwayat', [$k, 'riwayat'])->name('riwayat')->middleware('hakakses:pos,lihat');
         Route::get('/struk/{penjualan}', [$k, 'struk'])->name('struk')->middleware('hakakses:pos,lihat')->whereNumber('penjualan');
+        Route::get('/retur', [$k, 'formRetur'])->name('retur')->middleware('hakakses:pos,buat');
+        Route::post('/retur', [$k, 'retur'])->name('retur.simpan')->middleware('hakakses:pos,buat');
+        Route::get('/retur/{retur}/struk', [$k, 'strukRetur'])->name('struk_retur')->middleware('hakakses:pos,lihat')->whereNumber('retur');
         Route::get('/tutup', [$k, 'formTutup'])->name('tutup')->middleware('hakakses:pos,buat');
         Route::post('/tutup', [$k, 'tutup'])->name('tutup.simpan')->middleware('hakakses:pos,buat');
         // Tanpa middleware hak: dibuka kasirnya (hak pos) ATAU pengawas (hak shift-kasir) — diperiksa di controller.

@@ -6,6 +6,7 @@
 
 @section('aksi')
     <a href="{{ route('pos.riwayat') }}" class="rounded border border-white/30 px-2 py-1 text-xs hover:bg-white/10">Riwayat Struk</a>
+    <a href="{{ route('pos.retur') }}" class="rounded border border-white/30 px-2 py-1 text-xs hover:bg-white/10">Retur</a>
     <a href="{{ route('pos.tutup') }}" class="rounded bg-amber-400 px-2 py-1 text-xs font-semibold text-amber-950 hover:bg-amber-300">Tutup Shift</a>
 @endsection
 
@@ -64,8 +65,23 @@
                                         <button type="button" @click="ubahQty(r, 1)" class="h-8 w-8 rounded bg-gray-100 text-lg leading-none hover:bg-gray-200">+</button>
                                     </div>
                                 </td>
-                                <td class="px-3 py-2 text-right tabular-nums" data-label="Harga" x-text="rp(r.harga)"></td>
-                                <td class="px-3 py-2 text-right font-semibold tabular-nums" data-label="Subtotal" x-text="rp(r.harga * r.qty)"></td>
+                                <td class="px-3 py-2 text-right tabular-nums" data-label="Harga">
+                                    <span x-text="rp(r.harga)"></span>
+                                    <template x-if="r.normal > r.harga">
+                                        <div class="text-[11px]"><span class="text-gray-400 line-through" x-text="rp(r.normal)"></span> <span class="rounded bg-rose-100 px-1 font-medium text-rose-700">promo</span></div>
+                                    </template>
+                                </td>
+                                <td class="px-3 py-2 text-right font-semibold tabular-nums" data-label="Subtotal">
+                                    <span x-text="rp(r.harga * r.qty - (r.diskon || 0))"></span>
+                                    {{-- Diskon manual per barang — butuh PIN pengawas saat bayar. --}}
+                                    <div class="text-[11px] font-normal">
+                                        <button type="button" x-show="!r.bukaDiskon && !r.diskon" @click="r.bukaDiskon = true" class="text-gray-400 hover:text-brand">+ diskon</button>
+                                        <span x-show="r.diskon > 0" class="text-rose-600" x-text="'− ' + rp(r.diskon)"></span>
+                                        <input x-show="r.bukaDiskon" type="text" inputmode="numeric" :value="fmtRupiah(r.diskon)" @input="r.diskon = parseInt(ketikRupiah($event) || 0, 10)"
+                                               @keydown.enter.prevent="r.bukaDiskon = false" @blur="r.bukaDiskon = false" placeholder="nominal"
+                                               class="mt-0.5 w-24 rounded border-gray-300 py-0.5 text-right text-xs">
+                                    </div>
+                                </td>
                                 <td class="px-2 py-2 text-center" data-tumpuk-aksi><button type="button" @click="keranjang.splice(i, 1); fokus()" class="text-red-500 hover:text-red-700" title="Hapus">&times;</button></td>
                             </tr>
                         </template>
@@ -84,6 +100,14 @@
             </div>
 
             <div class="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div x-show="keranjang.length" class="flex items-center justify-between gap-2 text-sm">
+                    <span class="text-gray-600">Diskon struk</span>
+                    <input type="text" inputmode="numeric" :value="fmtRupiah(diskonStruk)" @input="diskonStruk = parseInt(ketikRupiah($event) || 0, 10)"
+                           placeholder="0" class="w-32 rounded border-gray-300 py-1 text-right text-sm tabular-nums">
+                </div>
+                <div x-show="adaDiskon" x-cloak class="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-800">
+                    Ada diskon <b x-text="rp(totalDiskon)"></b> — butuh persetujuan pengawas saat bayar.
+                </div>
                 <label class="block text-sm font-medium text-gray-700">Uang diterima</label>
                 <input x-ref="bayar" type="text" inputmode="numeric" :value="fmtRupiah(bayar)" @input="bayar = ketikRupiah($event)" @keydown.enter.prevent="simpan()"
                        placeholder="0" class="w-full rounded-lg border-gray-300 text-right text-2xl tabular-nums">
@@ -116,16 +140,44 @@
             </div>
         </aside>
 
+        {{-- Persetujuan pengawas (diskon manual) — PIN diketik pengawas di perangkat ini. --}}
+        <div x-show="minta" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 p-4" @keydown.escape.window="minta = false">
+            <form @submit.prevent="setujui()" class="w-full max-w-sm space-y-3 rounded-xl bg-white p-5 shadow-xl">
+                <div class="font-semibold text-gray-900">Persetujuan pengawas</div>
+                <p class="text-xs text-gray-500">Diskon <b x-text="rp(totalDiskon)"></b>. Pengawas memilih namanya dan mengetik PIN.</p>
+                @if (! $pengawas)
+                    <div class="rounded bg-amber-50 px-3 py-2 text-xs text-amber-800">Belum ada pengawas yang memasang PIN (menu Profil). Diskon tak bisa disetujui.</div>
+                @endif
+                <select x-model="idPengawas" required class="w-full rounded-lg border-gray-300 text-sm">
+                    <option value="">— pilih pengawas —</option>
+                    @foreach ($pengawas as $p)<option value="{{ $p['id'] }}">{{ $p['nama'] }}</option>@endforeach
+                </select>
+                <input type="text" x-model="alasanDiskon" required maxlength="255" placeholder="Alasan diskon (mis. kemasan penyok)" class="w-full rounded-lg border-gray-300 text-sm">
+                <input type="password" inputmode="numeric" x-ref="pin" x-model="pin" required maxlength="6" placeholder="PIN pengawas" autocomplete="off"
+                       class="w-full rounded-lg border-gray-300 text-center text-lg tracking-widest">
+                <div class="flex gap-2">
+                    <button type="button" @click="minta = false" class="flex-1 rounded-lg border border-gray-300 py-2 text-sm">Batal</button>
+                    <button class="flex-1 rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Setujui &amp; Bayar</button>
+                </div>
+            </form>
+        </div>
+
         {{-- Struk dicetak lewat iframe tersembunyi: jendela baru sesudah fetch diblokir peramban. --}}
         <iframe x-ref="cetakan" class="hidden" title="Struk"></iframe>
+        @if (session('cetak_retur'))
+            <iframe class="hidden" title="Struk retur" src="{{ session('cetak_retur') }}"></iframe>
+        @endif
     </div>
 
     <script>
         function kasir(url, ringkas) {
             return {
                 q: '', hasil: [], keranjang: [], bayar: '', sibuk: false, pesan: '', pesanJenis: '', terakhir: null, ringkas,
+                diskonStruk: 0, minta: false, idPengawas: '', pin: '', alasanDiskon: '',
 
-                get total() { return this.keranjang.reduce((s, r) => s + r.harga * (r.qty || 0), 0); },
+                get totalDiskon() { return this.keranjang.reduce((s, r) => s + (r.diskon || 0), 0) + (this.diskonStruk || 0); },
+                get adaDiskon() { return this.totalDiskon > 0; },
+                get total() { return Math.max(0, this.keranjang.reduce((s, r) => s + r.harga * (r.qty || 0) - (r.diskon || 0), 0) - (this.diskonStruk || 0)); },
                 get kembalian() { return (parseInt(this.bayar || 0, 10)) - this.total; },
                 get jumlahBarang() { return this.keranjang.reduce((s, r) => s + (r.qty || 0), 0); },
                 rp(n) { return 'Rp ' + Math.round(n || 0).toLocaleString('id-ID'); },
@@ -160,13 +212,13 @@
                     const o = h.opsi.find(x => x.satuan === satuan) || h.opsi[0];
                     const ada = this.keranjang.find(r => r.kode === h.kode && r.satuan === o.satuan);
                     if (ada) { ada.qty += 1; ada.stok = h.stok; }
-                    else this.keranjang.push({ kode: h.kode, nama: h.nama, satuan: o.satuan, isi: o.isi, harga: o.harga, qty: 1,
-                        stok: h.stok, satuan_dasar: h.satuan_dasar, opsi: h.opsi, barcode: h.barcode });
+                    else this.keranjang.push({ kode: h.kode, nama: h.nama, satuan: o.satuan, isi: o.isi, harga: o.harga, normal: o.normal ?? o.harga, qty: 1,
+                        stok: h.stok, satuan_dasar: h.satuan_dasar, opsi: h.opsi, barcode: h.barcode, diskon: 0, bukaDiskon: false });
                     const r = this.keranjang.find(x => x.kode === h.kode && x.satuan === o.satuan);
                     if (this.kurang(r)) this.beri('Stok ' + h.nama + ' di toko tidak cukup.', 'peringatan');
                     this.q = ''; this.hasil = []; this.fokus();
                 },
-                gantiSatuan(r) { const o = r.opsi.find(x => x.satuan === r.satuan); if (o) { r.isi = o.isi; r.harga = o.harga; } },
+                gantiSatuan(r) { const o = r.opsi.find(x => x.satuan === r.satuan); if (o) { r.isi = o.isi; r.harga = o.harga; r.normal = o.normal ?? o.harga; } },
                 ubahQty(r, d) { r.qty = Math.max(1, (parseInt(r.qty, 10) || 1) + d); },
                 // Stok dicek per BARANG (dus + pcs barang yang sama dijumlahkan dalam satuan dasar).
                 kurang(r) {
@@ -175,9 +227,16 @@
                 },
                 cetak(alamat) { this.$refs.cetakan.src = alamat; },
 
-                async simpan() {
+                // Ada diskon → minta PIN pengawas dulu; tanpa diskon langsung simpan.
+                simpan() {
                     if (this.sibuk || !this.keranjang.length) return;
                     if (this.kembalian < 0) { this.beri('Uang diterima kurang dari total.'); this.$refs.bayar.focus(); return; }
+                    if (this.adaDiskon) { this.pin = ''; this.minta = true; this.$nextTick(() => this.$refs.pin.focus()); return; }
+                    this.kirim();
+                },
+                setujui() { this.minta = false; this.kirim(); },
+
+                async kirim() {
                     this.sibuk = true;
                     try {
                         const r = await fetch(url.jual, {
@@ -186,13 +245,18 @@
                                 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
                             body: JSON.stringify({
                                 bayar: parseInt(this.bayar || 0, 10),
-                                baris: this.keranjang.map(x => ({ kode_persediaan: x.kode, satuan: x.satuan, kuantiti: x.qty, barcode: x.barcode })),
+                                baris: this.keranjang.map(x => ({ kode_persediaan: x.kode, satuan: x.satuan, kuantiti: x.qty, barcode: x.barcode, diskon: x.diskon || 0 })),
+                                diskon_struk: this.diskonStruk || 0,
+                                alasan_diskon: this.adaDiskon ? this.alasanDiskon : null,
+                                id_pengawas: this.adaDiskon ? (parseInt(this.idPengawas, 10) || null) : null,
+                                pin: this.adaDiskon ? this.pin : null,
                             }),
                         });
                         const data = await r.json();
+                        this.pin = '';   // PIN tak disimpan di layar, berhasil atau gagal
                         if (!r.ok) { this.beri(data.message || 'Gagal menyimpan.'); return; }
                         this.terakhir = data; this.ringkas = data.ringkas;
-                        this.keranjang = []; this.bayar = '';
+                        this.keranjang = []; this.bayar = ''; this.diskonStruk = 0; this.alasanDiskon = ''; this.idPengawas = '';
                         this.cetak(data.struk);
                         this.fokus();
                     } catch (e) {

@@ -34,16 +34,29 @@
             <tr><td colspan="2">{{ $d->persediaan?->nama_persediaan }}</td></tr>
             <tr>
                 <td>{{ $angka($d->kuantiti_input) }} {{ $d->satuan }} × {{ $rp($d->harga_satuan) }}</td>
-                <td class="kanan">{{ $rp($d->total) }}</td>
+                <td class="kanan">{{ $rp((float) $d->total + (float) $d->diskon) }}</td>
             </tr>
+            @if ($d->promo && $d->harga_normal)
+                <tr><td colspan="2">&nbsp; promo (normal {{ $rp($d->harga_normal) }})</td></tr>
+            @endif
+            @if ((float) $d->diskon > 0)
+                <tr><td>&nbsp; diskon</td><td class="kanan">-{{ $rp($d->diskon) }}</td></tr>
+            @endif
         @endforeach
     </table>
+    @if ((float) $jual->diskon_struk > 0)
+        <div class="garis"></div>
+        <table><tr><td>Diskon</td><td class="kanan">-{{ $rp($jual->diskon_struk) }}</td></tr></table>
+    @endif
     <div class="garis"></div>
     <table>
         <tr class="besar"><td>TOTAL</td><td class="kanan">{{ $rp($jual->total) }}</td></tr>
         <tr><td>Tunai</td><td class="kanan">{{ $rp($jual->bayar) }}</td></tr>
         <tr><td>Kembali</td><td class="kanan">{{ $rp($jual->kembalian) }}</td></tr>
     </table>
+    @if ($jual->disetujui_oleh)
+        <div>Diskon disetujui: {{ $jual->penyetuju?->nama }}</div>
+    @endif
     <div class="garis"></div>
     <div class="tengah">Terima kasih — barang yang sudah dibeli<br>tidak dapat ditukar tanpa struk ini.</div>
 </body>

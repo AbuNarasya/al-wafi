@@ -226,6 +226,10 @@ class InventoryController extends Controller
             // Barang toko tanpa harga jual tak bisa dipindai kasir — wajib sejak awal.
             'harga_jual' => ['nullable', 'required_if:dijual_di_toko,true', 'numeric', 'min:0'],
             'stok_minimum' => ['nullable', 'numeric', 'min:0'],
+            // Promo terjadwal (satuan dasar): harga + tanggal mulai wajib berpasangan.
+            'harga_promo' => ['nullable', 'required_with:promo_mulai', 'numeric', 'min:0', 'lt:harga_jual'],
+            'promo_mulai' => ['nullable', 'required_with:harga_promo', 'date'],
+            'promo_selesai' => ['nullable', 'date', 'after_or_equal:promo_mulai'],
             'kode_coa' => ['required', 'string', 'exists:coa_detail,kode_coa'],
             'kode_coa_beban' => ['required', 'string', 'exists:coa_detail,kode_coa'],
             'kode_coa_selisih' => ['required', 'string', 'exists:coa_detail,kode_coa'],
@@ -241,6 +245,9 @@ class InventoryController extends Controller
             'barcode.*.satuan' => ['nullable', 'string', 'max:50'],
         ], [
             'harga_jual.required_if' => 'Barang yang dijual di toko wajib punya harga jual.',
+            'harga_promo.lt' => 'Harga promo harus lebih murah dari harga jual.',
+            'harga_promo.required_with' => 'Tanggal mulai promo diisi, tetapi harga promonya kosong.',
+            'promo_mulai.required_with' => 'Harga promo diisi, tetapi tanggal mulainya kosong.',
             'satuan_lain.*.isi.gt' => 'Isi satuan konversi harus lebih dari 1 satuan dasar.',
             'satuan_lain.*.satuan.distinct' => 'Satuan konversi tidak boleh kembar.',
             'barcode.*.barcode.distinct' => 'Barcode yang sama ditulis dua kali.',

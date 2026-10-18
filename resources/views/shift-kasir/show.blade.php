@@ -68,6 +68,33 @@
             </form>
         @endif
 
+        @if ($retur->isNotEmpty())
+            <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-800">Retur ({{ $retur->count() }}) — uangnya keluar dari laci shift ini</div>
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <tr><th class="px-4 py-2">Nomor</th><th class="px-4 py-2">Struk asal</th><th class="px-4 py-2">Barang</th><th class="px-4 py-2 text-right">Uang kembali</th><th class="px-4 py-2">Disetujui</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @foreach ($retur as $r)
+                            <tr>
+                                <td class="px-4 py-2 font-mono">{{ $r->nomor }}</td>
+                                <td class="px-4 py-2 font-mono text-xs">{{ $r->penjualan?->nomor }}</td>
+                                <td class="px-4 py-2 text-xs">
+                                    @foreach ($r->details as $d)
+                                        <div>{{ $angka($d->kuantiti_input) }} {{ $d->persediaan?->nama_persediaan }} · {{ $d->kondisi }}</div>
+                                    @endforeach
+                                    <div class="text-gray-500">{{ $r->alasan }}</div>
+                                </td>
+                                <td class="px-4 py-2 text-right tabular-nums">{{ $rp($r->total) }}</td>
+                                <td class="px-4 py-2">{{ $r->penyetuju?->nama }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+
         <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
             <div class="border-b border-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-800">Struk ({{ $struk->count() }})</div>
             <table class="min-w-full divide-y divide-gray-200 text-sm">

@@ -72,6 +72,25 @@ final class Akses
         return (bool) (self::hakUser($user)[$kode][$aksi] ?? false);
     }
 
+    /**
+     * Hak pengguna TERTENTU (bukan yang sedang masuk) — mis. pengawas yang mengetik
+     * PIN di perangkat kasir. Aturannya sama persis dengan boleh().
+     */
+    public static function bolehUntuk(User $user, string $kode, string $aksi = 'lihat'): bool
+    {
+        if (ModulRegistry::isBebas($kode)) {
+            return true;
+        }
+        if ($user->status !== 'aktif') {
+            return false;
+        }
+        if ($user->is_admin) {
+            return true;
+        }
+
+        return (bool) (self::hakUser($user)[$kode][$aksi] ?? false);
+    }
+
     /** Apakah modul tampil di sidebar untuk pengguna login. */
     public static function bolehMenu(string $kode): bool
     {

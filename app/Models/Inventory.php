@@ -50,6 +50,9 @@ class Inventory extends Model
         'kode_merk',
         'harga_perolehan',
         'harga_jual',
+        'harga_promo',
+        'promo_mulai',
+        'promo_selesai',
         'stok_minimum',
         'dijual_di_toko',
         'stok_masuk',
@@ -70,9 +73,25 @@ class Inventory extends Model
             'stok_keluar' => 'decimal:4',
             'nilai_persediaan' => 'decimal:2',
             'harga_jual' => 'decimal:2',
+            'harga_promo' => 'decimal:2',
+            'promo_mulai' => 'date',
+            'promo_selesai' => 'date',
             'stok_minimum' => 'decimal:4',
             'dijual_di_toko' => 'boolean',
         ];
+    }
+
+    /**
+     * Promo berlaku pada tanggal itu? Butuh harga promo + tanggal mulai; tanggal selesai
+     * kosong = berlaku sampai dicabut. Hanya untuk SATUAN DASAR.
+     */
+    public function promoAktif(?\DateTimeInterface $pada = null): bool
+    {
+        $hari = \Illuminate\Support\Carbon::instance($pada ?? now())->startOfDay();
+
+        return $this->harga_promo !== null && $this->promo_mulai !== null
+            && $this->promo_mulai->lte($hari)
+            && ($this->promo_selesai === null || $this->promo_selesai->gte($hari));
     }
 
     public function kategori(): BelongsTo

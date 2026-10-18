@@ -14,7 +14,7 @@ class PenjualanDetail extends Model
 
     protected $fillable = [
         'id_penjualan', 'kode_persediaan', 'barcode', 'satuan', 'isi', 'kuantiti_input', 'kuantiti',
-        'harga_satuan', 'total', 'hpp',
+        'harga_satuan', 'total', 'hpp', 'harga_normal', 'promo', 'diskon',
     ];
 
     protected function casts(): array
@@ -22,6 +22,7 @@ class PenjualanDetail extends Model
         return [
             'isi' => 'decimal:4', 'kuantiti_input' => 'decimal:4', 'kuantiti' => 'decimal:4',
             'harga_satuan' => 'decimal:2', 'total' => 'decimal:2', 'hpp' => 'decimal:2',
+            'harga_normal' => 'decimal:2', 'promo' => 'boolean', 'diskon' => 'decimal:2',
         ];
     }
 

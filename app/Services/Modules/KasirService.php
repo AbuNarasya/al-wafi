@@ -9,6 +9,8 @@ use App\Models\Inventory;
 use App\Models\LokasiPersediaan;
 use App\Models\MutasiPersediaan;
 use App\Models\Penjualan;
+use App\Models\ReturPenjualan;
+use App\Models\ReturPenjualanDetail;
 use App\Models\SatuanPersediaan;
 use App\Models\ShiftKasir;
 use App\Models\User;
@@ -73,9 +75,12 @@ class KasirService
      * Simpan satu struk. Tiap baris: `barcode` ATAU `kode_persediaan` (+ `satuan`), dan `kuantiti`.
      * Harga diambil dari master — kasir tak mengetik harga.
      *
-     * @param  list<array{barcode?:?string, kode_persediaan?:?string, satuan?:?string, kuantiti:string|int|float}>  $baris
+     * @param  list<array{barcode?:?string, kode_persediaan?:?string, satuan?:?string, kuantiti:string|int|float, diskon?:string|int|float|null}>  $baris
+     * @param  array{struk?:string|int|float|null, alasan?:?string, id_pengawas?:?int, pin?:?string}  $diskon
+     *         Diskon manual (nominal per baris di `$baris[*]['diskon']`, per struk di `struk`) SELALU
+     *         butuh PIN pengawas — keputusan user 19 Okt 2026. Promo terjadwal tak butuh apa pun.
      */
-    public function jual(int $idShift, array $baris, string|int|float $bayar, int $idKasir): Penjualan
+    public function jual(int $idShift, array $baris, string|int|float $bayar, int $idKasir, array $diskon = []): Penjualan
     {
         $shift = $this->shiftKasir($idShift, $idKasir);
         if (! $baris) {
@@ -84,15 +89,38 @@ class KasirService
 
         $rincian = [];
         $total = '0';
+        $adaDiskon = false;
         foreach ($baris as $i => $l) {
-            [$item, $satuan, $isi, $harga, $barcode] = $this->resolusi($l, $i + 1);
+            [$item, $satuan, $isi, $harga, $barcode, $normal] = $this->resolusi($l, $i + 1);
             $qtyInput = Money::of($l['kuantiti'], 4);
             if (! Money::gtZero($qtyInput, 4)) {
                 throw new AppException(422, "Jumlah {$item->nama_persediaan} harus lebih dari nol.");
             }
-            $subtotal = Money::mul($qtyInput, $harga);
-            $rincian[] = compact('item', 'satuan', 'isi', 'harga', 'barcode', 'qtyInput', 'subtotal');
+            $kotor = Money::mul($qtyInput, $harga);
+            $potong = Money::of($l['diskon'] ?? 0);
+            if (Money::isNegative($potong) || Money::gt($potong, $kotor)) {
+                throw new AppException(422, "Diskon {$item->nama_persediaan} tidak boleh negatif atau melebihi harganya.");
+            }
+            $adaDiskon = $adaDiskon || Money::gtZero($potong);
+            $subtotal = Money::sub($kotor, $potong);
+            $rincian[] = compact('item', 'satuan', 'isi', 'harga', 'barcode', 'qtyInput', 'subtotal', 'normal', 'potong');
             $total = Money::add($total, $subtotal);
+        }
+
+        $diskonStruk = Money::of($diskon['struk'] ?? 0);
+        if (Money::isNegative($diskonStruk) || Money::gt($diskonStruk, $total)) {
+            throw new AppException(422, 'Diskon struk tidak boleh negatif atau melebihi total belanja.');
+        }
+        $adaDiskon = $adaDiskon || Money::gtZero($diskonStruk);
+        $total = Money::sub($total, $diskonStruk);
+
+        $penyetuju = null;
+        $alasan = trim((string) ($diskon['alasan'] ?? ''));
+        if ($adaDiskon) {
+            if ($alasan === '') {
+                throw new AppException(422, 'Tulis alasan diskon.');
+            }
+            $penyetuju = (new PinPengawasService)->verifikasi($diskon['id_pengawas'] ?? null, $diskon['pin'] ?? null, $idKasir);
         }
 
         $bayar = Money::of($bayar);
@@ -100,7 +128,7 @@ class KasirService
             throw new AppException(422, 'Uang yang dibayarkan kurang dari total belanja.');
         }
 
-        return DB::transaction(function () use ($shift, $rincian, $total, $bayar, $idKasir) {
+        return DB::transaction(function () use ($shift, $rincian, $total, $bayar, $idKasir, $diskonStruk, $penyetuju, $adaDiskon, $alasan) {
             // Nomor struk harian per toko; kunci advisori supaya dua kasir yang menyimpan
             // bersamaan tak berebut nomor yang sama.
             DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('penjualan-nomor')]);
@@ -115,10 +143,13 @@ class KasirService
                 'waktu' => now(),
                 'metode' => 'tunai',
                 'total' => $total,
+                'diskon_struk' => $diskonStruk,
                 'bayar' => $bayar,
                 'kembalian' => Money::sub($bayar, $total),
                 'status' => 'selesai',
                 'id_kasir' => $idKasir,
+                'disetujui_oleh' => $penyetuju?->id_pengguna,
+                'alasan_diskon' => $adaDiskon ? $alasan : null,
             ]);
 
             $hpp = '0';
@@ -142,6 +173,9 @@ class KasirService
                     'kuantiti_input' => $r['qtyInput'],
                     'kuantiti' => $qty,
                     'harga_satuan' => $r['harga'],
+                    'harga_normal' => $r['normal'],
+                    'promo' => ! Money::eq($r['harga'], $r['normal']),
+                    'diskon' => $r['potong'],
                     'total' => $r['subtotal'],
                     'hpp' => $keluar->nilai,
                 ]);
@@ -166,6 +200,10 @@ class KasirService
         }
         if ($jual->shift->status !== 'buka') {
             throw new AppException(409, 'Shift struk ini sudah ditutup dan dijurnal — pembatalan tak bisa lagi lewat sini.');
+        }
+        // Struk yang sudah diretur sebagian tak dibatalkan utuh — stok & uangnya akan pulih dua kali.
+        if (ReturPenjualan::where('id_penjualan', $jual->id_penjualan)->exists()) {
+            throw new AppException(409, "Struk {$jual->nomor} sudah pernah diretur — pembatalan utuh tak bisa lagi.");
         }
         if ($jual->id_kasir === $idPenyetuju && ! User::find($idPenyetuju)?->is_admin) {
             throw new AppException(403, 'Pembatalan struk harus disetujui orang lain, bukan kasirnya sendiri.');
@@ -217,15 +255,19 @@ class KasirService
 
         return DB::transaction(function () use ($shift, $rincian, $uang, $catatan, $idPengguna) {
             $jual = Penjualan::with('details.persediaan')->where('id_shift', $shift->id_shift)->where('status', 'selesai')->get();
+            $retur = ReturPenjualan::with('details.persediaan')->where('id_shift', $shift->id_shift)->get();
             $tunai = Money::of($jual->where('metode', 'tunai')->sum('total'));
             $hpp = Money::of($jual->sum('hpp'));
-            $selisih = Money::sub($uang, Money::add($shift->modal_awal, $tunai));
+            $totalRetur = Money::of($retur->sum('total'));
+            // Uang retur keluar dari laci shift INI, walau struk asalnya dari shift lain.
+            $selisih = Money::sub($uang, Money::sub(Money::add($shift->modal_awal, $tunai), $totalRetur));
 
-            $entry = $this->jurnalShift($shift, $jual, $tunai, $hpp, $selisih, $idPengguna);
+            $entry = $this->jurnalShift($shift, $jual, $tunai, $hpp, $selisih, $idPengguna, $retur);
 
             if ($entry) {
-                MutasiPersediaan::where('sumber_modul', Penjualan::SUMBER)
-                    ->whereIn('sumber_ref', $jual->pluck('nomor'))
+                MutasiPersediaan::where(fn ($q) => $q
+                    ->where(fn ($w) => $w->where('sumber_modul', Penjualan::SUMBER)->whereIn('sumber_ref', $jual->pluck('nomor')))
+                    ->orWhere(fn ($w) => $w->where('sumber_modul', ReturPenjualan::SUMBER)->whereIn('sumber_ref', $retur->pluck('nomor'))))
                     ->whereNull('journal_entry_id')
                     ->update(['journal_entry_id' => $entry->id]);
             }
@@ -235,6 +277,7 @@ class KasirService
                 'ditutup_pada' => now(),
                 'jumlah_transaksi' => $jual->count(),
                 'total_tunai' => $tunai,
+                'total_retur' => $totalRetur,
                 'total_hpp' => $hpp,
                 'uang_dihitung' => $uang,
                 'rincian_pecahan' => $rincian,
@@ -299,13 +342,155 @@ class KasirService
         });
     }
 
+    /**
+     * RETUR PENJUALAN — dari struk asal, uangnya keluar dari laci shift yang SEDANG BUKA.
+     *
+     * Uang kembali = bagian yang SUDAH DIBAYAR atas barang itu: harga baris dikurangi diskon
+     * barisnya, lalu dikalikan porsi diskon struk. Retur yang menghabiskan sisa baris memakai
+     * sisa nilainya persis, supaya tak ada rupiah pembulatan yang tertinggal. Barang LAYAK
+     * kembali ke stok seharga pokok FIFO baris asalnya; barang RUSAK tidak kembali (keputusan
+     * user 19 Okt 2026). Jurnalnya menyusul ringkas saat shift ditutup. PIN pengawas wajib.
+     *
+     * @param  list<array{id_penjualan_detail:int, kuantiti:string|int|float, kondisi:string}>  $baris
+     *         `kuantiti` dalam satuan struk asal (mis. 1 DUS).
+     */
+    public function retur(int $idShift, string $nomorStruk, array $baris, string $alasan, ?int $idPengawas, ?string $pin, int $idKasir): ReturPenjualan
+    {
+        $shift = $this->shiftKasir($idShift, $idKasir);
+        $jual = Penjualan::with('details.persediaan', 'shift.lokasi')->where('nomor', trim($nomorStruk))->first()
+            ?? throw new AppException(404, "Struk {$nomorStruk} tidak ditemukan.");
+        if ($jual->status !== 'selesai') {
+            throw new AppException(409, "Struk {$jual->nomor} sudah dibatalkan — tak ada yang bisa diretur.");
+        }
+        if ($jual->kode_lokasi !== $shift->kode_lokasi) {
+            throw new AppException(422, 'Retur dilayani di toko tempat barang dibeli ('.$jual->shift->lokasi->nama.').');
+        }
+        $batas = (int) ($shift->lokasi->batas_hari_retur ?? 7);
+        if ($jual->waktu->copy()->startOfDay()->lt(now()->startOfDay()->subDays($batas))) {
+            throw new AppException(422, "Struk {$jual->nomor} sudah lewat batas retur {$batas} hari.");
+        }
+        if (trim($alasan) === '') {
+            throw new AppException(422, 'Tulis alasan retur.');
+        }
+
+        // Yang sudah pernah diretur per baris struk.
+        $sudah = ReturPenjualanDetail::whereIn('id_penjualan_detail', $jual->details->pluck('id'))
+            ->groupBy('id_penjualan_detail')
+            ->selectRaw('id_penjualan_detail, SUM(kuantiti_input) AS qty, SUM(nilai) AS nilai, SUM(hpp) AS hpp')
+            ->get()->keyBy('id_penjualan_detail');
+
+        // Porsi diskon struk: yang dibayar dibagi jumlah baris (bersih diskon baris).
+        $jumlahBaris = Money::of($jual->details->sum('total'));
+        $faktor = Money::gtZero($jumlahBaris) ? Money::div($jual->total, $jumlahBaris, 8) : '0';
+
+        $rincian = [];
+        $total = '0';
+        foreach ($baris as $l) {
+            $d = $jual->details->firstWhere('id', (int) $l['id_penjualan_detail'])
+                ?? throw new AppException(422, 'Baris retur tidak cocok dengan struknya.');
+            $qty = Money::of($l['kuantiti'], 4);
+            if (! Money::gtZero($qty, 4)) {
+                continue;
+            }
+            if (! in_array($l['kondisi'] ?? '', ['layak', 'rusak'], true)) {
+                throw new AppException(422, "Pilih kondisi {$d->persediaan->nama_persediaan}: layak jual atau rusak.");
+            }
+            $s = $sudah[$d->id] ?? null;
+            $sisa = Money::sub($d->kuantiti_input, $s->qty ?? '0', 4);
+            if (Money::gt($qty, $sisa, 4)) {
+                throw new AppException(422, "{$d->persediaan->nama_persediaan}: diretur melebihi yang dibeli (sisa {$this->angka($sisa)} {$d->satuan}).");
+            }
+
+            $bersihBaris = Money::mul($d->total, $faktor);
+            if (Money::eq($qty, $sisa, 4)) {
+                $nilai = Money::sub($bersihBaris, $s->nilai ?? '0');
+                $hpp = Money::sub($d->hpp, $s->hpp ?? '0');
+            } else {
+                $nilai = Money::div(Money::mul($bersihBaris, $qty, 4), $d->kuantiti_input);
+                $hpp = Money::div(Money::mul($d->hpp, $qty, 4), $d->kuantiti_input);
+            }
+            $rincian[] = ['d' => $d, 'qty' => $qty, 'kondisi' => $l['kondisi'], 'nilai' => $nilai, 'hpp' => $hpp];
+            $total = Money::add($total, $nilai);
+        }
+        if (! $rincian) {
+            throw new AppException(422, 'Belum ada barang yang diretur.');
+        }
+
+        $pengawas = (new PinPengawasService)->verifikasi($idPengawas, $pin, $idKasir);
+
+        return DB::transaction(function () use ($shift, $jual, $rincian, $total, $alasan, $pengawas, $idKasir) {
+            DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('retur-nomor')]);
+            $base = 'RT-'.now()->format('ymd').'-';
+            $nomor = DocNumber::nextDocNumber($base, ReturPenjualan::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor'));
+
+            $retur = ReturPenjualan::create([
+                'nomor' => $nomor, 'id_penjualan' => $jual->id_penjualan, 'id_shift' => $shift->id_shift,
+                'kode_lokasi' => $shift->kode_lokasi, 'waktu' => now(), 'total' => $total, 'alasan' => trim($alasan),
+                'id_kasir' => $idKasir, 'disetujui_oleh' => $pengawas->id_pengguna,
+            ]);
+
+            $hppKembali = '0';
+            foreach ($rincian as $r) {
+                $d = $r['d'];
+                $qtyDasar = Money::mul($r['qty'], $d->isi, 4);
+                $retur->details()->create([
+                    'id_penjualan_detail' => $d->id, 'kode_persediaan' => $d->kode_persediaan,
+                    'kuantiti_input' => $r['qty'], 'kuantiti' => $qtyDasar, 'kondisi' => $r['kondisi'],
+                    'nilai' => $r['nilai'], 'hpp' => $r['hpp'],
+                ]);
+                if ($r['kondisi'] === 'layak') {
+                    InventoryMovement::masuk([
+                        'kode_persediaan' => $d->kode_persediaan, 'kode_lokasi' => $shift->kode_lokasi,
+                        'kuantiti' => $qtyDasar, 'nilai' => $r['hpp'], 'alasan' => 'retur',
+                        'sumber_modul' => ReturPenjualan::SUMBER, 'sumber_ref' => $nomor,
+                        'keterangan' => "Retur dari {$jual->nomor}", 'id_pengguna' => $idKasir,
+                    ]);
+                    $hppKembali = Money::add($hppKembali, $r['hpp']);
+                }
+            }
+            $retur->update(['hpp_kembali' => $hppKembali]);
+
+            return $retur->load('details');
+        });
+    }
+
+    private function angka(string $v): string
+    {
+        return rtrim(rtrim(number_format((float) $v, 4, ',', '.'), '0'), ',');
+    }
+
     // ---- Bagian dalam ----
 
-    private function jurnalShift(ShiftKasir $shift, $jual, string $tunai, string $hpp, string $selisih, int $idPengguna)
+    private function jurnalShift(ShiftKasir $shift, $jual, string $tunai, string $hpp, string $selisih, int $idPengguna, $retur = null)
     {
         $l = $shift->lokasi;
         $ket = "Penjualan kasir {$shift->nomor} — {$l->nama} ({$jual->count()} struk)";
         $lines = [];
+
+        // RETUR: uang kembali membalik pendapatan; barang LAYAK yang kembali ke rak membalik
+        // HPP per akun persediaannya. Barang rusak tak kembali — harga pokoknya tetap HPP.
+        $retur ??= collect();
+        $totalRetur = Money::of($retur->sum('total'));
+        if (Money::gtZero($totalRetur)) {
+            $ketRetur = "Retur penjualan {$shift->nomor} — {$l->nama} ({$retur->count()} retur)";
+            $lines[] = ['kode_coa' => $l->kode_coa_pendapatan, 'debet' => $totalRetur, 'kredit' => '0', 'keterangan' => $ketRetur, 'kode_bagian' => $l->kode_bagian];
+            $lines[] = ['kode_coa' => $l->kode_coa_kas, 'debet' => '0', 'kredit' => $totalRetur, 'keterangan' => $ketRetur];
+        }
+        $kembali = [];
+        foreach ($retur as $r) {
+            foreach ($r->details->where('kondisi', 'layak') as $d) {
+                $kembali[$d->persediaan->kode_coa] = Money::add($kembali[$d->persediaan->kode_coa] ?? '0', $d->hpp);
+            }
+        }
+        $hppKembali = array_reduce($kembali, fn ($s, $v) => Money::add($s, $v), '0');
+        if (Money::gtZero($hppKembali)) {
+            foreach ($kembali as $akun => $nilai) {
+                if (Money::gtZero($nilai)) {
+                    $lines[] = ['kode_coa' => $akun, 'debet' => $nilai, 'kredit' => '0', 'keterangan' => "Retur layak jual {$shift->nomor}"];
+                }
+            }
+            $lines[] = ['kode_coa' => $l->kode_coa_hpp, 'debet' => '0', 'kredit' => $hppKembali, 'keterangan' => "Retur layak jual {$shift->nomor}", 'kode_bagian' => $l->kode_bagian];
+        }
 
         if (Money::gtZero($tunai)) {
             $lines[] = ['kode_coa' => $l->kode_coa_kas, 'debet' => $tunai, 'kredit' => '0', 'keterangan' => $ket];
@@ -377,7 +562,7 @@ class KasirService
      * Baris keranjang → [barang, satuan, isi, harga per satuan, barcode].
      * Harga satuan konversi: harga khususnya bila diisi, selain itu isi × harga jual dasar.
      *
-     * @return array{0:Inventory,1:string,2:string,3:string,4:?string}
+     * @return array{0:Inventory,1:string,2:string,3:string,4:?string,5:string} [.., harga berlaku, barcode, harga normal]
      */
     private function resolusi(array $l, int $no): array
     {
@@ -402,7 +587,7 @@ class KasirService
         [$satuan, $isi] = $item->satuanKe($satuanDiminta)
             ?? throw new AppException(422, "Satuan {$satuanDiminta} belum terdaftar untuk {$item->nama_persediaan}.");
 
-        return [$item, $satuan, $isi, self::hargaJual($item, $satuan, $isi), $barcode];
+        return [$item, $satuan, $isi, self::hargaJual($item, $satuan, $isi), $barcode, self::hargaNormal($item, $satuan, $isi)];
     }
 
     /**
@@ -411,6 +596,17 @@ class KasirService
      * yang sama, jadi angka di layar tak pernah berbeda dari yang tersimpan.
      */
     public static function hargaJual(Inventory $item, string $satuan, string $isi): string
+    {
+        // Promo terjadwal hanya untuk SATUAN DASAR; satuan besar memakai harganya sendiri.
+        if (Money::eq($isi, '1', 4) && $item->promoAktif()) {
+            return Money::of($item->harga_promo);
+        }
+
+        return self::hargaNormal($item, $satuan, $isi);
+    }
+
+    /** Harga master tanpa promo — dicetak di struk sebagai pembanding. */
+    public static function hargaNormal(Inventory $item, string $satuan, string $isi): string
     {
         if (Money::eq($isi, '1', 4)) {
             return Money::of($item->harga_jual);

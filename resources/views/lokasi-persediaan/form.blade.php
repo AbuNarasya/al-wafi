@@ -28,6 +28,8 @@
                     <x-field name="kode_coa_hpp" label="Harga Pokok Penjualan" :value="old('kode_coa_hpp', $row->kode_coa_hpp)" :options="$bebanOptions" />
                     <x-field name="kode_coa_selisih_kas" label="Selisih Kas" :value="old('kode_coa_selisih_kas', $row->kode_coa_selisih_kas)" :options="$selisihOptions"
                              hint="Uang laci kurang/lebih saat tutup shift." />
+                    <x-field name="batas_hari_retur" label="Batas Retur (hari)" type="number" :value="old('batas_hari_retur', $row->batas_hari_retur ?? 7)"
+                             hint="Struk yang lebih tua dari ini tak bisa diretur. 0 = hanya hari yang sama." />
                     <x-field name="kode_bagian" label="Bagian Pengelola Toko" :value="old('kode_bagian', $row->kode_bagian)" :options="$bagianOptions"
                              hint="Dimensi wajib untuk baris HPP & selisih kas (akun beban)." />
                 </div>

@@ -99,7 +99,8 @@ class PosTest extends TestCase
         $pindai = $this->actingAs($this->kasir)->getJson(route('pos.cari', ['barcode' => '8998009010231']))->assertOk()->json('items');
         $this->assertCount(1, $pindai);
         $this->assertSame(['BRG0001', 'DUS', 30], [$pindai[0]['kode'], $pindai[0]['satuan_dipilih'], (int) $pindai[0]['stok']]);
-        $this->assertEquals([['satuan' => 'pcs', 'isi' => 1, 'harga' => 4000], ['satuan' => 'DUS', 'isi' => 24, 'harga' => 90000]], $pindai[0]['opsi']);
+        // `normal` = harga tanpa promo (pembanding di layar & struk).
+        $this->assertEquals([['satuan' => 'pcs', 'isi' => 1, 'harga' => 4000, 'normal' => 4000], ['satuan' => 'DUS', 'isi' => 24, 'harga' => 90000, 'normal' => 90000]], $pindai[0]['opsi']);
 
         // "Sabun Gudang" tak ditandai dijual di toko → tak muncul.
         $this->assertSame(['BRG0001'], array_column($this->actingAs($this->kasir)->getJson(route('pos.cari', ['q' => 'teh']))->json('items'), 'kode'));

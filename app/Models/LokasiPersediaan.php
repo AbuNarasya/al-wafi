@@ -42,6 +42,7 @@ class LokasiPersediaan extends Model
         'kode', 'nama', 'jenis', 'kode_unit', 'status', 'urutan',
         // Akun kasir toko (Wafi Mart tahap 2a).
         'kode_coa_kas', 'kode_coa_pendapatan', 'kode_coa_hpp', 'kode_coa_selisih_kas', 'kode_bagian',
+        'batas_hari_retur',
     ];
 
     /** Akun kasir yang wajib lengkap sebelum shift pertama dibuka. */

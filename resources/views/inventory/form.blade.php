@@ -65,6 +65,18 @@
                              hint="Di bawah angka ini barang ditandai perlu dibeli lagi." />
                 </div>
 
+                {{-- Promo terjadwal — otomatis berlaku di kasir pada rentang tanggalnya, tanpa PIN. --}}
+                <div class="grid gap-4 sm:grid-cols-3">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Harga Promo <span class="text-gray-400" x-text="dasar ? '/ ' + dasar : ''"></span></label>
+                        <x-input-rupiah name="harga_promo" :value="old('harga_promo', $item->harga_promo)" placeholder="kosong = tanpa promo" />
+                        @error('harga_promo')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                    </div>
+                    <x-field name="promo_mulai" label="Promo Mulai" type="date" :value="old('promo_mulai', $item->promo_mulai?->toDateString())" />
+                    <x-field name="promo_selesai" label="Promo Selesai" type="date" :value="old('promo_selesai', $item->promo_selesai?->toDateString())"
+                             hint="Kosong = berlaku sampai dicabut. Hanya satuan dasar." />
+                </div>
+
                 {{-- Satuan konversi --}}
                 <div>
                     <div class="mb-1 flex items-center justify-between">

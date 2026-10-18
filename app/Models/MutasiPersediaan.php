@@ -33,6 +33,8 @@ class MutasiPersediaan extends Model
         'penjualan' => 'Penjualan Kasir',
         // Stok pembuka dari Impor Data Awal (lapisan FIFO pertama).
         'saldo_awal' => 'Saldo Awal',
+        // Barang layak jual yang dikembalikan pembeli — jurnalnya ringkas di tutup shift.
+        'retur' => 'Retur Penjualan',
     ];
 
     protected $fillable = [
