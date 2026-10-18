@@ -163,6 +163,54 @@ class PosController extends Controller
         ]);
     }
 
+    /**
+     * Tutup shift — HITUNG BUTA: kasir tak melihat berapa seharusnya isi laci sebelum
+     * menghitung; angka yang terlihat menggoda untuk "dicocokkan" alih-alih dihitung.
+     * Selisihnya baru tampil di laporan sesudah ditutup.
+     */
+    public function formTutup(Request $request): View|RedirectResponse
+    {
+        $shift = $this->shiftTerbuka($request);
+        if (! $shift) {
+            return redirect()->route('pos.index')->with('error', 'Tidak ada shift terbuka.');
+        }
+
+        return view('pos.tutup', ['shift' => $shift->load('lokasi'), 'ringkas' => $this->ringkas($shift)]);
+    }
+
+    public function tutup(Request $request): RedirectResponse
+    {
+        $shift = $this->shiftTerbuka($request);
+        if (! $shift) {
+            return redirect()->route('pos.index')->with('error', 'Tidak ada shift terbuka.');
+        }
+        $data = $request->validate([
+            'pecahan' => ['required', 'array'],
+            'pecahan.*' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            'catatan' => ['nullable', 'string', 'max:255'],
+        ]);
+        $pecahan = array_filter(array_map('intval', $data['pecahan']));
+
+        try {
+            // Laci kosong sama sekali tetap sah — dicatat sebagai uang dihitung nol.
+            $tutup = $this->kasir->tutupShift($shift->id_shift, $pecahan ?: null, $pecahan ? null : 0,
+                $data['catatan'] ?? null, $request->user()->id_pengguna);
+        } catch (AppException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('pos.laporan', $tutup->id_shift)->with('status', "Shift {$tutup->nomor} ditutup. Serahkan uang laci ke bagian keuangan.");
+    }
+
+    /** Laporan tutup shift (bisa dicetak) — milik kasirnya sendiri atau pengawas kasir. */
+    public function laporan(Request $request, ShiftKasir $shift): View
+    {
+        $milikSendiri = $shift->id_kasir === $request->user()->id_pengguna && \App\Support\Akses::boleh('pos', 'lihat');
+        abort_unless($milikSendiri || \App\Support\Akses::boleh('shift-kasir', 'lihat'), 403);
+
+        return view('pos.laporan', ['shift' => $shift->load(['lokasi', 'kasir', 'penerima'])]);
+    }
+
     private function shiftTerbuka(Request $request): ?ShiftKasir
     {
         return ShiftKasir::where('id_kasir', $request->user()->id_pengguna)->where('status', 'buka')->first();

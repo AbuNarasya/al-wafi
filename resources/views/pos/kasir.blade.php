@@ -6,6 +6,7 @@
 
 @section('aksi')
     <a href="{{ route('pos.riwayat') }}" class="rounded border border-white/30 px-2 py-1 text-xs hover:bg-white/10">Riwayat Struk</a>
+    <a href="{{ route('pos.tutup') }}" class="rounded bg-amber-400 px-2 py-1 text-xs font-semibold text-amber-950 hover:bg-amber-300">Tutup Shift</a>
 @endsection
 
 @section('content')

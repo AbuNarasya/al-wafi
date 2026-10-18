@@ -52,6 +52,7 @@ use App\Http\Controllers\LokasiPersediaanController;
 use App\Http\Controllers\OpnamePersediaanController;
 use App\Http\Controllers\PenerimaanBarangController;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\ShiftKasirController;
 use App\Http\Controllers\TransferPersediaanController;
 use App\Http\Controllers\NisController;
 use App\Http\Controllers\NotifikasiController;
@@ -725,6 +726,20 @@ Route::middleware('auth')->group(function () {
         Route::post('/jual', [$k, 'jual'])->name('jual')->middleware('hakakses:pos,buat');
         Route::get('/riwayat', [$k, 'riwayat'])->name('riwayat')->middleware('hakakses:pos,lihat');
         Route::get('/struk/{penjualan}', [$k, 'struk'])->name('struk')->middleware('hakakses:pos,lihat')->whereNumber('penjualan');
+        Route::get('/tutup', [$k, 'formTutup'])->name('tutup')->middleware('hakakses:pos,buat');
+        Route::post('/tutup', [$k, 'tutup'])->name('tutup.simpan')->middleware('hakakses:pos,buat');
+        // Tanpa middleware hak: dibuka kasirnya (hak pos) ATAU pengawas (hak shift-kasir) — diperiksa di controller.
+        Route::get('/laporan/{shift}', [$k, 'laporan'])->name('laporan')->whereNumber('shift');
+    });
+
+    // Pengawas kasir: rekap harian, rincian shift, batal struk, tutup paksa, terima setoran.
+    Route::prefix('shift-kasir')->name('shift_kasir.')->group(function () {
+        $s = ShiftKasirController::class;
+        Route::get('/', [$s, 'index'])->name('index')->middleware('hakakses:shift-kasir,lihat');
+        Route::get('/{shift}', [$s, 'show'])->name('show')->middleware('hakakses:shift-kasir,lihat')->whereNumber('shift');
+        Route::post('/{shift}/tutup', [$s, 'tutup'])->name('tutup')->middleware('hakakses:shift-kasir,ubah')->whereNumber('shift');
+        Route::post('/{shift}/serah', [$s, 'serah'])->name('serah')->middleware('hakakses:shift-kasir,ubah')->whereNumber('shift');
+        Route::post('/struk/{penjualan}/batal', [$s, 'batalStruk'])->name('batal_struk')->middleware('hakakses:shift-kasir,ubah')->whereNumber('penjualan');
     });
 
     // Penerimaan Barang (D Persediaan / K Barang Diterima Belum Ditagih; stok masuk per lokasi).

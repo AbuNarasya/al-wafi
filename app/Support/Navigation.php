@@ -92,6 +92,7 @@ final class Navigation
 
         ['url' => '/purchase-orders', 'label' => 'Purchase Order', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'purchase-orders'],
         ['url' => '/pos', 'label' => 'Kasir (POS)', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'pos'],
+        ['url' => '/shift-kasir', 'label' => 'Shift Kasir & Setoran', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'shift-kasir'],
         ['url' => '/penerimaan-barang', 'label' => 'Penerimaan Barang', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'penerimaan-barang'],
         ['url' => '/perintah-pembayaran', 'label' => 'Perintah Pembayaran', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'perintah-pembayaran'],
         ['url' => '/cash-in', 'label' => 'Kas Masuk', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'cash-in'],

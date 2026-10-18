@@ -82,6 +82,9 @@ final class ModulRegistry
         // `buat` = buka shift & berjualan. Pembatalan struk & penerimaan setoran
         // sengaja di modul lain — kasir tak memutus atas uangnya sendiri.
         ['kode' => 'pos', 'nama' => 'Kasir Toko / POS (buka shift & berjualan)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
+        // Pengawas kasir: `lihat` = rekap & rincian shift; `ubah` = batalkan struk,
+        // tutup shift kasir yang lupa, terima setoran laci ke kas keuangan.
+        ['kode' => 'shift-kasir', 'nama' => 'Shift Kasir & Setoran (rekap, batal struk, terima setoran)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Pekerjaan gudang/toko: `buat` = mencatat barang datang, `hapus` = membatalkan.
         ['kode' => 'penerimaan-barang', 'nama' => 'Penerimaan Barang (stok masuk dari vendor)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Perintah Pembayaran mendahului Kas Keluar dalam urutan kerja: rencana
