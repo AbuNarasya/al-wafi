@@ -387,6 +387,34 @@ class PenarikanTunaiTest extends TestCase
         $this->assertSame('selesai', $sesi->fresh()->status);
     }
 
+    public function test_tugas_saya_kabar_pemutus_dan_halaman_anak(): void
+    {
+        $tugas = function (User $u): array {
+            \App\Support\TugasSaya::lupakan();
+            Akses::lupakan();
+            $this->actingAs($u);
+
+            return array_map(fn ($t) => $t['jumlah'], \App\Support\TugasSaya::semua());
+        };
+        $sesi = $this->svc->buatSesi($this->jadwal(), [$this->ahmad->id, $this->fatimah->id], $this->keuangan->id_pengguna);
+        $this->svc->aturDibuka($sesi->id_sesi, true);
+        $this->ajukan($sesi, 100000);
+        $this->ajukan($sesi, 50000, $this->fatimah);
+
+        // Dua pengajuan, tapi kabar ke pemutus hanya SATU per sesi per hari.
+        $this->assertSame(1, \App\Models\Notification::where('id_pengguna', $this->kesantrian->id_pengguna)->where('jenis', 'tarik_tunai_menunggu')->count());
+        $this->assertSame(2, $tugas($this->kesantrian)['/kesantrian/tarik-tunai'] ?? 0);
+        $this->assertArrayNotHasKey('/tarik-tunai', $tugas($this->keuangan));
+
+        $this->sebagaiWali()->get(route('portal.anak', $this->ahmad->id))->assertOk()
+            ->assertSee('Uang saku kegiatan')->assertSee('Rihlah Kelas 9')->assertSee('Menunggu persetujuan');
+
+        $this->travel(3)->days();
+        $this->travel(1)->hours();
+        $this->assertArrayNotHasKey('/kesantrian/tarik-tunai', $tugas($this->kesantrian));   // gugur, tak lagi tugas
+        $this->assertSame(1, $tugas($this->keuangan)['/tarik-tunai'] ?? 0);                  // sesi siap diambil
+    }
+
     public function test_portal_wali(): void
     {
         $this->sebagaiWali()->get(route('portal.tarik_tunai.index'))->assertOk()->assertSee('Tidak ada kegiatan');

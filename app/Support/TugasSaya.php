@@ -97,6 +97,18 @@ final class TugasSaya
             ['/kesantrian/dompet', $keuangan && Akses::boleh('dompet', 'ubah')
                 ? MutasiDompet::where('status', 'menunggu_verifikasi')->count() : 0, 'top-up menunggu verifikasi'],
 
+            // Penarikan tunai kegiatan: kesantrian memutus pengajuan; keuangan mengambil dana
+            // (sesudah batas persetujuan) lalu membagikan & menutup sesi.
+            ['/kesantrian/tarik-tunai', Akses::boleh('penarikan-tunai', 'ubah')
+                ? \App\Models\PengajuanTarikTunai::where('status', 'diajukan')
+                    ->whereHas('sesi', fn ($q) => $q->where('status', 'berjalan')->where('batas_persetujuan', '>=', now()))->count() : 0,
+                'pengajuan uang saku kegiatan menunggu'],
+
+            ['/tarik-tunai', Akses::boleh('sesi-tarik-tunai', 'ubah')
+                ? \App\Models\SesiTarikTunai::where(fn ($q) => $q->where('status', 'dana_diambil')
+                    ->orWhere(fn ($w) => $w->where('status', 'berjalan')->where('batas_persetujuan', '<', now())))->count() : 0,
+                'sesi tarik tunai menunggu diambil/dibagikan'],
+
             ...self::jatuhTempo(),
         ];
     }

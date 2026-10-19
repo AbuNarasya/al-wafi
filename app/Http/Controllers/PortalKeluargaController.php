@@ -313,6 +313,10 @@ class PortalKeluargaController extends Controller
             'riwayat' => PembayaranSantri::with('tagihan.jenis:kode,nama')->where('id_santri', $s->id)
                 ->whereIn('status', ['terverifikasi', 'menunggu_verifikasi'])->orderByDesc('tanggal')->orderByDesc('id')->limit(5)->get(),
             'mutasi' => $mutasi,
+            // Uang saku kegiatan: sesi yang tampil untuk anak ini + pengajuannya (bila ada).
+            'kegiatan' => $aktif ? (new \App\Services\Modules\PenarikanTunaiService)->sesiUntukWali(SesiWali::wali())
+                ->filter(fn ($sesi) => $sesi->santri->contains('id', $s->id))
+                ->map(fn ($sesi) => ['sesi' => $sesi, 'pengajuan' => $sesi->pengajuan->firstWhere('id_santri', $s->id)])->values() : collect(),
             // Kartu belanja Wafi Mart (santri aktif saja).
             'belanja' => $aktif ? [
                 'kartu' => $s->kartuAktif()->first(),

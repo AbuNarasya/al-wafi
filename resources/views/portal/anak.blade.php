@@ -127,6 +127,31 @@
             @endif
         </section>
 
+        @if ($kegiatan->isNotEmpty())
+            <section class="mt-5">
+                <h2 class="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-amber-500"></span> Uang saku kegiatan</h2>
+                <a href="{{ route('portal.tarik_tunai.index') }}" class="block divide-y divide-slate-100 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
+                    @foreach ($kegiatan as $k)
+                        <div class="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                            <div class="min-w-0">
+                                <p class="truncate font-medium text-slate-900">{{ $k['sesi']->nama }}</p>
+                                <p class="text-xs text-slate-500">
+                                    @if ($k['pengajuan'])
+                                        Rp {{ number_format((float) $k['pengajuan']->nominalBerlaku(), 0, ',', '.') }} &middot; {{ $k['pengajuan']->labelStatus() }}
+                                    @elseif ($k['sesi']->status === 'berjalan' && $k['sesi']->tahap() === 'pengajuan')
+                                        Belum mengajukan &middot; batas {{ $k['sesi']->batas_pengajuan->translatedFormat('j M, H:i') }}
+                                    @else
+                                        Tidak mengajukan
+                                    @endif
+                                </p>
+                            </div>
+                            <span class="text-slate-400">&rsaquo;</span>
+                        </div>
+                    @endforeach
+                </a>
+            </section>
+        @endif
+
         {{-- Kartu belanja Wafi Mart: semua aksi dengan PIN WALI (papan PIN). --}}
         @if ($belanja)
             @php $punyaPinWali = \App\Services\PortalWali\SesiWali::punyaPin(); @endphp

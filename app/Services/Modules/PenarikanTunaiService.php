@@ -196,7 +196,7 @@ class PenarikanTunaiService
         $this->assertDompet($santri, $nominal);
         (new PinTransaksi($wali, $peran))->periksa($pin);
 
-        return DB::transaction(function () use ($wali, $peran, $sesi, $santri, $nominal) {
+        $p = DB::transaction(function () use ($wali, $peran, $sesi, $santri, $nominal) {
             $dompet = DompetSantri::where('id_santri', $santri->id)->lockForUpdate()->first();
             self::pastikanTersedia($santri->id, $dompet->saldo, $nominal, "Uang saku {$santri->nama} tidak cukup");
             $base = DocNumber::docBase('TTK', now());
@@ -207,6 +207,30 @@ class PenarikanTunaiService
                 'nominal' => $nominal, 'status' => 'diajukan',
             ]);
         });
+        $this->kabariPemutus($sesi);
+
+        return $p;
+    }
+
+    /**
+     * Kabar ke pemegang hak memutus — SATU per sesi per hari per orang, bukan per pengajuan
+     * (200 santri = 200 notifikasi tak terbaca). Angka pastinya ada di Tugas Saya.
+     */
+    private function kabariPemutus(SesiTarikTunai $sesi): void
+    {
+        $pemegang = \App\Models\HakAksesModul::where('kode_modul', 'penarikan-tunai')->where('ubah', true)
+            ->whereHas('pengguna', fn ($q) => $q->where('status', 'aktif'))->pluck('id_pengguna');
+        $sudah = \App\Models\Notification::where('jenis', 'tarik_tunai_menunggu')->where('ref_id', (string) $sesi->id_sesi)
+            ->whereDate('created_at', now()->toDateString())->pluck('id_pengguna');
+        $tujuan = $pemegang->diff($sudah);
+        if ($tujuan->isEmpty()) {
+            return;
+        }
+        (new NotificationService)->kirim($tujuan->map(fn ($id) => [
+            'id_pengguna' => $id, 'judul' => 'Pengajuan uang saku kegiatan masuk',
+            'pesan' => "{$sesi->nama}: ada pengajuan wali yang menunggu diputus sebelum ".$sesi->batas_persetujuan->format('d/m/Y H:i').'.',
+            'jenis' => 'tarik_tunai_menunggu', 'ref_jenis' => 'SesiTarikTunai', 'ref_id' => (string) $sesi->id_sesi,
+        ])->values()->all());
     }
 
     /** Ubah nominal sampai batas pengajuan. Putusan yang sudah ada gugur — kesantrian memutus ulang. */
