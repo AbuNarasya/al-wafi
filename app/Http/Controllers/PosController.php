@@ -121,6 +121,9 @@ class PosController extends Controller
             'alasan_diskon' => ['nullable', 'string', 'max:255'],
             'id_pengawas' => ['nullable', 'integer'],
             'pin' => ['nullable', 'string', 'max:6'],
+            // Bayar kartu: UID dari pembaca RFID + PIN belanja santri (bila melewati batas harian).
+            'kartu_uid' => ['nullable', 'string', 'max:80'],
+            'pin_santri' => ['nullable', 'string', 'max:6'],
         ]);
         $shift = $this->shiftTerbuka($request);
         if (! $shift) {
@@ -139,9 +142,10 @@ class PosController extends Controller
                 'alasan' => $data['alasan_diskon'] ?? null,
                 'id_pengawas' => $data['id_pengawas'] ?? null,
                 'pin' => $data['pin'] ?? null,
-            ]);
+            ], ($data['kartu_uid'] ?? '') !== '' ? ['uid' => $data['kartu_uid'], 'pin' => $data['pin_santri'] ?? null] : null);
         } catch (AppException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            // 428/423 dibawa ke layar: kasir perlu tahu bedanya "minta PIN" dengan "PIN terkunci".
+            return response()->json(['message' => $e->getMessage(), 'kode' => $e->status], 422);
         }
 
         return response()->json([
@@ -161,7 +165,9 @@ class PosController extends Controller
         abort_unless($penjualan->id_kasir === $request->user()->id_pengguna || $request->user()->is_admin, 403);
 
         return view('pos.struk', [
-            'jual' => $penjualan,
+            'jual' => $penjualan->load('santri:id,nama'),
+            // Sisa uang saku sesudah belanja — dicetak untuk santrinya sendiri.
+            'sisaSaldo' => $penjualan->id_mutasi_dompet ? \App\Models\MutasiDompet::whereKey($penjualan->id_mutasi_dompet)->value('saldo_setelah') : null,
             'perusahaan' => CompanySettings::find(1),
             'cetak' => $request->boolean('cetak'),
         ]);
@@ -223,6 +229,30 @@ class PosController extends Controller
         abort_unless($milikSendiri || \App\Support\Akses::boleh('shift-kasir', 'lihat'), 403);
 
         return view('pos.laporan', ['shift' => $shift->load(['lokasi', 'kasir', 'penerima'])]);
+    }
+
+    /**
+     * Kartu ditempel — siapa pemiliknya & perlukah PIN untuk total ini. SALDO SENGAJA tak
+     * dikirim ke layar kasir (bukan urusan kasir); yang kurang cukup ditolak saat bayar.
+     */
+    public function kartu(Request $request): JsonResponse
+    {
+        abort_unless($this->shiftTerbuka($request), 409, 'Belum ada shift terbuka.');
+        $k = (new \App\Services\Modules\KartuSantriService)->cariAktif((string) $request->query('uid'));
+        if (! $k || $k->santri->status !== 'aktif') {
+            return response()->json(['message' => 'Kartu tidak dikenal, diblokir, atau bukan santri aktif.'], 404);
+        }
+        $total = Money::of($request->query('total', 0));
+        $pakai = KasirService::belanjaKartuHariIni($k->santri->id);
+        $batas = \App\Services\Modules\KartuSantriService::batasHarian($k->santri->id);
+
+        return response()->json([
+            'nama' => $k->santri->nama,
+            'nis' => $k->santri->nis,
+            'sisa_batas' => (float) max(0, (float) Money::sub($batas, $pakai)),
+            'perlu_pin' => Money::gt(Money::add($pakai, $total), $batas),
+            'punya_pin' => \App\Services\Modules\KartuSantriService::punyaPin($k->santri->id),
+        ]);
     }
 
     /** Layar retur: cari struk asal, lalu pilih barang & kondisinya. */

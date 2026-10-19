@@ -11,9 +11,10 @@
 @endsection
 
 @section('content')
-    <div x-data="kasir(@js(['cari' => route('pos.cari'), 'jual' => route('pos.jual')]), @js($ringkas))"
+    <div x-data="kasir(@js(['cari' => route('pos.cari'), 'jual' => route('pos.jual'), 'kartu' => route('pos.kartu')]), @js($ringkas))"
          @keydown.window.f2.prevent="$refs.cari.focus()"
          @keydown.window.f9.prevent="simpan()"
+         @keydown.window.f8.prevent="bukaKartu()"
          class="grid gap-4 lg:grid-cols-3">
 
         {{-- Kiri: scan & keranjang --}}
@@ -125,6 +126,10 @@
                         class="w-full rounded-xl bg-emerald-600 py-4 text-lg font-bold text-white shadow hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40">
                     <span x-text="sibuk ? 'Menyimpan…' : 'BAYAR  (F9)'"></span>
                 </button>
+                <button type="button" @click="bukaKartu()" :disabled="sibuk || !keranjang.length"
+                        class="w-full rounded-xl bg-sky-600 py-3 text-base font-bold text-white shadow hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-40">
+                    BAYAR KARTU SANTRI  (F8)
+                </button>
                 <button type="button" x-show="keranjang.length" @click="if (confirm('Kosongkan keranjang?')) { keranjang = []; bayar = ''; fokus(); }"
                         class="w-full text-xs text-gray-500 hover:text-red-600">Kosongkan keranjang</button>
             </div>
@@ -139,6 +144,47 @@
                 Shift ini: <b x-text="ringkas.struk"></b> struk · <b class="tabular-nums" x-text="rp(ringkas.omzet)"></b>
             </div>
         </aside>
+
+        {{-- Bayar KARTU: santri menempelkan kartu (pembaca RFID USB mengetik UID + Enter). Di atas
+             batas harian santri mengetik PIN belanjanya. Saldo sengaja tak ditampilkan ke kasir. --}}
+        <div x-show="kartuBuka" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 p-4" @keydown.escape.window="kartuBuka = false">
+            <form @submit.prevent="info ? bayarKartu() : cekKartu()" class="w-full max-w-sm space-y-3 rounded-xl bg-white p-5 shadow-xl">
+                <div class="font-semibold text-gray-900">Bayar dengan kartu santri</div>
+                <div class="text-sm text-gray-600">Total <b class="tabular-nums" x-text="rp(total)"></b></div>
+                <input x-ref="uid" type="password" x-model="uid" :readonly="!!info" autocomplete="off" placeholder="Tempelkan kartu ke pembaca…"
+                       class="w-full rounded-lg border-gray-300 text-center font-mono">
+                <template x-if="info">
+                    <div class="space-y-2 rounded-lg bg-sky-50 p-3 text-sm">
+                        <div class="text-base font-semibold text-sky-900" x-text="info.nama"></div>
+                        <div class="text-xs text-sky-800" x-text="'NIS ' + (info.nis || '-') + ' · sisa batas hari ini ' + rp(info.sisa_batas)"></div>
+                        <template x-if="info.perlu_pin">
+                            <div class="space-y-1">
+                                <div class="text-xs font-medium text-amber-800" x-text="info.punya_pin ? 'Melewati batas harian — santri mengetik PIN belanjanya.' : 'Melewati batas harian, dan wali belum memasang PIN belanja — kurangi belanja atau bayar tunai.'"></div>
+                                <input x-show="info.punya_pin" x-ref="pinSantri" type="password" inputmode="numeric" x-model="pinSantri" maxlength="6" autocomplete="off" placeholder="PIN santri"
+                                       class="w-full rounded-lg border-gray-300 text-center text-lg tracking-widest">
+                            </div>
+                        </template>
+                    </div>
+                </template>
+                <template x-if="info && adaDiskon">
+                    <div class="space-y-2 rounded-lg bg-rose-50 p-3 text-sm">
+                        <div class="text-xs text-rose-800">Ada diskon <b x-text="rp(totalDiskon)"></b> — persetujuan pengawas:</div>
+                        <select x-model="idPengawas" class="w-full rounded-lg border-gray-300 text-sm">
+                            <option value="">— pilih pengawas —</option>
+                            @foreach ($pengawas as $p)<option value="{{ $p['id'] }}">{{ $p['nama'] }}</option>@endforeach
+                        </select>
+                        <input type="text" x-model="alasanDiskon" placeholder="Alasan diskon" class="w-full rounded-lg border-gray-300 text-sm">
+                        <input type="password" inputmode="numeric" x-model="pin" maxlength="6" placeholder="PIN pengawas" autocomplete="off" class="w-full rounded-lg border-gray-300 text-center tracking-widest">
+                    </div>
+                </template>
+                <p x-show="kartuGalat" class="text-sm text-red-600" x-text="kartuGalat"></p>
+                <div class="flex gap-2">
+                    <button type="button" @click="kartuBuka = false" class="flex-1 rounded-lg border border-gray-300 py-2 text-sm">Batal</button>
+                    <button class="flex-1 rounded-lg bg-sky-600 py-2 text-sm font-semibold text-white hover:bg-sky-700" :disabled="sibuk"
+                            x-text="info ? 'Bayar ' + rp(total) : 'Baca kartu'"></button>
+                </div>
+            </form>
+        </div>
 
         {{-- Persetujuan pengawas (diskon manual) — PIN diketik pengawas di perangkat ini. --}}
         <div x-show="minta" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 p-4" @keydown.escape.window="minta = false">
@@ -174,6 +220,7 @@
             return {
                 q: '', hasil: [], keranjang: [], bayar: '', sibuk: false, pesan: '', pesanJenis: '', terakhir: null, ringkas,
                 diskonStruk: 0, minta: false, idPengawas: '', pin: '', alasanDiskon: '',
+                kartuBuka: false, uid: '', info: null, pinSantri: '', kartuGalat: '',
 
                 get totalDiskon() { return this.keranjang.reduce((s, r) => s + (r.diskon || 0), 0) + (this.diskonStruk || 0); },
                 get adaDiskon() { return this.totalDiskon > 0; },
@@ -236,7 +283,26 @@
                 },
                 setujui() { this.minta = false; this.kirim(); },
 
-                async kirim() {
+                // ---- Bayar kartu ----
+                bukaKartu() {
+                    if (this.sibuk || !this.keranjang.length) return;
+                    this.kartuBuka = true; this.uid = ''; this.info = null; this.pinSantri = ''; this.kartuGalat = '';
+                    this.$nextTick(() => this.$refs.uid.focus());
+                },
+                async cekKartu() {
+                    this.kartuGalat = '';
+                    const r = await fetch(url.kartu + '?' + new URLSearchParams({ uid: this.uid, total: this.total }), { headers: { Accept: 'application/json' } });
+                    const data = await r.json();
+                    if (!r.ok) { this.kartuGalat = data.message || 'Kartu tak terbaca.'; this.uid = ''; this.$refs.uid.focus(); return; }
+                    this.info = data;
+                    this.$nextTick(() => this.$refs.pinSantri?.focus());
+                },
+                async bayarKartu() {
+                    const ok = await this.kirim({ kartu: true });
+                    if (ok) this.kartuBuka = false;
+                },
+
+                async kirim(opsi = {}) {
                     this.sibuk = true;
                     try {
                         const r = await fetch(url.jual, {
@@ -244,7 +310,9 @@
                             headers: { 'Content-Type': 'application/json', Accept: 'application/json',
                                 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
                             body: JSON.stringify({
-                                bayar: parseInt(this.bayar || 0, 10),
+                                bayar: opsi.kartu ? this.total : parseInt(this.bayar || 0, 10),
+                                kartu_uid: opsi.kartu ? this.uid : null,
+                                pin_santri: opsi.kartu ? this.pinSantri : null,
                                 baris: this.keranjang.map(x => ({ kode_persediaan: x.kode, satuan: x.satuan, kuantiti: x.qty, barcode: x.barcode, diskon: x.diskon || 0 })),
                                 diskon_struk: this.diskonStruk || 0,
                                 alasan_diskon: this.adaDiskon ? this.alasanDiskon : null,
@@ -253,14 +321,22 @@
                             }),
                         });
                         const data = await r.json();
-                        this.pin = '';   // PIN tak disimpan di layar, berhasil atau gagal
-                        if (!r.ok) { this.beri(data.message || 'Gagal menyimpan.'); return; }
+                        this.pin = ''; this.pinSantri = '';   // PIN tak disimpan di layar, berhasil atau gagal
+                        if (!r.ok) {
+                            if (opsi.kartu) this.kartuGalat = data.message || 'Gagal menyimpan.';
+                            else this.beri(data.message || 'Gagal menyimpan.');
+                            return false;
+                        }
                         this.terakhir = data; this.ringkas = data.ringkas;
                         this.keranjang = []; this.bayar = ''; this.diskonStruk = 0; this.alasanDiskon = ''; this.idPengawas = '';
+                        this.uid = ''; this.info = null;
                         this.cetak(data.struk);
                         this.fokus();
+                        return true;
                     } catch (e) {
-                        this.beri('Koneksi ke server terputus — struk BELUM tersimpan. Coba lagi.');
+                        const pesan = 'Koneksi ke server terputus — struk BELUM tersimpan. Coba lagi.';
+                        if (opsi.kartu) this.kartuGalat = pesan; else this.beri(pesan);
+                        return false;
                     } finally {
                         this.sibuk = false;
                     }

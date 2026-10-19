@@ -110,8 +110,7 @@ class PemetaKartuSantri implements Pemeta, PemetaBisaDibatalkan
         if ($kartu->isEmpty()) {
             return ['Tidak ada kartu dari batch ini yang tersisa.'];
         }
-        $dipakai = \Illuminate\Support\Facades\Schema::hasColumn('penjualan', 'uid_kartu')
-            ? \App\Models\Penjualan::whereIn('uid_kartu', $kartu)->count() : 0;
+        $dipakai = \App\Models\Penjualan::whereIn('uid_kartu', $kartu)->count();
 
         return $dipakai > 0 ? ["{$dipakai} struk belanja sudah memakai kartu dari batch ini."] : [];
     }

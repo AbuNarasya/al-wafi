@@ -26,6 +26,9 @@
             <dl class="grid grid-cols-2 gap-y-2 tabular-nums">
                 <dt class="text-gray-500">Modal awal</dt><dd class="text-right">{{ $rp($shift->modal_awal) }}</dd>
                 <dt class="text-gray-500">Penjualan tunai</dt><dd class="text-right">{{ $rp($shift->total_tunai) }}</dd>
+                @if ((float) $shift->total_dompet > 0)
+                    <dt class="text-gray-500">Penjualan kartu <span class="text-xs">(tak masuk laci)</span></dt><dd class="text-right text-gray-500">{{ $rp($shift->total_dompet) }}</dd>
+                @endif
                 @if ((float) $shift->total_retur > 0)
                     <dt class="text-gray-500">Uang retur dikembalikan</dt><dd class="text-right">− {{ $rp($shift->total_retur) }}</dd>
                 @endif

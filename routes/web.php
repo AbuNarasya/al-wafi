@@ -735,6 +735,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/shift', [$k, 'bukaShift'])->name('buka_shift')->middleware('hakakses:pos,buat');
         Route::get('/cari', [$k, 'cari'])->name('cari')->middleware('hakakses:pos,buat');
         Route::post('/jual', [$k, 'jual'])->name('jual')->middleware('hakakses:pos,buat');
+        Route::get('/kartu', [$k, 'kartu'])->name('kartu')->middleware(['hakakses:pos,buat', 'throttle:60,1']);
         Route::get('/riwayat', [$k, 'riwayat'])->name('riwayat')->middleware('hakakses:pos,lihat');
         Route::get('/struk/{penjualan}', [$k, 'struk'])->name('struk')->middleware('hakakses:pos,lihat')->whereNumber('penjualan');
         Route::get('/retur', [$k, 'formRetur'])->name('retur')->middleware('hakakses:pos,buat');

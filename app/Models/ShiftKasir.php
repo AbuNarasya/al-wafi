@@ -23,7 +23,7 @@ class ShiftKasir extends Model
 
     protected $jejakModul = 'pos';
 
-    protected $jejakAbaikan = ['jumlah_transaksi', 'total_tunai', 'total_hpp', 'total_retur'];
+    protected $jejakAbaikan = ['jumlah_transaksi', 'total_tunai', 'total_dompet', 'total_hpp', 'total_retur'];
 
     protected $table = 'shift_kasir';
 
@@ -31,7 +31,7 @@ class ShiftKasir extends Model
 
     protected $fillable = [
         'nomor', 'kode_lokasi', 'id_kasir', 'dibuka_pada', 'modal_awal', 'ditutup_pada', 'jumlah_transaksi',
-        'total_tunai', 'total_retur', 'total_hpp', 'uang_dihitung', 'rincian_pecahan', 'selisih', 'catatan_tutup', 'status',
+        'total_tunai', 'total_dompet', 'total_retur', 'total_hpp', 'uang_dihitung', 'rincian_pecahan', 'selisih', 'catatan_tutup', 'status',
         'journal_entry_id', 'setoran', 'kode_coa_kas_tujuan', 'diterima_oleh', 'diterima_pada', 'journal_setoran_id',
     ];
 
@@ -39,7 +39,7 @@ class ShiftKasir extends Model
     {
         return [
             'dibuka_pada' => 'datetime', 'ditutup_pada' => 'datetime', 'diterima_pada' => 'datetime',
-            'modal_awal' => 'decimal:2', 'total_tunai' => 'decimal:2', 'total_hpp' => 'decimal:2', 'total_retur' => 'decimal:2',
+            'modal_awal' => 'decimal:2', 'total_tunai' => 'decimal:2', 'total_hpp' => 'decimal:2', 'total_retur' => 'decimal:2', 'total_dompet' => 'decimal:2',
             'uang_dihitung' => 'decimal:2', 'selisih' => 'decimal:2', 'setoran' => 'decimal:2',
             'rincian_pecahan' => 'array',
         ];

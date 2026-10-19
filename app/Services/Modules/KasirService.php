@@ -5,6 +5,8 @@ namespace App\Services\Modules;
 use App\Exceptions\AppException;
 use App\Models\BankAccount;
 use App\Models\BarcodePersediaan;
+use App\Models\DompetSantri;
+use App\Models\MutasiDompet;
 use App\Models\Inventory;
 use App\Models\LokasiPersediaan;
 use App\Models\MutasiPersediaan;
@@ -17,6 +19,7 @@ use App\Models\User;
 use App\Services\Ledger\DocNumber;
 use App\Services\Ledger\InventoryMovement;
 use App\Services\Ledger\PostingService;
+use App\Services\Ppsb\DompetPolicy;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 
@@ -80,7 +83,7 @@ class KasirService
      *         Diskon manual (nominal per baris di `$baris[*]['diskon']`, per struk di `struk`) SELALU
      *         butuh PIN pengawas — keputusan user 19 Okt 2026. Promo terjadwal tak butuh apa pun.
      */
-    public function jual(int $idShift, array $baris, string|int|float $bayar, int $idKasir, array $diskon = []): Penjualan
+    public function jual(int $idShift, array $baris, string|int|float $bayar, int $idKasir, array $diskon = [], ?array $kartu = null): Penjualan
     {
         $shift = $this->shiftKasir($idShift, $idKasir);
         if (! $baris) {
@@ -123,12 +126,31 @@ class KasirService
             $penyetuju = (new PinPengawasService)->verifikasi($diskon['id_pengawas'] ?? null, $diskon['pin'] ?? null, $idKasir);
         }
 
+        // ---- Bayar KARTU (dompet santri) atau TUNAI ----
+        $santri = null;
+        $pinBenar = false;
+        if ($kartu !== null) {
+            $k = (new KartuSantriService)->cariAktif($kartu['uid'] ?? null)
+                ?? throw new AppException(404, 'Kartu tidak dikenal atau sudah diblokir.');
+            $santri = $k->santri;
+            if ($santri->status !== 'aktif') {
+                throw new AppException(422, "{$santri->nama} bukan santri aktif — kartunya tak bisa dipakai belanja.");
+            }
+            // Di atas batas harian → PIN belanja anak. Diperiksa DI LUAR transaksi supaya
+            // hitungan salah PIN tak ikut tergulung saat galat dilempar.
+            if (Money::gt(Money::add(self::belanjaKartuHariIni($santri->id), $total), KartuSantriService::batasHarian($santri->id))) {
+                (new KartuSantriService)->periksaPin($santri->id, $kartu['pin'] ?? null);
+                $pinBenar = true;
+            }
+            $bayar = $total;   // kartu membayar persis totalnya
+        }
+
         $bayar = Money::of($bayar);
         if (Money::lt($bayar, $total)) {
             throw new AppException(422, 'Uang yang dibayarkan kurang dari total belanja.');
         }
 
-        return DB::transaction(function () use ($shift, $rincian, $total, $bayar, $idKasir, $diskonStruk, $penyetuju, $adaDiskon, $alasan) {
+        return DB::transaction(function () use ($shift, $rincian, $total, $bayar, $idKasir, $diskonStruk, $penyetuju, $adaDiskon, $alasan, $santri, $pinBenar, $kartu) {
             // Nomor struk harian per toko; kunci advisori supaya dua kasir yang menyimpan
             // bersamaan tak berebut nomor yang sama.
             DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('penjualan-nomor')]);
@@ -141,7 +163,9 @@ class KasirService
                 'id_shift' => $shift->id_shift,
                 'kode_lokasi' => $shift->kode_lokasi,
                 'waktu' => now(),
-                'metode' => 'tunai',
+                'metode' => $santri ? 'dompet' : 'tunai',
+                'id_santri' => $santri?->id,
+                'uid_kartu' => $santri ? KartuSantriService::bersihkanUid($kartu['uid']) : null,
                 'total' => $total,
                 'diskon_struk' => $diskonStruk,
                 'bayar' => $bayar,
@@ -183,8 +207,70 @@ class KasirService
             }
             $jual->update(['hpp' => $hpp]);
 
+            if ($santri) {
+                // Dihitung ULANG di bawah kunci saldo: dua tempelan kartu yang nyaris bersamaan
+                // tak boleh sama-sama lolos dari batas harian.
+                $mutasi = $this->potongDompet($santri->id, $total, $jual->nomor, $idKasir, $pinBenar);
+                $jual->update(['id_mutasi_dompet' => $mutasi->id]);
+            }
+
             return $jual->load('details');
         });
+    }
+
+    /**
+     * Belanja kartu bersih hari ini untuk satu santri (potongan dikurangi pengembalian).
+     * Dihitung dari mutasi `jajan`, jadi batal struk & retur ke dompet ikut mengembalikan jatahnya.
+     */
+    public static function belanjaKartuHariIni(int $idSantri): string
+    {
+        $idDompet = DompetSantri::where('id_santri', $idSantri)->value('id');
+        if (! $idDompet) {
+            return '0';
+        }
+
+        return Money::sub('0', Money::of(MutasiDompet::where('pemilik', 'santri')->where('id_dompet', $idDompet)
+            ->where('jenis', 'jajan')->whereDate('tanggal', now()->toDateString())->sum('nominal')));
+    }
+
+    /** Potong saldo dompet santri (dalam transaksi pemanggil, baris saldo dikunci). */
+    private function potongDompet(int $idSantri, string $nominal, string $nomorStruk, int $idKasir, bool $pinBenar): MutasiDompet
+    {
+        $dompet = DompetSantri::where('id_santri', $idSantri)->lockForUpdate()->first();
+        if (! $dompet || Money::lt($dompet->saldo, $nominal)) {
+            throw new AppException(422, 'Saldo uang saku tidak cukup untuk belanja ini.');
+        }
+        if (! $pinBenar && Money::gt(Money::add(self::belanjaKartuHariIni($idSantri), $nominal), KartuSantriService::batasHarian($idSantri))) {
+            throw new AppException(409, 'Batas belanja harian terlampaui — ulangi dengan PIN belanja.');
+        }
+
+        return $this->mutasiDompet($dompet, Money::sub('0', $nominal), "Belanja Wafi Mart {$nomorStruk}", $idKasir);
+    }
+
+    /** Kembalikan uang ke dompet santri (batal struk / retur struk kartu). */
+    private function kembalikanDompet(int $idSantri, string $nominal, string $keterangan, int $idPengguna): MutasiDompet
+    {
+        $dompet = DompetSantri::where('id_santri', $idSantri)->lockForUpdate()->firstOrFail();
+
+        return $this->mutasiDompet($dompet, $nominal, $keterangan, $idPengguna);
+    }
+
+    /**
+     * Satu baris mutasi `jajan` (bertanda: − potong, + kembali). TANPA jurnal di sini —
+     * jurnalnya ringkas di tutup shift (D/K Titipan Uang Saku ↔ Pendapatan toko).
+     */
+    private function mutasiDompet(DompetSantri $dompet, string $nominalBertanda, string $keterangan, int $idPengguna): MutasiDompet
+    {
+        $saldo = Money::add($dompet->saldo, $nominalBertanda);
+        $dompet->update(['saldo' => $saldo]);
+        $base = DocNumber::docBase('DMP', now());
+        $nomor = DocNumber::nextDocNumber($base, MutasiDompet::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor'));
+
+        return MutasiDompet::create([
+            'nomor' => $nomor, 'pemilik' => 'santri', 'id_dompet' => $dompet->id, 'jenis' => 'jajan',
+            'nominal' => $nominalBertanda, 'saldo_setelah' => $saldo, 'tanggal' => now()->toDateString(),
+            'keterangan' => $keterangan, 'status' => 'terverifikasi', 'dicatat_oleh' => $idPengguna,
+        ]);
     }
 
     /**
@@ -211,6 +297,10 @@ class KasirService
 
         return DB::transaction(function () use ($jual, $alasan, $idPenyetuju) {
             InventoryMovement::batalkanDokumen(Penjualan::SUMBER, $jual->nomor, $idPenyetuju);
+            if ($jual->metode === 'dompet' && $jual->id_santri) {
+                // Struk kartu: uangnya kembali ke dompet santri, bukan dari laci.
+                $this->kembalikanDompet($jual->id_santri, Money::of($jual->total), "Batal struk Wafi Mart {$jual->nomor}", $idPenyetuju);
+            }
             $jual->update(['status' => 'batal', 'alasan_batal' => $alasan, 'dibatalkan_oleh' => $idPenyetuju, 'dibatalkan_pada' => now()]);
 
             return $jual;
@@ -257,12 +347,14 @@ class KasirService
             $jual = Penjualan::with('details.persediaan')->where('id_shift', $shift->id_shift)->where('status', 'selesai')->get();
             $retur = ReturPenjualan::with('details.persediaan')->where('id_shift', $shift->id_shift)->get();
             $tunai = Money::of($jual->where('metode', 'tunai')->sum('total'));
+            $dompet = Money::of($jual->where('metode', 'dompet')->sum('total'));
             $hpp = Money::of($jual->sum('hpp'));
-            $totalRetur = Money::of($retur->sum('total'));
-            // Uang retur keluar dari laci shift INI, walau struk asalnya dari shift lain.
+            // Hanya retur TUNAI yang keluar dari laci shift ini (walau struk asalnya dari shift lain);
+            // retur struk kartu kembali ke dompet santri.
+            $totalRetur = Money::of($retur->where('metode', 'tunai')->sum('total'));
             $selisih = Money::sub($uang, Money::sub(Money::add($shift->modal_awal, $tunai), $totalRetur));
 
-            $entry = $this->jurnalShift($shift, $jual, $tunai, $hpp, $selisih, $idPengguna, $retur);
+            $entry = $this->jurnalShift($shift, $jual, $tunai, $hpp, $selisih, $idPengguna, $retur, $dompet);
 
             if ($entry) {
                 MutasiPersediaan::where(fn ($q) => $q
@@ -270,6 +362,9 @@ class KasirService
                     ->orWhere(fn ($w) => $w->where('sumber_modul', ReturPenjualan::SUMBER)->whereIn('sumber_ref', $retur->pluck('nomor'))))
                     ->whereNull('journal_entry_id')
                     ->update(['journal_entry_id' => $entry->id]);
+                // Mutasi dompet kartu (belanja, batal, retur) ikut menunjuk jurnal ringkas ini.
+                MutasiDompet::whereIn('id', $jual->pluck('id_mutasi_dompet')->merge($retur->pluck('id_mutasi_dompet'))->filter())
+                    ->whereNull('journal_entry_id')->update(['journal_entry_id' => $entry->id]);
             }
 
             $shift->update([
@@ -277,6 +372,7 @@ class KasirService
                 'ditutup_pada' => now(),
                 'jumlah_transaksi' => $jual->count(),
                 'total_tunai' => $tunai,
+                'total_dompet' => $dompet,
                 'total_retur' => $totalRetur,
                 'total_hpp' => $hpp,
                 'uang_dihitung' => $uang,
@@ -427,6 +523,8 @@ class KasirService
                 'nomor' => $nomor, 'id_penjualan' => $jual->id_penjualan, 'id_shift' => $shift->id_shift,
                 'kode_lokasi' => $shift->kode_lokasi, 'waktu' => now(), 'total' => $total, 'alasan' => trim($alasan),
                 'id_kasir' => $idKasir, 'disetujui_oleh' => $pengawas->id_pengguna,
+                // Struk kartu → uang kembali ke DOMPET santri, bukan dari laci.
+                'metode' => $jual->metode === 'dompet' ? 'dompet' : 'tunai',
             ]);
 
             $hppKembali = '0';
@@ -450,6 +548,11 @@ class KasirService
             }
             $retur->update(['hpp_kembali' => $hppKembali]);
 
+            if ($retur->metode === 'dompet' && $jual->id_santri) {
+                $m = $this->kembalikanDompet($jual->id_santri, $total, "Retur {$nomor} dari {$jual->nomor}", $idKasir);
+                $retur->update(['id_mutasi_dompet' => $m->id]);
+            }
+
             return $retur->load('details');
         });
     }
@@ -461,7 +564,7 @@ class KasirService
 
     // ---- Bagian dalam ----
 
-    private function jurnalShift(ShiftKasir $shift, $jual, string $tunai, string $hpp, string $selisih, int $idPengguna, $retur = null)
+    private function jurnalShift(ShiftKasir $shift, $jual, string $tunai, string $hpp, string $selisih, int $idPengguna, $retur = null, string $dompet = '0')
     {
         $l = $shift->lokasi;
         $ket = "Penjualan kasir {$shift->nomor} — {$l->nama} ({$jual->count()} struk)";
@@ -470,11 +573,23 @@ class KasirService
         // RETUR: uang kembali membalik pendapatan; barang LAYAK yang kembali ke rak membalik
         // HPP per akun persediaannya. Barang rusak tak kembali — harga pokoknya tetap HPP.
         $retur ??= collect();
-        $totalRetur = Money::of($retur->sum('total'));
-        if (Money::gtZero($totalRetur)) {
-            $ketRetur = "Retur penjualan {$shift->nomor} — {$l->nama} ({$retur->count()} retur)";
-            $lines[] = ['kode_coa' => $l->kode_coa_pendapatan, 'debet' => $totalRetur, 'kredit' => '0', 'keterangan' => $ketRetur, 'kode_bagian' => $l->kode_bagian];
-            $lines[] = ['kode_coa' => $l->kode_coa_kas, 'debet' => '0', 'kredit' => $totalRetur, 'keterangan' => $ketRetur];
+        $titipanSantri = DompetPolicy::COA_TITIPAN['santri'];
+
+        // BELANJA KARTU: tak ada kas yang masuk — titipan uang saku santri berkurang, pendapatan
+        // toko bertambah. Uangnya baru pindah ke kas toko lewat pencairan mingguan (D3).
+        if (Money::gtZero($dompet)) {
+            $ketKartu = "Belanja kartu {$shift->nomor} — {$l->nama}";
+            $lines[] = ['kode_coa' => $titipanSantri, 'debet' => $dompet, 'kredit' => '0', 'keterangan' => $ketKartu];
+            $lines[] = ['kode_coa' => $l->kode_coa_pendapatan, 'debet' => '0', 'kredit' => $dompet, 'keterangan' => $ketKartu, 'kode_bagian' => $l->kode_bagian];
+        }
+
+        foreach (['tunai' => $l->kode_coa_kas, 'dompet' => $titipanSantri] as $metode => $akunKembali) {
+            $nilai = Money::of($retur->where('metode', $metode)->sum('total'));
+            if (Money::gtZero($nilai)) {
+                $ketRetur = "Retur penjualan {$shift->nomor} — {$l->nama} (".($metode === 'tunai' ? 'tunai' : 'ke dompet santri').')';
+                $lines[] = ['kode_coa' => $l->kode_coa_pendapatan, 'debet' => $nilai, 'kredit' => '0', 'keterangan' => $ketRetur, 'kode_bagian' => $l->kode_bagian];
+                $lines[] = ['kode_coa' => $akunKembali, 'debet' => '0', 'kredit' => $nilai, 'keterangan' => $ketRetur];
+            }
         }
         $kembali = [];
         foreach ($retur as $r) {

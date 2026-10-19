@@ -23,7 +23,13 @@ class Penjualan extends Model
         'nomor', 'id_shift', 'kode_lokasi', 'waktu', 'metode', 'total', 'bayar', 'kembalian', 'hpp',
         'status', 'id_kasir', 'alasan_batal', 'dibatalkan_oleh', 'dibatalkan_pada',
         'diskon_struk', 'disetujui_oleh', 'alasan_diskon',
+        'id_santri', 'uid_kartu', 'id_mutasi_dompet', 'id_pencairan',
     ];
+
+    public function santri(): BelongsTo
+    {
+        return $this->belongsTo(Santri::class, 'id_santri', 'id');
+    }
 
     protected function casts(): array
     {

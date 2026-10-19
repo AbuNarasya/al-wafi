@@ -51,8 +51,16 @@
     <div class="garis"></div>
     <table>
         <tr class="besar"><td>TOTAL</td><td class="kanan">{{ $rp($jual->total) }}</td></tr>
-        <tr><td>Tunai</td><td class="kanan">{{ $rp($jual->bayar) }}</td></tr>
-        <tr><td>Kembali</td><td class="kanan">{{ $rp($jual->kembalian) }}</td></tr>
+        @if ($jual->metode === 'dompet')
+            <tr><td>Kartu</td><td class="kanan">{{ $rp($jual->bayar) }}</td></tr>
+            <tr><td colspan="2">{{ $jual->santri?->nama }}</td></tr>
+            @if ($sisaSaldo !== null)
+                <tr><td>Sisa uang saku</td><td class="kanan">{{ $rp($sisaSaldo) }}</td></tr>
+            @endif
+        @else
+            <tr><td>Tunai</td><td class="kanan">{{ $rp($jual->bayar) }}</td></tr>
+            <tr><td>Kembali</td><td class="kanan">{{ $rp($jual->kembalian) }}</td></tr>
+        @endif
     </table>
     @if ($jual->disetujui_oleh)
         <div>Diskon disetujui: {{ $jual->penyetuju?->nama }}</div>
