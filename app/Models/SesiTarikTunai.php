@@ -27,13 +27,19 @@ class SesiTarikTunai extends Model
     protected $fillable = [
         'nomor', 'nama', 'keterangan', 'batas_pengajuan', 'batas_persetujuan', 'tanggal_ambil', 'tanggal_distribusi',
         'maks_per_santri', 'kode_coa_bank', 'kode_coa_kas', 'dibuka', 'status', 'alasan_batal', 'dibuat_oleh',
+        'total_diambil', 'dana_diambil_pada', 'dana_diambil_oleh', 'journal_ambil_id', 'total_diserahkan', 'sisa_disetor',
+        'selesai_pada', 'selesai_oleh', 'journal_selesai_id',
     ];
+
+    public const SUMBER = 'SesiTarikTunai';
 
     protected function casts(): array
     {
         return [
             'batas_pengajuan' => 'datetime', 'batas_persetujuan' => 'datetime', 'tanggal_ambil' => 'date',
             'tanggal_distribusi' => 'date', 'maks_per_santri' => 'decimal:2', 'dibuka' => 'boolean',
+            'total_diambil' => 'decimal:2', 'total_diserahkan' => 'decimal:2', 'sisa_disetor' => 'decimal:2',
+            'dana_diambil_pada' => 'datetime', 'selesai_pada' => 'datetime',
         ];
     }
 

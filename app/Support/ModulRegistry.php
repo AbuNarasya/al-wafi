@@ -87,7 +87,8 @@ final class ModulRegistry
         ['kode' => 'shift-kasir', 'nama' => 'Shift Kasir & Setoran (rekap, batal struk, terima setoran)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Keuangan: buat = mencairkan belanja kartu santri ke kas toko, hapus = membatalkan.
         ['kode' => 'pencairan-kartu', 'nama' => 'Pencairan Belanja Kartu ke Toko (mingguan)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
-        // Keuangan: buat = membuat sesi, ubah = jadwal/peserta/saklar buka, hapus = membatalkan sesi.
+        // Keuangan: buat = membuat sesi, ubah = jadwal/peserta/saklar buka + ambil dana, distribusi,
+        // selesaikan; hapus = membatalkan sesi / penyerahan yang keliru.
         // MEMUTUS pengajuan wali sengaja di modul lain (`penarikan-tunai`, kesantrian).
         ['kode' => 'sesi-tarik-tunai', 'nama' => 'Sesi Penarikan Tunai Kegiatan (outbound/rihlah)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Pekerjaan gudang/toko: `buat` = mencatat barang datang, `hapus` = membatalkan.

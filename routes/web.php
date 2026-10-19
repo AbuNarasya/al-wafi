@@ -782,6 +782,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/{sesi}/peserta', [$c, 'tambahPeserta'])->name('peserta.tambah')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber('sesi');
         Route::delete('/{sesi}/peserta/{santri}', [$c, 'hapusPeserta'])->name('peserta.hapus')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber(['sesi', 'santri']);
         Route::post('/{sesi}/batal', [$c, 'batal'])->name('batal')->middleware('hakakses:sesi-tarik-tunai,hapus')->whereNumber('sesi');
+        Route::get('/{sesi}/rekap', [$c, 'rekap'])->name('rekap')->middleware('hakakses:sesi-tarik-tunai,lihat')->whereNumber('sesi');
+        Route::post('/{sesi}/ambil', [$c, 'ambil'])->name('ambil')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber('sesi');
+        Route::get('/{sesi}/distribusi', [$c, 'distribusi'])->name('distribusi')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber('sesi');
+        Route::post('/{sesi}/serah', [$c, 'serah'])->name('serah')->middleware(['hakakses:sesi-tarik-tunai,ubah', 'throttle:120,1'])->whereNumber('sesi');
+        Route::post('/{sesi}/serah-manual', [$c, 'serahManual'])->name('serah_manual')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber('sesi');
+        Route::post('/{sesi}/batal-serah/{id}', [$c, 'batalSerah'])->name('batal_serah')->middleware('hakakses:sesi-tarik-tunai,hapus')->whereNumber(['sesi', 'id']);
+        Route::post('/{sesi}/selesai', [$c, 'selesai'])->name('selesai')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber('sesi');
     });
     Route::prefix('kesantrian/tarik-tunai')->name('persetujuan_tarik_tunai.')->group(function () {
         $c = \App\Http\Controllers\PersetujuanTarikTunaiController::class;

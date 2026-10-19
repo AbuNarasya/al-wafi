@@ -105,6 +105,95 @@ class SesiTarikTunaiController extends Controller
             "Sesi {$sesi->nomor} dibatalkan — pengajuan yang masih hidup ikut batal dan wali dikabari.");
     }
 
+    // ---- E2: ambil dana, distribusi, selesai ----
+
+    /** Lembar rekap untuk slip penarikan bank (bisa dicetak). */
+    public function rekap(SesiTarikTunai $sesi): View
+    {
+        return view('tarik-tunai.rekap', ['sesi' => $sesi->load('bank', 'kas'), ...$this->service->rekapAmbil($sesi)]);
+    }
+
+    public function ambil(Request $request, SesiTarikTunai $sesi): RedirectResponse
+    {
+        return $this->jalankan(fn () => $this->service->ambilDana($sesi->id_sesi, $request->user()->id_pengguna),
+            'Dana dicatat sudah diambil — jurnal D Kas Tunai Kegiatan / K Bank dibukukan. Sesi masuk tahap distribusi.');
+    }
+
+    /** Layar distribusi: tempel kartu → tampil nama & nominal → Serahkan. */
+    public function distribusi(Request $request, SesiTarikTunai $sesi): View|RedirectResponse
+    {
+        if ($sesi->status !== 'dana_diambil') {
+            return redirect()->route('tarik_tunai.show', $sesi->id_sesi)->with('error', 'Distribusi hanya sesudah dana diambil dan sebelum sesi diselesaikan.');
+        }
+        $siap = null;
+        $galat = null;
+        if ($request->filled('uid')) {
+            try {
+                $siap = $this->service->pengajuanUntukKartu($sesi->id_sesi, $request->query('uid'));
+            } catch (AppException $e) {
+                $galat = $e->getMessage();
+            }
+        }
+        $semua = $sesi->pengajuan()->with(['santri:id,nama,nis', 'penyerah'])->whereIn('status', ['disetujui', 'diserahkan'])->get()->sortBy('santri.nama');
+        $diserahkan = $semua->where('status', 'diserahkan');
+
+        return view('tarik-tunai.distribusi', [
+            'sesi' => $sesi, 'siap' => $siap, 'galat' => $galat,
+            'belum' => $semua->where('status', 'disetujui')->values(),
+            'sudah' => $diserahkan->sortByDesc('diserahkan_pada')->values(),
+            'totalSerah' => $diserahkan->reduce(fn ($t, $p) => \App\Support\Money::add($t, $p->nominal_disetujui), '0'),
+        ]);
+    }
+
+    public function serah(Request $request, SesiTarikTunai $sesi): RedirectResponse
+    {
+        $data = $request->validate(['uid' => ['required', 'string', 'max:100']]);
+        try {
+            $p = $this->service->serahLewatKartu($sesi->id_sesi, $data['uid'], $request->user()->id_pengguna);
+        } catch (AppException $e) {
+            return redirect()->route('tarik_tunai.distribusi', $sesi->id_sesi)->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('tarik_tunai.distribusi', $sesi->id_sesi)
+            ->with('status', "Rp ".number_format((float) $p->nominal_disetujui, 0, ',', '.')." diserahkan kepada {$p->santri->nama}.");
+    }
+
+    public function serahManual(Request $request, SesiTarikTunai $sesi): RedirectResponse
+    {
+        $data = $request->validate(['id_pengajuan' => ['required', 'integer'], 'alasan' => ['required', 'string', 'max:255']]);
+        $p = $sesi->pengajuan()->findOrFail($data['id_pengajuan']);
+        try {
+            $p = $this->service->serahManual($p->id, $data['alasan'], $request->user()->id_pengguna);
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('status', "Rp ".number_format((float) $p->nominal_disetujui, 0, ',', '.')." diserahkan kepada {$p->santri->nama} (tanpa kartu).");
+    }
+
+    public function batalSerah(Request $request, SesiTarikTunai $sesi, int $id): RedirectResponse
+    {
+        $data = $request->validate(['alasan' => ['required', 'string', 'max:255']]);
+        $p = $sesi->pengajuan()->findOrFail($id);
+
+        return $this->jalankan(fn () => $this->service->batalSerah($p->id, $data['alasan'], $request->user()->id_pengguna),
+            'Penyerahan dibatalkan — uang saku dikembalikan ke dompet santri.');
+    }
+
+    public function selesai(Request $request, SesiTarikTunai $sesi): RedirectResponse
+    {
+        $data = $request->validate(['uang_fisik' => ['required', 'numeric', 'min:0']]);
+
+        try {
+            $sesi = $this->service->selesaikan($sesi->id_sesi, (string) $data['uang_fisik'], $request->user()->id_pengguna);
+        } catch (AppException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('tarik_tunai.show', $sesi->id_sesi)->with('status', 'Sesi selesai. Jurnal penutup dibukukan; setorkan sisa Rp '
+            .number_format((float) $sesi->sisa_disetor, 0, ',', '.').' ke rekening bank.');
+    }
+
     private function validasi(Request $request): array
     {
         return $request->validate([

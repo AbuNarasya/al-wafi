@@ -61,6 +61,8 @@ final class SumberModul
         'ImporDataAwal',
         // Pindah buku belanja kartu santri dari rekening penampung titipan ke kas toko.
         'PencairanKartu',
+        // Penarikan tunai kegiatan: ambil dana (D Kas Kegiatan / K Bank) & penutup sesi.
+        'SesiTarikTunai',
     ];
 
     public static function isValid(string $v): bool

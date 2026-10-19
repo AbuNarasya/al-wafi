@@ -22,12 +22,25 @@ class PengajuanTarikTunai extends Model
 
     protected $fillable = [
         'nomor', 'id_sesi', 'id_santri', 'id_wali', 'peran', 'nominal', 'nominal_disetujui', 'status', 'alasan_tolak',
-        'diputus_oleh', 'diputus_pada',
+        'diputus_oleh', 'diputus_pada', 'diserahkan_pada', 'diserahkan_oleh', 'cara_serah', 'alasan_manual', 'id_mutasi_dompet',
     ];
 
     protected function casts(): array
     {
-        return ['nominal' => 'decimal:2', 'nominal_disetujui' => 'decimal:2', 'diputus_pada' => 'datetime'];
+        return ['nominal' => 'decimal:2', 'nominal_disetujui' => 'decimal:2', 'diputus_pada' => 'datetime', 'diserahkan_pada' => 'datetime'];
+    }
+
+    /** Pecahan uang untuk satu santri: lembar Rp 100.000 sebanyak mungkin, sisanya satu Rp 50.000. */
+    public function pecahan(): array
+    {
+        $n = (int) $this->nominalBerlaku();
+
+        return ['100000' => intdiv($n, 100000), '50000' => intdiv($n % 100000, 50000)];
+    }
+
+    public function penyerah(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'diserahkan_oleh', 'id_pengguna');
     }
 
     /** Status yang dilihat orang: `diajukan` yang melewati batas persetujuan sesinya = gugur. */

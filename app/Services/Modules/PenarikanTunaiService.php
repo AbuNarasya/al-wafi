@@ -280,6 +280,202 @@ class PenarikanTunaiService
         return $p;
     }
 
+    // ---- E2: ambil dana, distribusi, selesai (keuangan) ----
+
+    /** Untuk slip penarikan bank: pengajuan disetujui/diserahkan, totalnya, & jumlah lembar per pecahan. */
+    public function rekapAmbil(SesiTarikTunai $sesi): array
+    {
+        $baris = $sesi->pengajuan()->with('santri:id,nama,nis')->whereIn('status', ['disetujui', 'diserahkan'])->orderBy('id')->get();
+        $total = '0';
+        $lembar = ['100000' => 0, '50000' => 0];
+        foreach ($baris as $p) {
+            $total = Money::add($total, $p->nominalBerlaku());
+            foreach ($p->pecahan() as $pecahan => $n) {
+                $lembar[$pecahan] += $n;
+            }
+        }
+
+        return ['baris' => $baris, 'total' => Money::of($total), 'lembar' => $lembar];
+    }
+
+    /** "Dana sudah diambil": D Kas Tunai Kegiatan / K Bank sebesar seluruh yang disetujui. */
+    public function ambilDana(int $idSesi, int $idPengguna): SesiTarikTunai
+    {
+        return DB::transaction(function () use ($idSesi, $idPengguna) {
+            $sesi = SesiTarikTunai::lockForUpdate()->find($idSesi) ?? throw new AppException(404, 'Sesi tidak ditemukan.');
+            if ($sesi->status !== 'berjalan') {
+                throw new AppException(422, 'Dana sesi ini sudah diambil atau sesinya sudah ditutup.');
+            }
+            if ($sesi->tahap() !== 'siap_ambil') {
+                throw new AppException(422, 'Dana baru bisa diambil sesudah batas persetujuan lewat ('.$sesi->batas_persetujuan->format('d/m/Y H:i').').');
+            }
+            $total = $this->rekapAmbil($sesi)['total'];
+            if (! Money::gtZero($total)) {
+                throw new AppException(422, 'Tidak ada pengajuan yang disetujui. Batalkan sesi ini bila kegiatannya tak jadi memakai uang tunai.');
+            }
+            $jurnal = \App\Services\Ledger\PostingService::postJournal([
+                'referensi' => $sesi->nomor, 'tanggal' => now()->toDateString(), 'sumber_modul' => SesiTarikTunai::SUMBER,
+                'id_sumber' => $sesi->nomor, 'id_pengguna' => $idPengguna, 'keterangan' => "Ambil dana uang saku kegiatan — {$sesi->nama}",
+                'lines' => [
+                    ['kode_coa' => $sesi->kode_coa_kas, 'debet' => $total, 'kredit' => '0'],
+                    ['kode_coa' => $sesi->kode_coa_bank, 'debet' => '0', 'kredit' => $total],
+                ],
+            ]);
+            $sesi->update(['status' => 'dana_diambil', 'dibuka' => false, 'total_diambil' => $total, 'dana_diambil_pada' => now(),
+                'dana_diambil_oleh' => $idPengguna, 'journal_ambil_id' => $jurnal->id]);
+
+            return $sesi;
+        });
+    }
+
+    /** Pengajuan disetujui milik kartu yang ditempel — untuk ditampilkan sebelum diserahkan. */
+    public function pengajuanUntukKartu(int $idSesi, ?string $uid): PengajuanTarikTunai
+    {
+        $kartu = (new KartuSantriService)->cariAktif($uid) ?? throw new AppException(422, 'Kartu tidak dikenal atau sudah diblokir.');
+        $p = PengajuanTarikTunai::with(['santri', 'sesi'])->where('id_sesi', $idSesi)->where('id_santri', $kartu->id_santri)
+            ->whereIn('status', ['disetujui', 'diserahkan'])->first();
+        if (! $p) {
+            throw new AppException(422, "{$kartu->santri->nama} tidak punya pengajuan yang disetujui di sesi ini.");
+        }
+        if ($p->status === 'diserahkan') {
+            throw new AppException(422, "{$kartu->santri->nama} SUDAH menerima ".self::rp($p->nominal_disetujui).' pada '.$p->diserahkan_pada->format('d/m H:i').'.');
+        }
+
+        return $p;
+    }
+
+    public function serahLewatKartu(int $idSesi, ?string $uid, int $idPengguna): PengajuanTarikTunai
+    {
+        return $this->serah($this->pengajuanUntukKartu($idSesi, $uid)->id, 'kartu', null, $idPengguna);
+    }
+
+    /** Kartu hilang/rusak: penyerahan dipilih dari daftar, alasannya wajib & tercatat. */
+    public function serahManual(int $idPengajuan, string $alasan, int $idPengguna): PengajuanTarikTunai
+    {
+        if (trim($alasan) === '') {
+            throw new AppException(422, 'Alasan penyerahan tanpa kartu wajib diisi.');
+        }
+
+        return $this->serah($idPengajuan, 'manual', trim($alasan), $idPengguna);
+    }
+
+    /** Penyerahan keliru — selama sesi belum selesai: saldo kembali, mutasinya ditandai ditolak beserta alasan. */
+    public function batalSerah(int $idPengajuan, string $alasan, int $idPengguna): PengajuanTarikTunai
+    {
+        return DB::transaction(function () use ($idPengajuan, $alasan, $idPengguna) {
+            $p = PengajuanTarikTunai::with(['sesi', 'santri'])->lockForUpdate()->find($idPengajuan) ?? throw new AppException(404, 'Pengajuan tidak ditemukan.');
+            if ($p->status !== 'diserahkan' || $p->sesi->status !== 'dana_diambil') {
+                throw new AppException(422, 'Hanya penyerahan di sesi yang belum diselesaikan yang bisa dibatalkan.');
+            }
+            $dompet = DompetSantri::where('id_santri', $p->id_santri)->lockForUpdate()->first();
+            $dompet->update(['saldo' => Money::add($dompet->saldo, $p->nominal_disetujui)]);
+            $mutasi = \App\Models\MutasiDompet::find($p->id_mutasi_dompet);
+            $mutasi?->update(['status' => 'ditolak', 'keterangan' => "{$mutasi->keterangan} — DIBATALKAN: {$alasan}"]);
+            \App\Support\Audit\Jejak::catat('batal_serah_tarik_tunai', [
+                'modul' => 'sesi-tarik-tunai', 'ref_jenis' => 'PengajuanTarikTunai', 'ref_id' => $p->id,
+                'detail' => ['nominal' => (string) $p->nominal_disetujui, 'alasan' => $alasan, 'mutasi' => $mutasi?->nomor], 'id_pengguna' => $idPengguna,
+            ]);
+            $p->update(['status' => 'disetujui', 'diserahkan_pada' => null, 'diserahkan_oleh' => null, 'cara_serah' => null,
+                'alasan_manual' => null, 'id_mutasi_dompet' => null]);
+
+            return $p;
+        });
+    }
+
+    /**
+     * Tutup sesi. Uang fisik sisa WAJIB sama dengan hitungan (keputusan user 19 Okt 2026) —
+     * selisih berarti ada salah serah yang harus dicari dulu. Jurnal ringkas:
+     * D Titipan Santri (diserahkan) + D Bank (sisa disetor) / K Kas Tunai Kegiatan (diambil).
+     */
+    public function selesaikan(int $idSesi, string $uangFisik, int $idPengguna): SesiTarikTunai
+    {
+        [$sesi, $takDiambil] = DB::transaction(function () use ($idSesi, $uangFisik, $idPengguna) {
+            $sesi = SesiTarikTunai::lockForUpdate()->find($idSesi) ?? throw new AppException(404, 'Sesi tidak ditemukan.');
+            if ($sesi->status !== 'dana_diambil') {
+                throw new AppException(422, 'Hanya sesi yang dananya sudah diambil yang bisa diselesaikan.');
+            }
+            $diserahkan = $sesi->pengajuan()->where('status', 'diserahkan')->get();
+            $totalSerah = Money::of($diserahkan->reduce(fn ($t, $p) => Money::add($t, $p->nominal_disetujui), '0'));
+            $sisa = Money::sub($sesi->total_diambil, $totalSerah);
+            $fisik = Money::of($uangFisik);
+            if (! Money::eq($fisik, $sisa)) {
+                throw new AppException(422, 'Uang fisik '.self::rp($fisik).' tidak sama dengan hitungan '.self::rp($sisa)
+                    .' (diambil '.self::rp($sesi->total_diambil).' − diserahkan '.self::rp($totalSerah).'). Periksa penyerahan yang keliru dulu.');
+            }
+
+            $baris = [];
+            if (Money::gtZero($totalSerah)) {
+                $baris[] = ['kode_coa' => \App\Services\Ppsb\DompetPolicy::COA_TITIPAN['santri'], 'debet' => $totalSerah, 'kredit' => '0'];
+            }
+            if (Money::gtZero($sisa)) {
+                $baris[] = ['kode_coa' => $sesi->kode_coa_bank, 'debet' => $sisa, 'kredit' => '0'];
+            }
+            $baris[] = ['kode_coa' => $sesi->kode_coa_kas, 'debet' => '0', 'kredit' => $sesi->total_diambil];
+            $jurnal = \App\Services\Ledger\PostingService::postJournal([
+                'referensi' => $sesi->nomor.'-S', 'tanggal' => now()->toDateString(), 'sumber_modul' => SesiTarikTunai::SUMBER,
+                'id_sumber' => $sesi->nomor, 'id_pengguna' => $idPengguna,
+                'keterangan' => "Penutup uang saku kegiatan — {$sesi->nama}: diserahkan ".self::rp($totalSerah).', disetor balik '.self::rp($sisa),
+                'lines' => $baris,
+            ]);
+            \App\Models\MutasiDompet::whereIn('id', $diserahkan->pluck('id_mutasi_dompet')->filter())->update(['journal_entry_id' => $jurnal->id]);
+
+            $takDiambil = $sesi->pengajuan()->with('santri:id,nama')->where('status', 'disetujui')->get();
+            $sesi->pengajuan()->where('status', 'disetujui')->update(['status' => 'tak_diambil']);
+            $sesi->update(['status' => 'selesai', 'total_diserahkan' => $totalSerah, 'sisa_disetor' => $sisa,
+                'selesai_pada' => now(), 'selesai_oleh' => $idPengguna, 'journal_selesai_id' => $jurnal->id]);
+
+            return [$sesi, $takDiambil];
+        });
+        foreach ($takDiambil as $p) {
+            $this->kabari($p, 'Uang saku kegiatan tidak diambil', "{$sesi->nama}: ".self::rp($p->nominal_disetujui)
+                ." untuk {$p->santri->nama} tidak diambil. Uang saku kembali bisa dipakai seperti biasa.");
+        }
+
+        return $sesi;
+    }
+
+    private function serah(int $idPengajuan, string $cara, ?string $alasan, int $idPengguna): PengajuanTarikTunai
+    {
+        $p = DB::transaction(function () use ($idPengajuan, $cara, $alasan, $idPengguna) {
+            $p = PengajuanTarikTunai::with(['sesi', 'santri'])->lockForUpdate()->find($idPengajuan) ?? throw new AppException(404, 'Pengajuan tidak ditemukan.');
+            if ($p->sesi->status !== 'dana_diambil') {
+                throw new AppException(422, 'Distribusi hanya sesudah dana diambil dan sebelum sesi diselesaikan.');
+            }
+            if ($p->status === 'diserahkan') {
+                throw new AppException(422, "{$p->santri->nama} SUDAH menerima uangnya.");
+            }
+            if ($p->status !== 'disetujui') {
+                throw new AppException(422, "Pengajuan {$p->santri->nama} tidak berstatus disetujui.");
+            }
+            $nominal = Money::of($p->nominal_disetujui);
+            $dompet = DompetSantri::where('id_santri', $p->id_santri)->lockForUpdate()->first();
+            if (! $dompet || $dompet->kunci_tarik) {
+                throw new AppException(422, "Uang saku {$p->santri->nama} sedang dikunci dari penarikan. Buka kuncinya dulu di menu Dompet & Tabungan.");
+            }
+            if (Money::lt($dompet->saldo, $nominal)) {
+                throw new AppException(422, "Saldo uang saku {$p->santri->nama} kini hanya ".self::rp($dompet->saldo).' — tak cukup untuk '.self::rp($nominal).'.');
+            }
+            $saldo = Money::sub($dompet->saldo, $nominal);
+            $dompet->update(['saldo' => $saldo]);
+            $base = DocNumber::docBase('DMP', now());
+            // Tanpa jurnal di sini — jurnalnya ringkas saat sesi diselesaikan, lalu ditautkan ke mutasi ini.
+            $mutasi = \App\Models\MutasiDompet::create([
+                'nomor' => DocNumber::nextDocNumber($base, \App\Models\MutasiDompet::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor')),
+                'pemilik' => 'santri', 'id_dompet' => $dompet->id, 'jenis' => 'tarik', 'nominal' => $nominal, 'saldo_setelah' => $saldo,
+                'tanggal' => now()->toDateString(), 'status' => 'terverifikasi', 'kode_rekening' => $p->sesi->kode_coa_kas,
+                'keterangan' => "Uang saku kegiatan {$p->sesi->nama} — {$p->nomor}".($cara === 'manual' ? " (tanpa kartu: {$alasan})" : ''),
+                'dicatat_oleh' => $idPengguna, 'diverifikasi_oleh' => $idPengguna, 'diverifikasi_pada' => now(),
+            ]);
+            $p->update(['status' => 'diserahkan', 'diserahkan_pada' => now(), 'diserahkan_oleh' => $idPengguna, 'cara_serah' => $cara,
+                'alasan_manual' => $alasan, 'id_mutasi_dompet' => $mutasi->id]);
+
+            return $p;
+        });
+        $this->kabari($p, 'Uang saku kegiatan sudah diterima', "{$p->sesi->nama}: ".self::rp($p->nominal_disetujui)." diterima {$p->santri->nama}.");
+
+        return $p;
+    }
+
     /** Ringkasan per sesi untuk layar staf. */
     public function rekap(SesiTarikTunai $sesi): array
     {

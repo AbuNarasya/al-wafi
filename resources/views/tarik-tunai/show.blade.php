@@ -65,6 +65,46 @@
         <div class="rounded-xl border border-gray-200 bg-white p-3"><div class="text-xs text-gray-500">Ditolak / gugur / batal</div><div class="text-xl font-bold tabular-nums">{{ ($rekap['jumlah']['ditolak'] ?? 0) + ($rekap['jumlah']['gugur'] ?? 0) + ($rekap['jumlah']['dibatalkan'] ?? 0) }}</div></div>
     </div>
 
+    @php $bolehKerja = \App\Support\Akses::boleh('sesi-tarik-tunai', 'ubah'); @endphp
+    @if ($sesi->tahap() === 'siap_ambil')
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm">
+            <div class="text-sky-900">Batas persetujuan sudah lewat. Tarik <b>{{ $rp($rekap['disetujui']) }}</b> dari {{ $sesi->bank?->nama_rekening }}, lalu catat di sini.</div>
+            <div class="flex gap-2">
+                <a href="{{ route('tarik_tunai.rekap', $sesi->id_sesi) }}" class="rounded-lg border border-sky-300 bg-white px-3 py-2 font-semibold text-sky-800 hover:bg-sky-100">Rekap & pecahan</a>
+                @if ($bolehKerja)
+                    <form method="POST" action="{{ route('tarik_tunai.ambil', $sesi->id_sesi) }}" data-confirm="Catat dana Rp {{ number_format((float) $rekap['disetujui'], 0, ',', '.') }} sudah diambil dari bank? Jurnal D Kas Tunai Kegiatan / K Bank dibukukan.">
+                        @csrf<button class="rounded-lg bg-sky-600 px-3 py-2 font-semibold text-white hover:bg-sky-700">Dana sudah diambil</button>
+                    </form>
+                @endif
+            </div>
+        </div>
+    @elseif ($sesi->status === 'dana_diambil')
+        <div class="mb-6 flex flex-wrap items-end justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+            <div class="text-emerald-900">
+                Dana {{ $rp($sesi->total_diambil) }} diambil {{ $sesi->dana_diambil_pada->format('d/m/Y H:i') }}.
+                Diserahkan {{ $rekap['jumlah']['diserahkan'] ?? 0 }} dari {{ ($rekap['jumlah']['diserahkan'] ?? 0) + ($rekap['jumlah']['disetujui'] ?? 0) }} santri.
+                <a href="{{ route('tarik_tunai.rekap', $sesi->id_sesi) }}" class="ml-1 underline">Rekap</a>
+            </div>
+            @if ($bolehKerja)
+                <div class="flex flex-wrap items-end gap-2">
+                    <a href="{{ route('tarik_tunai.distribusi', $sesi->id_sesi) }}" class="rounded-lg bg-emerald-600 px-3 py-2 font-semibold text-white hover:bg-emerald-700">Buka layar distribusi</a>
+                    <form method="POST" action="{{ route('tarik_tunai.selesai', $sesi->id_sesi) }}" class="flex items-end gap-2"
+                          data-confirm="Selesaikan sesi? Pengajuan yang belum diambil dilepas dan jurnal penutup dibukukan.">
+                        @csrf
+                        <div><label class="mb-1 block text-xs text-emerald-900">Uang fisik sisa (dihitung)</label>
+                            <input type="number" name="uang_fisik" min="0" step="1" required value="{{ old('uang_fisik') }}" class="w-36 rounded-lg border-gray-300 text-right text-sm"></div>
+                        <button class="rounded-lg border border-emerald-600 bg-white px-3 py-2 font-semibold text-emerald-700 hover:bg-emerald-100">Selesaikan sesi</button>
+                    </form>
+                </div>
+            @endif
+        </div>
+    @elseif ($sesi->status === 'selesai')
+        <div class="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+            Selesai {{ $sesi->selesai_pada->format('d/m/Y H:i') }}: diambil {{ $rp($sesi->total_diambil) }} · diserahkan {{ $rp($sesi->total_diserahkan) }}
+            · disetor balik {{ $rp($sesi->sisa_disetor) }}. <a href="{{ route('tarik_tunai.rekap', $sesi->id_sesi) }}" class="underline">Rekap</a>
+        </div>
+    @endif
+
     @if ($bolehUbah)
         <details class="mb-6 rounded-xl border border-gray-200 bg-white shadow-sm" @if ($errors->any()) open @endif>
             <summary class="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-800">Ubah jadwal & batas</summary>

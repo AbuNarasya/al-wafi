@@ -19,6 +19,7 @@ use App\Models\TabunganSantri;
 use App\Models\User;
 use App\Models\Wali;
 use App\Services\Modules\DompetService;
+use App\Services\Modules\KartuSantriService;
 use App\Services\Modules\PenarikanTunaiService;
 use App\Services\PortalWali\PinTransaksi;
 use App\Services\Ppsb\DompetPolicy;
@@ -281,6 +282,109 @@ class PenarikanTunaiTest extends TestCase
         $this->actingAs($this->kesantrian)->post(route('persetujuan_tarik_tunai.setujui', $p->id), ['nominal' => 100000])
             ->assertSessionHas('status', fn ($s) => str_contains($s, 'Rp 100.000'));
         $this->assertSame('100000.00', $p->fresh()->nominal_disetujui);
+    }
+
+    // ---- E2 ----
+
+    private function saldoAkun(string $coa): string
+    {
+        return \App\Support\Money::sub(\App\Models\JournalLine::where('kode_coa', $coa)->sum('debet'), \App\Models\JournalLine::where('kode_coa', $coa)->sum('kredit'));
+    }
+
+    private function uangSaku(Santri $s): string
+    {
+        return DompetSantri::where('id_santri', $s->id)->value('saldo');
+    }
+
+    /** Sesi dua peserta: Ahmad disetujui 250.000, Fatimah 100.000; lalu batas persetujuan lewat. */
+    private function sesiSiapAmbil(): SesiTarikTunai
+    {
+        $sesi = $this->svc->buatSesi($this->jadwal(['maks_per_santri' => 300000]), [$this->ahmad->id, $this->fatimah->id], $this->keuangan->id_pengguna);
+        $this->svc->aturDibuka($sesi->id_sesi, true);
+        $this->svc->setujui($this->ajukan($sesi, 250000)->id, null, $this->kesantrian->id_pengguna);
+        $this->svc->setujui($this->ajukan($sesi, 100000, $this->fatimah)->id, null, $this->kesantrian->id_pengguna);
+        $this->travel(3)->days();
+        $this->travel(1)->hours();
+
+        return $sesi->fresh();
+    }
+
+    public function test_ambil_dana_menjurnal_dan_rekap_pecahan(): void
+    {
+        $sesi = $this->svc->buatSesi($this->jadwal(['maks_per_santri' => 300000]), [$this->ahmad->id], $this->keuangan->id_pengguna);
+        $this->svc->aturDibuka($sesi->id_sesi, true);
+        $this->svc->setujui($this->ajukan($sesi, 250000)->id, null, $this->kesantrian->id_pengguna);
+        $this->galat(fn () => $this->svc->ambilDana($sesi->id_sesi, $this->keuangan->id_pengguna), '/sesudah batas persetujuan/');
+
+        $this->travel(3)->days();
+        $this->travel(1)->hours();
+        $rekap = $this->svc->rekapAmbil($sesi->fresh());
+        $this->assertSame(['250000.00', ['100000' => 2, '50000' => 1]], [$rekap['total'], $rekap['lembar']]);
+
+        $this->svc->ambilDana($sesi->id_sesi, $this->keuangan->id_pengguna);
+        $this->assertSame(['dana_diambil', 'distribusi', '250000.00'], [$sesi->fresh()->status, $sesi->fresh()->tahap(), $sesi->fresh()->total_diambil]);
+        $this->assertSame(['250000.00', '-250000.00'], [$this->saldoAkun('1.ZZTT.KAS'), $this->saldoAkun('1.ZZTT.BNK')]);
+        $this->assertSame('250000.00', PenarikanTunaiService::cadangan($this->ahmad->id));   // tetap dicadangkan sampai diserahkan
+        $this->galat(fn () => $this->svc->ambilDana($sesi->id_sesi, $this->keuangan->id_pengguna), '/sudah diambil/');
+        $this->galat(fn () => $this->svc->batalSesi($sesi->id_sesi, 'x', $this->keuangan->id_pengguna), '/tak bisa diubah/');
+    }
+
+    public function test_distribusi_tap_manual_batal_dan_selesai_wajib_cocok(): void
+    {
+        (new KartuSantriService)->pasang($this->ahmad->id, 'KARTU-AHMAD', $this->keuangan->id_pengguna);
+        $sesi = $this->sesiSiapAmbil();
+        $this->galat(fn () => $this->svc->serahLewatKartu($sesi->id_sesi, 'KARTU-AHMAD', $this->keuangan->id_pengguna), '/sesudah dana diambil/');
+        $this->svc->ambilDana($sesi->id_sesi, $this->keuangan->id_pengguna);   // 350.000
+
+        $this->galat(fn () => $this->svc->serahLewatKartu($sesi->id_sesi, 'KARTU-LAIN', $this->keuangan->id_pengguna), '/tidak dikenal/');
+        $a = $this->svc->serahLewatKartu($sesi->id_sesi, 'KARTU-AHMAD', $this->keuangan->id_pengguna);
+        $this->assertSame(['diserahkan', 'kartu', '50000.00', '0.00'], [$a->status, $a->cara_serah, $this->uangSaku($this->ahmad), PenarikanTunaiService::cadangan($this->ahmad->id)]);
+        $m = \App\Models\MutasiDompet::find($a->id_mutasi_dompet);
+        $this->assertSame(['tarik', '250000.00', null], [$m->jenis, $m->nominal, $m->journal_entry_id]);
+        $this->galat(fn () => $this->svc->serahLewatKartu($sesi->id_sesi, 'KARTU-AHMAD', $this->keuangan->id_pengguna), '/SUDAH menerima/');
+        $this->assertSame(1, NotifikasiWali::where('judul', 'Uang saku kegiatan sudah diterima')->count());
+
+        // Fatimah tanpa kartu → keliru → dibatalkan → saldo kembali.
+        $f = PengajuanTarikTunai::where('id_santri', $this->fatimah->id)->sole();
+        $this->galat(fn () => $this->svc->serahManual($f->id, ' ', $this->keuangan->id_pengguna), '/Alasan/');
+        $this->svc->serahManual($f->id, 'kartu tertinggal', $this->keuangan->id_pengguna);
+        $this->assertSame('0.00', $this->uangSaku($this->fatimah));
+        $this->svc->batalSerah($f->id, 'salah orang', $this->keuangan->id_pengguna);
+        $this->assertSame(['disetujui', '100000.00'], [$f->fresh()->status, $this->uangSaku($this->fatimah)]);
+        $this->assertSame('ditolak', \App\Models\MutasiDompet::where('jenis', 'tarik')->where('nominal', 100000)->sole()->status);
+
+        // Uang fisik sisa harus 100.000 (350.000 − 250.000).
+        $this->galat(fn () => $this->svc->selesaikan($sesi->id_sesi, '90000', $this->keuangan->id_pengguna), '/tidak sama dengan hitungan Rp 100.000/');
+        $this->svc->selesaikan($sesi->id_sesi, '100000', $this->keuangan->id_pengguna);
+
+        $s = $sesi->fresh();
+        $this->assertSame(['selesai', '250000.00', '100000.00'], [$s->status, $s->total_diserahkan, $s->sisa_disetor]);
+        $this->assertSame('0.00', $this->saldoAkun('1.ZZTT.KAS'));                                 // kas kegiatan kembali nol
+        $this->assertSame('-250000.00', $this->saldoAkun('1.ZZTT.BNK'));                          // −350.000 + 100.000 setor balik
+        $this->assertSame('250000.00', $this->saldoAkun(DompetPolicy::COA_TITIPAN['santri']));    // titipan berkurang
+        $this->assertSame($s->journal_selesai_id, $m->fresh()->journal_entry_id);
+        $this->assertSame(['tak_diambil', '0.00'], [$f->fresh()->status, PenarikanTunaiService::cadangan($this->fatimah->id)]);
+        $this->assertSame(1, NotifikasiWali::where('judul', 'Uang saku kegiatan tidak diambil')->count());
+        $this->galat(fn () => $this->svc->serahManual($f->id, 'x', $this->keuangan->id_pengguna), '/sebelum sesi diselesaikan/');
+    }
+
+    public function test_layar_rekap_dan_distribusi(): void
+    {
+        (new KartuSantriService)->pasang($this->ahmad->id, 'KARTU-AHMAD', $this->keuangan->id_pengguna);
+        $sesi = $this->sesiSiapAmbil();
+        $this->actingAs($this->keuangan)->get(route('tarik_tunai.show', $sesi->id_sesi))->assertOk()->assertSee('Dana sudah diambil');
+        $this->actingAs($this->keuangan)->get(route('tarik_tunai.rekap', $sesi->id_sesi))->assertOk()->assertSee('Rp 350.000')->assertSee('3 lembar');
+        $this->actingAs($this->keuangan)->post(route('tarik_tunai.ambil', $sesi->id_sesi))->assertSessionHas('status');
+
+        $this->actingAs($this->keuangan)->get(route('tarik_tunai.distribusi', $sesi->id_sesi).'?uid=KARTU-AHMAD')->assertOk()
+            ->assertSee('Serahkan kepada')->assertSee('AHMAD')->assertSee('Rp 250.000');
+        $this->actingAs($this->keuangan)->post(route('tarik_tunai.serah', $sesi->id_sesi), ['uid' => 'KARTU-AHMAD'])
+            ->assertRedirect(route('tarik_tunai.distribusi', $sesi->id_sesi))->assertSessionHas('status', 'Rp 250.000 diserahkan kepada AHMAD.');
+        $this->actingAs($this->keuangan)->get(route('tarik_tunai.distribusi', $sesi->id_sesi).'?uid=KARTU-AHMAD')->assertSee('SUDAH menerima');
+        $this->actingAs($this->kesantrian)->get(route('tarik_tunai.distribusi', $sesi->id_sesi))->assertForbidden();
+        $this->actingAs($this->keuangan)->post(route('tarik_tunai.selesai', $sesi->id_sesi), ['uang_fisik' => 100000])
+            ->assertRedirect(route('tarik_tunai.show', $sesi->id_sesi));
+        $this->assertSame('selesai', $sesi->fresh()->status);
     }
 
     public function test_portal_wali(): void
