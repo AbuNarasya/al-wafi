@@ -47,8 +47,13 @@ class CompanySettingsController extends Controller
             'kode_unit_neraca' => ['nullable', 'string', 'exists:business_units,kode_unit'],
             'kode_coa_grni' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
             'batas_jajan_harian' => ['nullable', 'numeric', 'min:0'],
+            'kode_unit_wafimart' => ['nullable', 'string', 'exists:business_units,kode_unit'],
             'keterangan' => ['nullable', 'string'],
         ]);
+        // Tak terkirim (formulir lama) = biarkan; terkirim kosong = dikosongkan.
+        if ($request->has('kode_unit_wafimart')) {
+            $data['kode_unit_wafimart'] = ($data['kode_unit_wafimart'] ?? null) ?: null;
+        }
         $data['kode_coa_grni'] = ($data['kode_coa_grni'] ?? null) ?: null;
         // Tak terkirim (formulir lama) = biarkan nilai tersimpan; jangan diam-diam jadi nol.
         if (($data['batas_jajan_harian'] ?? null) === null) {

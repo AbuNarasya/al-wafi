@@ -82,8 +82,6 @@ final class Navigation
         ['url' => '/transfer-persediaan', 'label' => 'Transfer Antar Lokasi', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'transfer-persediaan'],
         ['url' => '/opname-persediaan', 'label' => 'Stok Opname', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'opname-persediaan'],
         ['url' => '/lokasi-persediaan', 'label' => 'Lokasi Persediaan', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'lokasi-persediaan'],
-        ['url' => '/kategori-barang', 'label' => 'Kategori Barang', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'kategori-barang'],
-        ['url' => '/merk-barang', 'label' => 'Merk Barang', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'merk-barang'],
         ['url' => '/asset-categories', 'label' => 'Kategori Aset', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'asset-categories'],
         ['url' => '/assets', 'label' => 'Aset Tetap', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'assets'],
         // Menyusul Aset Tetap: ia pintu keluarnya, dan sejak ada di sini tombol
@@ -91,9 +89,6 @@ final class Navigation
         ['url' => '/assets/pelepasan', 'label' => 'Pelepasan Aset', 'group' => 'KEUANGAN', 'sub' => 'Aset & Persediaan', 'modul' => 'assets'],
 
         ['url' => '/purchase-orders', 'label' => 'Purchase Order', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'purchase-orders'],
-        ['url' => '/pos', 'label' => 'Kasir (POS)', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'pos'],
-        ['url' => '/shift-kasir', 'label' => 'Shift Kasir & Setoran', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'shift-kasir'],
-        ['url' => '/pencairan-kartu', 'label' => 'Pencairan Belanja Kartu', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'pencairan-kartu'],
         ['url' => '/tarik-tunai', 'label' => 'Penarikan Tunai Kegiatan', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'sesi-tarik-tunai'],
         ['url' => '/penerimaan-barang', 'label' => 'Penerimaan Barang', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'penerimaan-barang'],
         ['url' => '/perintah-pembayaran', 'label' => 'Perintah Pembayaran', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'perintah-pembayaran'],
@@ -109,7 +104,6 @@ final class Navigation
         ['url' => '/bank-reconciliation', 'label' => 'Rekonsiliasi Bank', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'bank-reconciliation'],
         ['url' => '/journal', 'label' => 'Jurnal Umum', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'journal'],
 
-        ['url' => '/laporan-toko', 'label' => 'Laporan Toko (Wafi Mart)', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'laporan-toko'],
         ['url' => '/reports/neraca', 'label' => 'Laporan Posisi Keuangan', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
         ['url' => '/reports/laba-rugi', 'label' => 'Penghasilan Komprehensif', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
         // Format nirlaba (ISAK 35) mendahului format perusahaan: yayasan yang
@@ -150,6 +144,35 @@ final class Navigation
         ['url' => '/dana/laporan', 'label' => 'Laporan Pertanggungjawaban Dana', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'dana'],
         ['url' => '/period-close', 'label' => 'Tutup Buku Periode', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'period-close'],
         ['url' => '/export', 'label' => 'Export Data', 'group' => 'KEUANGAN', 'sub' => 'Kontrol', 'modul' => 'reports'],
+
+        // ---- Wafi Mart (keputusan user 19 Okt 2026) ----
+        // Satu grup untuk seluruh pekerjaan toko, supaya Wafi Mart terasa usaha tersendiri.
+        // Layar persediaan, PO, dan Kartu Santri dipakai BERSAMA Al Wafi, jadi tampil di dua
+        // grup — URL sama, grup yang terbuka mengikuti grup terakhir yang dipakai (lihat
+        // activeItem). Bukunya tetap satu: laporan di sini hanya tersaring unit Wafi Mart
+        // (`company_settings.kode_unit_wafimart`); neraca terpisah baru ada di instans sendiri.
+        ['url' => '/lokasi-persediaan', 'label' => 'Toko & Gudang (Lokasi)', 'group' => 'WAFI MART', 'sub' => 'Setting Awal', 'modul' => 'lokasi-persediaan'],
+        ['url' => '/kategori-barang', 'label' => 'Kategori Barang', 'group' => 'WAFI MART', 'sub' => 'Setting Awal', 'modul' => 'kategori-barang'],
+        ['url' => '/merk-barang', 'label' => 'Merk Barang', 'group' => 'WAFI MART', 'sub' => 'Setting Awal', 'modul' => 'merk-barang'],
+        ['url' => '/impor-data-awal', 'href' => '/impor-data-awal?jenis=barang-toko', 'label' => 'Impor Barang & Stok Awal', 'group' => 'WAFI MART', 'sub' => 'Setting Awal', 'modul' => 'impor-data-awal'],
+        ['url' => '/kartu-santri', 'label' => 'Kartu Santri (RFID)', 'group' => 'WAFI MART', 'sub' => 'Setting Awal', 'modul' => 'kartu-santri'],
+
+        ['url' => '/inventory', 'label' => 'Data Barang & Stok', 'group' => 'WAFI MART', 'sub' => 'Persediaan', 'modul' => 'inventory'],
+        ['url' => '/purchase-orders', 'label' => 'Purchase Order', 'group' => 'WAFI MART', 'sub' => 'Persediaan', 'modul' => 'purchase-orders'],
+        ['url' => '/penerimaan-barang', 'label' => 'Penerimaan Barang', 'group' => 'WAFI MART', 'sub' => 'Persediaan', 'modul' => 'penerimaan-barang'],
+        ['url' => '/transfer-persediaan', 'label' => 'Transfer Antar Gudang', 'group' => 'WAFI MART', 'sub' => 'Persediaan', 'modul' => 'transfer-persediaan'],
+        ['url' => '/opname-persediaan', 'label' => 'Stok Opname', 'group' => 'WAFI MART', 'sub' => 'Persediaan', 'modul' => 'opname-persediaan'],
+
+        ['url' => '/pos', 'label' => 'Kasir (POS)', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'pos'],
+        ['url' => '/shift-kasir', 'label' => 'Shift Kasir & Setoran', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'shift-kasir'],
+        ['url' => '/pencairan-kartu', 'label' => 'Pencairan Belanja Kartu', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'pencairan-kartu'],
+
+        ['url' => '/laporan-toko', 'label' => 'Laporan Toko', 'group' => 'WAFI MART', 'sub' => 'Laporan', 'modul' => 'laporan-toko'],
+        ['url' => '/reports/laba-rugi', 'label' => 'Laba Rugi Wafi Mart', 'group' => 'WAFI MART', 'sub' => 'Laporan', 'modul' => 'reports', 'unitWafiMart' => true],
+        ['url' => '/reports/neraca-saldo', 'label' => 'Neraca Saldo Wafi Mart', 'group' => 'WAFI MART', 'sub' => 'Laporan', 'modul' => 'reports', 'unitWafiMart' => true],
+        ['url' => '/reports/arus-kas', 'label' => 'Arus Kas Wafi Mart', 'group' => 'WAFI MART', 'sub' => 'Laporan', 'modul' => 'reports', 'unitWafiMart' => true],
+        ['url' => '/reports/buku-besar', 'label' => 'Buku Besar Wafi Mart', 'group' => 'WAFI MART', 'sub' => 'Laporan', 'modul' => 'reports', 'unitWafiMart' => true],
+        ['url' => '/reports/persediaan', 'label' => 'Laporan Persediaan', 'group' => 'WAFI MART', 'sub' => 'Laporan', 'modul' => 'reports'],
 
         // ---- 5. Data Siswa/Santri ----
         // Satu grup untuk SELURUH daftar orangnya, dari wali sampai alumni.
@@ -272,12 +295,13 @@ final class Navigation
 
     // DATA SISWA/SANTRI mendahului PPSB & KEPENDIDIKAN: isinya orang yang jadi
     // rujukan kedua grup itu, dan itu pula yang paling sering dibuka.
-    public const GROUP_ORDER = ['', 'SETTING AWAL', 'ANGGARAN', 'PENGAJUAN PEMBAYARAN', 'KEUANGAN', 'DATA SISWA/SANTRI', 'PPSB', 'KEPENDIDIKAN', 'TAGIHAN LAIN-LAIN', 'SISTEM'];
+    public const GROUP_ORDER = ['', 'SETTING AWAL', 'ANGGARAN', 'PENGAJUAN PEMBAYARAN', 'KEUANGAN', 'WAFI MART', 'DATA SISWA/SANTRI', 'PPSB', 'KEPENDIDIKAN', 'TAGIHAN LAIN-LAIN', 'SISTEM'];
 
     public const SUB_ORDER = [
         'SETTING AWAL' => ['Setting Umum', 'Setting Biaya'],
         'PENGAJUAN PEMBAYARAN' => ['Buat Pengajuan', 'Pengajuan'],
         'KEUANGAN' => ['Vendor & Customer', 'Aset & Persediaan', 'Transaksi', 'Laporan', 'Kontrol'],
+        'WAFI MART' => ['Setting Awal', 'Persediaan', 'Transaksi', 'Laporan'],
         // DATA SISWA/SANTRI sengaja TANPA sub: tujuh menunya satu deret menurut
         // perjalanan santri, dan memecahnya jadi sub cuma menambah satu ketukan
         // untuk daftar yang justru paling sering dibuka.
@@ -328,7 +352,7 @@ final class Navigation
     private static function activeItem(): ?array
     {
         $path = '/'.trim(request()->path(), '/');
-        $terbaik = null;
+        $calon = [];
         $skorTerbaik = -1;
 
         foreach (self::items() as $n) {
@@ -342,8 +366,26 @@ final class Navigation
 
             if (strlen($url) > $skorTerbaik) {
                 $skorTerbaik = strlen($url);
-                $terbaik = $n;
+                $calon = [$n];
+            } elseif (strlen($url) === $skorTerbaik) {
+                $calon[] = $n;
             }
+        }
+
+        // URL yang sama di dua grup (layar persediaan dipakai Al Wafi & Wafi Mart):
+        // pilih grup terakhir yang dipakai pengguna — membuka Persediaan dari grup
+        // WAFI MART tetap membuka grup itu. Hanya grup yang boleh dilihat yang ikut.
+        // Penanda `?nav=` (dibawa tautan sidebar item kembar) menang atas ingatan sesi.
+        $terbaik = $calon[0] ?? null;
+        if (count($calon) > 1) {
+            $terlihat = array_values(array_filter($calon, fn ($n) => self::canSee($n)));
+            $diminta = (string) request()->query('nav', '');
+            $terakhir = request()->hasSession() ? request()->session()->get('nav.grup') : null;
+            $terbaik = collect($terlihat)->first(fn ($n) => $diminta !== '' && \Illuminate\Support\Str::slug($n['group']) === $diminta)
+                ?? collect($terlihat)->firstWhere('group', $terakhir) ?? $terlihat[0] ?? $terbaik;
+        }
+        if ($terbaik !== null && request()->hasSession()) {
+            request()->session()->put('nav.grup', $terbaik['group']);
         }
 
         if ($terbaik === null && str_starts_with($path, '/dashboard')) {
@@ -474,6 +516,48 @@ final class Navigation
      */
     private static function petakan(array $items): array
     {
-        return array_map(fn ($n) => ['url' => $n['url'], 'label' => $n['label']], $items);
+        $aktif = self::activeItem();
+
+        return array_map(fn ($n) => [
+            'url' => $n['url'], 'label' => $n['label'], 'href' => self::href($n),
+            // Disorot hanya di grup yang terbuka — URL yang sama di dua grup tak menyala dua kali.
+            'aktif' => $aktif !== null && $n['url'] === $aktif['url'] && $n['group'] === $aktif['group'],
+        ], $items);
+    }
+
+    /**
+     * Tautan item: `href` bila ada; laporan Wafi Mart membawa saringan unitnya; item yang
+     * URL-nya ada di dua grup membawa `?nav=<grup>` supaya grup tempat ia diklik yang terbuka.
+     */
+    private static function href(array $n): string
+    {
+        $href = $n['href'] ?? $n['url'];
+        if ($n['unitWafiMart'] ?? false) {
+            $unit = once(fn () => \App\Models\CompanySettings::query()->value('kode_unit_wafimart'));
+            // Unit belum dipilih: arahkan ke Pengaturan, jangan menampilkan angka seluruh yayasan
+            // di bawah judul "Wafi Mart".
+            if (! $unit) {
+                return '/company-settings';
+            }
+            $href .= '?'.http_build_query(['kode_unit' => $unit]);
+        }
+        if (in_array($n['url'], self::urlKembar(), true)) {
+            $href .= (str_contains($href, '?') ? '&' : '?').'nav='.\Illuminate\Support\Str::slug($n['group']);
+        }
+
+        return $href;
+    }
+
+    /** URL yang muncul di lebih dari satu grup. */
+    private static function urlKembar(): array
+    {
+        return once(function () {
+            $grup = [];
+            foreach (self::items() as $n) {
+                $grup[$n['url']][$n['group']] = true;
+            }
+
+            return array_keys(array_filter($grup, fn ($g) => count($g) > 1));
+        });
     }
 }

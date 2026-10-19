@@ -53,8 +53,8 @@
                     {{-- Grup tanpa header (Dashboard): tampil langsung. --}}
                     @foreach ($grup['subs'] as $sub)
                         @foreach ($sub['items'] as $item)
-                            <a href="{{ url($item['url']) }}"
-                               class="mb-1 flex items-center justify-between gap-2 rounded px-2 py-2 text-[12px] font-medium {{ $item['url'] === $aktifUrl ? 'bg-accent text-brand-dark font-semibold' : 'text-slate-200 hover:bg-white/10 hover:text-white' }}">
+                            <a href="{{ url($item['href']) }}"
+                               class="mb-1 flex items-center justify-between gap-2 rounded px-2 py-2 text-[12px] font-medium {{ $item['aktif'] ? 'bg-accent text-brand-dark font-semibold' : 'text-slate-200 hover:bg-white/10 hover:text-white' }}">
                                 <span class="min-w-0 truncate">{{ $item['label'] }}</span>
                                 <x-badge-tugas :url="$item['url']" />
                             </a>
@@ -94,8 +94,8 @@
                                         </button>
                                         <div x-show="openSub === @js($sub['sub'])" x-cloak class="space-y-0.5">
                                             @foreach ($sub['items'] as $item)
-                                                <a href="{{ url($item['url']) }}"
-                                                   class="ml-4 flex items-center justify-between gap-2 rounded border-l border-white/15 py-1.5 pl-4 pr-3 text-[12px] {{ $item['url'] === $aktifUrl ? 'border-accent bg-accent text-brand-dark font-semibold' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
+                                                <a href="{{ url($item['href']) }}"
+                                                   class="ml-4 flex items-center justify-between gap-2 rounded border-l border-white/15 py-1.5 pl-4 pr-3 text-[12px] {{ $item['aktif'] ? 'border-accent bg-accent text-brand-dark font-semibold' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
                                                     <span class="min-w-0 truncate">{{ $item['label'] }}</span>
                                                     <x-badge-tugas :url="$item['url']" />
                                                 </a>
@@ -105,8 +105,8 @@
                                 @else
                                     {{-- Item langsung di bawah grup: menjorok 1 tingkat. --}}
                                     @foreach ($sub['items'] as $item)
-                                        <a href="{{ url($item['url']) }}"
-                                           class="flex items-center justify-between gap-2 rounded py-1.5 pl-4 pr-3 text-[12px] {{ $item['url'] === $aktifUrl ? 'bg-accent text-brand-dark font-semibold' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
+                                        <a href="{{ url($item['href']) }}"
+                                           class="flex items-center justify-between gap-2 rounded py-1.5 pl-4 pr-3 text-[12px] {{ $item['aktif'] ? 'bg-accent text-brand-dark font-semibold' : 'text-slate-300 hover:bg-white/10 hover:text-white' }}">
                                             <span class="min-w-0 truncate">{{ $item['label'] }}</span>
                                             <x-badge-tugas :url="$item['url']" />
                                         </a>

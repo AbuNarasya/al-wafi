@@ -33,6 +33,7 @@ class CompanySettings extends Model
         'kode_unit_neraca',
         'kode_coa_grni',
         'batas_jajan_harian',
+        'kode_unit_wafimart',
         'keterangan',
     ];
 

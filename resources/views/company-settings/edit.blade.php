@@ -72,6 +72,17 @@
                 </p>
             </div>
 
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <x-field name="kode_unit_wafimart" label="Unit Bisnis Wafi Mart"
+                         :value="$s->kode_unit_wafimart"
+                         :options="['' => '— belum ditetapkan —'] + $opsiUnit" />
+                <p class="mt-2 text-xs text-gray-500">
+                    Laporan keuangan di grup menu <b>WAFI MART</b> (Laba Rugi, Neraca Saldo, Arus Kas, Buku Besar) langsung
+                    tersaring unit ini. Neraca Wafi Mart sendiri belum tersedia: kas &amp; hutang masih dipusatkan ke unit
+                    penampung neraca — baru terpisah saat Wafi Mart berdiri di instans sendiri.
+                </p>
+            </div>
+
             <x-field name="keterangan" label="Keterangan" :value="$s->keterangan" textarea />
 
             <div class="flex justify-end border-t border-gray-100 pt-4">
