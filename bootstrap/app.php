@@ -25,6 +25,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // ada proxy di depannya.
         $middleware->trustProxies(at: '*');
 
+        // Rute yang tak berlaku di instans ini (Portal Wali di Wafi Mart, dst.) → 404.
+        $middleware->web(append: [\App\Http\Middleware\SaklarInstans::class]);
+
         // Notifikasi Midtrans datang dari server Midtrans, tanpa sesi & token CSRF.
         // Pengamannya tanda tangan SHA-512 + status yang ditanyakan ulang ke API.
         $middleware->validateCsrfTokens(except: ['midtrans/notifikasi']);

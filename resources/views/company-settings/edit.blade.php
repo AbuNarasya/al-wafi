@@ -32,6 +32,9 @@
                          :options="[1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember']" />
             </div>
 
+            {{-- Isian dompet & jajan santri hanya di instans Al Wafi (config/instans.php `pengaturan_santri`). --}}
+            @php $isianSantri = \App\Support\Instans::fitur('pengaturan_santri'); @endphp
+            @if ($isianSantri)
             <label class="flex items-center gap-2 text-sm text-gray-700">
                 <input type="hidden" name="topup_tunai_dompet_santri" value="0">
                 <input type="checkbox" name="topup_tunai_dompet_santri" value="1"
@@ -39,6 +42,7 @@
                        class="rounded border-gray-300 text-brand focus:ring-brand">
                 Izinkan setor tunai langsung ke Dompet Santri
             </label>
+            @endif
 
             <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <x-field name="kode_unit_neraca" label="Unit Penampung Neraca"
@@ -63,6 +67,7 @@
                 </p>
             </div>
 
+            @if ($isianSantri)
             <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <label class="mb-1 block text-sm font-medium text-gray-700">Batas belanja kartu harian (bawaan)</label>
                 <div class="max-w-xs"><x-input-rupiah name="batas_jajan_harian" :value="$s->batas_jajan_harian ?? 20000" /></div>
@@ -82,6 +87,7 @@
                     penampung neraca — baru terpisah saat Wafi Mart berdiri di instans sendiri.
                 </p>
             </div>
+            @endif
 
             <x-field name="keterangan" label="Keterangan" :value="$s->keterangan" textarea />
 

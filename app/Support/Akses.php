@@ -60,6 +60,10 @@ final class Akses
         if (ModulRegistry::isBebas($kode)) {
             return true;
         }
+        // Modul yang dimatikan di instans ini tertutup bagi SIAPA PUN — admin juga.
+        if (! Instans::modulHidup($kode)) {
+            return false;
+        }
 
         $user = Auth::user();
         if (! $user || $user->status !== 'aktif') {
@@ -81,6 +85,9 @@ final class Akses
         if (ModulRegistry::isBebas($kode)) {
             return true;
         }
+        if (! Instans::modulHidup($kode)) {
+            return false;
+        }
         if ($user->status !== 'aktif') {
             return false;
         }
@@ -94,6 +101,9 @@ final class Akses
     /** Apakah modul tampil di sidebar untuk pengguna login. */
     public static function bolehMenu(string $kode): bool
     {
+        if (! Instans::modulHidup($kode)) {
+            return false;
+        }
         $user = Auth::user();
         if (! $user || $user->status !== 'aktif') {
             return false;
@@ -114,7 +124,7 @@ final class Akses
     public static function menu(): array
     {
         $tampil = array_filter(
-            ModulRegistry::MODUL,
+            ModulRegistry::aktif(),
             fn ($m) => $m['grup'] !== 'TANPA MENU' && self::bolehMenu($m['kode']),
         );
 

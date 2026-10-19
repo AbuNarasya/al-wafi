@@ -19,7 +19,7 @@
 <div class="flex min-h-full flex-col">
     <header class="flex flex-wrap items-center justify-between gap-2 bg-brand-dark px-4 py-2 text-white">
         <div class="flex items-center gap-3">
-            <img src="{{ asset('ikon/logo.png') }}" alt="" class="h-8 w-8 rounded object-contain">
+            <x-logo class="h-8 w-8 rounded text-base" />
             <div class="leading-tight">
                 <div class="font-semibold">@yield('kepala', 'Kasir Wafi Mart')</div>
                 <div class="text-xs text-white/70">@yield('subkepala')</div>

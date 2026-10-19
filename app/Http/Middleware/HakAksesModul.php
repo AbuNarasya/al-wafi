@@ -28,6 +28,10 @@ class HakAksesModul
         if (ModulRegistry::isBebas($kode)) {
             return $next($request);
         }
+        // Dimatikan di instans ini: 404 untuk SIAPA PUN — diperiksa sebelum jalan pintas admin.
+        if (! \App\Support\Instans::modulHidup($kode)) {
+            abort(404);
+        }
 
         $user = Auth::user();
         if (! $user) {

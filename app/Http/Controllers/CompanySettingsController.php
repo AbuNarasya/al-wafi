@@ -59,7 +59,10 @@ class CompanySettingsController extends Controller
         if (($data['batas_jajan_harian'] ?? null) === null) {
             unset($data['batas_jajan_harian']);
         }
-        $data['topup_tunai_dompet_santri'] = $request->boolean('topup_tunai_dompet_santri');
+        // Isiannya tak tampil di instans Wafi Mart — tak terkirim = biarkan nilai tersimpan.
+        if ($request->has('topup_tunai_dompet_santri')) {
+            $data['topup_tunai_dompet_santri'] = $request->boolean('topup_tunai_dompet_santri');
+        }
         $data['kode_unit_neraca'] = ($data['kode_unit_neraca'] ?? null) ?: null;
 
         CompanySettings::updateOrCreate(['id' => self::ID], $data);

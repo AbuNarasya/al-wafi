@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Masuk — Al Wafi ERP</title>
+    <title>Masuk — {{ \App\Support\Instans::nama() }}</title>
 
     <x-kepala-pwa />
 
@@ -13,8 +13,8 @@
     <div class="w-full max-w-sm">
         <div class="mb-6 text-center">
             <x-logo class="mx-auto mb-3 h-20 w-20 rounded-2xl text-3xl" />
-            <h1 class="text-xl font-semibold text-white">Al Wafi ERP</h1>
-            <p class="text-sm text-slate-300">AL Wafi Islamic Boarding School</p>
+            <h1 class="text-xl font-semibold text-white">{{ \App\Support\Instans::nama() }}</h1>
+            <p class="text-sm text-slate-300">{{ \App\Support\Instans::subjudul() }}</p>
         </div>
 
         <form method="POST" action="{{ url('/login') }}" data-no-confirm class="space-y-4 rounded-xl bg-white p-6 shadow-xl">

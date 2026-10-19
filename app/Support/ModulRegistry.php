@@ -285,6 +285,17 @@ final class ModulRegistry
         'budget-realisasi',
     ];
 
+    /**
+     * Modul yang hidup di instans ini — matriks hak akses & menu memakai ini, bukan MODUL
+     * mentah, supaya modul yang dimatikan (config/instans.php) tak bisa diberikan ke siapa pun.
+     *
+     * @return list<array{kode:string,nama:string,grup:string,sub?:string}>
+     */
+    public static function aktif(): array
+    {
+        return array_values(array_filter(self::MODUL, fn ($m) => Instans::modulHidup($m['kode'])));
+    }
+
     /** @return array{kode:string,nama:string,grup:string,sub?:string}|null */
     public static function byKode(string $kode): ?array
     {

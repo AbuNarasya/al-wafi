@@ -66,7 +66,10 @@ class ImporSaldoAwal
     {
         $hasil = [];
         foreach (self::PEMETA as $kelas) {
-            $hasil[$kelas::kunci()] = $kelas;
+            // Jenis yang tak berlaku di instans ini (mis. santri lama di Wafi Mart) tak ditawarkan.
+            if (\App\Support\Instans::imporHidup($kelas::kunci())) {
+                $hasil[$kelas::kunci()] = $kelas;
+            }
         }
 
         return $hasil;

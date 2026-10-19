@@ -430,6 +430,12 @@ final class Navigation
         if (! $user) {
             return false;
         }
+        // Penyaring per instans (config/instans.php): alamat yang ditutup, menu kembar yang
+        // disembunyikan, dan laporan "… Wafi Mart" di instans yang seluruh bukunya Wafi Mart.
+        if (Instans::alamatMati($n['url']) || Instans::menuSembunyi($n['group'], $n['url'])
+            || (($n['unitWafiMart'] ?? false) && ! Instans::fitur('laporan_unit_toko'))) {
+            return false;
+        }
 
         if ($n['adminOnly'] ?? false) {
             return (bool) $user->is_admin;

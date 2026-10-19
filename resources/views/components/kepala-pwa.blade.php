@@ -16,7 +16,12 @@
 --}}
 {{-- Portal Wali memakai manifest SENDIRI (/manifest-wali.json, lingkup /wali/) supaya terpasang
      sebagai aplikasi terpisah "Al Wafi Wali" yang langsung membuka beranda wali — bukan dasbor staf. --}}
-@props(['manifest' => '/manifest.json', 'judul' => 'Al Wafi ERP'])
+@props(['manifest' => null, 'judul' => null])
+@php
+    // Bawaan per instans (config/instans.php); Portal Wali tetap mengoper manifest & judulnya sendiri.
+    $manifest ??= \App\Support\Instans::manifest();
+    $judul ??= \App\Support\Instans::nama();
+@endphp
 <meta name="pwa" content="{{ config('app.pwa_aktif') ? 'aktif' : 'mati' }}">
 <meta name="theme-color" content="#164a9e">
 <link rel="manifest" href="{{ $manifest }}">

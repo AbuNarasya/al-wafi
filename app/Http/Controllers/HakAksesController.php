@@ -60,7 +60,7 @@ class HakAksesController extends Controller
         $menuTanpaLihat = [];
         $simpan = [];
 
-        foreach (ModulRegistry::MODUL as $m) {
+        foreach (ModulRegistry::aktif() as $m) {
             $kode = $m['kode'];
             $row = $input[$kode] ?? [];
             $lihat = ! empty($row['lihat']);
@@ -99,8 +99,11 @@ class HakAksesController extends Controller
                 'Modul berikut diminta tampil di menu tanpa hak lihat: ' . implode(', ', $menuTanpaLihat) . '. Centang "lihat" juga, atau matikan menunya.');
         }
 
-        DB::transaction(function () use ($user, $simpan) {
-            HakAksesModul::where('id_pengguna', $user->id_pengguna)->delete();
+        // Hak atas modul yang sedang DIMATIKAN di instans ini tak tampil di matriks — jangan ikut
+        // terhapus: bila modulnya dinyalakan lagi (MODUL_MATI dikosongkan), haknya kembali utuh.
+        $mati = array_values(array_diff(array_column(ModulRegistry::MODUL, 'kode'), array_column(ModulRegistry::aktif(), 'kode')));
+        DB::transaction(function () use ($user, $simpan, $mati) {
+            HakAksesModul::where('id_pengguna', $user->id_pengguna)->whereNotIn('kode_modul', $mati)->delete();
             if ($simpan !== []) {
                 HakAksesModul::insert($simpan);
             }
@@ -116,7 +119,7 @@ class HakAksesController extends Controller
      */
     private function modulTerurut(): array
     {
-        $modul = ModulRegistry::MODUL;
+        $modul = ModulRegistry::aktif();
         usort($modul, function ($a, $b) {
             $g = array_search($a['grup'], ModulRegistry::GRUP_ORDER, true) - array_search($b['grup'], ModulRegistry::GRUP_ORDER, true);
             if ($g !== 0) {
