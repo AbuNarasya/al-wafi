@@ -407,6 +407,7 @@ class PembayaranPortal
         if (Money::lt($saldo, $nominal)) {
             throw new AppException(422, "Uang saku {$asal->nama} tidak cukup (tersedia Rp ".number_format((float) $saldo, 0, ',', '.').').');
         }
+        \App\Services\Modules\PenarikanTunaiService::pastikanTersedia($asal->id, $saldo, $nominal, "Uang saku {$asal->nama} tidak cukup");
         $this->pin()->periksa($pin);
 
         $nama = $this->wali->{'nama_'.$this->pencatat['peran']} ?: $this->wali->nama;

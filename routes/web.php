@@ -199,6 +199,13 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\A
     Route::post('/anak/{id}/kartu/pin', 'pinAnak')->name('kartu.pin')->middleware('throttle:10,1')->whereNumber('id');
     Route::post('/anak/{id}/kartu/blokir', 'blokir')->name('kartu.blokir')->middleware('throttle:10,1')->whereNumber('id');
 });
+// Penarikan tunai kegiatan (uang saku untuk outbound/rihlah) — di /wali/tarik-tunai, BUKAN /wali/data.
+Route::prefix('wali/tarik-tunai')->name('portal.tarik_tunai.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalTarikTunaiController::class)->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::post('/', 'ajukan')->name('ajukan')->middleware('throttle:10,1');
+    Route::post('/{id}/ubah', 'ubah')->name('ubah')->middleware('throttle:10,1')->whereNumber('id');
+    Route::post('/{id}/batal', 'batal')->name('batal')->middleware('throttle:10,1')->whereNumber('id');
+});
 Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(PortalDompetController::class)->group(function () {
     Route::get('/pin', 'pin')->name('pin');
     Route::post('/pin/kode', 'mintaKodePin')->name('pin.kode')->middleware('throttle:5,1');
@@ -762,6 +769,25 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [$c, 'index'])->name('index')->middleware('hakakses:pencairan-kartu,lihat');
         Route::post('/', [$c, 'store'])->name('store')->middleware('hakakses:pencairan-kartu,buat');
         Route::post('/{pencairan}/batal', [$c, 'batal'])->name('batal')->middleware('hakakses:pencairan-kartu,hapus')->whereNumber('pencairan');
+    });
+
+    // Penarikan tunai kegiatan — sesi oleh keuangan, persetujuan oleh kesantrian.
+    Route::prefix('tarik-tunai')->name('tarik_tunai.')->group(function () {
+        $c = \App\Http\Controllers\SesiTarikTunaiController::class;
+        Route::get('/', [$c, 'index'])->name('index')->middleware('hakakses:sesi-tarik-tunai,lihat');
+        Route::post('/', [$c, 'store'])->name('store')->middleware('hakakses:sesi-tarik-tunai,buat');
+        Route::get('/{sesi}', [$c, 'show'])->name('show')->middleware('hakakses:sesi-tarik-tunai,lihat')->whereNumber('sesi');
+        Route::put('/{sesi}', [$c, 'update'])->name('update')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber('sesi');
+        Route::post('/{sesi}/dibuka', [$c, 'dibuka'])->name('dibuka')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber('sesi');
+        Route::post('/{sesi}/peserta', [$c, 'tambahPeserta'])->name('peserta.tambah')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber('sesi');
+        Route::delete('/{sesi}/peserta/{santri}', [$c, 'hapusPeserta'])->name('peserta.hapus')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber(['sesi', 'santri']);
+        Route::post('/{sesi}/batal', [$c, 'batal'])->name('batal')->middleware('hakakses:sesi-tarik-tunai,hapus')->whereNumber('sesi');
+    });
+    Route::prefix('kesantrian/tarik-tunai')->name('persetujuan_tarik_tunai.')->group(function () {
+        $c = \App\Http\Controllers\PersetujuanTarikTunaiController::class;
+        Route::get('/', [$c, 'index'])->name('index')->middleware('hakakses:penarikan-tunai,lihat');
+        Route::post('/{id}/setujui', [$c, 'setujui'])->name('setujui')->middleware('hakakses:penarikan-tunai,ubah')->whereNumber('id');
+        Route::post('/{id}/tolak', [$c, 'tolak'])->name('tolak')->middleware('hakakses:penarikan-tunai,ubah')->whereNumber('id');
     });
 
     // Laporan toko Wafi Mart (hanya membaca): terlaris & margin, per kategori, perlu dibeli, tidak laku.

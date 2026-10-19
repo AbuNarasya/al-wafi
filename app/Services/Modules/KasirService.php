@@ -240,6 +240,7 @@ class KasirService
         if (! $dompet || Money::lt($dompet->saldo, $nominal)) {
             throw new AppException(422, 'Saldo uang saku tidak cukup untuk belanja ini.');
         }
+        PenarikanTunaiService::pastikanTersedia($idSantri, $dompet->saldo, $nominal, 'Saldo uang saku tidak cukup untuk belanja ini');
         if (! $pinBenar && Money::gt(Money::add(self::belanjaKartuHariIni($idSantri), $nominal), KartuSantriService::batasHarian($idSantri))) {
             throw new AppException(409, 'Batas belanja harian terlampaui — ulangi dengan PIN belanja.');
         }

@@ -87,6 +87,9 @@ final class ModulRegistry
         ['kode' => 'shift-kasir', 'nama' => 'Shift Kasir & Setoran (rekap, batal struk, terima setoran)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Keuangan: buat = mencairkan belanja kartu santri ke kas toko, hapus = membatalkan.
         ['kode' => 'pencairan-kartu', 'nama' => 'Pencairan Belanja Kartu ke Toko (mingguan)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
+        // Keuangan: buat = membuat sesi, ubah = jadwal/peserta/saklar buka, hapus = membatalkan sesi.
+        // MEMUTUS pengajuan wali sengaja di modul lain (`penarikan-tunai`, kesantrian).
+        ['kode' => 'sesi-tarik-tunai', 'nama' => 'Sesi Penarikan Tunai Kegiatan (outbound/rihlah)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Pekerjaan gudang/toko: `buat` = mencatat barang datang, `hapus` = membatalkan.
         ['kode' => 'penerimaan-barang', 'nama' => 'Penerimaan Barang (stok masuk dari vendor)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Perintah Pembayaran mendahului Kas Keluar dalam urutan kerja: rencana
@@ -174,6 +177,8 @@ final class ModulRegistry
 
         ['kode' => 'pembayaran-kesantrian', 'nama' => 'Pembayaran SPP & Tagihan Lain', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
         ['kode' => 'dompet', 'nama' => 'Dompet & Tabungan Santri', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
+        // Kesantrian: ubah = menyetujui (boleh nominal lebih kecil) / menolak pengajuan tarik tunai kegiatan.
+        ['kode' => 'penarikan-tunai', 'nama' => 'Persetujuan Penarikan Tunai Kegiatan', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Transaksi'],
         // Grupnya sendiri sejak rancangan v2 — dua watak yang cara kerjanya
         // berbeda (laundry berbasis pemakaian, kegiatan berbasis kepesertaan)
         // tak lagi muat sebagai satu baris di antara menu Kependidikan.

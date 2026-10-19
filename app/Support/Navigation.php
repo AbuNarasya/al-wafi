@@ -94,6 +94,7 @@ final class Navigation
         ['url' => '/pos', 'label' => 'Kasir (POS)', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'pos'],
         ['url' => '/shift-kasir', 'label' => 'Shift Kasir & Setoran', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'shift-kasir'],
         ['url' => '/pencairan-kartu', 'label' => 'Pencairan Belanja Kartu', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'pencairan-kartu'],
+        ['url' => '/tarik-tunai', 'label' => 'Penarikan Tunai Kegiatan', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'sesi-tarik-tunai'],
         ['url' => '/penerimaan-barang', 'label' => 'Penerimaan Barang', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'penerimaan-barang'],
         ['url' => '/perintah-pembayaran', 'label' => 'Perintah Pembayaran', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'perintah-pembayaran'],
         ['url' => '/cash-in', 'label' => 'Kas Masuk', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'cash-in'],
@@ -227,6 +228,7 @@ final class Navigation
 
         ['url' => '/kesantrian/pembayaran', 'label' => 'Pembayaran SPP & Tagihan Lain', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'pembayaran-kesantrian'],
         ['url' => '/kesantrian/dompet', 'label' => 'Dompet & Tabungan', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'dompet'],
+        ['url' => '/kesantrian/tarik-tunai', 'label' => 'Persetujuan Tarik Tunai Kegiatan', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'penarikan-tunai'],
         ['url' => '/rekap-pembayaran', 'label' => 'Rekap Pembayaran Santri', 'group' => 'KEPENDIDIKAN', 'sub' => 'Transaksi', 'modul' => 'rekap-pembayaran'],
         // Kontrol = memeriksa yang MASIH menggantung, bukan menerbitkan yang baru.
         // Sejajar dengan sub "Kontrol" di KEUANGAN, dan sengaja dipisah dari menu

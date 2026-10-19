@@ -234,6 +234,9 @@ class DompetService
         if (Money::lt($asal->saldo, $nominal)) {
             throw new AppException(422, 'Saldo '.DompetPolicy::labelDompet($data['dari'])." tidak cukup (tersedia {$asal->saldo}).");
         }
+        if ($data['dari'] === 'santri') {
+            PenarikanTunaiService::pastikanTersedia($asal->id_santri, $asal->saldo, $nominal);
+        }
 
         return DB::transaction(function () use ($data, $nominal, $asal, $tujuan, $pencatat) {
             $saldoAsal = $this->kurangiSaldo($data['dari'], $asal->id, $nominal);
@@ -301,6 +304,7 @@ class DompetService
             if (Money::lt($asal->saldo, $nominal)) {
                 throw new AppException(422, "Saldo uang saku tidak cukup (tersedia {$asal->saldo}).");
             }
+            PenarikanTunaiService::pastikanTersedia($asal->id_santri, $asal->saldo, $nominal);
             $saldoAsal = $this->kurangiSaldo('santri', $asal->id, $nominal);
             $saldoTujuan = $this->tambahSaldo('santri', $tujuan->id, $nominal);
 
@@ -431,6 +435,9 @@ class DompetService
             throw new AppException(422,
                 'Saldo '.DompetPolicy::labelDompet($pemilik).' tidak cukup: diminta '
                 .Money::of($nominal).', tersedia '.Money::of($model->saldo).'.');
+        }
+        if ($pemilik === 'santri') {
+            PenarikanTunaiService::pastikanTersedia($model->id_santri, $model->saldo, $nominal, 'Saldo Dompet Santri tidak cukup');
         }
 
         return DB::transaction(function () use ($data, $pemilik, $nominal, $rekening, $model, $idPengguna) {

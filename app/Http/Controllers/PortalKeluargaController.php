@@ -343,6 +343,7 @@ class PortalKeluargaController extends Controller
             'autoDebet' => (bool) $wali->auto_debet,
             'saldoWali' => $wali->dompet?->saldo ?? '0',
             'anak' => $wali->santri->whereIn('status', self::STATUS_DOMPET)->values(),
+            'sesiTarik' => (new \App\Services\Modules\PenarikanTunaiService)->sesiUntukWali($wali),
             'mutasi' => $mutasi->map(fn (MutasiDompet $m) => [
                 'tanggal' => $m->tanggal, 'label' => self::LABEL_MUTASI[$m->jenis] ?? $m->jenis,
                 'keterangan' => $m->keterangan, 'nominal' => Money::of($m->nominal),

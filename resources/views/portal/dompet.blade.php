@@ -25,6 +25,17 @@
         </a>
     </div>
 
+    @if ($sesiTarik->isNotEmpty())
+        <a href="{{ route('portal.tarik_tunai.index') }}" class="mt-3 flex items-center gap-3 rounded-3xl bg-amber-50 p-4 text-sm shadow-sm ring-1 ring-amber-200">
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800"><x-portal.ikon nama="dompet" kelas="h-5 w-5" /></span>
+            <span class="min-w-0 flex-1">
+                <span class="block font-semibold text-amber-900">Uang saku kegiatan</span>
+                <span class="block truncate text-xs text-amber-800">{{ $sesiTarik->pluck('nama')->join(', ') }}</span>
+            </span>
+            <span class="text-amber-800">&rsaquo;</span>
+        </a>
+    @endif
+
     {{-- Auto-debet: izin keluarga, bukan per orang. MENGAKTIFKAN = izin memotong
          untuk seterusnya → lewat PIN. Mematikan cukup konfirmasi biasa. --}}
     <form method="POST" action="{{ route('portal.dompet.auto_debet') }}" class="mt-4 flex items-center gap-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200"
@@ -70,6 +81,10 @@
                     <div class="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
                         <p class="mb-1 font-semibold text-slate-900">{{ $a->nama }}</p>
                         <div class="flex justify-between text-sm text-slate-600"><span>Dompet santri (uang saku)</span><span class="tabular-nums">{{ $rp($a->dompet?->saldo ?? 0) }}</span></div>
+                        @php $cadangan = \App\Services\Modules\PenarikanTunaiService::cadangan($a->id); @endphp
+                        @if ((float) $cadangan > 0)
+                            <div class="flex justify-between text-xs text-amber-700"><span>dicadangkan untuk kegiatan</span><span class="tabular-nums">&minus;{{ $rp($cadangan) }}</span></div>
+                        @endif
                         <div class="flex justify-between text-sm text-slate-600"><span>Tabungan</span><span class="tabular-nums">{{ $rp($a->tabungan?->saldo ?? 0) }}</span></div>
                     </div>
                 @endforeach

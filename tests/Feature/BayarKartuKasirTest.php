@@ -182,6 +182,25 @@ class BayarKartuKasirTest extends TestCase
         $this->jualKartu(1);
     }
 
+    public function test_uang_saku_yang_dicadangkan_untuk_kegiatan_tak_bisa_dibelanjakan(): void
+    {
+        CoaDetail::create(['kode_coa' => '1.ZZBK.BNK', 'nama_coa' => 'Bank', 'kode_grup' => 'ZZBK', 'jenis_saldo' => 'debet']);
+        BankAccount::create(['kode_coa' => '1.ZZBK.BNK', 'nama_rekening' => 'Bank', 'jenis_rekening' => 'bank', 'status' => 'aktif']);
+        $sesi = \App\Models\SesiTarikTunai::create(['nomor' => 'STT-1', 'nama' => 'Rihlah', 'batas_pengajuan' => now()->addDay(),
+            'batas_persetujuan' => now()->addDays(2), 'tanggal_ambil' => now()->addDays(3), 'tanggal_distribusi' => now()->addDays(4),
+            'maks_per_santri' => 50000, 'kode_coa_bank' => '1.ZZBK.BNK', 'kode_coa_kas' => '1.ZZBK.LCI', 'dibuka' => true]);
+        \App\Models\PengajuanTarikTunai::create(['nomor' => 'TTK-1', 'id_sesi' => $sesi->id_sesi, 'id_santri' => $this->ahmad->id,
+            'id_wali' => $this->ahmad->id_wali, 'peran' => 'ibu', 'nominal' => 50000]);
+
+        try {
+            $this->jualKartu(1);   // saldo 50.000 seluruhnya dicadangkan
+            $this->fail('Uang saku yang dicadangkan seharusnya tak bisa dibelanjakan.');
+        } catch (AppException $e) {
+            $this->assertStringContainsString('dicadangkan untuk penarikan tunai kegiatan', $e->getMessage());
+        }
+        $this->assertSame([0, '50000.00'], [Penjualan::count(), $this->saldo()]);
+    }
+
     public function test_batal_dan_retur_struk_kartu_kembali_ke_dompet(): void
     {
         $a = $this->jualKartu(2);   // 8.000
