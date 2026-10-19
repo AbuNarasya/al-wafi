@@ -46,9 +46,14 @@ class CompanySettingsController extends Controller
             'topup_tunai_dompet_santri' => ['nullable', 'boolean'],
             'kode_unit_neraca' => ['nullable', 'string', 'exists:business_units,kode_unit'],
             'kode_coa_grni' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
+            'batas_jajan_harian' => ['nullable', 'numeric', 'min:0'],
             'keterangan' => ['nullable', 'string'],
         ]);
         $data['kode_coa_grni'] = ($data['kode_coa_grni'] ?? null) ?: null;
+        // Tak terkirim (formulir lama) = biarkan nilai tersimpan; jangan diam-diam jadi nol.
+        if (($data['batas_jajan_harian'] ?? null) === null) {
+            unset($data['batas_jajan_harian']);
+        }
         $data['topup_tunai_dompet_santri'] = $request->boolean('topup_tunai_dompet_santri');
         $data['kode_unit_neraca'] = ($data['kode_unit_neraca'] ?? null) ?: null;
 

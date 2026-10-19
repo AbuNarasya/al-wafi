@@ -211,6 +211,12 @@ class Santri extends Model
         return $this->hasOne(DompetSantri::class, 'id_santri', 'id');
     }
 
+    /** Kartu RFID yang sedang AKTIF (paling banyak satu). */
+    public function kartuAktif(): HasOne
+    {
+        return $this->hasOne(KartuSantri::class, 'id_santri', 'id')->where('status', 'aktif');
+    }
+
     public function tabungan(): HasOne
     {
         return $this->hasOne(TabunganSantri::class, 'id_santri', 'id');

@@ -126,6 +126,71 @@
                 </div>
             @endif
         </section>
+
+        {{-- Kartu belanja Wafi Mart: semua aksi dengan PIN WALI (papan PIN). --}}
+        @if ($belanja)
+            @php $punyaPinWali = \App\Services\PortalWali\SesiWali::punyaPin(); @endphp
+            {{-- `panel`, bukan `buka`: formulir di dalamnya memakai pinPad yang punya method buka(). --}}
+            <section class="mt-5" x-data="{ panel: '' }">
+                <h2 class="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span> Kartu belanja Wafi Mart</h2>
+                <div class="space-y-3 rounded-3xl bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-500">Kartu</span>
+                        @if ($belanja['kartu'])
+                            <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Aktif · …{{ substr($belanja['kartu']->uid, -4) }}</span>
+                        @else
+                            <span class="text-xs text-slate-400">Belum ada / diblokir — dipasang di kantor</span>
+                        @endif
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-500">Batas belanja harian</span>
+                        <span class="font-semibold tabular-nums">{{ $rp($belanja['batas']) }}{{ $belanja['milik'] === null ? ' (bawaan)' : '' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-500">PIN belanja anak</span>
+                        <span class="text-xs {{ $belanja['punyaPin'] ? 'text-emerald-700' : 'text-amber-700' }}">{{ $belanja['punyaPin'] ? 'terpasang' : 'belum — belanja di atas batas akan ditolak' }}</span>
+                    </div>
+                    <p class="text-xs text-slate-500">Belanja sampai batas harian cukup tempel kartu. Di atas batas, anak mengetik PIN belanjanya.</p>
+
+                    <div class="grid grid-cols-3 gap-2 pt-1 text-xs font-semibold">
+                        <button type="button" @click="panel = panel ==='batas' ? '' : 'batas'" class="rounded-2xl bg-slate-100 py-2 text-slate-700">Ubah batas</button>
+                        <button type="button" @click="panel = panel ==='pin' ? '' : 'pin'" class="rounded-2xl bg-slate-100 py-2 text-slate-700">{{ $belanja['punyaPin'] ? 'Ganti PIN' : 'Pasang PIN' }}</button>
+                        @if ($belanja['kartu'])
+                            <button type="button" @click="panel = panel ==='blokir' ? '' : 'blokir'" class="rounded-2xl bg-red-50 py-2 text-red-700">Blokir kartu</button>
+                        @endif
+                    </div>
+
+                    <form x-show="panel ==='batas'" x-cloak method="POST" action="{{ route('portal.kartu.batas', $santri->id) }}" class="space-y-2"
+                          data-no-confirm x-data="{ ...pinPad(@js($punyaPinWali), @js(route('portal.pin'))), nilai: @js($belanja['milik'] === null ? '' : (string) (int) $belanja['milik']) }" @submit.prevent="buka()">
+                        @csrf
+                        <input type="text" inputmode="numeric" :value="fmtRupiah(nilai)" @input="nilai = ketikRupiah($event)"
+                               placeholder="Kosongkan = bawaan {{ $rp($belanja['bawaan']) }}" class="w-full rounded-2xl border-slate-300 text-right">
+                        <input type="hidden" name="batas_harian" :value="nilai">
+                        <button class="w-full rounded-2xl bg-brand py-2.5 font-semibold text-white">Simpan batas</button>
+                        @include('portal._pin', ['judul' => 'Ubah batas belanja '.$santri->nama])
+                    </form>
+
+                    <form x-show="panel ==='pin'" x-cloak method="POST" action="{{ route('portal.kartu.pin', $santri->id) }}" class="space-y-2"
+                          data-no-confirm x-data="pinPad(@js($punyaPinWali), @js(route('portal.pin')))" @submit.prevent="buka()">
+                        @csrf
+                        <input type="password" inputmode="numeric" name="pin_anak" required maxlength="6" autocomplete="off" placeholder="PIN belanja anak (6 angka)" class="w-full rounded-2xl border-slate-300 text-center tracking-widest">
+                        <input type="password" inputmode="numeric" name="pin_anak_ulang" required maxlength="6" autocomplete="off" placeholder="Ulangi PIN anak" class="w-full rounded-2xl border-slate-300 text-center tracking-widest">
+                        <button class="w-full rounded-2xl bg-brand py-2.5 font-semibold text-white">Simpan PIN anak</button>
+                        @include('portal._pin', ['judul' => 'Konfirmasi dengan PIN Anda (wali)'])
+                    </form>
+
+                    @if ($belanja['kartu'])
+                        <form x-show="panel ==='blokir'" x-cloak method="POST" action="{{ route('portal.kartu.blokir', $santri->id) }}" class="space-y-2"
+                              data-no-confirm x-data="pinPad(@js($punyaPinWali), @js(route('portal.pin')))" @submit.prevent="buka()">
+                            @csrf
+                            <p class="text-xs text-red-700">Kartu langsung tak bisa dipakai belanja. Membuka blokir / kartu baru hanya di kantor.</p>
+                            <button class="w-full rounded-2xl bg-red-600 py-2.5 font-semibold text-white">Blokir kartu sekarang</button>
+                            @include('portal._pin', ['judul' => 'Blokir kartu '.$santri->nama])
+                        </form>
+                    @endif
+                </div>
+            </section>
+        @endif
     @endif
 
     {{-- Riwayat bayar --}}

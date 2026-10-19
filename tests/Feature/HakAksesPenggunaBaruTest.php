@@ -136,7 +136,8 @@ class HakAksesPenggunaBaruTest extends TestCase
     {
         $grup = collect(ModulRegistry::MODUL)->groupBy('grup')->map(fn ($m) => $m->pluck('kode')->all());
 
-        $this->assertSame(['wali', 'santri', 'dokumen-santri'], $grup['DATA SISWA/SANTRI']);
+        // kartu-santri (19 Okt 2026): kartu RFID belanja Wafi Mart — alat, bukan tahap santri, jadi di ujung.
+        $this->assertSame(['wali', 'santri', 'dokumen-santri', 'kartu-santri'], $grup['DATA SISWA/SANTRI']);
         $this->assertNotContains('santri', $grup['PPSB']);
         // Angsuran Uang Pangkal ikut menunya turun ke Transaksi.
         $this->assertSame(

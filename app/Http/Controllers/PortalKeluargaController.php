@@ -313,6 +313,14 @@ class PortalKeluargaController extends Controller
             'riwayat' => PembayaranSantri::with('tagihan.jenis:kode,nama')->where('id_santri', $s->id)
                 ->whereIn('status', ['terverifikasi', 'menunggu_verifikasi'])->orderByDesc('tanggal')->orderByDesc('id')->limit(5)->get(),
             'mutasi' => $mutasi,
+            // Kartu belanja Wafi Mart (santri aktif saja).
+            'belanja' => $aktif ? [
+                'kartu' => $s->kartuAktif()->first(),
+                'milik' => $s->dompet?->batas_harian,
+                'batas' => \App\Services\Modules\KartuSantriService::batasHarian($s->id),
+                'bawaan' => \App\Services\Modules\KartuSantriService::batasBawaan(),
+                'punyaPin' => \App\Services\Modules\KartuSantriService::punyaPin($s->id),
+            ] : null,
         ]);
     }
 

@@ -133,6 +133,8 @@ final class ModulRegistry
         // TANPA MENU sendiri: dibuka dari halaman santri. Ikut ke grup ini karena
         // isinya berkas orang yang sama, bukan urusan pendaftaran.
         ['kode' => 'dokumen-santri', 'nama' => 'Berkas Santri (KTP, akta, KK, med check)', 'grup' => 'DATA SISWA/SANTRI'],
+        // Kartu RFID belanja Wafi Mart: buat = pasang/ganti kartu, ubah = blokir & buka blokir.
+        ['kode' => 'kartu-santri', 'nama' => 'Kartu Santri (RFID belanja Wafi Mart)', 'grup' => 'DATA SISWA/SANTRI'],
 
         // ---- PPSB ----
         ['kode' => 'tahun-ajaran', 'nama' => 'Tahun Ajaran', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],

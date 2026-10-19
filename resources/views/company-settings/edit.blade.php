@@ -63,6 +63,15 @@
                 </p>
             </div>
 
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <label class="mb-1 block text-sm font-medium text-gray-700">Batas belanja kartu harian (bawaan)</label>
+                <div class="max-w-xs"><x-input-rupiah name="batas_jajan_harian" :value="$s->batas_jajan_harian ?? 20000" /></div>
+                <p class="mt-2 text-xs text-gray-500">
+                    Untuk santri yang batasnya belum diatur wali. Belanja kartu sampai batas ini cukup tempel kartu;
+                    di atasnya santri mengetik PIN belanja yang dipasang walinya.
+                </p>
+            </div>
+
             <x-field name="keterangan" label="Keterangan" :value="$s->keterangan" textarea />
 
             <div class="flex justify-end border-t border-gray-100 pt-4">

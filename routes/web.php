@@ -48,6 +48,7 @@ use App\Http\Controllers\KoreksiTagihanController;
 use App\Http\Controllers\LampiranController;
 use App\Http\Controllers\LevelController;
 use App\Http\Controllers\LevelPengajuanController;
+use App\Http\Controllers\KartuSantriController;
 use App\Http\Controllers\LaporanTokoController;
 use App\Http\Controllers\LokasiPersediaanController;
 use App\Http\Controllers\OpnamePersediaanController;
@@ -192,6 +193,12 @@ Route::prefix('wali/online')->name('portal.online.')->middleware('portal.wali')-
 // Notifikasi Midtrans — tanpa sesi & dikecualikan dari CSRF (bootstrap/app.php).
 Route::post('/midtrans/notifikasi', \App\Http\Controllers\MidtransNotifikasiController::class)
     ->name('midtrans.notifikasi')->middleware('throttle:120,1');
+// Kartu belanja Wafi Mart per anak — di bawah /wali/anak, BUKAN /wali/data (mode verifikasi).
+Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalKartuController::class)->group(function () {
+    Route::post('/anak/{id}/kartu/batas', 'batas')->name('kartu.batas')->middleware('throttle:10,1')->whereNumber('id');
+    Route::post('/anak/{id}/kartu/pin', 'pinAnak')->name('kartu.pin')->middleware('throttle:10,1')->whereNumber('id');
+    Route::post('/anak/{id}/kartu/blokir', 'blokir')->name('kartu.blokir')->middleware('throttle:10,1')->whereNumber('id');
+});
 Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(PortalDompetController::class)->group(function () {
     Route::get('/pin', 'pin')->name('pin');
     Route::post('/pin/kode', 'mintaKodePin')->name('pin.kode')->middleware('throttle:5,1');
@@ -737,6 +744,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/tutup', [$k, 'tutup'])->name('tutup.simpan')->middleware('hakakses:pos,buat');
         // Tanpa middleware hak: dibuka kasirnya (hak pos) ATAU pengawas (hak shift-kasir) — diperiksa di controller.
         Route::get('/laporan/{shift}', [$k, 'laporan'])->name('laporan')->whereNumber('shift');
+    });
+
+    // Kartu RFID santri: pasang (tempel kartu), blokir, buka blokir.
+    Route::prefix('kartu-santri')->name('kartu_santri.')->group(function () {
+        $c = KartuSantriController::class;
+        Route::get('/', [$c, 'index'])->name('index')->middleware('hakakses:kartu-santri,lihat');
+        Route::post('/', [$c, 'pasang'])->name('pasang')->middleware('hakakses:kartu-santri,buat');
+        Route::post('/{kartu}/blokir', [$c, 'blokir'])->name('blokir')->middleware('hakakses:kartu-santri,ubah')->whereNumber('kartu');
+        Route::post('/{kartu}/buka', [$c, 'buka'])->name('buka')->middleware('hakakses:kartu-santri,ubah')->whereNumber('kartu');
     });
 
     // Laporan toko Wafi Mart (hanya membaca): terlaris & margin, per kategori, perlu dibeli, tidak laku.

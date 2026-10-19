@@ -19,6 +19,7 @@ use App\Models\Wali;
 use App\Services\Impor\Pemeta\PemetaAccruePrepaid;
 use App\Services\Impor\Pemeta\PemetaAsetTetap;
 use App\Services\Impor\Pemeta\PemetaBarangToko;
+use App\Services\Impor\Pemeta\PemetaKartuSantri;
 use App\Services\Impor\Pemeta\PemetaStokAwalBarang;
 use App\Services\Impor\Pemeta\PemetaInvoiceVendor;
 use App\Services\Impor\Pemeta\PemetaPengajuanBelumDibayar;
@@ -57,6 +58,7 @@ class ImporSaldoAwal
         // Wafi Mart: master barang toko lebih dulu, baru stok awal per lokasinya.
         PemetaBarangToko::class,
         PemetaStokAwalBarang::class,
+        PemetaKartuSantri::class,
     ];
 
     /** @return array<string,class-string<Pemeta>> */
