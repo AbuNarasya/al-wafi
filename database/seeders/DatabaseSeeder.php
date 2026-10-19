@@ -34,6 +34,13 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // Instans Wafi Mart (INSTANS=wafimart) punya data awalnya sendiri: COA ritel, toko, tanpa pesantren.
+        if (\App\Support\Instans::adalah('wafimart')) {
+            $this->call(WafiMartSeeder::class);
+
+            return;
+        }
+
         $this->seedLevels();
         $this->seedLevelPengajuan();
         $this->seedCoa();
@@ -52,7 +59,7 @@ class DatabaseSeeder extends Seeder
      * Level otorisasi KEUANGAN — batas nominal transaksi internal.
      * L1 = TERTINGGI (Direktur, tak terbatas). max_transaksi null = unlimited.
      */
-    private function seedLevels(): void
+    protected function seedLevels(): void
     {
         $levels = [
             ['kode_level' => 'L1', 'nama_level' => 'Direktur', 'max_transaksi' => null],
@@ -305,7 +312,7 @@ class DatabaseSeeder extends Seeder
      * Pengguna admin: melewati matriks hak akses modul (is_admin), TIDAK ikut
      * rantai pengajuan (peringkat_pengajuan null). Login: admin / admin123.
      */
-    private function seedAdmin(): void
+    protected function seedAdmin(): void
     {
         User::updateOrCreate(
             ['username' => 'admin'],
