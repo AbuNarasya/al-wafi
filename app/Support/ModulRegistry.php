@@ -85,6 +85,8 @@ final class ModulRegistry
         // Pengawas kasir: `lihat` = rekap & rincian shift; `ubah` = batalkan struk,
         // tutup shift kasir yang lupa, terima setoran laci ke kas keuangan.
         ['kode' => 'shift-kasir', 'nama' => 'Shift Kasir & Setoran (rekap, batal struk, terima setoran)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
+        // Keuangan: buat = mencairkan belanja kartu santri ke kas toko, hapus = membatalkan.
+        ['kode' => 'pencairan-kartu', 'nama' => 'Pencairan Belanja Kartu ke Toko (mingguan)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Pekerjaan gudang/toko: `buat` = mencatat barang datang, `hapus` = membatalkan.
         ['kode' => 'penerimaan-barang', 'nama' => 'Penerimaan Barang (stok masuk dari vendor)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Perintah Pembayaran mendahului Kas Keluar dalam urutan kerja: rencana

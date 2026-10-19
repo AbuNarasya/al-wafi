@@ -756,6 +756,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/{kartu}/buka', [$c, 'buka'])->name('buka')->middleware('hakakses:kartu-santri,ubah')->whereNumber('kartu');
     });
 
+    // Pencairan belanja kartu santri ke kas toko (mingguan).
+    Route::prefix('pencairan-kartu')->name('pencairan_kartu.')->group(function () {
+        $c = \App\Http\Controllers\PencairanKartuController::class;
+        Route::get('/', [$c, 'index'])->name('index')->middleware('hakakses:pencairan-kartu,lihat');
+        Route::post('/', [$c, 'store'])->name('store')->middleware('hakakses:pencairan-kartu,buat');
+        Route::post('/{pencairan}/batal', [$c, 'batal'])->name('batal')->middleware('hakakses:pencairan-kartu,hapus')->whereNumber('pencairan');
+    });
+
     // Laporan toko Wafi Mart (hanya membaca): terlaris & margin, per kategori, perlu dibeli, tidak laku.
     Route::get('/laporan-toko', [LaporanTokoController::class, 'index'])->name('laporan_toko.index')->middleware('hakakses:laporan-toko,lihat');
 

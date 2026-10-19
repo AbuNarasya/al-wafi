@@ -17,7 +17,7 @@ class ReturPenjualan extends Model
 
     protected $fillable = [
         'nomor', 'id_penjualan', 'id_shift', 'kode_lokasi', 'waktu', 'total', 'hpp_kembali',
-        'alasan', 'id_kasir', 'disetujui_oleh', 'metode', 'id_mutasi_dompet',
+        'alasan', 'id_kasir', 'disetujui_oleh', 'metode', 'id_mutasi_dompet', 'id_pencairan',
     ];
 
     protected function casts(): array

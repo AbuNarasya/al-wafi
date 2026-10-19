@@ -59,6 +59,8 @@ final class SumberModul
         'SetoranKasir',
         // Stok awal barang dari Impor Data Awal (D Persediaan / K akun perantara).
         'ImporDataAwal',
+        // Pindah buku belanja kartu santri dari rekening penampung titipan ke kas toko.
+        'PencairanKartu',
     ];
 
     public static function isValid(string $v): bool
