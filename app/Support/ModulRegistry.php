@@ -103,6 +103,9 @@ final class ModulRegistry
         ['kode' => 'journal', 'nama' => 'Jurnal Umum', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
 
         ['kode' => 'reports', 'nama' => 'Laporan (Neraca, Laba Rugi, … & Export Data)', 'grup' => 'KEUANGAN', 'sub' => 'Laporan'],
+        // Dipisah dari `reports`: pengelola toko perlu melihat laku/tidak lakunya barang
+        // tanpa ikut membuka neraca & laba rugi yayasan.
+        ['kode' => 'laporan-toko', 'nama' => 'Laporan Toko (terlaris, margin, perlu dibeli, tidak laku)', 'grup' => 'KEUANGAN', 'sub' => 'Laporan'],
 
         ['kode' => 'outstanding', 'nama' => 'Kontrol Outstanding (Aging, Uang Muka, Rekap)', 'grup' => 'KEUANGAN', 'sub' => 'Kontrol'],
         ['kode' => 'coa-detail', 'nama' => 'Chart of Account', 'grup' => 'KEUANGAN', 'sub' => 'Kontrol'],

@@ -107,6 +107,7 @@ final class Navigation
         ['url' => '/bank-reconciliation', 'label' => 'Rekonsiliasi Bank', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'bank-reconciliation'],
         ['url' => '/journal', 'label' => 'Jurnal Umum', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'journal'],
 
+        ['url' => '/laporan-toko', 'label' => 'Laporan Toko (Wafi Mart)', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'laporan-toko'],
         ['url' => '/reports/neraca', 'label' => 'Laporan Posisi Keuangan', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
         ['url' => '/reports/laba-rugi', 'label' => 'Penghasilan Komprehensif', 'group' => 'KEUANGAN', 'sub' => 'Laporan', 'modul' => 'reports'],
         // Format nirlaba (ISAK 35) mendahului format perusahaan: yayasan yang

@@ -48,6 +48,7 @@ use App\Http\Controllers\KoreksiTagihanController;
 use App\Http\Controllers\LampiranController;
 use App\Http\Controllers\LevelController;
 use App\Http\Controllers\LevelPengajuanController;
+use App\Http\Controllers\LaporanTokoController;
 use App\Http\Controllers\LokasiPersediaanController;
 use App\Http\Controllers\OpnamePersediaanController;
 use App\Http\Controllers\PenerimaanBarangController;
@@ -737,6 +738,9 @@ Route::middleware('auth')->group(function () {
         // Tanpa middleware hak: dibuka kasirnya (hak pos) ATAU pengawas (hak shift-kasir) — diperiksa di controller.
         Route::get('/laporan/{shift}', [$k, 'laporan'])->name('laporan')->whereNumber('shift');
     });
+
+    // Laporan toko Wafi Mart (hanya membaca): terlaris & margin, per kategori, perlu dibeli, tidak laku.
+    Route::get('/laporan-toko', [LaporanTokoController::class, 'index'])->name('laporan_toko.index')->middleware('hakakses:laporan-toko,lihat');
 
     // Pengawas kasir: rekap harian, rincian shift, batal struk, tutup paksa, terima setoran.
     Route::prefix('shift-kasir')->name('shift_kasir.')->group(function () {
