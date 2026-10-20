@@ -27,7 +27,7 @@
                 <p class="mt-1 whitespace-pre-line text-sm text-slate-600">{{ $s->keterangan }}</p>
             @endif
             <dl class="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <div class="rounded-2xl bg-slate-50 p-2"><dt class="text-slate-500">Batas pengajuan</dt><dd class="font-semibold text-slate-900">{{ $s->batas_pengajuan->translatedFormat('j M Y, H:i') }}</dd></div>
+                <div class="rounded-2xl bg-slate-50 p-2"><dt class="text-slate-500">Batas pengajuan</dt><dd class="font-semibold text-slate-900">{{ $s->batas_pengajuan->translatedFormat('j M Y') }}</dd></div>
                 <div class="rounded-2xl bg-slate-50 p-2"><dt class="text-slate-500">Diterima anak</dt><dd class="font-semibold text-slate-900">{{ $s->tanggal_distribusi->translatedFormat('j M Y') }}</dd></div>
                 <div class="col-span-2 rounded-2xl bg-slate-50 p-2"><dt class="text-slate-500">Maksimal per anak</dt><dd class="font-semibold text-slate-900">{{ $rp($s->maks_per_santri) }} &middot; kelipatan Rp 50.000</dd></div>
             </dl>
@@ -97,7 +97,7 @@
                 @endforeach
             </div>
             <p class="mt-3 text-xs text-slate-500">Selama diajukan atau disetujui, uang saku sebesar itu dicadangkan — tak bisa dipakai belanja atau dipindah.
-                Pengajuan yang belum diputus sampai {{ $s->batas_persetujuan->translatedFormat('j M Y, H:i') }} gugur dengan sendirinya.</p>
+                Pengajuan yang belum diputus sampai akhir {{ $s->batas_persetujuan->translatedFormat('j M Y') }} gugur dengan sendirinya.</p>
         </section>
     @empty
         <div class="rounded-3xl bg-white p-6 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">Tidak ada kegiatan yang membuka pengajuan uang saku saat ini.</div>

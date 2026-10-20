@@ -19,8 +19,9 @@
         <div class="mb-6 rounded-xl border border-gray-200 bg-white shadow-sm">
             <div class="flex flex-wrap items-baseline justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
                 <div class="text-sm font-semibold text-gray-800">{{ $s->nama }} <span class="font-mono text-xs font-normal text-gray-500">{{ $s->nomor }}</span></div>
-                <div class="text-xs text-gray-500">batas persetujuan <b>{{ $s->batas_persetujuan->format('d/m/Y H:i') }}</b> · maks {{ $rp($s->maks_per_santri) }}/santri · {{ $daftar->count() }} menunggu</div>
+                <div class="text-xs text-gray-500">batas persetujuan <b>{{ $s->batas_persetujuan->format('d/m/Y') }}</b> · maks {{ $rp($s->maks_per_santri) }}/santri · {{ $daftar->count() }} menunggu</div>
             </div>
+            <div class="border-b border-gray-100 px-4 py-2">@include('tarik-tunai._ubah_jadwal', ['sesi' => $s, 'kelas' => ''])</div>
             <div class="divide-y divide-gray-100">
                 @forelse ($daftar as $p)
                     <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">

@@ -44,7 +44,7 @@
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-2 font-mono"><a href="{{ route('tarik_tunai.show', $r->id_sesi) }}" class="text-brand hover:underline">{{ $r->nomor }}</a></td>
                         <td class="px-4 py-2">{{ $r->nama }}</td>
-                        <td class="px-4 py-2">{{ $r->batas_pengajuan->format('d/m/Y H:i') }}</td>
+                        <td class="px-4 py-2">{{ $r->batas_pengajuan->format('d/m/Y') }}</td>
                         <td class="px-4 py-2">{{ $r->tanggal_distribusi->format('d/m/Y') }}</td>
                         <td class="px-4 py-2 text-right tabular-nums">{{ $r->santri_count }}</td>
                         <td class="px-4 py-2 text-right tabular-nums">{{ $rp($r->maks_per_santri) }}</td>

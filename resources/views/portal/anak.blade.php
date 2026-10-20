@@ -139,7 +139,7 @@
                                     @if ($k['pengajuan'])
                                         Rp {{ number_format((float) $k['pengajuan']->nominalBerlaku(), 0, ',', '.') }} &middot; {{ $k['pengajuan']->labelStatus() }}
                                     @elseif ($k['sesi']->status === 'berjalan' && $k['sesi']->tahap() === 'pengajuan')
-                                        Belum mengajukan &middot; batas {{ $k['sesi']->batas_pengajuan->translatedFormat('j M, H:i') }}
+                                        Belum mengajukan &middot; batas {{ $k['sesi']->batas_pengajuan->translatedFormat('j M') }}
                                     @else
                                         Tidak mengajukan
                                     @endif

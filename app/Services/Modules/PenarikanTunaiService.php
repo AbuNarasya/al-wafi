@@ -78,6 +78,7 @@ class PenarikanTunaiService
     /** @param  array<int,int>  $peserta  id santri */
     public function buatSesi(array $d, array $peserta, int $idPengguna): SesiTarikTunai
     {
+        $d = self::batasAkhirHari($d);
         $this->assertJadwal($d);
         if ($peserta === []) {
             throw new AppException(422, 'Belum ada peserta — tak ada santri aktif yang cocok dengan saringan itu.');
@@ -99,10 +100,11 @@ class PenarikanTunaiService
         });
     }
 
+    /** Data sesi (nama, batas nominal, rekening) — keuangan saja. Jadwal lewat [[self::ubahJadwal]]. */
     public function ubahSesi(int $idSesi, array $d): SesiTarikTunai
     {
         $sesi = $this->sesiBerjalan($idSesi);
-        $this->assertJadwal($d);
+        $this->assertDataSesi($d);
         $lewat = $sesi->pengajuan()->whereIn('status', ['diajukan', 'disetujui'])
             ->whereRaw('COALESCE(nominal_disetujui, nominal) > ?', [Money::of($d['maks_per_santri'])])->count();
         if ($lewat) {
@@ -110,10 +112,69 @@ class PenarikanTunaiService
         }
         $sesi->update([
             'nama' => trim($d['nama']), 'keterangan' => $d['keterangan'] ?? null,
-            'batas_pengajuan' => $d['batas_pengajuan'], 'batas_persetujuan' => $d['batas_persetujuan'],
-            'tanggal_ambil' => $d['tanggal_ambil'], 'tanggal_distribusi' => $d['tanggal_distribusi'],
             'maks_per_santri' => Money::of($d['maks_per_santri']), 'kode_coa_bank' => $d['kode_coa_bank'], 'kode_coa_kas' => $d['kode_coa_kas'],
         ]);
+
+        return $sesi;
+    }
+
+    /**
+     * Ubah jadwal (keputusan user 20 Okt 2026) — pembagian wewenang:
+     *   batas pengajuan & persetujuan : keuangan ATAU kesantrian, sebelum dana diambil
+     *   tanggal ambil di bank         : keuangan, sebelum dana diambil
+     *   tanggal distribusi            : keuangan, juga SESUDAH dana diambil (selama sesi belum selesai)
+     * Isian yang tak dikirim dibiarkan. Memajukan batas persetujuan ke waktu lampau = menutup persetujuan
+     * sekarang (yang belum diputus gugur). Perubahan tercatat di jejak audit (model MencatatJejak); wali
+     * yang pengajuannya masih hidup dikabari bila batas pengajuan atau tanggal distribusi berubah.
+     *
+     * @param  array{batas_pengajuan?:?string, batas_persetujuan?:?string, tanggal_ambil?:?string, tanggal_distribusi?:?string}  $d
+     */
+    public function ubahJadwal(int $idSesi, array $d, bool $hakKeuangan, bool $hakKesantrian): SesiTarikTunai
+    {
+        $sesi = SesiTarikTunai::find($idSesi) ?? throw new AppException(404, 'Sesi tidak ditemukan.');
+        if (! in_array($sesi->status, ['berjalan', 'dana_diambil'], true)) {
+            throw new AppException(422, 'Sesi ini sudah '.strtolower($sesi->labelTahap()).' — jadwalnya tak bisa diubah lagi.');
+        }
+        $d = self::batasAkhirHari(array_filter($d, fn ($v) => $v !== null && $v !== ''));
+        if ($d === []) {
+            throw new AppException(422, 'Tidak ada tanggal yang diubah.');
+        }
+        $berjalan = $sesi->status === 'berjalan';
+        foreach (array_keys($d) as $kolom) {
+            [$boleh, $alasan] = match ($kolom) {
+                'batas_pengajuan', 'batas_persetujuan' => [($hakKeuangan || $hakKesantrian) && $berjalan, 'sebelum dana diambil, oleh keuangan atau kesantrian'],
+                'tanggal_ambil' => [$hakKeuangan && $berjalan, 'sebelum dana diambil, oleh keuangan'],
+                'tanggal_distribusi' => [$hakKeuangan, 'oleh keuangan'],
+                default => [false, '-'],
+            };
+            if (! $boleh) {
+                throw new AppException(403, ucfirst(str_replace('_', ' ', $kolom))." hanya bisa diubah {$alasan}.");
+            }
+        }
+
+        $baru = [
+            'batas_pengajuan' => $d['batas_pengajuan'] ?? $sesi->batas_pengajuan->format('Y-m-d H:i'),
+            'batas_persetujuan' => $d['batas_persetujuan'] ?? $sesi->batas_persetujuan->format('Y-m-d H:i'),
+            'tanggal_ambil' => $d['tanggal_ambil'] ?? $sesi->tanggal_ambil->toDateString(),
+            'tanggal_distribusi' => $d['tanggal_distribusi'] ?? $sesi->tanggal_distribusi->toDateString(),
+        ];
+        $this->assertUrutan(...array_values($baru));
+
+        $lama = ['pengajuan' => $sesi->batas_pengajuan, 'distribusi' => $sesi->tanggal_distribusi];
+        $sesi->update(array_intersect_key($baru, $d));
+
+        $kabar = [];
+        if (isset($d['batas_pengajuan']) && ! $lama['pengajuan']->eq($sesi->batas_pengajuan)) {
+            $kabar[] = 'batas pengajuan kini sampai akhir '.$sesi->batas_pengajuan->translatedFormat('j M Y');
+        }
+        if (isset($d['tanggal_distribusi']) && ! $lama['distribusi']->eq($sesi->tanggal_distribusi)) {
+            $kabar[] = 'uang diserahkan '.$sesi->tanggal_distribusi->translatedFormat('j F Y');
+        }
+        if ($kabar) {
+            foreach ($sesi->pengajuan()->with('santri:id,nama')->whereIn('status', ['diajukan', 'disetujui'])->get() as $p) {
+                $this->kabari($p, 'Jadwal uang saku kegiatan berubah', "{$sesi->nama}: ".implode('; ', $kabar).'.');
+            }
+        }
 
         return $sesi;
     }
@@ -228,7 +289,7 @@ class PenarikanTunaiService
         }
         (new NotificationService)->kirim($tujuan->map(fn ($id) => [
             'id_pengguna' => $id, 'judul' => 'Pengajuan uang saku kegiatan masuk',
-            'pesan' => "{$sesi->nama}: ada pengajuan wali yang menunggu diputus sebelum ".$sesi->batas_persetujuan->format('d/m/Y H:i').'.',
+            'pesan' => "{$sesi->nama}: ada pengajuan wali yang menunggu diputus paling lambat ".$sesi->batas_persetujuan->format('d/m/Y').'.',
             'jenis' => 'tarik_tunai_menunggu', 'ref_jenis' => 'SesiTarikTunai', 'ref_id' => (string) $sesi->id_sesi,
         ])->values()->all());
     }
@@ -331,7 +392,7 @@ class PenarikanTunaiService
                 throw new AppException(422, 'Dana sesi ini sudah diambil atau sesinya sudah ditutup.');
             }
             if ($sesi->tahap() !== 'siap_ambil') {
-                throw new AppException(422, 'Dana baru bisa diambil sesudah batas persetujuan lewat ('.$sesi->batas_persetujuan->format('d/m/Y H:i').').');
+                throw new AppException(422, 'Dana baru bisa diambil sesudah batas persetujuan lewat (akhir '.$sesi->batas_persetujuan->format('d/m/Y').').');
             }
             $total = $this->rekapAmbil($sesi)['total'];
             if (! Money::gtZero($total)) {
@@ -518,16 +579,41 @@ class PenarikanTunaiService
 
     private function assertJadwal(array $d): void
     {
-        $urut = [$d['batas_pengajuan'], $d['batas_persetujuan'], $d['tanggal_ambil'].' 23:59:59', $d['tanggal_distribusi'].' 23:59:59'];
-        if (strtotime($urut[0]) > strtotime($urut[1])) {
+        $this->assertUrutan($d['batas_pengajuan'], $d['batas_persetujuan'], $d['tanggal_ambil'], $d['tanggal_distribusi']);
+        $this->assertDataSesi($d);
+    }
+
+    /**
+     * Batas pengajuan & persetujuan diisi TANGGAL saja di layar (permintaan user 20 Okt 2026) dan berlaku
+     * SAMPAI AKHIR HARI itu: "2026-10-24" → "2026-10-24 23:59:59". Nilai yang sudah berjam dibiarkan.
+     */
+    private static function batasAkhirHari(array $d): array
+    {
+        foreach (['batas_pengajuan', 'batas_persetujuan'] as $k) {
+            if (isset($d[$k]) && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $d[$k])) {
+                $d[$k] .= ' 23:59:59';
+            }
+        }
+
+        return $d;
+    }
+
+    /** Pengajuan ≤ persetujuan ≤ ambil di bank ≤ distribusi (dua terakhir tanggal saja). */
+    private function assertUrutan(string $pengajuan, string $persetujuan, string $ambil, string $distribusi): void
+    {
+        if (strtotime($pengajuan) > strtotime($persetujuan)) {
             throw new AppException(422, 'Batas persetujuan harus sesudah batas pengajuan.');
         }
-        if (strtotime(substr($urut[1], 0, 10)) > strtotime($d['tanggal_ambil'])) {
+        if (strtotime(date('Y-m-d', strtotime($persetujuan))) > strtotime($ambil)) {
             throw new AppException(422, 'Tanggal ambil di bank tak boleh sebelum batas persetujuan.');
         }
-        if (strtotime($d['tanggal_ambil']) > strtotime($d['tanggal_distribusi'])) {
+        if (strtotime($ambil) > strtotime($distribusi)) {
             throw new AppException(422, 'Tanggal distribusi tak boleh sebelum tanggal ambil di bank.');
         }
+    }
+
+    private function assertDataSesi(array $d): void
+    {
         if ($d['kode_coa_bank'] === $d['kode_coa_kas']) {
             throw new AppException(422, 'Rekening bank dan kas tunai kegiatan harus berbeda.');
         }
@@ -587,7 +673,7 @@ class PenarikanTunaiService
             throw new AppException(422, 'Penarikan tunai kegiatan ini tidak dibuka.');
         }
         if ($sesi->tahap() !== 'pengajuan') {
-            throw new AppException(422, 'Batas pengajuan kegiatan ini sudah lewat ('.$sesi->batas_pengajuan->format('d/m/Y H:i').').');
+            throw new AppException(422, 'Batas pengajuan kegiatan ini sudah lewat (akhir '.$sesi->batas_pengajuan->format('d/m/Y').').');
         }
 
         return $sesi;

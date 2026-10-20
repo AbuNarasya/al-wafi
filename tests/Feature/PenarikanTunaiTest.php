@@ -252,12 +252,61 @@ class PenarikanTunaiTest extends TestCase
         $this->galat(fn () => $this->svc->aturDibuka($sesi->id_sesi, true), '/tak bisa diubah/');
     }
 
+    public function test_batas_cukup_tanggal_berlaku_sampai_akhir_hari(): void
+    {
+        $sesi = $this->svc->buatSesi($this->jadwal([
+            'batas_pengajuan' => now()->toDateString(), 'batas_persetujuan' => now()->addDay()->toDateString(),
+        ]), [$this->ahmad->id], $this->keuangan->id_pengguna);
+        $this->assertSame([now()->toDateString().' 23:59:59', now()->addDay()->toDateString().' 23:59:59'],
+            [$sesi->batas_pengajuan->format('Y-m-d H:i:s'), $sesi->batas_persetujuan->format('Y-m-d H:i:s')]);
+        $this->assertSame('pengajuan', $sesi->tahap());   // hari ini masih terbuka sampai malam
+
+        // Menutup persetujuan HARI INI = memilih tanggal kemarin (lewat layar, tanpa jam).
+        $this->actingAs($this->kesantrian)->put(route('tarik_tunai.jadwal', $sesi->id_sesi), [
+            'batas_pengajuan' => now()->subDays(2)->toDateString(), 'batas_persetujuan' => now()->subDay()->toDateString(),
+        ])->assertSessionHas('status');
+        $this->assertSame('siap_ambil', $sesi->fresh()->tahap());
+    }
+
     public function test_jadwal_sesi_harus_berurutan(): void
     {
         $this->galat(fn () => $this->svc->buatSesi($this->jadwal(['batas_persetujuan' => now()->addDay()->format('Y-m-d H:i')]), [$this->ahmad->id], 1), '/sesudah batas pengajuan/');
         $this->galat(fn () => $this->svc->buatSesi($this->jadwal(['tanggal_distribusi' => now()->addDays(3)->toDateString()]), [$this->ahmad->id], 1), '/distribusi/');
         $this->galat(fn () => $this->svc->buatSesi($this->jadwal(['maks_per_santri' => 120000]), [$this->ahmad->id], 1), '/kelipatan/');
         $this->galat(fn () => $this->svc->buatSesi($this->jadwal(['kode_coa_kas' => '1.ZZTT.BNK']), [$this->ahmad->id], 1), '/harus berbeda/');
+    }
+
+    public function test_ubah_jadwal_dibagi_keuangan_dan_kesantrian(): void
+    {
+        $sesi = $this->sesiTerbuka();
+        $p = $this->ajukan($sesi, 100000);
+        $besok = now()->addDay();
+
+        // Kesantrian: batas pengajuan & persetujuan boleh; tanggal ambil/distribusi tidak.
+        $this->galat(fn () => $this->svc->ubahJadwal($sesi->id_sesi, ['tanggal_distribusi' => $besok->copy()->addDays(9)->toDateString()], false, true), '/hanya bisa diubah oleh keuangan/');
+        $this->svc->ubahJadwal($sesi->id_sesi, ['batas_pengajuan' => now()->subHours(2)->format('Y-m-d H:i'), 'batas_persetujuan' => now()->subHour()->format('Y-m-d H:i')], false, true);
+        $sesi->refresh();
+        $this->assertSame('siap_ambil', $sesi->tahap());                          // menutup persetujuan sekarang
+        $this->assertSame('gugur', $p->fresh()->statusEfektif());
+        $this->assertSame(1, NotifikasiWali::where('judul', 'Jadwal uang saku kegiatan berubah')->count());
+
+        // Urutan tetap dijaga.
+        $this->galat(fn () => $this->svc->ubahJadwal($sesi->id_sesi, ['tanggal_ambil' => now()->subDays(3)->toDateString()], true, false), '/tak boleh sebelum batas persetujuan/');
+
+        // Setelah dana diambil: hanya tanggal distribusi, oleh keuangan.
+        $sesi2 = $this->sesiSiapAmbil();
+        $this->svc->ambilDana($sesi2->id_sesi, $this->keuangan->id_pengguna);
+        $this->galat(fn () => $this->svc->ubahJadwal($sesi2->id_sesi, ['batas_pengajuan' => now()->format('Y-m-d H:i')], true, true), '/sebelum dana diambil/');
+        $this->svc->ubahJadwal($sesi2->id_sesi, ['tanggal_distribusi' => now()->addDays(10)->toDateString()], true, false);
+        $this->assertSame(now()->addDays(10)->toDateString(), $sesi2->fresh()->tanggal_distribusi->toDateString());
+
+        // Lewat HTTP: kesantrian boleh membuka rutenya, pengguna lain tidak.
+        $lain = $this->pengguna('lain', ['cash-in' => ['buat']]);
+        $this->actingAs($lain)->put(route('tarik_tunai.jadwal', $sesi2->id_sesi), ['tanggal_distribusi' => now()->addDays(11)->toDateString()])->assertForbidden();
+        $this->actingAs($this->kesantrian)->put(route('tarik_tunai.jadwal', $sesi2->id_sesi), ['tanggal_distribusi' => now()->addDays(11)->toDateString()])
+            ->assertSessionHas('error', fn ($e) => str_contains($e, 'oleh keuangan'));
+        $this->actingAs($this->keuangan)->put(route('tarik_tunai.jadwal', $sesi2->id_sesi), ['tanggal_distribusi' => now()->addDays(11)->toDateString()])
+            ->assertSessionHas('status');
     }
 
     public function test_layar_staf_dan_hak_akses(): void

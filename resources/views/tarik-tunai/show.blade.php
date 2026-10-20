@@ -49,8 +49,8 @@
 
     <div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         @foreach ([
-            ['Batas pengajuan', $sesi->batas_pengajuan->format('d/m/Y H:i')],
-            ['Batas persetujuan', $sesi->batas_persetujuan->format('d/m/Y H:i')],
+            ['Batas pengajuan', $sesi->batas_pengajuan->format('d/m/Y')],
+            ['Batas persetujuan', $sesi->batas_persetujuan->format('d/m/Y')],
             ['Ambil di bank', $sesi->tanggal_ambil->format('d/m/Y').' · '.$sesi->bank?->nama_rekening],
             ['Distribusi', $sesi->tanggal_distribusi->format('d/m/Y').' · '.$sesi->kas?->nama_rekening],
         ] as [$l, $v])
@@ -105,12 +105,14 @@
         </div>
     @endif
 
+    @include('tarik-tunai._ubah_jadwal', ['sesi' => $sesi, 'kelas' => 'mb-3'])
+
     @if ($bolehUbah)
         <details class="mb-6 rounded-xl border border-gray-200 bg-white shadow-sm" @if ($errors->any()) open @endif>
-            <summary class="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-800">Ubah jadwal & batas</summary>
+            <summary class="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-800">Ubah data sesi (nama, batas nominal, rekening)</summary>
             <form method="POST" action="{{ route('tarik_tunai.update', $sesi->id_sesi) }}" class="space-y-4 border-t border-gray-100 p-4">
                 @csrf @method('PUT')
-                @include('tarik-tunai._jadwal', ['sesi' => $sesi])
+                @include('tarik-tunai._jadwal', ['sesi' => $sesi, 'tanpaJadwal' => true])
                 <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white">Simpan</button>
             </form>
         </details>

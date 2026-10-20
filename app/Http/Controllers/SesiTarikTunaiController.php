@@ -62,9 +62,32 @@ class SesiTarikTunaiController extends Controller
 
     public function update(Request $request, SesiTarikTunai $sesi): RedirectResponse
     {
-        $data = $this->validasi($request);
+        $data = $request->validate([
+            'nama' => ['required', 'string', 'max:150'],
+            'keterangan' => ['nullable', 'string', 'max:1000'],
+            'maks_per_santri' => ['required', 'numeric', 'gt:0'],
+            'kode_coa_bank' => ['required', 'string', 'exists:bank_accounts,kode_coa'],
+            'kode_coa_kas' => ['required', 'string', 'exists:bank_accounts,kode_coa'],
+        ]);
 
-        return $this->jalankan(fn () => $this->service->ubahSesi($sesi->id_sesi, $data), 'Jadwal & batas sesi disimpan.');
+        return $this->jalankan(fn () => $this->service->ubahSesi($sesi->id_sesi, $data), 'Data sesi disimpan.');
+    }
+
+    /**
+     * Ubah jadwal — keuangan (sesi-tarik-tunai: ubah) ATAU kesantrian (penarikan-tunai: ubah). Siapa boleh
+     * mengubah tanggal apa ditegakkan di PenarikanTunaiService::ubahJadwal.
+     */
+    public function jadwal(Request $request, SesiTarikTunai $sesi): RedirectResponse
+    {
+        $keuangan = \App\Support\Akses::boleh('sesi-tarik-tunai', 'ubah');
+        $kesantrian = \App\Support\Akses::boleh('penarikan-tunai', 'ubah');
+        abort_unless($keuangan || $kesantrian, 403);
+        $data = $request->validate([
+            'batas_pengajuan' => ['nullable', 'date'], 'batas_persetujuan' => ['nullable', 'date'],
+            'tanggal_ambil' => ['nullable', 'date'], 'tanggal_distribusi' => ['nullable', 'date'],
+        ]);
+
+        return $this->jalankan(fn () => $this->service->ubahJadwal($sesi->id_sesi, $data, $keuangan, $kesantrian), "Jadwal {$sesi->nama} disimpan.");
     }
 
     public function dibuka(Request $request, SesiTarikTunai $sesi): RedirectResponse

@@ -149,7 +149,8 @@ sudo nginx -t 2>&1 | tail -1
 sudo systemctl reload nginx
 
 langkah "9. Cron (schedule:run tiap menit, sebagai www-data)"
-BARIS="* * * * * cd $DIR && php artisan schedule:run >> /dev/null 2>&1"
+# umask 002: berkas cache buatan cron tetap bisa ditulis deploy (satu grup www-data).
+BARIS="* * * * * cd $DIR && umask 002 && php artisan schedule:run >> /dev/null 2>&1"
 # `crontab -l` gagal bila belum ada crontab & `grep -v` gagal bila tak ada sisa baris — keduanya wajar.
 ( { sudo crontab -u www-data -l 2>/dev/null || true; } | { grep -vF "$DIR " || true; } ; echo "$BARIS" ) | sudo crontab -u www-data -
 sudo crontab -u www-data -l | grep -F "$DIR"

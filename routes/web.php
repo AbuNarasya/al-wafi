@@ -787,6 +787,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [$c, 'store'])->name('store')->middleware('hakakses:sesi-tarik-tunai,buat');
         Route::get('/{sesi}', [$c, 'show'])->name('show')->middleware('hakakses:sesi-tarik-tunai,lihat')->whereNumber('sesi');
         Route::put('/{sesi}', [$c, 'update'])->name('update')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber('sesi');
+        // Hak keuangan ATAU kesantrian — diperiksa di controller & service.
+        Route::put('/{sesi}/jadwal', [$c, 'jadwal'])->name('jadwal')->whereNumber('sesi');
         Route::post('/{sesi}/dibuka', [$c, 'dibuka'])->name('dibuka')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber('sesi');
         Route::post('/{sesi}/peserta', [$c, 'tambahPeserta'])->name('peserta.tambah')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber('sesi');
         Route::delete('/{sesi}/peserta/{santri}', [$c, 'hapusPeserta'])->name('peserta.hapus')->middleware('hakakses:sesi-tarik-tunai,ubah')->whereNumber(['sesi', 'santri']);

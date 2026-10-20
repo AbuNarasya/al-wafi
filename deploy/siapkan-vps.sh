@@ -48,6 +48,12 @@ if [ ! -f /swapfile ]; then
   echo "/swapfile none swap sw 0 0" >> /etc/fstab
 fi
 rm -f /etc/nginx/sites-enabled/default && systemctl reload nginx
+# Berkas cache/log dibuat www-data (web & cron) DAN deploy (deploy, artisan): keduanya satu grup & umask 002,
+# kalau tidak `php artisan …` oleh deploy gagal "Permission denied" pada cache buatan www-data.
+usermod -aG www-data deploy
+mkdir -p /etc/systemd/system/php8.5-fpm.service.d
+printf "[Service]\nUMask=0002\n" > /etc/systemd/system/php8.5-fpm.service.d/umask.conf
+systemctl daemon-reload && systemctl restart php8.5-fpm
 
 langkah "4. Deploy key GitHub (milik pengguna deploy)"
 sudo -u deploy bash -c '
