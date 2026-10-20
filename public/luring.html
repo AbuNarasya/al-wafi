@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tidak ada koneksi — Al Wafi ERP</title>
+<title>Tidak ada koneksi</title>
+<!-- Dipakai SEMUA instans (Al Wafi & Wafi Mart) dari satu berkas statis — karena itu tanpa nama aplikasi. -->
 <!-- Gayanya ditulis di dalam berkas ini, tanpa memanggil aset apa pun: halaman
      ini justru dipakai ketika jaringan sedang tak bisa dihubungi. -->
 <style>
@@ -12,7 +13,7 @@
     .kotak { max-width: 22rem; text-align: center; }
     /* Latar emasnya tetap diberikan: bila ikonnya belum sempat tersimpan, yang
        tampil petak emas polos — bukan lambang gambar rusak. */
-    .lambang { width: 56px; height: 56px; border-radius: 14px; background: #d9b34b;
+    .lambang { width: 56px; height: 56px; border-radius: 14px; background: #d9b34b center / cover no-repeat;
                display: block; margin: 0 auto 20px; }
     h1 { font-size: 19px; font-weight: 600; margin: 0 0 10px; color: #fff; }
     p { font-size: 14.5px; line-height: 1.6; margin: 0 0 22px; color: #b8c4d9; }
@@ -22,12 +23,14 @@
 </head>
 <body>
     <div class="kotak">
-        <img class="lambang" src="/ikon/ikon-192.png" alt="">
+        <!-- Gambar latar, bukan <img>: bila ikonnya tak bisa dimuat, yang tampil petak emas polos,
+             bukan lambang gambar rusak. -->
+        <div class="lambang" style="background-image: url('/ikon/ikon-192.png')"></div>
         <h1>Tidak ada koneksi</h1>
         <p>
-            Al Wafi ERP membutuhkan sambungan untuk menampilkan data terbaru. Angka kas &amp;
-            tagihan sengaja tidak disimpan di ponsel agar tak ada yang membaca data lama
-            sebagai data hari ini.
+            Aplikasi ini membutuhkan sambungan untuk menampilkan data terbaru. Angka keuangan
+            sengaja tidak disimpan di perangkat agar tak ada yang membaca data lama sebagai
+            data hari ini.
         </p>
         <button type="button" onclick="location.reload()">Coba lagi</button>
     </div>

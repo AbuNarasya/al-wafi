@@ -95,7 +95,10 @@ ls public/build/manifest.json
 
 langkah "6. Migrasi & seed"
 php artisan migrate --force --no-interaction | tail -3
-if [ ! -f "$KREDENSIAL" ]; then
+# TANPA_SEED=1: hanya struktur tabel — data pengaturan dimuat terpisah (mis. salinan master dari laptop).
+if [ "${TANPA_SEED:-}" = 1 ]; then
+  echo "seed DILEWATI (TANPA_SEED=1)"
+elif [ ! -f "$KREDENSIAL" ]; then
   php artisan db:seed --force --no-interaction | tail -2
   ADMINPASS="$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-16)"
   PW="$ADMINPASS" php artisan tinker --execute='App\Models\User::where("username","admin")->update(["password_hash"=>Illuminate\Support\Facades\Hash::make(getenv("PW"))]);' >/dev/null

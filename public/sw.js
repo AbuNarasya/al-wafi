@@ -32,6 +32,8 @@
 // v6 — ikon diganti logo LENGKAP dengan tulisan "AL WAFI ERP" (permintaan user
 //      15 Okt 2026): ikon-any-* untuk layar pembuka, ikon-* maskable dengan
 //      lambang+tulisan di dalam lingkaran aman 80%.
+// v7 — halaman luring tanpa nama aplikasi (dipakai instans Al Wafi & Wafi Mart),
+//      lambangnya gambar latar sehingga tak tampil sebagai gambar rusak (20 Okt 2026).
 //
 // ⚠️ TIAP KENAIKAN NOMOR MEMAKSA SETIAP PERANGKAT MEMASANG ULANG pekerja
 // layanannya, dan sampai itu terjadi ia masih menjalankan versi lama. Untuk dua
@@ -39,7 +41,7 @@
 // puluh orang yang notifikasinya tertinggal sampai aplikasinya ditutup total.
 // Jadi kumpulkan perubahan `sw.js` dan naikkan nomornya sekali, bukan sekali
 // per perubahan kecil.
-const VERSI = 'alwafi-v6';
+const VERSI = 'alwafi-v7';
 const LURING = '/luring.html';
 
 self.addEventListener('install', (e) => {
