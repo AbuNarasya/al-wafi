@@ -106,6 +106,8 @@ class WafiMartSeeder extends DatabaseSeeder
             ['2.1.03.001', 'Hutang PPh 21', $k], ['2.1.03.002', 'Hutang PPh Final / PPh Badan', $k], ['2.1.03.003', 'Hutang Pajak Lainnya', $k],
             ['2.2.01.001', 'Pinjaman Bank', $k],
             ['3.1.01.001', 'Modal Disetor', $k], ['3.1.01.002', 'Laba Ditahan', $k], ['3.1.01.003', 'Dividen', $d],
+            // Penampung jurnal pembuka (stok awal impor, saldo awal) — diseimbangkan lalu dinolkan ke modal/laba ditahan.
+            ['3.1.01.004', 'Ekuitas Saldo Awal (Penampung)', $k],
             ['4.1.01.001', 'Penjualan Barang Dagang', $k],
             ['4.2.01.001', 'Pendapatan Sewa Display & Promosi', $k], ['4.2.01.002', 'Pendapatan Bunga Bank', $k],
             ['4.2.01.003', 'Selisih Kas Lebih', $k], ['4.2.01.004', 'Laba/Rugi Pelepasan Aset', $k], ['4.2.01.009', 'Pendapatan Lain-lain', $k],
