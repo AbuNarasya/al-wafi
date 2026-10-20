@@ -204,6 +204,8 @@ class WafiMartSeeder extends DatabaseSeeder
             'bulan_awal_anggaran' => $ada?->bulan_awal_anggaran ?: 1,
             'kode_unit_neraca' => $ada?->kode_unit_neraca ?: 'U001',
             'kode_coa_grni' => $ada?->kode_coa_grni ?: '2.1.01.002',
+            // Penjualan kartu santri (lewat penghubung) didebet ke piutang ke Al Wafi saat tutup shift.
+            'kode_coa_kartu_santri' => $ada?->kode_coa_kartu_santri ?: '1.1.03.001',
             'topup_tunai_dompet_santri' => false,
         ]);
     }

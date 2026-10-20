@@ -167,7 +167,10 @@ class PosController extends Controller
         return view('pos.struk', [
             'jual' => $penjualan->load('santri:id,nama'),
             // Sisa uang saku sesudah belanja — dicetak untuk santrinya sendiri.
-            'sisaSaldo' => $penjualan->id_mutasi_dompet ? \App\Models\MutasiDompet::whereKey($penjualan->id_mutasi_dompet)->value('saldo_setelah') : null,
+            // Kartu lewat penghubung: sisa saldo snapshot jawaban ERP Al Wafi.
+            'sisaSaldo' => $penjualan->id_mutasi_dompet
+                ? \App\Models\MutasiDompet::whereKey($penjualan->id_mutasi_dompet)->value('saldo_setelah')
+                : $penjualan->sisa_saldo_kartu,
             'perusahaan' => CompanySettings::find(1),
             'cetak' => $request->boolean('cetak'),
         ]);
@@ -238,6 +241,21 @@ class PosController extends Controller
     public function kartu(Request $request): JsonResponse
     {
         abort_unless($this->shiftTerbuka($request), 409, 'Belum ada shift terbuka.');
+        if (KasirService::lewatPenghubung()) {
+            // Instans Wafi Mart: tanya ERP Al Wafi; bentuk jawabannya disamakan dengan mode lokal.
+            try {
+                $h = app(\App\Services\Penghubung\KlienDompetToko::class)
+                    ->cekKartu((string) $request->query('uid'), Money::of($request->query('total', 0)));
+            } catch (\App\Exceptions\AppException $e) {
+                return response()->json(['message' => $e->getMessage()], $e->status);
+            }
+
+            return response()->json([
+                'nama' => $h['nama'] ?? null, 'nis' => $h['nis'] ?? null,
+                'sisa_batas' => (float) ($h['sisa_batas'] ?? 0),
+                'perlu_pin' => (bool) ($h['perlu_pin'] ?? false), 'punya_pin' => (bool) ($h['punya_pin'] ?? false),
+            ]);
+        }
         $k = (new \App\Services\Modules\KartuSantriService)->cariAktif((string) $request->query('uid'));
         if (! $k || $k->santri->status !== 'aktif') {
             return response()->json(['message' => 'Kartu tidak dikenal, diblokir, atau bukan santri aktif.'], 404);

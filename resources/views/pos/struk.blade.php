@@ -53,7 +53,7 @@
         <tr class="besar"><td>TOTAL</td><td class="kanan">{{ $rp($jual->total) }}</td></tr>
         @if ($jual->metode === 'dompet')
             <tr><td>Kartu</td><td class="kanan">{{ $rp($jual->bayar) }}</td></tr>
-            <tr><td colspan="2">{{ $jual->santri?->nama }}</td></tr>
+            <tr><td colspan="2">{{ $jual->santri?->nama ?? $jual->nama_kartu }}</td></tr>
             @if ($sisaSaldo !== null)
                 <tr><td>Sisa uang saku</td><td class="kanan">{{ $rp($sisaSaldo) }}</td></tr>
             @endif

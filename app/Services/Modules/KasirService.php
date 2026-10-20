@@ -129,7 +129,15 @@ class KasirService
         // ---- Bayar KARTU (dompet santri) atau TUNAI ----
         $santri = null;
         $pinBenar = false;
-        if ($kartu !== null) {
+        $kartuJauh = $kartu !== null && self::lewatPenghubung();
+        if ($kartuJauh) {
+            // Instans Wafi Mart: kartu, saldo, batas & PIN diperiksa ERP Al Wafi lewat penghubung —
+            // dipanggil di dalam transaksi di bawah, sesudah struk & stok siap.
+            if (trim((string) ($kartu['uid'] ?? '')) === '') {
+                throw new AppException(422, 'Tempelkan kartu santri dulu.');
+            }
+            $bayar = $total;
+        } elseif ($kartu !== null) {
             $k = (new KartuSantriService)->cariAktif($kartu['uid'] ?? null)
                 ?? throw new AppException(404, 'Kartu tidak dikenal atau sudah diblokir.');
             $santri = $k->santri;
@@ -150,7 +158,7 @@ class KasirService
             throw new AppException(422, 'Uang yang dibayarkan kurang dari total belanja.');
         }
 
-        return DB::transaction(function () use ($shift, $rincian, $total, $bayar, $idKasir, $diskonStruk, $penyetuju, $adaDiskon, $alasan, $santri, $pinBenar, $kartu) {
+        return DB::transaction(function () use ($shift, $rincian, $total, $bayar, $idKasir, $diskonStruk, $penyetuju, $adaDiskon, $alasan, $santri, $pinBenar, $kartu, $kartuJauh) {
             // Nomor struk harian per toko; kunci advisori supaya dua kasir yang menyimpan
             // bersamaan tak berebut nomor yang sama.
             DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('penjualan-nomor')]);
@@ -163,9 +171,9 @@ class KasirService
                 'id_shift' => $shift->id_shift,
                 'kode_lokasi' => $shift->kode_lokasi,
                 'waktu' => now(),
-                'metode' => $santri ? 'dompet' : 'tunai',
+                'metode' => ($santri || $kartuJauh) ? 'dompet' : 'tunai',
                 'id_santri' => $santri?->id,
-                'uid_kartu' => $santri ? KartuSantriService::bersihkanUid($kartu['uid']) : null,
+                'uid_kartu' => ($santri || $kartuJauh) ? KartuSantriService::bersihkanUid($kartu['uid']) : null,
                 'total' => $total,
                 'diskon_struk' => $diskonStruk,
                 'bayar' => $bayar,
@@ -212,6 +220,16 @@ class KasirService
                 // tak boleh sama-sama lolos dari batas harian.
                 $mutasi = $this->potongDompet($santri->id, $total, $jual->nomor, $idKasir, $pinBenar);
                 $jual->update(['id_mutasi_dompet' => $mutasi->id]);
+            } elseif ($kartuJauh) {
+                // PALING AKHIR, sesudah struk & stok siap: bila penghubung menolak (saldo, PIN, kartu) atau
+                // tak menjawab, galatnya menggulung seluruh struk. Nomor rujukan ditambah acak: nomor struk
+                // yang tergulung dipakai ulang struk berikutnya, sedangkan nomor rujukan di Al Wafi harus unik.
+                // Potongan yang sempat terjadi tapi struknya tergulung ditangkap rekonsiliasi malam (Fase 3c).
+                $ref = 'WM-'.$nomor.'-'.strtoupper(\Illuminate\Support\Str::random(6));
+                $lokasi = $shift->lokasi ?? LokasiPersediaan::find($shift->kode_lokasi);
+                $h = app(\App\Services\Penghubung\KlienDompetToko::class)->potong($ref, KartuSantriService::bersihkanUid($kartu['uid']),
+                    $total, $kartu['pin'] ?? null, $shift->kode_lokasi, $lokasi?->nama);
+                $jual->update(['ref_dompet' => $ref, 'nama_kartu' => $h['nama'] ?? null, 'sisa_saldo_kartu' => $h['sisa_saldo'] ?? null]);
             }
 
             return $jual->load('details');
@@ -225,6 +243,15 @@ class KasirService
     public static function belanjaKartuHariIni(int $idSantri): string
     {
         return DompetBelanja::hariIni($idSantri);
+    }
+
+    /**
+     * Kartu santri dibayar lewat PENGHUBUNG (Fase 3b) — di instans Wafi Mart, yang dompet santrinya milik
+     * ERP Al Wafi. Di instans Al Wafi kasir memotong dompet langsung (mode lokal, perilaku lama).
+     */
+    public static function lewatPenghubung(): bool
+    {
+        return \App\Support\Instans::adalah('wafimart');
     }
 
     /**
@@ -268,6 +295,12 @@ class KasirService
             if ($jual->metode === 'dompet' && $jual->id_santri) {
                 // Struk kartu: uangnya kembali ke dompet santri, bukan dari laci.
                 $this->kembalikanDompet($jual->id_santri, Money::of($jual->total), "Batal struk Wafi Mart {$jual->nomor}", $idPenyetuju);
+            } elseif ($jual->metode === 'dompet' && $jual->ref_dompet) {
+                // Kartu lewat penghubung: nomornya tetap (bukan acak) supaya mengulang pembatalan yang
+                // tergulung tak mengembalikan uang dua kali — ERP Al Wafi menjawab ulang transaksi yang sama.
+                $ref = 'WM-BATAL-'.$jual->ref_dompet;
+                app(\App\Services\Penghubung\KlienDompetToko::class)->kembalikan($ref, $jual->ref_dompet, Money::of($jual->total), "Batal struk Wafi Mart {$jual->nomor}");
+                $jual->ref_dompet_batal = $ref;
             }
             $jual->update(['status' => 'batal', 'alasan_batal' => $alasan, 'dibatalkan_oleh' => $idPenyetuju, 'dibatalkan_pada' => now()]);
 
@@ -519,6 +552,11 @@ class KasirService
             if ($retur->metode === 'dompet' && $jual->id_santri) {
                 $m = $this->kembalikanDompet($jual->id_santri, $total, "Retur {$nomor} dari {$jual->nomor}", $idKasir);
                 $retur->update(['id_mutasi_dompet' => $m->id]);
+            } elseif ($retur->metode === 'dompet' && $jual->ref_dompet) {
+                // Paling akhir: penghubung menolak/tak menjawab → retur tergulung utuh, stok tak jadi masuk.
+                $ref = 'WM-'.$nomor.'-'.strtoupper(\Illuminate\Support\Str::random(6));
+                app(\App\Services\Penghubung\KlienDompetToko::class)->kembalikan($ref, $jual->ref_dompet, $total, "Retur {$nomor} dari {$jual->nomor}");
+                $retur->update(['ref_dompet' => $ref]);
             }
 
             return $retur->load('details');
@@ -541,10 +579,12 @@ class KasirService
         // RETUR: uang kembali membalik pendapatan; barang LAYAK yang kembali ke rak membalik
         // HPP per akun persediaannya. Barang rusak tak kembali — harga pokoknya tetap HPP.
         $retur ??= collect();
-        $titipanSantri = DompetPolicy::COA_TITIPAN['santri'];
+        // Akun kartu: mode lokal (instans Al Wafi) = Titipan Uang Saku santri; instans Wafi Mart =
+        // Piutang ke Al Wafi (company_settings.kode_coa_kartu_santri, Fase 3b) — dompetnya milik entitas lain.
+        $titipanSantri = \App\Models\CompanySettings::query()->value('kode_coa_kartu_santri') ?: DompetPolicy::COA_TITIPAN['santri'];
 
-        // BELANJA KARTU: tak ada kas yang masuk — titipan uang saku santri berkurang, pendapatan
-        // toko bertambah. Uangnya baru pindah ke kas toko lewat pencairan mingguan (D3).
+        // BELANJA KARTU: tak ada kas yang masuk — titipan uang saku santri berkurang (atau piutang ke Al Wafi
+        // bertambah), pendapatan toko bertambah. Uangnya pindah ke kas toko lewat pencairan mingguan.
         if (Money::gtZero($dompet)) {
             $ketKartu = "Belanja kartu {$shift->nomor} — {$l->nama}";
             $lines[] = ['kode_coa' => $titipanSantri, 'debet' => $dompet, 'kredit' => '0', 'keterangan' => $ketKartu];
