@@ -17,6 +17,9 @@ return [
     // Selisih waktu maksimum (detik) antara tanda tangan & jam server — penangkal pemutaran ulang.
     'toleransi_detik' => (int) env('PENGHUBUNG_TOKO_TOLERANSI', 300),
 
+    // Jeda (milidetik) antar-pertanyaan "pastikan" saat jawaban potong tak datang (Fase 3c-1). Tiga kali bertanya.
+    'jeda_pastikan_ms' => (int) env('PENGHUBUNG_TOKO_JEDA_PASTIKAN_MS', 1000),
+
     // Alamat IP pengirim yang diterima (dipisah koma). Kosong = tak dibatasi IP (tetap wajib tanda tangan).
     'ip' => env('PENGHUBUNG_TOKO_IP', ''),
 ];

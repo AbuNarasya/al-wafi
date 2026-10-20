@@ -195,6 +195,28 @@ class PenghubungDompetTokoTest extends TestCase
             $r->json('transaksi'));
     }
 
+    public function test_pastikan_jawabannya_final(): void
+    {
+        $pastikan = fn (string $nomor, int $n = 20000) => $this->kirim('POST', '/api/dompet-toko/v1/pastikan', ['nomor' => $nomor, 'jenis' => 'potong', 'nominal' => $n]);
+
+        // Sudah terpotong → "berhasil" beserta hasilnya (untuk struk).
+        $this->potong('WM-1', 20000)->assertOk();
+        $pastikan('WM-1')->assertOk()->assertJson(['status' => 'berhasil', 'nama' => 'AHMAD', 'sisa_saldo' => '80000.00']);
+        $pastikan('WM-1', 5000)->assertStatus(409);   // nomor sama, isi lain
+
+        // Belum pernah ada → nisan; potong yang TERLAMBAT tiba dengan nomor itu ditolak, saldo utuh.
+        $pastikan('WM-2')->assertOk()->assertJson(['status' => 'dibatalkan']);
+        $this->potong('WM-2', 20000)->assertStatus(409);
+        $pastikan('WM-2')->assertOk()->assertJson(['status' => 'dibatalkan']);   // diulang tetap sama
+        $this->assertSame('80000.00', $this->saldo());
+
+        // Nisan tak ikut jurnal & tercantum di daftar rekonsiliasi sebagai dibatalkan.
+        $this->assertSame([['WM-1', 'berhasil'], ['WM-2', 'dibatalkan']], collect($this->kirim('GET', '/api/dompet-toko/v1/transaksi',
+            ['tanggal' => now()->toDateString()])->json('transaksi'))->map(fn ($t) => [$t['nomor'], $t['status']])->all());
+        $hasil = (new JurnalDompetToko)->jalankan(now()->addDay()->toDateString());
+        $this->assertSame([1, '20000.00'], [$hasil[0]['transaksi'], $hasil[0]['bersih']]);
+    }
+
     public function test_rincian_belanja_disimpan_dan_tampil_di_portal_wali(): void
     {
         $rincian = ['struk' => 'JL-261020-0001', 'toko' => 'Koperasi Banin', 'waktu' => '2026-10-20T10:00:00+07:00', 'jenis' => 'belanja',

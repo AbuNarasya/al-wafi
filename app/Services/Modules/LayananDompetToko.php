@@ -127,6 +127,39 @@ class LayananDompetToko
         });
     }
 
+    /**
+     * PASTIKAN nasib satu nomor (Fase 3c-1) — dipanggil kasir Wafi Mart saat jawaban potong/kembalikan tak datang.
+     * Jawabannya FINAL: sudah ada & berhasil → "berhasil" + hasilnya; belum pernah ada → dicatat NISAN (status
+     * dibatalkan) lalu "dibatalkan", sehingga permintaan yang terlambat tiba dengan nomor itu ditolak. Kunci advisori
+     * sama dengan potong/kembalikan: permintaan yang sedang diproses ditunggu selesai dulu.
+     */
+    public function pastikan(string $nomor, string $jenis, string|int|float $nominal): array
+    {
+        $nomor = $this->nomor($nomor);
+        $nominal = Money::of($nominal);
+
+        return DB::transaction(function () use ($nomor, $jenis, $nominal) {
+            DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('dompet-toko:'.$nomor)]);
+            $ada = TransaksiDompetToko::where('nomor_toko', $nomor)->first();
+            if ($ada && $ada->status === 'berhasil') {
+                if ($ada->jenis !== $jenis || ! Money::eq($ada->nominal, $nominal)) {
+                    throw new AppException(409, "Nomor {$nomor} sudah dipakai untuk transaksi lain.");
+                }
+
+                return ['status' => 'berhasil'] + $this->hasil($ada, $ada->mutasi?->saldo_setelah);
+            }
+            if (! $ada) {
+                TransaksiDompetToko::create([
+                    'nomor_toko' => $nomor, 'jenis' => $jenis, 'id_santri' => null, 'nominal' => $nominal,
+                    'keterangan' => 'Dibatalkan kasir — jawaban penghubung tak sampai', 'status' => 'dibatalkan',
+                    'tanggal' => now()->toDateString(),
+                ]);
+            }
+
+            return ['status' => 'dibatalkan', 'nomor' => $nomor];
+        });
+    }
+
     /** Daftar transaksi satu tanggal — dasar rekonsiliasi malam di sisi Wafi Mart. */
     public function daftar(string $tanggal): array
     {
@@ -183,6 +216,10 @@ class LayananDompetToko
     /** Permintaan berulang: hasil yang sama bila isinya sama; nomor dipakai ulang untuk isi lain = DITOLAK. */
     private function ulang(TransaksiDompetToko $ada, string $jenis, string $nominal): array
     {
+        if ($ada->status === 'dibatalkan') {
+            // Nisan dari pastikan(): kasir sudah diberi tahu "tidak terjadi" — permintaan terlambat tak boleh memotong.
+            throw new AppException(409, "Nomor {$ada->nomor_toko} sudah dibatalkan oleh kasir — ulangi dengan nomor baru.");
+        }
         if ($ada->jenis !== $jenis || ! Money::eq($ada->nominal, $nominal)) {
             throw new AppException(409, "Nomor {$ada->nomor_toko} sudah dipakai untuk transaksi lain.");
         }

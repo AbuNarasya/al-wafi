@@ -124,6 +124,8 @@ class PosController extends Controller
             // Bayar kartu: UID dari pembaca RFID + PIN belanja santri (bila melewati batas harian).
             'kartu_uid' => ['nullable', 'string', 'max:80'],
             'pin_santri' => ['nullable', 'string', 'max:6'],
+            // Lanjutan "Cek lagi": niat bayar kartu yang sudah dipastikan terpotong — struk disimpan tanpa memotong lagi.
+            'permintaan_kartu' => ['nullable', 'integer'],
         ]);
         $shift = $this->shiftTerbuka($request);
         if (! $shift) {
@@ -142,7 +144,11 @@ class PosController extends Controller
                 'alasan' => $data['alasan_diskon'] ?? null,
                 'id_pengawas' => $data['id_pengawas'] ?? null,
                 'pin' => $data['pin'] ?? null,
-            ], ($data['kartu_uid'] ?? '') !== '' ? ['uid' => $data['kartu_uid'], 'pin' => $data['pin_santri'] ?? null] : null);
+            ], ($data['kartu_uid'] ?? '') !== '' ? ['uid' => $data['kartu_uid'], 'pin' => $data['pin_santri'] ?? null,
+                'permintaan' => $data['permintaan_kartu'] ?? null] : null);
+        } catch (\App\Services\Penghubung\PermintaanKartuTertunda $e) {
+            // Kartu belum pasti / sudah terpotong tanpa struk: layar menahan keranjang & menawarkan "Cek lagi".
+            return response()->json(['message' => $e->getMessage(), 'kode' => $e->status, 'tertunda' => $e->idPermintaan], 422);
         } catch (AppException $e) {
             // 428/423 dibawa ke layar: kasir perlu tahu bedanya "minta PIN" dengan "PIN terkunci".
             return response()->json(['message' => $e->getMessage(), 'kode' => $e->status], 422);
@@ -156,6 +162,12 @@ class PosController extends Controller
             'struk' => route('pos.struk', ['penjualan' => $jual->id_penjualan, 'cetak' => 1]),
             'ringkas' => $this->ringkas($shift),
         ]);
+    }
+
+    /** "Cek lagi" atas pembayaran kartu yang belum pasti: {status: berhasil|gagal|belum_pasti, sudah_struk}. */
+    public function pastikanKartu(Request $request, int $permintaan): JsonResponse
+    {
+        return response()->json($this->kasir->cekPermintaan($permintaan, $request->user()->id_pengguna));
     }
 
     /** Struk 58 mm. Kasir hanya bisa membuka struk shift-nya sendiri; pemegang hak lihat lain (admin) semua. */

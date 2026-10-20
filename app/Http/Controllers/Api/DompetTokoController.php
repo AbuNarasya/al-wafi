@@ -48,6 +48,16 @@ class DompetTokoController extends Controller
         return response()->json($this->layanan->kembalikan($d));
     }
 
+    public function pastikan(Request $request): JsonResponse
+    {
+        $d = $request->validate([
+            'nomor' => ['required', 'string', 'max:64'], 'jenis' => ['required', 'in:potong,kembalikan'],
+            'nominal' => ['required', 'numeric', 'gt:0'],
+        ]);
+
+        return response()->json($this->layanan->pastikan($d['nomor'], $d['jenis'], $d['nominal']));
+    }
+
     public function transaksi(Request $request): JsonResponse
     {
         $d = $request->validate(['tanggal' => ['required', 'date']]);

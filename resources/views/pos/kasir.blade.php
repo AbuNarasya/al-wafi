@@ -11,7 +11,7 @@
 @endsection
 
 @section('content')
-    <div x-data="kasir(@js(['cari' => route('pos.cari'), 'jual' => route('pos.jual'), 'kartu' => route('pos.kartu')]), @js($ringkas))"
+    <div x-data="kasir(@js(['cari' => route('pos.cari'), 'jual' => route('pos.jual'), 'kartu' => route('pos.kartu'), 'pastikan' => route('pos.kartu_pastikan', ['permintaan' => '__ID__'])]), @js($ringkas))"
          @keydown.window.f2.prevent="$refs.cari.focus()"
          @keydown.window.f9.prevent="simpan()"
          @keydown.window.f8.prevent="bukaKartu()"
@@ -147,7 +147,7 @@
 
         {{-- Bayar KARTU: santri menempelkan kartu (pembaca RFID USB mengetik UID + Enter). Di atas
              batas harian santri mengetik PIN belanjanya. Saldo sengaja tak ditampilkan ke kasir. --}}
-        <div x-show="kartuBuka" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 p-4" @keydown.escape.window="kartuBuka = false">
+        <div x-show="kartuBuka" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 p-4" @keydown.escape.window="if (!tertunda) kartuBuka = false">
             <form @submit.prevent="info ? bayarKartu() : cekKartu()" class="w-full max-w-sm space-y-3 rounded-xl bg-white p-5 shadow-xl">
                 <div class="font-semibold text-gray-900">Bayar dengan kartu santri</div>
                 <div class="text-sm text-gray-600">Total <b class="tabular-nums" x-text="rp(total)"></b></div>
@@ -177,8 +177,20 @@
                         <input type="password" inputmode="numeric" x-model="pin" maxlength="6" placeholder="PIN pengawas" autocomplete="off" class="w-full rounded-lg border-gray-300 text-center tracking-widest">
                     </div>
                 </template>
-                <p x-show="kartuGalat" class="text-sm text-red-600" x-text="kartuGalat"></p>
-                <div class="flex gap-2">
+                {{-- Pembayaran kartu yang nasibnya belum selesai (Fase 3c-1): keranjang ditahan, tunai DILARANG
+                     sampai "Cek lagi" memastikan terpotong (struk disimpan) atau tidak (aman). --}}
+                <template x-if="tertunda">
+                    <div class="space-y-2 rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
+                        <div class="font-semibold">Jangan terima tunai dulu</div>
+                        <div class="text-xs" x-text="kartuGalat"></div>
+                        <button type="button" @click="cekTertunda()" :disabled="sibuk"
+                                class="w-full rounded-lg bg-amber-500 py-2 text-sm font-semibold text-white hover:bg-amber-600">Cek lagi</button>
+                        <button type="button" @click="lepaskan()" :disabled="sibuk"
+                                class="w-full text-center text-xs text-amber-800 underline">Lepaskan &amp; layani tunai (potongan kartu, bila ada, kembali ke santri malam ini)</button>
+                    </div>
+                </template>
+                <p x-show="kartuGalat && !tertunda" class="text-sm text-red-600" x-text="kartuGalat"></p>
+                <div class="flex gap-2" x-show="!tertunda">
                     <button type="button" @click="kartuBuka = false" class="flex-1 rounded-lg border border-gray-300 py-2 text-sm">Batal</button>
                     <button class="flex-1 rounded-lg bg-sky-600 py-2 text-sm font-semibold text-white hover:bg-sky-700" :disabled="sibuk"
                             x-text="info ? 'Bayar ' + rp(total) : 'Baca kartu'"></button>
@@ -220,7 +232,7 @@
             return {
                 q: '', hasil: [], keranjang: [], bayar: '', sibuk: false, pesan: '', pesanJenis: '', terakhir: null, ringkas,
                 diskonStruk: 0, minta: false, idPengawas: '', pin: '', alasanDiskon: '',
-                kartuBuka: false, uid: '', info: null, pinSantri: '', kartuGalat: '',
+                kartuBuka: false, uid: '', info: null, pinSantri: '', kartuGalat: '', tertunda: null,
 
                 get totalDiskon() { return this.keranjang.reduce((s, r) => s + (r.diskon || 0), 0) + (this.diskonStruk || 0); },
                 get adaDiskon() { return this.totalDiskon > 0; },
@@ -277,6 +289,7 @@
                 // Ada diskon → minta PIN pengawas dulu; tanpa diskon langsung simpan.
                 simpan() {
                     if (this.sibuk || !this.keranjang.length) return;
+                    if (this.tertunda) { this.kartuBuka = true; return; }   // pembayaran kartu tertahan → selesaikan dulu
                     if (this.kembalian < 0) { this.beri('Uang diterima kurang dari total.'); this.$refs.bayar.focus(); return; }
                     if (this.adaDiskon) { this.pin = ''; this.minta = true; this.$nextTick(() => this.$refs.pin.focus()); return; }
                     this.kirim();
@@ -286,7 +299,9 @@
                 // ---- Bayar kartu ----
                 bukaKartu() {
                     if (this.sibuk || !this.keranjang.length) return;
-                    this.kartuBuka = true; this.uid = ''; this.info = null; this.pinSantri = ''; this.kartuGalat = '';
+                    this.kartuBuka = true;
+                    if (this.tertunda) return;   // tahanan tetap: kartu & pesan dipertahankan untuk "Cek lagi"
+                    this.uid = ''; this.info = null; this.pinSantri = ''; this.kartuGalat = '';
                     this.$nextTick(() => this.$refs.uid.focus());
                 },
                 async cekKartu() {
@@ -301,6 +316,36 @@
                     const ok = await this.kirim({ kartu: true });
                     if (ok) this.kartuBuka = false;
                 },
+                // Jalan keluar bila Al Wafi lama tak terjangkau: pencocokan malam mengembalikan potongan tanpa struk.
+                lepaskan() {
+                    if (!confirm('Lepaskan pembayaran kartu ini? Bila kartu ternyata sudah terpotong, uangnya dikembalikan otomatis ke santri malam ini.')) return;
+                    this.tertunda = null; this.kartuGalat = ''; this.kartuBuka = false; this.uid = ''; this.info = null;
+                },
+                // "Cek lagi": terpotong → simpan struk tanpa memotong lagi; tidak terjadi → aman, tahanan dilepas.
+                async cekTertunda() {
+                    this.sibuk = true;
+                    let data = null;
+                    try {
+                        const r = await fetch(url.pastikan.replace('__ID__', this.tertunda), { method: 'POST',
+                            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content } });
+                        data = await r.json();
+                        if (!r.ok) throw new Error(data.message);
+                    } catch (e) {
+                        this.kartuGalat = 'Server toko tak terjangkau — status masih BELUM PASTI. Coba "Cek lagi" sebentar lagi.';
+                        return;
+                    } finally {
+                        this.sibuk = false;
+                    }
+                    if (data.sudah_struk) { this.tertunda = null; this.kartuBuka = false; this.beri('Pembayaran ini sudah tersimpan sebagai struk — lihat Riwayat Struk.'); return; }
+                    if (data.status === 'berhasil') {
+                        if (await this.kirim({ kartu: true })) this.kartuBuka = false;
+                    } else if (data.status === 'gagal') {
+                        this.tertunda = null;
+                        this.kartuGalat = 'Dipastikan TIDAK terpotong — aman: ulangi bayar kartu, atau terima tunai.';
+                    } else {
+                        this.kartuGalat = 'Status masih BELUM PASTI (ERP Al Wafi tak terjangkau). Jangan terima tunai — coba lagi sebentar lagi.';
+                    }
+                },
 
                 async kirim(opsi = {}) {
                     this.sibuk = true;
@@ -313,6 +358,7 @@
                                 bayar: opsi.kartu ? this.total : parseInt(this.bayar || 0, 10),
                                 kartu_uid: opsi.kartu ? this.uid : null,
                                 pin_santri: opsi.kartu ? this.pinSantri : null,
+                                permintaan_kartu: opsi.kartu ? this.tertunda : null,
                                 baris: this.keranjang.map(x => ({ kode_persediaan: x.kode, satuan: x.satuan, kuantiti: x.qty, barcode: x.barcode, diskon: x.diskon || 0 })),
                                 diskon_struk: this.diskonStruk || 0,
                                 alasan_diskon: this.adaDiskon ? this.alasanDiskon : null,
@@ -323,13 +369,14 @@
                         const data = await r.json();
                         this.pin = ''; this.pinSantri = '';   // PIN tak disimpan di layar, berhasil atau gagal
                         if (!r.ok) {
+                            if (data.tertunda) this.tertunda = data.tertunda;
                             if (opsi.kartu) this.kartuGalat = data.message || 'Gagal menyimpan.';
                             else this.beri(data.message || 'Gagal menyimpan.');
                             return false;
                         }
                         this.terakhir = data; this.ringkas = data.ringkas;
                         this.keranjang = []; this.bayar = ''; this.diskonStruk = 0; this.alasanDiskon = ''; this.idPengawas = '';
-                        this.uid = ''; this.info = null;
+                        this.uid = ''; this.info = null; this.tertunda = null; this.kartuGalat = '';
                         this.cetak(data.struk);
                         this.fokus();
                         return true;

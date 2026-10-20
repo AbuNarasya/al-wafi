@@ -42,6 +42,15 @@ class KlienDompetToko
         ]);
     }
 
+    /**
+     * Pastikan nasib satu nomor (Fase 3c-1): {status: berhasil, ...hasil} atau {status: dibatalkan}. Jawabannya
+     * final — sesudah "dibatalkan", permintaan terlambat dengan nomor itu ditolak ERP Al Wafi.
+     */
+    public function pastikan(string $nomor, string $jenis, string $nominal): array
+    {
+        return $this->kirim('POST', '/api/dompet-toko/v1/pastikan', ['nomor' => $nomor, 'jenis' => $jenis, 'nominal' => $nominal]);
+    }
+
     /** @return list<array<string,mixed>> */
     public function daftar(string $tanggal): array
     {
@@ -66,7 +75,8 @@ class KlienDompetToko
                 ? $req->get($url.$path, $isi)
                 : $req->withBody($badan, 'application/json')->post($url.$path);
         } catch (ConnectionException) {
-            throw new AppException(503, self::TIDAK_TERSEDIA);
+            // Waktu habis / putus: permintaannya bisa saja sudah diproses di sana → TAK PASTI, bukan gagal.
+            throw new PenghubungTakPasti;
         }
 
         if ($res->successful()) {
@@ -74,8 +84,13 @@ class KlienDompetToko
         }
         $status = $res->status();
         $pesan = (string) ($res->json('message') ?? '');
-        if ($status >= 500 || $pesan === '' || in_array($status, [401, 403], true)) {
-            // 401/403 = kunci/alamat tak cocok; 5xx = ERP Al Wafi bermasalah — kasir cukup tahu harus tunai.
+        if ($status >= 500) {
+            // ERP Al Wafi galat — bisa sesudah menyimpan; tak pasti.
+            report(new \RuntimeException("Penghubung dompet {$path} → {$status}: ".mb_substr($res->body(), 0, 300)));
+            throw new PenghubungTakPasti;
+        }
+        if ($pesan === '' || in_array($status, [401, 403], true)) {
+            // 401/403 = kunci/alamat tak cocok: ditolak SEBELUM diproses — pasti tak memotong. Kasir cukup tahu harus tunai.
             report(new \RuntimeException("Penghubung dompet {$path} → {$status}: ".mb_substr($res->body(), 0, 300)));
             throw new AppException(503, self::TIDAK_TERSEDIA);
         }

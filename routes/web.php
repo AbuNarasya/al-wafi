@@ -199,6 +199,7 @@ Route::prefix('api/dompet-toko/v1')->middleware([\App\Http\Middleware\TandaTanga
         Route::post('/kartu', 'kartu');
         Route::post('/potong', 'potong');
         Route::post('/kembalikan', 'kembalikan');
+        Route::post('/pastikan', 'pastikan');
         Route::get('/transaksi', 'transaksi');
     });
 Route::post('/midtrans/notifikasi', \App\Http\Controllers\MidtransNotifikasiController::class)
@@ -753,6 +754,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/cari', [$k, 'cari'])->name('cari')->middleware('hakakses:pos,buat');
         Route::post('/jual', [$k, 'jual'])->name('jual')->middleware('hakakses:pos,buat');
         Route::get('/kartu', [$k, 'kartu'])->name('kartu')->middleware(['hakakses:pos,buat', 'throttle:60,1']);
+        Route::post('/kartu/pastikan/{permintaan}', [$k, 'pastikanKartu'])->name('kartu_pastikan')->middleware(['hakakses:pos,buat', 'throttle:30,1'])->whereNumber('permintaan');
         Route::get('/riwayat', [$k, 'riwayat'])->name('riwayat')->middleware('hakakses:pos,lihat');
         Route::get('/struk/{penjualan}', [$k, 'struk'])->name('struk')->middleware('hakakses:pos,lihat')->whereNumber('penjualan');
         Route::get('/retur', [$k, 'formRetur'])->name('retur')->middleware('hakakses:pos,buat');

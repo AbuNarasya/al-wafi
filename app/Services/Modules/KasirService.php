@@ -11,6 +11,7 @@ use App\Models\Inventory;
 use App\Models\LokasiPersediaan;
 use App\Models\MutasiPersediaan;
 use App\Models\Penjualan;
+use App\Models\PermintaanKartu;
 use App\Models\ReturPenjualan;
 use App\Models\ReturPenjualanDetail;
 use App\Models\SatuanPersediaan;
@@ -19,9 +20,13 @@ use App\Models\User;
 use App\Services\Ledger\DocNumber;
 use App\Services\Ledger\InventoryMovement;
 use App\Services\Ledger\PostingService;
+use App\Services\Penghubung\KlienDompetToko;
+use App\Services\Penghubung\PenghubungTakPasti;
+use App\Services\Penghubung\PermintaanKartuTertunda;
 use App\Services\Ppsb\DompetPolicy;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * KASIR WAFI MART — shift, penjualan tunai, tutup shift, serah terima.
@@ -85,6 +90,7 @@ class KasirService
      */
     public function jual(int $idShift, array $baris, string|int|float $bayar, int $idKasir, array $diskon = [], ?array $kartu = null): Penjualan
     {
+        $bayarAwal = $bayar;
         $shift = $this->shiftKasir($idShift, $idKasir);
         if (! $baris) {
             throw new AppException(422, 'Keranjang masih kosong.');
@@ -158,7 +164,31 @@ class KasirService
             throw new AppException(422, 'Uang yang dibayarkan kurang dari total belanja.');
         }
 
-        return DB::transaction(function () use ($shift, $rincian, $total, $bayar, $idKasir, $diskonStruk, $penyetuju, $adaDiskon, $alasan, $santri, $pinBenar, $kartu, $kartuJauh) {
+        // Kartu lewat penghubung: NIAT BAYAR disimpan dulu, di luar transaksi struk (Fase 3c-1) — nomor rujukannya
+        // tetap, jadi pembayaran yang jawabannya hilang bisa dipastikan, bukan ditebak "gagal".
+        $permintaan = $kartuJauh ? $this->siapkanPermintaan($kartu, $total, $shift, $idKasir) : null;
+        $dipotong = null;   // jawaban potong bila sudah terjadi di dalam transaksi (diisi lewat referensi)
+
+        try {
+            return $this->simpanJual($shift, $rincian, $total, $bayar, $idKasir, $diskonStruk, $penyetuju, $adaDiskon, $alasan,
+                $santri, $pinBenar, $kartu, $kartuJauh, $permintaan, $dipotong);
+        } catch (PenghubungTakPasti) {
+            // Jawaban hilang di jalan — tanyakan nasib nomornya; berhasil → simpan struk tanpa memotong lagi.
+            return $this->setelahDipastikan($permintaan,
+                fn () => $this->jual($idShift, $baris, $bayarAwal, $idKasir, $diskon, ['permintaan' => $permintaan->id] + $kartu));
+        } catch (\Throwable $e) {
+            if ($permintaan && ! $e instanceof PermintaanKartuTertunda) {
+                $this->catatPermintaanGagal($permintaan, $dipotong, $e);
+            }
+            throw $e;
+        }
+    }
+
+    private function simpanJual(ShiftKasir $shift, array $rincian, string $total, string $bayar, int $idKasir, string $diskonStruk,
+        $penyetuju, bool $adaDiskon, string $alasan, $santri, bool $pinBenar, ?array $kartu, bool $kartuJauh,
+        ?PermintaanKartu $permintaan, ?array &$dipotong): Penjualan
+    {
+        return DB::transaction(function () use ($shift, $rincian, $total, $bayar, $idKasir, $diskonStruk, $penyetuju, $adaDiskon, $alasan, $santri, $pinBenar, $kartu, $kartuJauh, $permintaan, &$dipotong) {
             // Nomor struk harian per toko; kunci advisori supaya dua kasir yang menyimpan
             // bersamaan tak berebut nomor yang sama.
             DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('penjualan-nomor')]);
@@ -221,16 +251,21 @@ class KasirService
                 $mutasi = $this->potongDompet($santri->id, $total, $jual->nomor, $idKasir, $pinBenar);
                 $jual->update(['id_mutasi_dompet' => $mutasi->id]);
             } elseif ($kartuJauh) {
-                // PALING AKHIR, sesudah struk & stok siap: bila penghubung menolak (saldo, PIN, kartu) atau
-                // tak menjawab, galatnya menggulung seluruh struk. Nomor rujukan ditambah acak: nomor struk
-                // yang tergulung dipakai ulang struk berikutnya, sedangkan nomor rujukan di Al Wafi harus unik.
-                // Potongan yang sempat terjadi tapi struknya tergulung ditangkap rekonsiliasi malam (Fase 3c).
-                $ref = 'WM-'.$nomor.'-'.strtoupper(\Illuminate\Support\Str::random(6));
-                $lokasi = $shift->lokasi ?? LokasiPersediaan::find($shift->kode_lokasi);
-                $h = app(\App\Services\Penghubung\KlienDompetToko::class)->potong($ref, KartuSantriService::bersihkanUid($kartu['uid']),
-                    $total, $kartu['pin'] ?? null, $shift->kode_lokasi, $lokasi?->nama,
-                    RincianBelanja::dariPenjualan($jual->load('details.persediaan'), $lokasi?->nama));
-                $jual->update(['ref_dompet' => $ref, 'nama_kartu' => $h['nama'] ?? null, 'sisa_saldo_kartu' => $h['sisa_saldo'] ?? null]);
+                // PALING AKHIR, sesudah struk & stok siap: bila penghubung menolak (saldo, PIN, kartu) galatnya
+                // menggulung seluruh struk. Nomor rujukan = nomor NIAT BAYAR (tetap, disimpan sebelum transaksi ini).
+                // Permintaan yang sudah dipastikan terpotong (lanjutan "Cek lagi") tak memotong untuk kedua kalinya.
+                if ($permintaan->status === 'berhasil') {
+                    $h = $permintaan->hasil ?? [];
+                } else {
+                    $lokasi = $shift->lokasi ?? LokasiPersediaan::find($shift->kode_lokasi);
+                    $h = app(KlienDompetToko::class)->potong($permintaan->nomor, KartuSantriService::bersihkanUid($kartu['uid']),
+                        $total, $kartu['pin'] ?? null, $shift->kode_lokasi, $lokasi?->nama,
+                        RincianBelanja::dariPenjualan($jual->load('details.persediaan'), $lokasi?->nama));
+                    $dipotong = self::ringkasHasil($h);
+                    $permintaan->update(['status' => 'berhasil', 'hasil' => $dipotong]);
+                }
+                $jual->update(['ref_dompet' => $permintaan->nomor, 'nama_kartu' => $h['nama'] ?? null, 'sisa_saldo_kartu' => $h['sisa_saldo'] ?? null]);
+                $permintaan->update(['id_penjualan' => $jual->id_penjualan]);
             }
 
             return $jual->load('details');
@@ -253,6 +288,116 @@ class KasirService
     public static function lewatPenghubung(): bool
     {
         return \App\Support\Instans::adalah('wafimart');
+    }
+
+    // ---- Niat bayar kartu & pemastian (Fase 3c-1: pencegahan potongan yatim) ----
+
+    public const PESAN_BELUM_PASTI = 'Status pembayaran kartu BELUM PASTI — JANGAN terima tunai dulu. Tekan "Cek lagi" sebentar lagi.';
+
+    public const PESAN_TIDAK_TERJADI = 'Pembayaran kartu TIDAK terjadi (penghubung tak menjawab tepat waktu) — aman: ulangi bayar kartu, atau terima tunai.';
+
+    /** Niat bayar baru (status menunggu), atau lanjutan "Cek lagi" atas permintaan yang sudah pasti terpotong. */
+    private function siapkanPermintaan(array $kartu, string $total, ShiftKasir $shift, int $idKasir): PermintaanKartu
+    {
+        $uid = KartuSantriService::bersihkanUid($kartu['uid']);
+        if (! empty($kartu['permintaan'])) {
+            $p = PermintaanKartu::where('id', (int) $kartu['permintaan'])->where('id_kasir', $idKasir)->where('jenis', 'potong')->first()
+                ?? throw new AppException(404, 'Pembayaran kartu yang dilanjutkan tidak ditemukan.');
+            if ($p->id_penjualan) {
+                throw new AppException(409, 'Pembayaran kartu ini sudah tersimpan sebagai struk — buka Riwayat Struk.');
+            }
+            if ($p->status !== 'berhasil') {
+                throw new AppException(409, $p->status === 'gagal' ? self::PESAN_TIDAK_TERJADI : self::PESAN_BELUM_PASTI);
+            }
+            if (! Money::eq($p->nominal, $total) || $p->uid_kartu !== $uid) {
+                throw new PermintaanKartuTertunda($p->id, 'Keranjang berubah dari pembayaran kartu yang SUDAH terpotong (Rp '
+                    .number_format((float) $p->nominal, 0, ',', '.').'). Kembalikan keranjang seperti semula lalu simpan lagi — '
+                    .'atau biarkan: potongan itu dikembalikan ke santri otomatis saat pencocokan malam.');
+            }
+
+            return $p;
+        }
+
+        return PermintaanKartu::create([
+            'nomor' => 'WM-'.now()->format('ymd').'-'.strtoupper(Str::random(10)), 'jenis' => 'potong', 'nominal' => $total,
+            'uid_kartu' => $uid, 'id_shift' => $shift->id_shift, 'id_kasir' => $idKasir, 'status' => 'menunggu',
+        ]);
+    }
+
+    /** Jawaban hilang: pastikan dulu. Berhasil → `$lanjut` (simpan struk tanpa memotong lagi). */
+    private function setelahDipastikan(PermintaanKartu $p, callable $lanjut): Penjualan
+    {
+        return match ($this->pastikanPermintaan($p)) {
+            'berhasil' => $lanjut(),
+            'gagal' => throw new AppException(503, self::PESAN_TIDAK_TERJADI),
+            default => throw new PermintaanKartuTertunda($p->id, self::PESAN_BELUM_PASTI),
+        };
+    }
+
+    /**
+     * Tanyakan nasib nomornya ke ERP Al Wafi (beberapa kali, berjeda). Jawaban Al Wafi FINAL; tak terjangkau sama
+     * sekali → `belum_pasti` (kasir menekan "Cek lagi"; sisanya dicocokkan malam hari).
+     */
+    public function pastikanPermintaan(PermintaanKartu $p): string
+    {
+        if (in_array($p->status, ['berhasil', 'gagal'], true)) {
+            return $p->status;
+        }
+        $jeda = (int) config('penghubung.jeda_pastikan_ms', 1000);
+        for ($i = 0; $i < 3; $i++) {
+            if ($i > 0 && $jeda > 0) {
+                usleep($jeda * 1000);
+            }
+            try {
+                $h = app(KlienDompetToko::class)->pastikan($p->nomor, $p->jenis, Money::of($p->nominal));
+            } catch (AppException) {
+                continue;
+            }
+            if (($h['status'] ?? '') === 'berhasil') {
+                $p->update(['status' => 'berhasil', 'hasil' => self::ringkasHasil($h)]);
+
+                return 'berhasil';
+            }
+            $p->update(['status' => 'gagal', 'pesan' => 'Dipastikan tidak terjadi di ERP Al Wafi.']);
+
+            return 'gagal';
+        }
+        $p->update(['status' => 'belum_pasti']);
+
+        return 'belum_pasti';
+    }
+
+    /** Tombol "Cek lagi" di layar kasir. */
+    public function cekPermintaan(int $id, int $idKasir): array
+    {
+        $p = PermintaanKartu::where('id', $id)->where('id_kasir', $idKasir)->first()
+            ?? throw new AppException(404, 'Pembayaran kartu tidak ditemukan.');
+
+        return ['status' => $this->pastikanPermintaan($p), 'sudah_struk' => (bool) $p->id_penjualan];
+    }
+
+    /**
+     * Transaksi struk gagal. Sudah terpotong (galat SESUDAH penghubung menjawab, atau lanjutan yang gagal) →
+     * catat "berhasil" & tahan di kasir; belum → penolakan pasti, niat bayarnya gagal.
+     */
+    private function catatPermintaanGagal(PermintaanKartu $p, ?array $dipotong, \Throwable $e): void
+    {
+        $segar = $p->fresh();
+        if ($dipotong !== null) {
+            $segar->update(['status' => 'berhasil', 'hasil' => $dipotong]);
+        }
+        if ($dipotong !== null || $segar->status === 'berhasil') {
+            throw new PermintaanKartuTertunda($p->id, 'Kartu SUDAH terpotong, tetapi struk gagal disimpan: '.$e->getMessage()
+                .' — betulkan lalu tekan "Simpan struk" (tidak memotong lagi), atau biarkan: potongannya dikembalikan otomatis malam ini.');
+        }
+        if ($segar->status === 'menunggu') {
+            $segar->update(['status' => 'gagal', 'pesan' => mb_substr($e->getMessage(), 0, 250)]);
+        }
+    }
+
+    private static function ringkasHasil(array $h): array
+    {
+        return ['nama' => $h['nama'] ?? null, 'sisa_saldo' => $h['sisa_saldo'] ?? null];
     }
 
     /**

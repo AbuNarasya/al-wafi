@@ -15,12 +15,14 @@ use App\Models\JournalLine;
 use App\Models\Level;
 use App\Models\LokasiPersediaan;
 use App\Models\Penjualan;
+use App\Models\PermintaanKartu;
 use App\Models\PinPengawas;
 use App\Models\ShiftKasir;
 use App\Models\User;
 use App\Services\Ledger\InventoryMovement;
 use App\Services\Modules\KasirService;
 use App\Services\Penghubung\KlienDompetToko;
+use App\Services\Penghubung\PermintaanKartuTertunda;
 use App\Support\Akses;
 use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,7 +60,8 @@ class KasirLewatPenghubungTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['instans.kode' => 'wafimart', 'penghubung.url' => self::URL, 'penghubung.rahasia' => str_repeat('k', 40)]);
+        config(['instans.kode' => 'wafimart', 'penghubung.url' => self::URL, 'penghubung.rahasia' => str_repeat('k', 40),
+            'penghubung.jeda_pastikan_ms' => 0]);
         Akses::lupakan();
 
         CoaGroup::create(['kode_grup' => 'ZZPH', 'nama_grup' => 'Toko']);
@@ -149,7 +152,10 @@ class KasirLewatPenghubungTest extends TestCase
 
         $this->assertSame(['dompet', '16000.00', null, self::UID, 'AHMAD', '34000.00'],
             [$j->metode, $j->bayar, $j->id_santri, $j->uid_kartu, $j->nama_kartu, $j->fresh()->sisa_saldo_kartu]);
-        $this->assertMatchesRegularExpression('/^WM-'.preg_quote($j->nomor, '/').'-[A-Z0-9]{6}$/', $j->ref_dompet);
+        // Nomor rujukan = nomor niat bayar yang disimpan sebelum memanggil penghubung (Fase 3c-1).
+        $this->assertMatchesRegularExpression('/^WM-\d{6}-[A-Z0-9]{10}$/', $j->ref_dompet);
+        $p = PermintaanKartu::where('nomor', $j->ref_dompet)->first();
+        $this->assertSame(['berhasil', $j->id_penjualan, 'AHMAD'], [$p->status, $p->id_penjualan, $p->hasil['nama']]);
         Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/potong') && $r['uid'] === self::UID && $r['pin'] === '730519'
             && Money::eq($r['nominal'], '16000') && $r['kode_toko'] === 'L002' && $r['nama_toko'] === 'Toko Banin'
             && $r->hasHeader('X-Penghubung-Tanda') && $r->hasHeader('X-Penghubung-Waktu'));
@@ -175,12 +181,16 @@ class KasirLewatPenghubungTest extends TestCase
             $this->assertSame([422, 'Saldo uang saku tidak cukup.'], [$e->status, $e->getMessage()]);
         }
 
+        $this->assertSame('gagal', PermintaanKartu::latest('id')->value('status'));   // penolakan = pasti tak terpotong
+
+        // 5xx terus-menerus (potong & pastikan): TAK PASTI → ditahan, bukan "gagal, bayar tunai".
         $this->penghubung(fn () => Http::response('Bad Gateway', 502));
         try {
             $this->jualKartu(2);
-            $this->fail('Harus ditolak.');
-        } catch (AppException $e) {
-            $this->assertSame([503, KlienDompetToko::TIDAK_TERSEDIA], [$e->status, $e->getMessage()]);
+            $this->fail('Harus ditahan.');
+        } catch (PermintaanKartuTertunda $e) {
+            $this->assertSame(KasirService::PESAN_BELUM_PASTI, $e->getMessage());
+            $this->assertSame('belum_pasti', PermintaanKartu::find($e->idPermintaan)->status);
         }
 
         $this->assertSame(0, Penjualan::count());
@@ -255,5 +265,92 @@ class KasirLewatPenghubungTest extends TestCase
         $this->penghubung(fn () => Http::response(['message' => 'Kartu tidak dikenal, diblokir, atau bukan santri aktif.'], 404));
         $this->actingAs($this->kasir)->getJson(route('pos.kartu', ['uid' => '999999']))->assertNotFound()
             ->assertJson(['message' => 'Kartu tidak dikenal, diblokir, atau bukan santri aktif.']);
+    }
+
+    // ---- Fase 3c-1: pencegahan potongan yatim ----
+
+    private function hitung(string $ujung): int
+    {
+        return Http::recorded(fn (Request $r) => str_ends_with($r->url(), $ujung))->count();
+    }
+
+    /** Potong selalu putus di jalan; jawaban "pastikan" ditentukan `$pastikan`. */
+    private function potongPutus(\Closure $pastikan): void
+    {
+        $this->penghubung(fn (Request $r) => match (true) {
+            str_ends_with($r->url(), '/potong') => Http::failedConnection(),
+            str_ends_with($r->url(), '/pastikan') => $pastikan($r),
+            default => Http::response([], 404),
+        });
+    }
+
+    public function test_jawaban_hilang_lalu_dipastikan_terpotong_struk_tetap_tersimpan(): void
+    {
+        $this->potongPutus(fn (Request $r) => Http::response(['status' => 'berhasil', 'nomor' => $r['nomor'], 'nama' => 'AHMAD', 'sisa_saldo' => '42000.00']));
+        $j = $this->jualKartu(2);
+
+        $p = PermintaanKartu::where('nomor', $j->ref_dompet)->first();
+        $this->assertSame(['berhasil', $j->id_penjualan], [$p->status, $p->id_penjualan]);
+        $this->assertSame(['AHMAD', '42000.00'], [$j->nama_kartu, $j->fresh()->sisa_saldo_kartu]);
+        $this->assertSame(1, $this->hitung('/potong'));   // TIDAK memotong untuk kedua kalinya
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/pastikan') && $r['nomor'] === $j->ref_dompet
+            && $r['jenis'] === 'potong' && Money::eq($r['nominal'], '8000'));
+    }
+
+    public function test_jawaban_hilang_lalu_dipastikan_tidak_terjadi_aman_tunai(): void
+    {
+        $stok = $this->stok();
+        $this->potongPutus(fn (Request $r) => Http::response(['status' => 'dibatalkan', 'nomor' => $r['nomor']]));
+        try {
+            $this->jualKartu(2);
+            $this->fail('Harus gagal.');
+        } catch (AppException $e) {
+            $this->assertSame([503, KasirService::PESAN_TIDAK_TERJADI], [$e->status, $e->getMessage()]);
+        }
+        $this->assertSame(0, Penjualan::count());
+        $this->assertSame($stok, $this->stok());
+        $this->assertSame('gagal', PermintaanKartu::value('status'));
+    }
+
+    public function test_al_wafi_tak_terjangkau_ditahan_lalu_cek_lagi_menyimpan_struk(): void
+    {
+        $this->potongPutus(fn () => Http::failedConnection());
+        $kirim = fn (int $qty, ?int $permintaan = null) => $this->actingAs($this->kasir)->postJson(route('pos.jual'), [
+            'bayar' => 0, 'baris' => [['kode_persediaan' => 'BRG0001', 'kuantiti' => $qty]], 'kartu_uid' => self::UID,
+            'permintaan_kartu' => $permintaan,
+        ]);
+
+        $id = $kirim(2)->assertStatus(422)->assertJson(['message' => KasirService::PESAN_BELUM_PASTI])->json('tertunda');
+        $this->assertSame(3, $this->hitung('/pastikan'));
+        $this->assertSame(0, Penjualan::count());
+
+        // Masih tak terjangkau → tetap belum pasti.
+        $this->actingAs($this->kasir)->postJson(route('pos.kartu_pastikan', $id))->assertOk()->assertJson(['status' => 'belum_pasti']);
+
+        // Al Wafi kembali: ternyata terpotong.
+        $this->potongPutus(fn (Request $r) => Http::response(['status' => 'berhasil', 'nomor' => $r['nomor'], 'nama' => 'AHMAD', 'sisa_saldo' => '42000.00']));
+        $this->actingAs($this->kasir)->postJson(route('pos.kartu_pastikan', $id))->assertOk()->assertJson(['status' => 'berhasil', 'sudah_struk' => false]);
+
+        // Keranjang berubah → ditahan, tak tersimpan dengan nilai lain.
+        $kirim(3, $id)->assertStatus(422)->assertJson(['tertunda' => $id]);
+        $kirim(2, $id)->assertOk();
+        $this->assertSame(1, $this->hitung('/potong'));
+        $this->assertSame(PermintaanKartu::find($id)->nomor, Penjualan::sole()->ref_dompet);
+
+        // Diulang lagi (tombol ditekan dua kali) → tidak jadi struk kedua.
+        $kirim(2, $id)->assertStatus(422);
+        $this->assertSame(1, Penjualan::count());
+    }
+
+    public function test_cek_lagi_hanya_milik_kasirnya_sendiri(): void
+    {
+        $this->potongPutus(fn () => Http::failedConnection());
+        try {
+            $this->jualKartu(1);
+        } catch (PermintaanKartuTertunda $e) {
+            $id = $e->idPermintaan;
+        }
+        $lain = $this->pengguna('kasir2', ['pos' => ['buat']]);
+        $this->actingAs($lain)->postJson(route('pos.kartu_pastikan', $id))->assertNotFound();
     }
 }
