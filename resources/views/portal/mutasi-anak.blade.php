@@ -40,15 +40,18 @@
         </div>
     </div>
 
-    <div class="mt-4 divide-y divide-slate-100 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
+    {{-- Baris belanja kartu bisa diketuk → lembar rincian barang (_rincian-belanja). --}}
+    <div class="mt-4 divide-y divide-slate-100 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200" x-data>
         @forelse ($mutasi as $m)
-            <div class="flex items-start justify-between gap-2 px-4 py-3">
+            <div @class(['flex items-start justify-between gap-2 px-4 py-3', 'cursor-pointer active:bg-slate-50' => $m['rinci']])
+                 @if ($m['rinci']) role="button" tabindex="0" @click="$dispatch('rincian-belanja', @js($m['rinci']))" @keydown.enter="$dispatch('rincian-belanja', @js($m['rinci']))" @endif>
                 <div class="min-w-0">
                     <p class="text-sm font-medium text-slate-900">{{ $m['dompet'] }} &middot; {{ $m['label'] }}</p>
                     <p class="truncate text-xs text-slate-500">
                         {{ $m['tanggal']->format('d/m/Y') }}{{ $dipilih ? '' : ' · '.$m['anak'] }}{{ $m['keterangan'] ? ' · '.$m['keterangan'] : '' }}
                     </p>
                     @if ($m['menunggu'])<p class="text-xs font-medium text-amber-700">Menunggu verifikasi</p>@endif
+                    @if ($m['rinci'])<p class="text-xs font-medium text-brand">Lihat rincian ›</p>@endif
                 </div>
                 <p @class(['shrink-0 text-sm font-bold tabular-nums', 'text-red-700' => $m['keluar'], 'text-emerald-700' => ! $m['keluar'] && ! $m['menunggu'], 'text-slate-400' => $m['menunggu']])>
                     {{ $m['keluar'] ? '−' : '+' }}{{ number_format($m['nominal'], 0, ',', '.') }}
@@ -58,4 +61,6 @@
             <p class="p-6 text-center text-sm text-slate-500">Belum ada mutasi.</p>
         @endforelse
     </div>
+
+    @include('portal._rincian-belanja')
 @endsection

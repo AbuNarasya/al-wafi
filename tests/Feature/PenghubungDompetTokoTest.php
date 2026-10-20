@@ -194,4 +194,42 @@ class PenghubungDompetTokoTest extends TestCase
         $this->assertSame([['nomor' => 'WM-1', 'jenis' => 'potong', 'nomor_asal' => null, 'nominal' => '20000.00', 'status' => 'berhasil', 'kode_toko' => 'L002']],
             $r->json('transaksi'));
     }
+
+    public function test_rincian_belanja_disimpan_dan_tampil_di_portal_wali(): void
+    {
+        $rincian = ['struk' => 'JL-261020-0001', 'toko' => 'Koperasi Banin', 'waktu' => '2026-10-20T10:00:00+07:00', 'jenis' => 'belanja',
+            'barang' => [
+                ['nama' => 'Roti Coklat', 'jumlah' => '2', 'satuan' => 'pcs', 'harga' => '3000', 'diskon' => '0', 'subtotal' => '6000', 'hpp' => '4000'],
+                ['nama' => '', 'jumlah' => '1'],   // rusak → dibuang
+            ],
+            'diskon_struk' => '0', 'total' => '6000', 'rahasia' => 'x'];
+        $this->kirim('POST', '/api/dompet-toko/v1/potong', ['nomor' => 'WM-1', 'uid' => self::UID, 'nominal' => 6000,
+            'nama_toko' => 'Koperasi Banin', 'rincian' => $rincian])->assertOk();
+        $this->kirim('POST', '/api/dompet-toko/v1/kembalikan', ['nomor' => 'WM-BATAL-WM-1', 'nomor_asal' => 'WM-1', 'nominal' => 6000])->assertOk();
+        $this->potong('WM-LAMA', 1000)->assertOk();   // tanpa rincian (sebelum fitur ini)
+
+        // Disimpan dalam bentuk baku: tanpa harga pokok & kolom asing, baris rusak dibuang.
+        $simpan = TransaksiDompetToko::where('nomor_toko', 'WM-1')->value('rincian');
+        $simpan = is_array($simpan) ? $simpan : json_decode($simpan, true);
+        $this->assertCount(1, $simpan['barang']);
+        $this->assertArrayNotHasKey('hpp', $simpan['barang'][0]);
+        $this->assertArrayNotHasKey('rahasia', $simpan);
+
+        $mutasi = fn (string $nomor) => TransaksiDompetToko::where('nomor_toko', $nomor)->value('id_mutasi_dompet');
+        $wali = Wali::find($this->ahmad->id_wali);
+        $sebagai = fn (Wali $w) => $this->actingAs($w, 'wali')->withSession(['portal.peran' => 'ibu', 'portal.punya_sandi' => true]);
+
+        $sebagai($wali)->getJson(route('portal.dompet.rincian', $mutasi('WM-1')))->assertOk()
+            ->assertJson(['keluar' => true, 'rincian' => ['jenis' => 'belanja', 'toko' => 'Koperasi Banin',
+                'barang' => [['nama' => 'Roti Coklat', 'jumlah' => '2.0000', 'subtotal' => '6000.00']]]]);
+        // Pembatalan utuh tak membawa rincian sendiri → struk asalnya, ditandai batal.
+        $sebagai($wali)->getJson(route('portal.dompet.rincian', $mutasi('WM-BATAL-WM-1')))->assertOk()
+            ->assertJson(['keluar' => false, 'rincian' => ['jenis' => 'batal', 'struk_asal' => 'JL-261020-0001', 'barang' => [['nama' => 'Roti Coklat']]]]);
+        $sebagai($wali)->getJson(route('portal.dompet.rincian', $mutasi('WM-LAMA')))->assertOk()->assertJson(['rincian' => null]);
+        $sebagai($wali)->get(route('portal.dompet.mutasi_anak'))->assertOk()->assertSee('Lihat rincian');
+
+        // Keluarga lain tak bisa mengintip.
+        $lain = Wali::create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Lain', 'telepon_ayah' => '0822', 'nama' => 'Lain', 'telepon' => '0822', 'status' => 'aktif']);
+        $sebagai($lain)->getJson(route('portal.dompet.rincian', $mutasi('WM-1')))->assertNotFound();
+    }
 }

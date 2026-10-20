@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DompetSantri;
 use App\Models\MutasiDompet;
 use App\Models\NotifikasiWali;
 use App\Models\PembayaranSantri;
@@ -9,10 +10,12 @@ use App\Models\PerangkatWali;
 use App\Models\Santri;
 use App\Models\TagihanSantri;
 use App\Services\Modules\DompetService;
+use App\Services\Modules\RincianBelanja;
 use App\Services\PortalWali\IngatPerangkat;
 use App\Services\PortalWali\MasukWali;
 use App\Services\PortalWali\SesiWali;
 use App\Support\Money;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -236,6 +239,24 @@ class PortalKeluargaController extends Controller
     // ---- Mutasi dompet anak (ikon Dompet di beranda) ----
 
     /** Histori uang saku & tabungan seluruh anak, boleh disaring per anak. */
+    /**
+     * Rincian barang di balik satu mutasi belanja — hanya mutasi uang saku anak keluarga yang sedang masuk
+     * (selain itu 404, tanpa membedakan "tak ada" dan "bukan milikmu").
+     */
+    public function rincianMutasi(int $id): JsonResponse
+    {
+        $m = MutasiDompet::where('pemilik', 'santri')->where('jenis', 'jajan')->findOrFail($id);
+        $milik = DompetSantri::whereKey($m->id_dompet)
+            ->whereHas('santri', fn ($q) => $q->where('id_wali', SesiWali::wali()->id)->whereIn('status', self::STATUS_DOMPET))
+            ->exists();
+        abort_unless($milik, 404);
+
+        return response()->json([
+            'nominal' => abs((float) $m->nominal), 'keluar' => self::keluar($m), 'tanggal' => $m->tanggal?->format('d/m/Y'),
+            'keterangan' => $m->keterangan, 'rincian' => RincianBelanja::untukMutasi($m),
+        ]);
+    }
+
     public function mutasiAnak(Request $request): View|RedirectResponse
     {
         $anak = Santri::with(['dompet', 'tabungan'])->where('id_wali', SesiWali::wali()->id)
@@ -275,6 +296,7 @@ class PortalKeluargaController extends Controller
                 'nominal' => abs((float) $m->nominal),
                 'keluar' => self::keluar($m),
                 'menunggu' => $m->status === 'menunggu_verifikasi',
+                'rinci' => $m->jenis === 'jajan' ? route('portal.dompet.rincian', $m->id) : null,
             ]),
         ]);
     }
@@ -305,6 +327,7 @@ class PortalKeluargaController extends Controller
                     'tanggal' => $m->tanggal, 'dompet' => $m->pemilik === 'tabungan' ? 'Tabungan' : 'Uang saku',
                     'label' => self::labelMutasi($m), 'keterangan' => $m->keterangan,
                     'nominal' => abs((float) $m->nominal), 'keluar' => self::keluar($m),
+                    'rinci' => $m->jenis === 'jajan' ? route('portal.dompet.rincian', $m->id) : null,
                 ]);
         }
 

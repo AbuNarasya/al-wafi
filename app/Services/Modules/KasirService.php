@@ -228,7 +228,8 @@ class KasirService
                 $ref = 'WM-'.$nomor.'-'.strtoupper(\Illuminate\Support\Str::random(6));
                 $lokasi = $shift->lokasi ?? LokasiPersediaan::find($shift->kode_lokasi);
                 $h = app(\App\Services\Penghubung\KlienDompetToko::class)->potong($ref, KartuSantriService::bersihkanUid($kartu['uid']),
-                    $total, $kartu['pin'] ?? null, $shift->kode_lokasi, $lokasi?->nama);
+                    $total, $kartu['pin'] ?? null, $shift->kode_lokasi, $lokasi?->nama,
+                    RincianBelanja::dariPenjualan($jual->load('details.persediaan'), $lokasi?->nama));
                 $jual->update(['ref_dompet' => $ref, 'nama_kartu' => $h['nama'] ?? null, 'sisa_saldo_kartu' => $h['sisa_saldo'] ?? null]);
             }
 
@@ -555,7 +556,8 @@ class KasirService
             } elseif ($retur->metode === 'dompet' && $jual->ref_dompet) {
                 // Paling akhir: penghubung menolak/tak menjawab → retur tergulung utuh, stok tak jadi masuk.
                 $ref = 'WM-'.$nomor.'-'.strtoupper(\Illuminate\Support\Str::random(6));
-                app(\App\Services\Penghubung\KlienDompetToko::class)->kembalikan($ref, $jual->ref_dompet, $total, "Retur {$nomor} dari {$jual->nomor}");
+                app(\App\Services\Penghubung\KlienDompetToko::class)->kembalikan($ref, $jual->ref_dompet, $total, "Retur {$nomor} dari {$jual->nomor}",
+                    RincianBelanja::dariRetur($retur->load('details.persediaan', 'details.baris'), $jual, $shift->lokasi?->nama));
                 $retur->update(['ref_dompet' => $ref]);
             }
 

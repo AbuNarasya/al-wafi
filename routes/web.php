@@ -165,6 +165,7 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(Po
     Route::get('/anak/{id}', 'anak')->name('anak')->whereNumber('id');
     Route::get('/tagihan/riwayat', 'riwayatTagihan')->name('tagihan.riwayat');
     Route::get('/dompet/mutasi-anak', 'mutasiAnak')->name('dompet.mutasi_anak');
+    Route::get('/dompet/mutasi/{id}/rincian', 'rincianMutasi')->name('dompet.rincian')->whereNumber('id');
     Route::post('/akun/perangkat/{id}/cabut', 'cabutPerangkat')->name('cabut_perangkat')->whereNumber('id');
 });
 Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(PortalBayarController::class)->group(function () {

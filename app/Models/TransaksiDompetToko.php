@@ -14,12 +14,12 @@ class TransaksiDompetToko extends Model
 
     protected $fillable = [
         'nomor_toko', 'jenis', 'nomor_asal', 'id_santri', 'uid_kartu', 'nominal', 'kode_toko', 'nama_toko', 'keterangan',
-        'id_mutasi_dompet', 'status', 'tanggal', 'journal_entry_id', 'dijurnal_pada',
+        'id_mutasi_dompet', 'status', 'tanggal', 'journal_entry_id', 'dijurnal_pada', 'rincian',
     ];
 
     protected function casts(): array
     {
-        return ['nominal' => 'decimal:2', 'tanggal' => 'date', 'dijurnal_pada' => 'datetime'];
+        return ['nominal' => 'decimal:2', 'tanggal' => 'date', 'dijurnal_pada' => 'datetime', 'rincian' => 'array'];
     }
 
     public function santri(): BelongsTo

@@ -41,7 +41,7 @@ class LayananDompetToko
     }
 
     /**
-     * @param  array{nomor:string, uid:string, nominal:string|int|float, pin?:?string, kode_toko?:?string, nama_toko?:?string, keterangan?:?string}  $d
+     * @param  array{nomor:string, uid:string, nominal:string|int|float, pin?:?string, kode_toko?:?string, nama_toko?:?string, keterangan?:?string, rincian?:?array}  $d
      */
     public function potong(array $d): array
     {
@@ -78,6 +78,7 @@ class LayananDompetToko
                 'uid_kartu' => KartuSantriService::bersihkanUid($d['uid']), 'nominal' => $nominal,
                 'kode_toko' => $d['kode_toko'] ?? null, 'nama_toko' => $toko, 'keterangan' => $d['keterangan'] ?? null,
                 'id_mutasi_dompet' => $mutasi->id, 'status' => 'berhasil', 'tanggal' => now()->toDateString(),
+                'rincian' => RincianBelanja::bersihkan($d['rincian'] ?? null),
             ]);
 
             return $this->hasil($t, $mutasi->saldo_setelah);
@@ -87,7 +88,7 @@ class LayananDompetToko
     /**
      * Kembalikan sebagian/seluruh potongan (batal struk / retur di Wafi Mart).
      *
-     * @param  array{nomor:string, nomor_asal:string, nominal:string|int|float, keterangan?:?string}  $d
+     * @param  array{nomor:string, nomor_asal:string, nominal:string|int|float, keterangan?:?string, rincian?:?array}  $d
      */
     public function kembalikan(array $d): array
     {
@@ -119,7 +120,7 @@ class LayananDompetToko
                 'nomor_toko' => $nomor, 'jenis' => 'kembalikan', 'nomor_asal' => $asal->nomor_toko, 'id_santri' => $asal->id_santri,
                 'uid_kartu' => $asal->uid_kartu, 'nominal' => $nominal, 'kode_toko' => $asal->kode_toko, 'nama_toko' => $asal->nama_toko,
                 'keterangan' => $d['keterangan'] ?? null, 'id_mutasi_dompet' => $mutasi->id, 'status' => 'berhasil',
-                'tanggal' => now()->toDateString(),
+                'tanggal' => now()->toDateString(), 'rincian' => RincianBelanja::bersihkan($d['rincian'] ?? null),
             ]);
 
             return $this->hasil($t, $mutasi->saldo_setelah);

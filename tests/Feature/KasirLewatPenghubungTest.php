@@ -153,6 +153,10 @@ class KasirLewatPenghubungTest extends TestCase
         Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/potong') && $r['uid'] === self::UID && $r['pin'] === '730519'
             && Money::eq($r['nominal'], '16000') && $r['kode_toko'] === 'L002' && $r['nama_toko'] === 'Toko Banin'
             && $r->hasHeader('X-Penghubung-Tanda') && $r->hasHeader('X-Penghubung-Waktu'));
+        // Daftar barang ikut terkirim untuk portal wali — tanpa harga pokok.
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/potong') && $r['rincian']['struk'] === $j->nomor
+            && $r['rincian']['toko'] === 'Toko Banin' && count($r['rincian']['barang']) === 1
+            && Money::eq($r['rincian']['barang'][0]['subtotal'], '16000') && ! isset($r['rincian']['barang'][0]['hpp']));
 
         $tutup = $this->k->tutupShift($this->shift->id_shift, null, 100000, null, $this->kasir->id_pengguna);
         $this->assertSame(['0.00', '16000.00', '0.00'], [$tutup->total_tunai, $tutup->total_dompet, $tutup->selisih]);
@@ -210,7 +214,9 @@ class KasirLewatPenghubungTest extends TestCase
         $this->assertSame(['dompet', '4000.00'], [$r->metode, $r->total]);
         $this->assertStringStartsWith('WM-'.$r->nomor.'-', $r->ref_dompet);
         Http::assertSent(fn (Request $q) => str_ends_with($q->url(), '/kembalikan') && $q['nomor'] === $r->ref_dompet
-            && $q['nomor_asal'] === $b->ref_dompet && Money::eq($q['nominal'], '4000'));
+            && $q['nomor_asal'] === $b->ref_dompet && Money::eq($q['nominal'], '4000')
+            && $q['rincian']['jenis'] === 'retur' && $q['rincian']['struk_asal'] === $b->nomor
+            && Money::eq($q['rincian']['barang'][0]['jumlah'], '1') && Money::eq($q['rincian']['barang'][0]['subtotal'], '4000'));
 
         // Penjualan kartu 12.000 − retur 4.000 → piutang ke Al Wafi 8.000.
         $this->k->tutupShift($this->shift->id_shift, null, 100000, null, $this->kasir->id_pengguna);

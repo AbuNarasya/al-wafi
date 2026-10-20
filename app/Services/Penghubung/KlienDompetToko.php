@@ -25,18 +25,20 @@ class KlienDompetToko
         return $this->kirim('POST', '/api/dompet-toko/v1/kartu', ['uid' => $uid, 'total' => $total]);
     }
 
-    public function potong(string $nomor, string $uid, string $nominal, ?string $pin, ?string $kodeToko, ?string $namaToko): array
+    /** `$rincian` = daftar barang untuk portal wali ([[App\Services\Modules\RincianBelanja]]). */
+    public function potong(string $nomor, string $uid, string $nominal, ?string $pin, ?string $kodeToko, ?string $namaToko, ?array $rincian = null): array
     {
         return $this->kirim('POST', '/api/dompet-toko/v1/potong', [
             'nomor' => $nomor, 'uid' => $uid, 'nominal' => $nominal, 'pin' => $pin,
-            'kode_toko' => $kodeToko, 'nama_toko' => $namaToko,
+            'kode_toko' => $kodeToko, 'nama_toko' => $namaToko, 'rincian' => $rincian,
         ]);
     }
 
-    public function kembalikan(string $nomor, string $nomorAsal, string $nominal, ?string $keterangan = null): array
+    public function kembalikan(string $nomor, string $nomorAsal, string $nominal, ?string $keterangan = null, ?array $rincian = null): array
     {
         return $this->kirim('POST', '/api/dompet-toko/v1/kembalikan', [
             'nomor' => $nomor, 'nomor_asal' => $nomorAsal, 'nominal' => $nominal, 'keterangan' => $keterangan,
+            'rincian' => $rincian,
         ]);
     }
 

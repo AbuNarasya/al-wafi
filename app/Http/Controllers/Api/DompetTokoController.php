@@ -30,6 +30,8 @@ class DompetTokoController extends Controller
             'nominal' => ['required', 'numeric', 'gt:0'], 'pin' => ['nullable', 'string', 'max:12'],
             'kode_toko' => ['nullable', 'string', 'max:30'], 'nama_toko' => ['nullable', 'string', 'max:100'],
             'keterangan' => ['nullable', 'string', 'max:255'],
+            // Daftar barang untuk portal wali — dibakukan di RincianBelanja::bersihkan().
+            'rincian' => ['nullable', 'array'],
         ]);
 
         return response()->json($this->layanan->potong($d));
@@ -40,6 +42,7 @@ class DompetTokoController extends Controller
         $d = $request->validate([
             'nomor' => ['required', 'string', 'max:64'], 'nomor_asal' => ['required', 'string', 'max:64'],
             'nominal' => ['required', 'numeric', 'gt:0'], 'keterangan' => ['nullable', 'string', 'max:255'],
+            'rincian' => ['nullable', 'array'],
         ]);
 
         return response()->json($this->layanan->kembalikan($d));
