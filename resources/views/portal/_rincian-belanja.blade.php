@@ -23,9 +23,10 @@
         },
      }"
      @rincian-belanja.window="buka($event.detail)" @keydown.escape.window="terbuka = false">
-    <div x-show="terbuka" x-cloak class="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
-        <div class="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-xl" @click.outside="terbuka = false"
-             style="padding-bottom: calc(2rem + env(safe-area-inset-bottom))">
+    {{-- Ponsel: lembar dari bawah (seperti papan PIN). Layar lebar: kotak di tengah — lembar yang menempel
+         di dasar layar lebar terlihat "jatuh". --}}
+    <div x-show="terbuka" x-cloak class="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-6">
+        <div class="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-xl sm:rounded-3xl sm:pb-6" @click.outside="terbuka = false">
             <div class="flex items-center justify-between">
                 <p class="text-lg font-bold text-slate-900" x-text="judul()"></p>
                 <button type="button" @click="terbuka = false" class="px-2 text-2xl leading-none text-slate-400" aria-label="Tutup">&times;</button>
