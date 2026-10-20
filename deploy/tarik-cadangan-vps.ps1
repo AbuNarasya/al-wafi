@@ -4,7 +4,7 @@
 # CATATAN: berkas ini sengaja ASCII saja - PowerShell 5.1 membaca berkas tanpa BOM sebagai ANSI, dan
 # satu tanda pisah panjang cukup untuk membuat seluruh skrip gagal diurai.
 $ErrorActionPreference = 'Stop'
-$Server  = 'deploy@31.97.67.109'
+$Server  = 'deploy@31.97.108.145'
 $Kunci   = Join-Path $env:USERPROFILE '.ssh\alwafi_ed25519'
 $Tujuan  = 'D:\Works\AL WAFI Reborn\cadangan\vps'
 $Log     = Join-Path $Tujuan 'tarik.log'

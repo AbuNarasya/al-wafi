@@ -6,6 +6,10 @@ set -euo pipefail
 umask 002
 
 NAMA="$1"; CABANG="$2"; APPNAME="$3"; shift 3; SERVER_NAMES="$*"
+# Jati diri instans (config/instans.php) — WAJIB ada di .env SEBELUM db:seed: seeder memilih data awalnya
+# dari sini (wafimart → COA ritel & toko). Bawaan dari nama folder; timpa lewat variabel INSTANS=… bila perlu.
+INSTANS_KODE="${INSTANS:-$([ "$NAMA" = wafimart ] && echo wafimart || echo alwafi)}"
+DOMAIN="${SERVER_NAMES%% *}"
 DIR="/var/www/$NAMA"
 REPO="git@github.com:AbuNarasya/al-wafi.git"
 KREDENSIAL="$HOME/kredensial-$NAMA.txt"
@@ -42,7 +46,8 @@ APP_NAME="$APPNAME"
 APP_ENV=production
 APP_KEY=
 APP_DEBUG=false
-APP_URL=http://31.97.67.109
+APP_URL=http://$DOMAIN
+INSTANS=$INSTANS_KODE
 APP_LOCALE=id
 APP_FALLBACK_LOCALE=en
 APP_FAKER_LOCALE=id_ID
