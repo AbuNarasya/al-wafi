@@ -93,6 +93,7 @@ final class Navigation
         // Sisi DOMPET SANTRI (milik Al Wafi): pencairan belanja kartu ke Wafi Mart — tetap di sini walau
         // fungsi toko sudah dipisah ke instans Wafi Mart (20 Okt 2026).
         ['url' => '/pencairan-kartu', 'label' => 'Pencairan Belanja Kartu', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'pencairan-kartu'],
+        ['url' => '/pencairan-toko', 'label' => 'Pencairan ke Wafi Mart', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'pencairan-toko'],
         ['url' => '/penerimaan-barang', 'label' => 'Penerimaan Barang', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'penerimaan-barang'],
         ['url' => '/perintah-pembayaran', 'label' => 'Perintah Pembayaran', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'perintah-pembayaran'],
         ['url' => '/cash-in', 'label' => 'Kas Masuk', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'cash-in'],
@@ -168,6 +169,8 @@ final class Navigation
 
         ['url' => '/pos', 'label' => 'Kasir (POS)', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'pos'],
         ['url' => '/shift-kasir', 'label' => 'Shift Kasir & Setoran', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'shift-kasir'],
+        ['url' => '/rekonsiliasi-kartu', 'label' => 'Rekonsiliasi Kartu Santri', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'rekonsiliasi-kartu'],
+        ['url' => '/penerimaan-al-wafi', 'label' => 'Penerimaan dari Al Wafi', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'penerimaan-al-wafi'],
 
         ['url' => '/laporan-toko', 'label' => 'Laporan Toko', 'group' => 'WAFI MART', 'sub' => 'Laporan', 'modul' => 'laporan-toko'],
         ['url' => '/reports/laba-rugi', 'label' => 'Laba Rugi Wafi Mart', 'group' => 'WAFI MART', 'sub' => 'Laporan', 'modul' => 'reports', 'unitWafiMart' => true],

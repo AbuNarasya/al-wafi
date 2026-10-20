@@ -201,6 +201,8 @@ Route::prefix('api/dompet-toko/v1')->middleware([\App\Http\Middleware\TandaTanga
         Route::post('/kembalikan', 'kembalikan');
         Route::post('/pastikan', 'pastikan');
         Route::get('/transaksi', 'transaksi');
+        Route::get('/pencairan', 'pencairan');
+        Route::post('/pencairan/terima', 'terimaPencairan');
     });
 Route::post('/midtrans/notifikasi', \App\Http\Controllers\MidtransNotifikasiController::class)
     ->name('midtrans.notifikasi')->middleware('throttle:120,1');
@@ -781,6 +783,28 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [$c, 'index'])->name('index')->middleware('hakakses:pencairan-kartu,lihat');
         Route::post('/', [$c, 'store'])->name('store')->middleware('hakakses:pencairan-kartu,buat');
         Route::post('/{pencairan}/batal', [$c, 'batal'])->name('batal')->middleware('hakakses:pencairan-kartu,hapus')->whereNumber('pencairan');
+    });
+
+    // Pencairan antar-entitas belanja kartu (Fase 3c-3): Al Wafi membayar, Wafi Mart menerima.
+    Route::prefix('pencairan-toko')->name('pencairan_toko.')->group(function () {
+        $c = \App\Http\Controllers\PencairanTokoController::class;
+        Route::get('/', [$c, 'index'])->name('index')->middleware('hakakses:pencairan-toko,lihat');
+        Route::post('/', [$c, 'store'])->name('store')->middleware('hakakses:pencairan-toko,buat');
+        Route::post('/jurnal', [$c, 'jurnal'])->name('jurnal')->middleware(['hakakses:pencairan-toko,buat', 'throttle:10,1']);
+        Route::post('/{pencairan}/batal', [$c, 'batal'])->name('batal')->middleware('hakakses:pencairan-toko,hapus')->whereNumber('pencairan');
+    });
+    Route::prefix('penerimaan-al-wafi')->name('penerimaan_al_wafi.')->group(function () {
+        $c = \App\Http\Controllers\PenerimaanAlWafiController::class;
+        Route::get('/', [$c, 'index'])->name('index')->middleware('hakakses:penerimaan-al-wafi,lihat');
+        Route::post('/', [$c, 'store'])->name('store')->middleware('hakakses:penerimaan-al-wafi,buat');
+    });
+
+    // Rekonsiliasi malam belanja kartu (instans Wafi Mart, Fase 3c-2).
+    Route::prefix('rekonsiliasi-kartu')->name('rekonsiliasi_kartu.')->group(function () {
+        $c = \App\Http\Controllers\RekonsiliasiKartuController::class;
+        Route::get('/', [$c, 'index'])->name('index')->middleware('hakakses:rekonsiliasi-kartu,lihat');
+        Route::post('/jalankan', [$c, 'jalankan'])->name('jalankan')->middleware(['hakakses:rekonsiliasi-kartu,ubah', 'throttle:10,1']);
+        Route::post('/{rekon}/tangani', [$c, 'tangani'])->name('tangani')->middleware('hakakses:rekonsiliasi-kartu,ubah')->whereNumber('rekon');
     });
 
     // Penarikan tunai kegiatan — sesi oleh keuangan, persetujuan oleh kesantrian.

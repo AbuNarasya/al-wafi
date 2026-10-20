@@ -51,6 +51,18 @@ class KlienDompetToko
         return $this->kirim('POST', '/api/dompet-toko/v1/pastikan', ['nomor' => $nomor, 'jenis' => $jenis, 'nominal' => $nominal]);
     }
 
+    /** Pencairan dari ERP Al Wafi, 90 hari terakhir (Fase 3c-3). @return list<array<string,mixed>> */
+    public function daftarPencairan(): array
+    {
+        return $this->kirim('GET', '/api/dompet-toko/v1/pencairan', [])['pencairan'] ?? [];
+    }
+
+    /** Kabari Al Wafi bahwa uang pencairannya sudah dicatat masuk (idempoten di sana). */
+    public function terimaPencairan(string $nomor, string $total): array
+    {
+        return $this->kirim('POST', '/api/dompet-toko/v1/pencairan/terima', ['nomor' => $nomor, 'total' => $total]);
+    }
+
     /** @return list<array<string,mixed>> */
     public function daftar(string $tanggal): array
     {

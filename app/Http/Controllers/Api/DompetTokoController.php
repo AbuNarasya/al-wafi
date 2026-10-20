@@ -58,6 +58,19 @@ class DompetTokoController extends Controller
         return response()->json($this->layanan->pastikan($d['nomor'], $d['jenis'], $d['nominal']));
     }
 
+    /** Pencairan ke Wafi Mart (Fase 3c-3) — dibaca layar "Penerimaan dari Al Wafi" di instans Wafi Mart. */
+    public function pencairan(\App\Services\Modules\PencairanTokoService $s): JsonResponse
+    {
+        return response()->json(['pencairan' => $s->daftarUntukToko()]);
+    }
+
+    public function terimaPencairan(Request $request, \App\Services\Modules\PencairanTokoService $s): JsonResponse
+    {
+        $d = $request->validate(['nomor' => ['required', 'string', 'max:30'], 'total' => ['required', 'numeric', 'gt:0']]);
+
+        return response()->json($s->tandaiDiterima($d['nomor'], $d['total']));
+    }
+
     public function transaksi(Request $request): JsonResponse
     {
         $d = $request->validate(['tanggal' => ['required', 'date']]);

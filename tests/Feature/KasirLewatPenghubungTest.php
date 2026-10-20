@@ -342,6 +342,115 @@ class KasirLewatPenghubungTest extends TestCase
         $this->assertSame(1, Penjualan::count());
     }
 
+    // ---- Fase 3c-2: rekonsiliasi malam ----
+
+    public function test_rekonsiliasi_mengembalikan_potongan_yatim_dan_menandai_selisih(): void
+    {
+        $kemarin = now()->subDay()->toDateString();
+        $this->penghubungSetuju();
+        $a = $this->jualKartu(2);   // 8.000 — cocok
+        $b = $this->jualKartu(1);   // 4.000 — ada di toko, tak dikenal Al Wafi
+        Penjualan::query()->update(['waktu' => now()->subDay()]);
+        PermintaanKartu::create(['nomor' => 'WM-YTM', 'jenis' => 'potong', 'nominal' => 5000, 'uid_kartu' => self::UID,
+            'id_shift' => $this->shift->id_shift, 'id_kasir' => $this->kasir->id_pengguna, 'status' => 'berhasil']);
+
+        $this->penghubung(fn (Request $r) => match (true) {
+            str_contains($r->url(), '/transaksi') => Http::response(['transaksi' => [
+                ['nomor' => $a->ref_dompet, 'jenis' => 'potong', 'nomor_asal' => null, 'nominal' => '8000.00', 'status' => 'berhasil'],
+                ['nomor' => 'WM-YTM', 'jenis' => 'potong', 'nomor_asal' => null, 'nominal' => '5000.00', 'status' => 'berhasil'],
+                ['nomor' => 'WM-ASING', 'jenis' => 'kembalikan', 'nomor_asal' => $a->ref_dompet, 'nominal' => '1000.00', 'status' => 'berhasil'],
+                ['nomor' => 'WM-NISAN', 'jenis' => 'potong', 'nomor_asal' => null, 'nominal' => '3000.00', 'status' => 'dibatalkan'],
+            ]]),
+            str_ends_with($r->url(), '/kembalikan') => Http::response(['nomor' => $r['nomor'], 'jenis' => 'kembalikan', 'nominal' => $r['nominal']]),
+            str_ends_with($r->url(), '/pastikan') => Http::response(['status' => 'dibatalkan', 'nomor' => $r['nomor']]),
+            default => Http::response([], 404),
+        });
+
+        $rk = app(\App\Services\Modules\RekonsiliasiDompetToko::class);
+        $h = $rk->jalankan($kemarin);
+        $this->assertSame(['perlu_diputus', 3, 1, '5000.00', 2, '12000.00'],
+            [$h->status, $h->jumlah_transaksi, $h->jumlah_yatim, $h->nilai_yatim, $h->perlu_diputus, $h->bersih_al_wafi]);
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/kembalikan') && $r['nomor'] === 'WM-YATIM-WM-YTM'
+            && $r['nomor_asal'] === 'WM-YTM' && Money::eq($r['nominal'], '5000'));
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/pastikan') && $r['nomor'] === $b->ref_dompet);
+        // Kasir yang masih menahannya tak bisa lagi menyimpannya sebagai struk.
+        $this->assertSame('gagal', PermintaanKartu::where('nomor', 'WM-YTM')->value('status'));
+        $this->assertEqualsCanonicalizing(['WM-YTM', 'WM-ASING', $b->ref_dompet], collect($h->rincian)->pluck('nomor')->all());
+
+        // Diulang: satu baris per tanggal, pengembalian memakai nomor yang sama (idempoten di Al Wafi).
+        $rk->jalankan($kemarin);
+        $this->assertSame(1, \App\Models\RekonsiliasiDompetToko::count());
+        $this->assertSame(2, Http::recorded(fn (Request $r) => str_ends_with($r->url(), '/kembalikan') && $r['nomor'] === 'WM-YATIM-WM-YTM')->count());
+
+        // Layar: staf menandai sudah ditangani; tanggal hari ini ditolak.
+        $staf = $this->pengguna('akuntan', ['rekonsiliasi-kartu' => ['ubah']]);
+        $this->actingAs($staf)->get(route('rekonsiliasi_kartu.index'))->assertOk()->assertSee('Perlu diputus')->assertSee('WM-ASING');
+        $this->actingAs($staf)->post(route('rekonsiliasi_kartu.tangani', $h->id), ['catatan' => 'Retur manual dicatat'])->assertRedirect();
+        $this->assertNotNull($h->fresh()->ditangani_pada);
+        $this->actingAs($staf)->post(route('rekonsiliasi_kartu.jalankan'), ['tanggal' => now()->toDateString()])->assertSessionHasErrors('tanggal');
+    }
+
+    public function test_rekonsiliasi_al_wafi_tak_terjangkau_dicatat_gagal_lalu_diulang_otomatis(): void
+    {
+        $this->penghubung(fn () => Http::failedConnection());
+        $rk = app(\App\Services\Modules\RekonsiliasiDompetToko::class);
+        $hasil = $rk->jalankanTertunda();
+        $this->assertCount(\App\Services\Modules\RekonsiliasiDompetToko::HARI_MUNDUR, $hasil);
+        $this->assertSame(['gagal'], collect($hasil)->pluck('status')->unique()->values()->all());
+
+        // Al Wafi kembali → yang gagal dijalankan ulang, yang sudah cocok tak diulang.
+        $this->penghubung(fn () => Http::response(['transaksi' => []]));
+        $this->assertSame(['cocok'], collect($rk->jalankanTertunda())->pluck('status')->unique()->values()->all());
+        $this->assertSame([], $rk->jalankanTertunda());
+    }
+
+    // ---- Fase 3c-3: penerimaan pencairan dari Al Wafi ----
+
+    public function test_penerimaan_pencairan_dari_al_wafi_melunasi_piutang(): void
+    {
+        $tolak = false;
+        $this->penghubung(function (Request $r) use (&$tolak) {
+            return match (true) {
+                str_ends_with($r->url(), '/pencairan/terima') => $tolak
+                    ? Http::response(['message' => 'Pencairan PWM-2610-0001 sudah dibatalkan di ERP Al Wafi.'], 409)
+                    : Http::response(['nomor' => $r['nomor'], 'diterima' => true]),
+                str_contains($r->url(), '/pencairan') => Http::response(['pencairan' => [
+                    ['nomor' => 'PWM-2610-0001', 'tanggal' => '2026-10-20', 'sampai_tanggal' => '2026-10-19', 'jumlah_transaksi' => 3,
+                        'total' => '12000.00', 'status' => 'aktif', 'diterima' => false],
+                ]]),
+                default => Http::response([], 404),
+            };
+        });
+        $s = app(\App\Services\Modules\PenerimaanAlWafiService::class);
+
+        // Al Wafi menolak → penerimaan & jurnalnya tergulung.
+        $tolak = true;
+        try {
+            $s->terima('PWM-2610-0001', '1.ZZPH.LCI', $this->kasir->id_pengguna);
+            $this->fail('Harus ditolak.');
+        } catch (AppException $e) {
+            $this->assertSame(409, $e->status);
+        }
+        $this->assertSame(0, \App\Models\PenerimaanAlWafi::count());
+
+        $tolak = false;
+        $doc = $s->terima('PWM-2610-0001', '1.ZZPH.LCI', $this->kasir->id_pengguna);
+        $this->assertSame('12000.00', $doc->total);
+        $this->assertSame(['12000.00', '-12000.00'], [$this->saldoAkun('1.ZZPH.LCI'), $this->saldoAkun('1.ZZPH.PIU')]);
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/pencairan/terima') && $r['nomor'] === 'PWM-2610-0001' && Money::eq($r['total'], '12000'));
+        try {
+            $s->terima('PWM-2610-0001', '1.ZZPH.LCI', $this->kasir->id_pengguna);
+            $this->fail('Tak boleh diterima dua kali.');
+        } catch (AppException $e) {
+            $this->assertSame(409, $e->status);
+        }
+
+        $staf = $this->pengguna('keuwm', ['penerimaan-al-wafi' => ['buat']]);
+        $this->actingAs($staf)->get(route('penerimaan_al_wafi.index'))->assertOk()->assertSee('PWM-2610-0001')->assertSee('Diterima');
+        // Modul sisi Al Wafi mati di instans ini.
+        $this->actingAs($staf)->get('/pencairan-toko')->assertNotFound();
+    }
+
     public function test_cek_lagi_hanya_milik_kasirnya_sendiri(): void
     {
         $this->potongPutus(fn () => Http::failedConnection());

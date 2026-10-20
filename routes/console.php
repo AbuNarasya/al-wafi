@@ -52,6 +52,21 @@ Artisan::command('dompet:jurnal-belanja-toko', function (App\Services\Modules\Ju
 })->purpose('Jurnal ringkas belanja kartu santri di Wafi Mart (penghubung)');
 Schedule::command('dompet:jurnal-belanja-toko')->dailyAt('00:15')->withoutOverlapping();
 
+// Sisi Wafi Mart (Fase 3c-2): cocokkan transaksi penghubung kemarin (dan tanggal tertunda ≤ 7 hari) dengan struk toko;
+// potongan tanpa struk dikembalikan otomatis ke santri. Di instans Al Wafi tak berbuat apa-apa.
+Artisan::command('toko:rekonsiliasi-dompet {--tanggal= : Satu tanggal tertentu (YYYY-MM-DD)}', function (App\Services\Modules\RekonsiliasiDompetToko $r) {
+    if (! App\Services\Modules\KasirService::lewatPenghubung()) {
+        $this->info('Bukan instans Wafi Mart — dilewati.');
+
+        return;
+    }
+    $hasil = $this->option('tanggal') ? [$r->jalankan($this->option('tanggal'))] : $r->jalankanTertunda();
+    foreach ($hasil as $h) {
+        $this->info("{$h->tanggal->toDateString()}: {$h->status} — {$h->jumlah_transaksi} transaksi, {$h->jumlah_yatim} yatim dikembalikan, {$h->perlu_diputus} perlu diputus".($h->pesan ? " ({$h->pesan})" : ''));
+    }
+})->purpose('Rekonsiliasi malam belanja kartu santri (Wafi Mart ↔ ERP Al Wafi)');
+Schedule::command('toko:rekonsiliasi-dompet')->dailyAt('00:40')->withoutOverlapping();
+
 // Potongan uang pangkal per gelombang: setelah tenggatnya lewat, putuskan
 // "terkunci" (syarat bayar terpenuhi) atau "hangus" (ditambahkan kembali ke
 // tagihan). Dulu hanya lewat tombol Evaluasi atau saat halaman detail dibuka,

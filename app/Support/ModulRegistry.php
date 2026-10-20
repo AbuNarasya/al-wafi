@@ -87,6 +87,12 @@ final class ModulRegistry
         ['kode' => 'shift-kasir', 'nama' => 'Shift Kasir & Setoran (rekap, batal struk, terima setoran)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Keuangan: buat = mencairkan belanja kartu santri ke kas toko, hapus = membatalkan.
         ['kode' => 'pencairan-kartu', 'nama' => 'Pencairan Belanja Kartu ke Toko (mingguan)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
+        // Instans Wafi Mart: `lihat` = hasil pencocokan malam belanja kartu; `ubah` = jalankan ulang & tandai sudah ditangani.
+        // Instans Al Wafi: buat = mencairkan hutang belanja kartu ke Wafi Mart (+ jurnal malam sekarang), hapus = membatalkan.
+        ['kode' => 'pencairan-toko', 'nama' => 'Pencairan Belanja Kartu ke Wafi Mart (antar-entitas)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
+        // Instans Wafi Mart: buat = mencatat uang pencairan dari Al Wafi sudah masuk.
+        ['kode' => 'penerimaan-al-wafi', 'nama' => 'Penerimaan Pencairan dari Al Wafi', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
+        ['kode' => 'rekonsiliasi-kartu', 'nama' => 'Rekonsiliasi Belanja Kartu Santri (Wafi Mart ↔ Al Wafi)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Keuangan: buat = membuat sesi, ubah = jadwal/peserta/saklar buka + ambil dana, distribusi,
         // selesaikan; hapus = membatalkan sesi / penyerahan yang keliru.
         // MEMUTUS pengajuan wali sengaja di modul lain (`penarikan-tunai`, kesantrian).

@@ -217,6 +217,49 @@ class PenghubungDompetTokoTest extends TestCase
         $this->assertSame([1, '20000.00'], [$hasil[0]['transaksi'], $hasil[0]['bersih']]);
     }
 
+    // ---- Fase 3c-3: pencairan antar-entitas (sisi Al Wafi) ----
+
+    public function test_pencairan_ke_wafi_mart_melunasi_hutang_dan_terkunci_sesudah_diterima(): void
+    {
+        CoaDetail::create(['kode_coa' => '1.ZZPD.BNK', 'nama_coa' => 'Bank', 'kode_grup' => 'ZZPD', 'jenis_saldo' => 'debet']);
+        BankAccount::create(['kode_coa' => '1.ZZPD.BNK', 'nama_rekening' => 'Bank Yayasan', 'jenis_rekening' => 'bank', 'status' => 'aktif']);
+        $staf = \App\Models\User::create(['username' => 'keu', 'nama' => 'Keuangan', 'password_hash' => 'x', 'kode_level' => 'L1',
+            'is_admin' => false, 'status' => 'aktif'])->fresh();
+        $s = new \App\Services\Modules\PencairanTokoService;
+
+        $this->potong('WM-1', 20000)->assertOk();
+        $this->potong('WM-2', 5000)->assertOk();
+        $this->kirim('POST', '/api/dompet-toko/v1/kembalikan', ['nomor' => 'WM-R', 'nomor_asal' => 'WM-1', 'nominal' => 2000])->assertOk();
+        $hariIni = now()->toDateString();
+
+        // Belum dijurnal malam = belum jadi hutang → belum bisa dicairkan.
+        $this->assertSame([0, 3], [$s->menunggu($hariIni)['transaksi']->count(), $s->menunggu($hariIni)['belum_dijurnal']]);
+        (new JurnalDompetToko)->jalankan(now()->addDay()->toDateString());
+        $this->assertSame('23000.00', Money::of($s->menunggu($hariIni)['total']));
+
+        $p = $s->cairkan($hariIni, '1.ZZPD.BNK', $staf->id_pengguna);
+        $this->assertSame(['23000.00', 3], [$p->total, $p->jumlah_transaksi]);
+        $saldo = fn ($coa) => Money::sub(JournalLine::where('kode_coa', $coa)->sum('debet'), JournalLine::where('kode_coa', $coa)->sum('kredit'));
+        $this->assertSame(['0.00', '-23000.00'], [$saldo(self::HUTANG), $saldo('1.ZZPD.BNK')]);   // hutang lunas
+        $this->assertSame('0.00', Money::of($s->menunggu($hariIni)['total']));
+
+        // Batal sebelum diterima → jurnal dibalik, transaksinya bisa dicairkan lagi.
+        $s->batal($p->id, 'salah rekening', $staf->id_pengguna);
+        $this->assertSame('-23000.00', $saldo(self::HUTANG));
+        $p2 = $s->cairkan($hariIni, '1.ZZPD.BNK', $staf->id_pengguna);
+
+        // Penghubung: Wafi Mart membaca daftar & mengabari diterima (nilai harus cocok; idempoten).
+        $daftar = $this->kirim('GET', '/api/dompet-toko/v1/pencairan')->assertOk()->json('pencairan');
+        $this->assertSame([[$p2->nomor, 'aktif', false], [$p->nomor, 'batal', false]], collect($daftar)->map(fn ($x) => [$x['nomor'], $x['status'], $x['diterima']])->all());
+        $terima = fn ($nomor, $n) => $this->kirim('POST', '/api/dompet-toko/v1/pencairan/terima', ['nomor' => $nomor, 'total' => $n]);
+        $terima($p2->nomor, 1000)->assertStatus(409);
+        $terima($p->nomor, 23000)->assertStatus(409);   // sudah dibatalkan
+        $terima($p2->nomor, 23000)->assertOk();
+        $terima($p2->nomor, 23000)->assertOk();
+        $this->expectException(\App\Exceptions\AppException::class);
+        $s->batal($p2->id, 'telat', $staf->id_pengguna);
+    }
+
     public function test_rincian_belanja_disimpan_dan_tampil_di_portal_wali(): void
     {
         $rincian = ['struk' => 'JL-261020-0001', 'toko' => 'Koperasi Banin', 'waktu' => '2026-10-20T10:00:00+07:00', 'jenis' => 'belanja',

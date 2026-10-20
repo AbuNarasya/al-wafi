@@ -66,6 +66,10 @@ final class SumberModul
         // Belanja kartu santri di Wafi Mart lewat penghubung (instans lain): jurnal ringkas tiap malam,
         // D Titipan Uang Saku / K Hutang ke Wafi Mart.
         'DompetToko',
+        // Pencairan antar-entitas belanja kartu (Fase 3c-3): Al Wafi membayar (D Hutang ke Wafi Mart / K Bank),
+        // Wafi Mart menerima (D Bank / K Piutang ke Al Wafi).
+        'PencairanToko',
+        'PenerimaanAlWafi',
     ];
 
     public static function isValid(string $v): bool
