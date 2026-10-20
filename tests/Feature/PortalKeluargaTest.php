@@ -222,6 +222,21 @@ class PortalKeluargaTest extends TestCase
             ->assertSee('Jajan adik')->assertDontSee('Jajan kakak');
     }
 
+    public function test_pengembalian_belanja_tampil_sebagai_uang_masuk(): void
+    {
+        $wali = $this->keluarga('Bapak Retur', '081200000015');
+        $s = $this->anak($wali, 'Anak Retur');
+        $d = DompetSantri::create(['id_santri' => $s->id, 'saldo' => 50000]);
+        foreach ([['MUT-RB1', -5000, 'Belanja toko'], ['MUT-RB2', 5000, 'Kembali dari toko']] as [$no, $n, $ket]) {
+            MutasiDompet::create(['nomor' => $no, 'pemilik' => 'santri', 'id_dompet' => $d->id, 'jenis' => 'jajan',
+                'nominal' => $n, 'saldo_setelah' => 50000, 'tanggal' => '2026-10-10', 'status' => 'terverifikasi',
+                'keterangan' => $ket, 'dicatat_oleh' => $this->staf->id_pengguna]);
+        }
+
+        $this->sebagai($wali)->get(route('portal.dompet.mutasi_anak'))->assertOk()
+            ->assertSee('Pengembalian belanja')->assertSee('+5.000')->assertSee('−5.000');
+    }
+
     public function test_detail_anak_hanya_untuk_anak_keluarga_sendiri(): void
     {
         $saya = $this->keluarga('Bapak Saya', '081200000009');

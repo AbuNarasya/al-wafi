@@ -45,6 +45,21 @@ class PortalKeluargaController extends Controller
 
     private const KELUAR = ['distribusi_keluar', 'tabung_keluar', 'bayar_tagihan', 'jajan', 'tarik'];
 
+    /** Uang keluar? `jajan` dua arah (− belanja, + pengembalian batal/retur), jadi tandanya yang menentukan. */
+    private static function keluar(MutasiDompet $m): bool
+    {
+        if ($m->jenis === 'jajan') {
+            return (float) $m->nominal < 0;
+        }
+
+        return (float) $m->nominal < 0 || in_array($m->jenis, self::KELUAR, true);
+    }
+
+    private static function labelMutasi(MutasiDompet $m): string
+    {
+        return $m->jenis === 'jajan' && (float) $m->nominal > 0 ? 'Pengembalian belanja' : (self::LABEL_MUTASI[$m->jenis] ?? $m->jenis);
+    }
+
     private const LABEL_SUMBER = ['dompet_wali' => 'Dompet Wali', 'xendit' => 'Pembayaran online', 'midtrans' => 'Virtual Account (online)', 'manual' => 'Transfer / tunai'];
 
     /** @return Collection<int,Santri> */
@@ -256,9 +271,9 @@ class PortalKeluargaController extends Controller
             'mutasi' => $mutasi->map(fn (MutasiDompet $m) => [
                 'tanggal' => $m->tanggal, 'anak' => $namaPer[$m->pemilik.':'.$m->id_dompet] ?? '',
                 'dompet' => $m->pemilik === 'tabungan' ? 'Tabungan' : 'Uang saku',
-                'label' => self::LABEL_MUTASI[$m->jenis] ?? $m->jenis, 'keterangan' => $m->keterangan,
+                'label' => self::labelMutasi($m), 'keterangan' => $m->keterangan,
                 'nominal' => abs((float) $m->nominal),
-                'keluar' => (float) $m->nominal < 0 || in_array($m->jenis, self::KELUAR, true),
+                'keluar' => self::keluar($m),
                 'menunggu' => $m->status === 'menunggu_verifikasi',
             ]),
         ]);
@@ -288,8 +303,8 @@ class PortalKeluargaController extends Controller
                 ->where('status', '!=', 'ditolak')->orderByDesc('tanggal')->orderByDesc('id')->limit(10)->get()
                 ->map(fn (MutasiDompet $m) => [
                     'tanggal' => $m->tanggal, 'dompet' => $m->pemilik === 'tabungan' ? 'Tabungan' : 'Uang saku',
-                    'label' => self::LABEL_MUTASI[$m->jenis] ?? $m->jenis, 'keterangan' => $m->keterangan,
-                    'nominal' => abs((float) $m->nominal), 'keluar' => (float) $m->nominal < 0 || in_array($m->jenis, self::KELUAR, true),
+                    'label' => self::labelMutasi($m), 'keterangan' => $m->keterangan,
+                    'nominal' => abs((float) $m->nominal), 'keluar' => self::keluar($m),
                 ]);
         }
 
