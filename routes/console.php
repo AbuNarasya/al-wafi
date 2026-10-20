@@ -43,6 +43,15 @@ Artisan::command('santri:terapkan-jadwal', function (KenaikanTingkatService $ser
 // Penerapnya idempoten, jadi dipanggil dari kedua arah pun aman.
 Schedule::command('santri:terapkan-jadwal')->dailyAt('00:30');
 
+// Belanja kartu santri di Wafi Mart (penghubung, Fase 3): jurnal ringkas per tanggal untuk transaksi
+// sebelum hari ini — D Titipan Uang Saku / K Hutang ke Wafi Mart. Aman diulang; kosong = tak berbuat apa-apa.
+Artisan::command('dompet:jurnal-belanja-toko', function (App\Services\Modules\JurnalDompetToko $j) {
+    foreach ($j->jalankan() as $h) {
+        $this->info("{$h['tanggal']}: {$h['transaksi']} transaksi, bersih Rp {$h['bersih']}".($h['jurnal'] ? " → jurnal #{$h['jurnal']}" : ' (nol, tanpa jurnal)'));
+    }
+})->purpose('Jurnal ringkas belanja kartu santri di Wafi Mart (penghubung)');
+Schedule::command('dompet:jurnal-belanja-toko')->dailyAt('00:15')->withoutOverlapping();
+
 // Potongan uang pangkal per gelombang: setelah tenggatnya lewat, putuskan
 // "terkunci" (syarat bayar terpenuhi) atau "hangus" (ditambahkan kembali ke
 // tagihan). Dulu hanya lewat tombol Evaluasi atau saat halaman detail dibuka,

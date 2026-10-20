@@ -30,7 +30,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Notifikasi Midtrans datang dari server Midtrans, tanpa sesi & token CSRF.
         // Pengamannya tanda tangan SHA-512 + status yang ditanyakan ulang ke API.
-        $middleware->validateCsrfTokens(except: ['midtrans/notifikasi']);
+        // Penghubung dompet toko: pengamannya tanda tangan HMAC (TandaTanganToko).
+        $middleware->validateCsrfTokens(except: ['midtrans/notifikasi', 'api/dompet-toko/*']);
 
         // Rute web belum ditemukan / tamu diarahkan ke halaman login.
         $middleware->redirectGuestsTo(fn () => route('login'));

@@ -224,54 +224,21 @@ class KasirService
      */
     public static function belanjaKartuHariIni(int $idSantri): string
     {
-        $idDompet = DompetSantri::where('id_santri', $idSantri)->value('id');
-        if (! $idDompet) {
-            return '0';
-        }
-
-        return Money::sub('0', Money::of(MutasiDompet::where('pemilik', 'santri')->where('id_dompet', $idDompet)
-            ->where('jenis', 'jajan')->whereDate('tanggal', now()->toDateString())->sum('nominal')));
-    }
-
-    /** Potong saldo dompet santri (dalam transaksi pemanggil, baris saldo dikunci). */
-    private function potongDompet(int $idSantri, string $nominal, string $nomorStruk, int $idKasir, bool $pinBenar): MutasiDompet
-    {
-        $dompet = DompetSantri::where('id_santri', $idSantri)->lockForUpdate()->first();
-        if (! $dompet || Money::lt($dompet->saldo, $nominal)) {
-            throw new AppException(422, 'Saldo uang saku tidak cukup untuk belanja ini.');
-        }
-        PenarikanTunaiService::pastikanTersedia($idSantri, $dompet->saldo, $nominal, 'Saldo uang saku tidak cukup untuk belanja ini');
-        if (! $pinBenar && Money::gt(Money::add(self::belanjaKartuHariIni($idSantri), $nominal), KartuSantriService::batasHarian($idSantri))) {
-            throw new AppException(409, 'Batas belanja harian terlampaui — ulangi dengan PIN belanja.');
-        }
-
-        return $this->mutasiDompet($dompet, Money::sub('0', $nominal), "Belanja Wafi Mart {$nomorStruk}", $idKasir);
-    }
-
-    /** Kembalikan uang ke dompet santri (batal struk / retur struk kartu). */
-    private function kembalikanDompet(int $idSantri, string $nominal, string $keterangan, int $idPengguna): MutasiDompet
-    {
-        $dompet = DompetSantri::where('id_santri', $idSantri)->lockForUpdate()->firstOrFail();
-
-        return $this->mutasiDompet($dompet, $nominal, $keterangan, $idPengguna);
+        return DompetBelanja::hariIni($idSantri);
     }
 
     /**
-     * Satu baris mutasi `jajan` (bertanda: − potong, + kembali). TANPA jurnal di sini —
-     * jurnalnya ringkas di tutup shift (D/K Titipan Uang Saku ↔ Pendapatan toko).
+     * Potong / kembalikan uang saku — aturan & mutasi `jajan`-nya di [[DompetBelanja]], satu pintu
+     * bersama penghubung Wafi Mart. Jurnalnya ringkas di tutup shift (D/K Titipan Uang Saku ↔ Pendapatan toko).
      */
-    private function mutasiDompet(DompetSantri $dompet, string $nominalBertanda, string $keterangan, int $idPengguna): MutasiDompet
+    private function potongDompet(int $idSantri, string $nominal, string $nomorStruk, int $idKasir, bool $pinBenar): MutasiDompet
     {
-        $saldo = Money::add($dompet->saldo, $nominalBertanda);
-        $dompet->update(['saldo' => $saldo]);
-        $base = DocNumber::docBase('DMP', now());
-        $nomor = DocNumber::nextDocNumber($base, MutasiDompet::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor'));
+        return DompetBelanja::potong($idSantri, $nominal, "Belanja Wafi Mart {$nomorStruk}", $idKasir, $pinBenar);
+    }
 
-        return MutasiDompet::create([
-            'nomor' => $nomor, 'pemilik' => 'santri', 'id_dompet' => $dompet->id, 'jenis' => 'jajan',
-            'nominal' => $nominalBertanda, 'saldo_setelah' => $saldo, 'tanggal' => now()->toDateString(),
-            'keterangan' => $keterangan, 'status' => 'terverifikasi', 'dicatat_oleh' => $idPengguna,
-        ]);
+    private function kembalikanDompet(int $idSantri, string $nominal, string $keterangan, int $idPengguna): MutasiDompet
+    {
+        return DompetBelanja::kembalikan($idSantri, $nominal, $keterangan, $idPengguna);
     }
 
     /**

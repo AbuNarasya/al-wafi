@@ -63,6 +63,9 @@ final class SumberModul
         'PencairanKartu',
         // Penarikan tunai kegiatan: ambil dana (D Kas Kegiatan / K Bank) & penutup sesi.
         'SesiTarikTunai',
+        // Belanja kartu santri di Wafi Mart lewat penghubung (instans lain): jurnal ringkas tiap malam,
+        // D Titipan Uang Saku / K Hutang ke Wafi Mart.
+        'DompetToko',
     ];
 
     public static function isValid(string $v): bool

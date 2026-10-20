@@ -191,6 +191,15 @@ Route::prefix('wali/online')->name('portal.online.')->middleware('portal.wali')-
     Route::post('/{order}/batal', 'batal')->name('batal')->middleware('throttle:10,1');
 });
 // Notifikasi Midtrans — tanpa sesi & dikecualikan dari CSRF (bootstrap/app.php).
+// Penghubung dompet santri untuk kasir Wafi Mart (instans lain) — tanpa sesi login & tanpa CSRF; pengamannya
+// tanda tangan HMAC (TandaTanganToko). Mati (404) bila kunci rahasianya belum dipasang.
+Route::prefix('api/dompet-toko/v1')->middleware([\App\Http\Middleware\TandaTanganToko::class, 'throttle:240,1'])
+    ->controller(\App\Http\Controllers\Api\DompetTokoController::class)->group(function () {
+        Route::post('/kartu', 'kartu');
+        Route::post('/potong', 'potong');
+        Route::post('/kembalikan', 'kembalikan');
+        Route::get('/transaksi', 'transaksi');
+    });
 Route::post('/midtrans/notifikasi', \App\Http\Controllers\MidtransNotifikasiController::class)
     ->name('midtrans.notifikasi')->middleware('throttle:120,1');
 // Kartu belanja Wafi Mart per anak — di bawah /wali/anak, BUKAN /wali/data (mode verifikasi).

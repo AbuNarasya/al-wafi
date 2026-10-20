@@ -32,6 +32,7 @@ class CompanySettings extends Model
         'topup_tunai_dompet_santri',
         'kode_unit_neraca',
         'kode_coa_grni',
+        'kode_coa_hutang_toko',
         'batas_jajan_harian',
         'kode_unit_wafimart',
         'keterangan',
