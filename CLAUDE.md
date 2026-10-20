@@ -25,7 +25,11 @@ npm run build                                   # wajib setelah menyunting app.j
 serve.bat                                       # jalankan server dev (port 8123)
 bash deploy/ke-dev.sh                           # kirim commit HEAD ke dev.erp (lihat di bawah)
 bash deploy/ke-vps.sh wafimart                  # perbarui instans Wafi Mart di VPS (sesudah ke-dev.sh)
+bash deploy/ke-vps.sh erp main                  # ERP PRODUKSI — hanya saat user bilang "rilis"
 ```
+
+**"Rilis" dari user = majukan `main` ke HEAD (maju lurus) LALU `bash deploy/ke-vps.sh erp main`.** Sejak 20 Okt 2026
+erp.al-wafi.sch.id (produksi) berjalan di VPS mengikuti cabang `main` dan TIDAK ikut "commit".
 
 **"Commit" dari user = commit LALU `bash deploy/ke-dev.sh` LALU `bash deploy/ke-vps.sh wafimart`**
 (keputusan 14 Okt 2026; langkah VPS ditambahkan 20 Okt 2026). VPS = `ssh vps-alwafi` (deploy@31.97.108.145,

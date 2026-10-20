@@ -90,6 +90,9 @@ final class Navigation
 
         ['url' => '/purchase-orders', 'label' => 'Purchase Order', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'purchase-orders'],
         ['url' => '/tarik-tunai', 'label' => 'Penarikan Tunai Kegiatan', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'sesi-tarik-tunai'],
+        // Sisi DOMPET SANTRI (milik Al Wafi): pencairan belanja kartu ke Wafi Mart — tetap di sini walau
+        // fungsi toko sudah dipisah ke instans Wafi Mart (20 Okt 2026).
+        ['url' => '/pencairan-kartu', 'label' => 'Pencairan Belanja Kartu', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'pencairan-kartu'],
         ['url' => '/penerimaan-barang', 'label' => 'Penerimaan Barang', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'penerimaan-barang'],
         ['url' => '/perintah-pembayaran', 'label' => 'Perintah Pembayaran', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'perintah-pembayaran'],
         ['url' => '/cash-in', 'label' => 'Kas Masuk', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'cash-in'],
@@ -165,7 +168,6 @@ final class Navigation
 
         ['url' => '/pos', 'label' => 'Kasir (POS)', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'pos'],
         ['url' => '/shift-kasir', 'label' => 'Shift Kasir & Setoran', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'shift-kasir'],
-        ['url' => '/pencairan-kartu', 'label' => 'Pencairan Belanja Kartu', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'pencairan-kartu'],
 
         ['url' => '/laporan-toko', 'label' => 'Laporan Toko', 'group' => 'WAFI MART', 'sub' => 'Laporan', 'modul' => 'laporan-toko'],
         ['url' => '/reports/laba-rugi', 'label' => 'Laba Rugi Wafi Mart', 'group' => 'WAFI MART', 'sub' => 'Laporan', 'modul' => 'reports', 'unitWafiMart' => true],
@@ -432,7 +434,7 @@ final class Navigation
         }
         // Penyaring per instans (config/instans.php): alamat yang ditutup, menu kembar yang
         // disembunyikan, dan laporan "… Wafi Mart" di instans yang seluruh bukunya Wafi Mart.
-        if (Instans::alamatMati($n['url']) || Instans::menuSembunyi($n['group'], $n['url'])
+        if (Instans::alamatMati($n['url']) || Instans::menuSembunyi($n['group'], $n['url']) || Instans::grupMenuSembunyi($n['group'])
             || (($n['unitWafiMart'] ?? false) && ! Instans::fitur('laporan_unit_toko'))) {
             return false;
         }

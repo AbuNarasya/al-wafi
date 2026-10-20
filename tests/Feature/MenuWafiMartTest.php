@@ -60,13 +60,16 @@ class MenuWafiMartTest extends TestCase
         $pohon = $this->pohon();
 
         foreach (['Toko & Gudang (Lokasi)', 'Kategori Barang', 'Impor Barang & Stok Awal', 'Data Barang & Stok', 'Transfer Antar Gudang',
-            'Stok Opname', 'Kasir (POS)', 'Shift Kasir & Setoran', 'Pencairan Belanja Kartu', 'Laporan Toko', 'Laba Rugi Wafi Mart'] as $label) {
+            'Stok Opname', 'Kasir (POS)', 'Shift Kasir & Setoran', 'Laporan Toko', 'Laba Rugi Wafi Mart'] as $label) {
             $this->assertContains($label, $pohon['WAFI MART'], $label);
         }
         // Layar khusus toko keluar dari KEUANGAN; layar persediaan bersama tetap di sana.
-        foreach (['Kasir (POS)', 'Shift Kasir & Setoran', 'Pencairan Belanja Kartu', 'Kategori Barang', 'Merk Barang'] as $label) {
+        foreach (['Kasir (POS)', 'Shift Kasir & Setoran', 'Kategori Barang', 'Merk Barang'] as $label) {
             $this->assertNotContains($label, $pohon['KEUANGAN'], $label);
         }
+        // Pencairan belanja kartu = sisi dompet santri (milik Al Wafi), bukan layar toko.
+        $this->assertContains('Pencairan Belanja Kartu', $pohon['KEUANGAN']);
+        $this->assertNotContains('Pencairan Belanja Kartu', $pohon['WAFI MART']);
         $this->assertContains('Persediaan', $pohon['KEUANGAN']);
         $this->assertContains('Kartu Santri (RFID)', $pohon['DATA SISWA/SANTRI']);
     }

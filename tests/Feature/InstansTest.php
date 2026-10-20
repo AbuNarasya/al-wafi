@@ -132,6 +132,31 @@ class InstansTest extends TestCase
         $this->assertEqualsCanonicalizing(['pos', 'santri'], HakAksesModul::where('id_pengguna', $u->id_pengguna)->pluck('kode_modul')->all());
     }
 
+    public function test_wafimart_terpisah_menghapus_fungsi_toko_dari_al_wafi(): void
+    {
+        config(['instans.wafimart_terpisah' => true]);
+        Akses::lupakan();
+
+        foreach (['/pos', '/shift-kasir', '/laporan-toko', '/kategori-barang', '/merk-barang'] as $url) {
+            $this->actingAs($this->admin)->get($url)->assertNotFound();
+        }
+        // Sisi dompet santri & persediaan pesantren tetap.
+        foreach (['/kartu-santri', '/pencairan-kartu', '/inventory', '/purchase-orders', '/kesantrian/santri'] as $url) {
+            $this->actingAs($this->admin)->get($url)->assertOk();
+        }
+        $this->assertNotContains('WAFI MART', $this->grupMenu());
+        $label = $this->labelMenu();
+        foreach (['Kartu Santri (RFID)', 'Pencairan Belanja Kartu', 'Persediaan'] as $l) {
+            $this->assertContains($l, $label, $l);
+        }
+        $this->assertNotContains('Kasir (POS)', $label);
+
+        // Instans Wafi Mart tak terpengaruh saklar ini.
+        $this->instans('wafimart');
+        config(['instans.wafimart_terpisah' => true]);
+        $this->actingAs($this->admin)->get('/pos')->assertOk();
+    }
+
     public function test_modul_mati_tambahan_lewat_env_di_al_wafi(): void
     {
         $this->instans('alwafi', 'pos, shift-kasir');

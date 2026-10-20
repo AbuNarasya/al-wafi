@@ -17,6 +17,12 @@ return [
     // Mart resmi pindah: MODUL_MATI=pos,shift-kasir,laporan-toko
     'modul_mati_tambahan' => env('MODUL_MATI', ''),
 
+    // PEMISAHAN WAFI MART (keputusan user 20 Okt 2026): di instans Al Wafi, fungsi toko dimatikan
+    // karena Wafi Mart sudah berjalan di instansnya sendiri. Yang tetap: kartu santri & pencairan
+    // belanja kartu (sisi dompet santri) serta persediaan milik pesantren. Bawaan MATI supaya laptop
+    // & test (yang masih menguji kasir di instans bawaan) tak berubah; nyalakan di .env server.
+    'wafimart_terpisah' => (bool) env('WAFIMART_TERPISAH', false),
+
     'daftar' => [
         'alwafi' => [
             'nama' => 'Al Wafi ERP',
@@ -26,6 +32,9 @@ return [
             'portal_wali' => true,
             'grup_mati' => [],
             'modul_mati' => [],
+            // Berlaku hanya bila `wafimart_terpisah` menyala.
+            'modul_mati_bila_toko_terpisah' => ['pos', 'shift-kasir', 'laporan-toko', 'kategori-barang', 'merk-barang'],
+            'grup_menu_sembunyi_bila_toko_terpisah' => ['WAFI MART'],
             'alamat_mati' => [],
             'menu_sembunyi' => [],
             'impor_mati' => [],

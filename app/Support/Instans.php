@@ -59,7 +59,21 @@ final class Instans
     {
         $tambahan = array_filter(array_map('trim', explode(',', (string) config('instans.modul_mati_tambahan', ''))));
 
-        return array_values(array_unique([...(self::data()['modul_mati'] ?? []), ...$tambahan]));
+        $toko = self::tokoTerpisah() ? (self::data()['modul_mati_bila_toko_terpisah'] ?? []) : [];
+
+        return array_values(array_unique([...(self::data()['modul_mati'] ?? []), ...$toko, ...$tambahan]));
+    }
+
+    /** Wafi Mart sudah berjalan di instansnya sendiri (WAFIMART_TERPISAH) — fungsi toko di sini dimatikan. */
+    public static function tokoTerpisah(): bool
+    {
+        return (bool) config('instans.wafimart_terpisah', false);
+    }
+
+    /** Grup menu sidebar yang disembunyikan utuh di instans ini. */
+    public static function grupMenuSembunyi(string $grup): bool
+    {
+        return self::tokoTerpisah() && in_array($grup, self::data()['grup_menu_sembunyi_bila_toko_terpisah'] ?? [], true);
     }
 
     /** Modul hidup di instans ini? Dimatikan per kode atau karena grupnya dimatikan. */
