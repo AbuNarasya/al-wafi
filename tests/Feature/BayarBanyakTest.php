@@ -239,6 +239,51 @@ class BayarBanyakTest extends TestCase
 
     // ---- Satu VA untuk beberapa tagihan ----
 
+    /**
+     * 21 Okt 2026: wali membuat VA gabungan lalu keluar dari halamannya. Dulu layar bayar menulis "menunggu
+     * verifikasi" dan menyodorkan formulir nominal Rp 0 tanpa jalan kembali; kini VA-nya tampil di layar bayar &
+     * daftar tagihan, dan "Ganti metode" membatalkannya lalu kembali ke layar bayar tagihan itu.
+     */
+    public function test_va_gabungan_yang_ditinggal_bisa_dilanjutkan_atau_diganti(): void
+    {
+        $up = $this->tagihan($this->calon, 'uang_pangkal', 5000000);
+        $plk = $this->tagihan($this->calon, 'perlengkapan', 1300000);
+        Http::fake(fn (PermintaanHttp $r) => str_ends_with($r->url(), '/snap/v1/transactions')
+            ? Http::response(['token' => 'TOK', 'redirect_url' => 'https://app.sandbox.midtrans.com/x'], 201)
+            : Http::response(['status_code' => '404'], 404)); // bank belum dipilih
+        $this->sebagaiIbu()->post(route('portal.bayar_banyak.online'), $this->isian([$up, $plk]));
+        $t = TransaksiMidtrans::sole();
+
+        $this->sebagaiIbu()->get(route('portal.bayar', $up->id))->assertOk()
+            ->assertSee('Pembayaran online menunggu dibayar')->assertSee('Rp 5.000.000 menunggu dibayar lewat Virtual Account.')
+            ->assertSee('Gabungan 2 tagihan')->assertSee(route('portal.online.lihat', $t->order_id))->assertSee('Ganti metode')
+            ->assertDontSee('menunggu verifikasi')->assertDontSee('Lanjut ke pembayaran');
+        $this->sebagaiIbu()->get(route('portal.tagihan'))->assertOk()->assertSee('Pembayaran online menunggu dibayar'); // ringkasan keluarga
+        $this->sebagaiIbu()->get(route('portal.tagihan', ['anak' => $this->calon->id]))->assertOk()
+            ->assertSee('Pembayaran online menunggu dibayar')->assertSee('Rp 1.300.000 menunggu dibayar lewat VA');
+
+        $this->sebagaiIbu()->post(route('portal.online.batal', $t->order_id), ['ganti' => 1, 'tagihan' => $up->id])
+            ->assertRedirect(route('portal.bayar', $up->id))->assertSessionHas('status');
+
+        $this->assertSame('batal', $t->refresh()->status);
+        $this->sebagaiIbu()->get(route('portal.bayar', $up->id))->assertOk()
+            ->assertDontSee('Pembayaran online menunggu dibayar')->assertSee('Lanjut ke pembayaran');
+    }
+
+    public function test_ganti_metode_tak_mengarah_ke_tagihan_di_luar_pesanan(): void
+    {
+        $up = $this->tagihan($this->calon, 'uang_pangkal', 5000000);
+        $plk = $this->tagihan($this->calon, 'perlengkapan', 1300000);
+        $lain = $this->tagihan($this->calon, 'registrasi', 250000);
+        Http::fake(fn (PermintaanHttp $r) => str_ends_with($r->url(), '/snap/v1/transactions')
+            ? Http::response(['token' => 'TOK', 'redirect_url' => 'https://app.sandbox.midtrans.com/x'], 201)
+            : Http::response(['status_code' => '404'], 404));
+        $this->sebagaiIbu()->post(route('portal.bayar_banyak.online'), $this->isian([$up, $plk]));
+
+        $this->sebagaiIbu()->post(route('portal.online.batal', TransaksiMidtrans::value('order_id')), ['ganti' => 1, 'tagihan' => $lain->id])
+            ->assertRedirect(route('portal.tagihan'));
+    }
+
     public function test_satu_va_untuk_beberapa_tagihan_biaya_sekali(): void
     {
         $up = $this->tagihan($this->calon, 'uang_pangkal', 5000000);

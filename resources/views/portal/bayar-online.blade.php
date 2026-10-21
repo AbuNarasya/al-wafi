@@ -107,6 +107,15 @@
             </div>
         </div>
       </div>
+        {{-- Ganti metode = batalkan VA ini (dicek dulu ke Midtrans) lalu kembali ke layar bayar. --}}
+        <form method="POST" action="{{ route('portal.online.batal', $t->order_id) }}" class="mt-3"
+              data-confirm="{{ $t->rincian->count() > 1
+                  ? 'Batalkan Virtual Account ini? Ke-'.$t->rincian->count().' tagihan di dalamnya akan terbuka untuk dibayar dengan cara lain. Nomor VA-nya tidak bisa dipakai lagi.'
+                  : 'Batalkan Virtual Account ini lalu pilih cara bayar lain? Nomor VA-nya tidak bisa dipakai lagi.' }}">
+            @csrf
+            <input type="hidden" name="ganti" value="1">
+            <button class="w-full rounded-2xl bg-white py-3 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200">Ganti metode pembayaran</button>
+        </form>
         <form method="POST" action="{{ route('portal.online.batal', $t->order_id) }}" class="mt-3 text-center"
               data-confirm="Batalkan pesanan pembayaran ini? Nomor Virtual Account-nya tidak bisa dipakai lagi.">
             @csrf

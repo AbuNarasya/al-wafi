@@ -149,6 +149,7 @@ class PortalKeluargaController extends Controller
                     'lembar' => ($belum[$s->id] ?? collect())->count(),
                 ]),
                 'total' => $belum->flatten()->sum(fn ($t) => (float) $t->sisa),
+                'va' => \App\Services\PortalWali\PembayaranPortal::vaMenunggu(SesiWali::wali()->id),
             ]);
         }
 
@@ -156,7 +157,7 @@ class PortalKeluargaController extends Controller
         $dipilih = $anak->firstWhere('id', (int) $request->query('anak')) ?? $anak->first();
 
         $data = ['anak' => $anak, 'dipilih' => $dipilih, 'tagihan' => collect(), 'riwayat' => collect(),
-            'ringkasan' => null, 'tab' => $tab];
+            'ringkasan' => null, 'tab' => $tab, 'va' => collect()];
         if (! $dipilih) {
             return view('portal.tagihan', $data);
         }
@@ -172,6 +173,9 @@ class PortalKeluargaController extends Controller
             ->map(fn ($g) => $g->reduce(fn ($t, $p) => Money::add($t, $p->nominal), '0'));
         $menunggu = $bayar->where('status', 'menunggu_verifikasi')->groupBy('id_tagihan')
             ->map(fn ($g) => $g->reduce(fn ($t, $p) => Money::add($t, $p->nominal), '0'));
+        // VA belum dibayar yang memuat tagihan anak ini — kotaknya memberi jalan "Lanjutkan bayar" / "Ganti metode".
+        $data['va'] = \App\Services\PortalWali\PembayaranPortal::vaMenunggu(SesiWali::wali()->id, $tagihan->pluck('id')->all());
+        $diVa = fn (int $id) => $data['va']->reduce(fn ($n, $p) => Money::add($n, \App\Services\PortalWali\PembayaranPortal::bagianVa($p, $id)), '0');
 
         $data['tagihan'] = $tagihan->map(fn (TagihanSantri $t) => [
             'id' => $t->id,
@@ -181,7 +185,7 @@ class PortalKeluargaController extends Controller
             'nama' => self::namaTagihan($t), 'keterangan' => self::keteranganTagihan($t),
             'periode' => $t->periode, 'jatuh_tempo' => $t->jatuh_tempo,
             'nominal' => Money::of($t->nominal), 'sisa' => Money::of($t->sisa),
-            'terbayar' => $diakui[$t->id] ?? '0', 'menunggu' => $menunggu[$t->id] ?? '0',
+            'terbayar' => $diakui[$t->id] ?? '0', 'menunggu' => $menunggu[$t->id] ?? '0', 'di_va' => $diVa($t->id),
             'status' => (float) $t->sisa <= 0 ? 'lunas' : ((float) ($diakui[$t->id] ?? 0) > 0 ? 'sebagian' : 'belum'),
         ]);
         $data['ringkasan'] = [

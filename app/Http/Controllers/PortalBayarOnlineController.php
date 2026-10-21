@@ -100,7 +100,12 @@ class PortalBayarOnlineController extends Controller
         return response()->json(['status' => $t->status]);
     }
 
-    public function batal(string $orderId): RedirectResponse
+    /**
+     * Batalkan pesanan VA. Dengan `ganti=1` ("Ganti metode pembayaran") wali langsung dibawa kembali
+     * ke layar bayar — tagihan yang dipilih (`tagihan`, hanya bila memang isi pesanan ini), tagihan
+     * pesanan satuan, atau daftar tagihan untuk pesanan gabungan.
+     */
+    public function batal(Request $request, string $orderId): RedirectResponse
     {
         $t = $this->milikSaya($orderId);
         try {
@@ -109,8 +114,21 @@ class PortalBayarOnlineController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('portal.online.lihat', $t->order_id)->with('status',
-            $t->status === 'lunas' ? 'Pembayaran ini ternyata sudah lunas.' : 'Pesanan pembayaran dibatalkan.');
+        if ($t->status === 'lunas' || ! $request->boolean('ganti')) {
+            return redirect()->route('portal.online.lihat', $t->order_id)->with('status',
+                $t->status === 'lunas' ? 'Pembayaran ini ternyata sudah lunas.' : 'Pesanan pembayaran dibatalkan.');
+        }
+
+        $isi = $t->jenis === 'bayar_kelompok' ? $t->rincian()->pluck('id_tagihan')->all() : array_filter([$t->id_tagihan]);
+        $pilih = (int) $request->input('tagihan');
+        $ke = match (true) {
+            in_array($pilih, $isi, false) => route('portal.bayar', $pilih),
+            $t->jenis === 'bayar_tagihan' => route('portal.bayar', $t->id_tagihan),
+            $t->jenis === 'isi_dompet' => route('portal.dompet.isi'),
+            default => route('portal.tagihan'),
+        };
+
+        return redirect($ke)->with('status', 'Pesanan Virtual Account dibatalkan. Silakan pilih cara bayar lain.');
     }
 
     private function milikSaya(string $orderId): TransaksiMidtrans

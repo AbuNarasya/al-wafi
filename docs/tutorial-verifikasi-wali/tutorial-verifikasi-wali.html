@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Panduan Verifikasi Data Keluarga</title>
+<!-- Dicetak ke PDF dengan Chrome headless (lihat README di folder ini). Gambar = tangkapan layar data contoh. -->
+<style>
+  @page { size: A4; margin: 14mm 14mm 14mm 14mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #1e293b; font-size: 11.5pt; line-height: 1.5; }
+  h1, h2, h3 { margin: 0; color: #0f172a; }
+  .halaman { page-break-after: always; }
+  .halaman:last-child { page-break-after: auto; }
+
+  /* Sampul */
+  .sampul { text-align: center; padding-top: 4mm; }
+  .sampul img.logo { width: 34mm; }
+  .sampul .lembaga { font-size: 12pt; color: #64748b; margin-top: 4mm; letter-spacing: .5px; }
+  .sampul h1 { font-size: 28pt; margin-top: 7mm; color: #1e4a9b; line-height: 1.2; }
+  .sampul .sub { font-size: 14pt; color: #475569; margin-top: 4mm; }
+  .kotak { border-radius: 4mm; padding: 4mm 6mm; margin-top: 5mm; text-align: left; }
+  .kotak.biru { background: #eff6ff; border: 1px solid #bfdbfe; }
+  .kotak.kuning { background: #fffbeb; border: 1px solid #fde68a; }
+  .kotak.merah { background: #fef2f2; border: 1px solid #fecaca; }
+  .kotak h3 { font-size: 12.5pt; margin-bottom: 2mm; }
+  .kotak ul, .kotak ol { margin: 0; padding-left: 6mm; }
+  .kotak li { margin: 1mm 0; }
+  .ringkas { display: flex; gap: 3mm; margin-top: 6mm; }
+  .ringkas div { flex: 1; background: #f1f5f9; border-radius: 3mm; padding: 4mm 2mm; text-align: center; font-size: 10pt; }
+  .ringkas b { display: block; font-size: 16pt; color: #1e4a9b; }
+
+  /* Langkah */
+  .judul-hal { font-size: 15pt; color: #1e4a9b; border-bottom: 2px solid #1e4a9b; padding-bottom: 2mm; margin-bottom: 5mm; }
+  .langkah { display: flex; gap: 7mm; align-items: flex-start; margin-bottom: 7mm; page-break-inside: avoid; }
+  .ponsel { flex: 0 0 56mm; border: 2.2mm solid #0f172a; border-radius: 6mm; overflow: hidden; background: #0f172a; }
+  .ponsel img { display: block; width: 100%; }
+  .teks { flex: 1; padding-top: 2mm; }
+  .nomor { display: inline-flex; width: 10mm; height: 10mm; border-radius: 50%; background: #1e4a9b; color: #fff;
+           font-weight: 700; font-size: 13pt; align-items: center; justify-content: center; margin-right: 2mm; }
+  .teks h2 { font-size: 14pt; display: flex; align-items: center; margin-bottom: 3mm; }
+  .teks p { margin: 0 0 2.5mm; }
+  .teks ol, .teks ul { margin: 0 0 2.5mm; padding-left: 6mm; }
+  .teks li { margin: 1mm 0; }
+  .tombol { display: inline-block; background: #1e4a9b; color: #fff; border-radius: 2mm; padding: 0 2mm; font-weight: 600; font-size: 10.5pt; white-space: nowrap; }
+  .tombol.putih { background: #fff; color: #1e4a9b; border: 1px solid #94a3b8; }
+  .tautan { color: #1e4a9b; font-weight: 600; }
+  .catatan { background: #fffbeb; border-left: 1.2mm solid #f59e0b; padding: 2mm 3mm; font-size: 10.5pt; border-radius: 1mm; }
+  .catatan.hijau { background: #ecfdf5; border-color: #10b981; }
+
+  /* Kendala */
+  table.kendala { width: 100%; border-collapse: collapse; font-size: 10.5pt; }
+  table.kendala th { background: #1e4a9b; color: #fff; text-align: left; padding: 2.5mm 3mm; }
+  table.kendala td { border-bottom: 1px solid #e2e8f0; padding: 2.5mm 3mm; vertical-align: top; }
+  table.kendala tr:nth-child(even) td { background: #f8fafc; }
+  table.kendala td:first-child { width: 38%; font-weight: 600; }
+  .kaki { margin-top: 8mm; text-align: center; color: #64748b; font-size: 10pt; }
+</style>
+</head>
+<body>
+
+<!-- ============ HALAMAN 1: SAMPUL ============ -->
+<section class="halaman sampul">
+  <img class="logo" src="gambar/logo.png" alt="">
+  <div class="lembaga">AL WAFI ISLAMIC BOARDING SCHOOL</div>
+  <h1>Panduan Verifikasi<br>Data Keluarga</h1>
+  <div class="sub">untuk Ayah, Ibu, atau Wali Santri</div>
+
+  <div class="kotak biru">
+    <h3>Apa ini?</h3>
+    Pesantren mengirimkan <b>link khusus lewat WhatsApp</b> untuk keluarga Anda. Lewat link itu, Bapak/Ibu
+    memeriksa data keluarga dan data santri, membetulkannya bila ada yang keliru, lalu mendaftarkan
+    <b>email aktif</b> yang nanti dipakai untuk masuk Portal Wali.
+  </div>
+
+  <div class="ringkas">
+    <div><b>±10</b>menit</div>
+    <div><b>8</b>langkah mudah</div>
+    <div><b>HP</b>cukup lewat ponsel</div>
+  </div>
+
+  <div class="kotak kuning">
+    <h3>Siapkan dulu sebelum mulai</h3>
+    <ul>
+      <li><b>Kartu Keluarga (KK)</b> — nama, NIK, tempat &amp; tanggal lahir harus ditulis persis seperti di KK.</li>
+      <li><b>NIS salah satu anak</b> — tertera di rapor atau kartu santri.</li>
+      <li><b>Email yang masih aktif</b> dan bisa Anda buka di HP (misalnya Gmail).</li>
+    </ul>
+  </div>
+
+  <div class="kotak merah">
+    <h3>Penting</h3>
+    <ul>
+      <li>Link ini <b>khusus untuk keluarga Anda</b>. Mohon <b>jangan dibagikan</b> ke orang lain.</li>
+      <li>Link berlaku <b>30 hari</b> sejak dikirim. Tanggal batasnya tertulis di layar pertama.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ HALAMAN 2: LANGKAH 1–2 ============ -->
+<section class="halaman">
+  <h2 class="judul-hal">Langkah-langkah verifikasi</h2>
+
+  <div class="langkah">
+    <div class="ponsel"><img src="gambar/1-buka-link.jpg" alt=""></div>
+    <div class="teks">
+      <h2><span class="nomor">1</span>Buka link dari WhatsApp</h2>
+      <ol>
+        <li>Ketuk link verifikasi yang dikirim pesantren di WhatsApp.</li>
+        <li>Pada <b>"Anda membuka sebagai"</b>, pilih diri Anda: <b>Ayah</b>, <b>Ibu</b>, atau <b>Wali</b>.</li>
+        <li>Ketik <b>NIS salah satu anak</b> Anda. Bila punya lebih dari satu anak di pesantren, cukup salah satu.</li>
+        <li>Ketuk <span class="tombol">Lanjut periksa data</span>.</li>
+      </ol>
+      <p class="catatan">NIS ada di rapor atau kartu santri. Bila salah ketik berkali-kali, kesempatan
+        dibatasi sementara — tunggu sekitar 1 jam lalu coba lagi.</p>
+    </div>
+  </div>
+
+  <div class="langkah">
+    <div class="ponsel"><img src="gambar/2-ringkasan.jpg" alt=""></div>
+    <div class="teks">
+      <h2><span class="nomor">2</span>Baca halaman ringkasan</h2>
+      <p>Muncul sapaan <b>"Assalamu'alaikum"</b> dengan nama Anda, beserta tiga bagian yang perlu dicek:</p>
+      <ol>
+        <li><b>Data orang tua / wali</b></li>
+        <li><b>Data santri</b></li>
+        <li><b>Email aktif Anda</b> <i>(wajib)</i></li>
+      </ol>
+      <p class="catatan">Perhatikan kotak kuning: <b>semua nama, NIK, tempat &amp; tanggal lahir harus sama persis
+        dengan Kartu Keluarga</b>, termasuk ejaannya. Data ini dipakai untuk rapor, ijazah, dan pendataan Kemenag.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HALAMAN 3: LANGKAH 3–4 ============ -->
+<section class="halaman">
+  <div class="langkah">
+    <div class="ponsel"><img src="gambar/3-data-wali.jpg" alt=""></div>
+    <div class="teks">
+      <h2><span class="nomor">3</span>Periksa data wali &amp; santri</h2>
+      <ol>
+        <li>Ketuk <span class="tautan">Periksa &amp; perbarui →</span> pada bagian 1 atau 2.</li>
+        <li>Gunakan tab <b>Data Santri</b> dan <b>Data Wali</b> untuk berpindah.</li>
+        <li>Cocokkan setiap isian dengan Kartu Keluarga. Tulisan <b>"Belum diisi"</b> berarti datanya masih kosong.</li>
+      </ol>
+      <p>Semua sudah benar? Ketuk <span class="tautan">Sudah diperiksa? Kembali ke langkah verifikasi</span>.</p>
+    </div>
+  </div>
+
+  <div class="langkah">
+    <div class="ponsel"><img src="gambar/4-perbaharui-data.jpg" alt=""></div>
+    <div class="teks">
+      <h2><span class="nomor">4</span>Betulkan bila ada yang keliru</h2>
+      <ol>
+        <li>Gulir ke bawah halaman data, lalu ketuk tombol <span class="tombol">Perbaharui Data Wali</span>
+          — untuk data anak, tombolnya <b>"Perbaharui Data (nama anak)"</b> di tab Data Santri.</li>
+        <li>Ubah isian yang keliru atau lengkapi yang masih kosong. Isian bertanda <b style="color:#dc2626">*</b> wajib diisi.</li>
+        <li>Ketuk <span class="tombol">Simpan perubahan</span> di bagian paling bawah, lalu setujui pertanyaan konfirmasinya.</li>
+      </ol>
+      <p class="catatan hijau">Perubahan <b>langsung tersimpan</b> dan bagian kesantrian otomatis diberi tahu.
+        Data yang sudah benar tidak perlu diubah.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HALAMAN 4: LANGKAH 5–6 ============ -->
+<section class="halaman">
+  <div class="langkah">
+    <div class="ponsel"><img src="gambar/5-email.jpg" alt=""></div>
+    <div class="teks">
+      <h2><span class="nomor">5</span>Pastikan email aktif</h2>
+      <p>Kembali di halaman ringkasan, lihat bagian <b>3 — Email aktif Anda</b>.</p>
+      <ul>
+        <li>Email yang tertulis masih Anda pakai? Ketuk <span class="tombol">Masih aktif — kirim kode</span>.</li>
+        <li>Email salah atau belum ada? Ketuk <span class="tombol putih">Ganti email</span>, ketik email baru, lalu kirim kode.</li>
+      </ul>
+      <p class="catatan">Email ini nantinya dipakai untuk <b>masuk Portal Wali</b>, jadi pilih email yang
+        benar-benar bisa Anda buka.</p>
+    </div>
+  </div>
+
+  <div class="langkah">
+    <div class="ponsel"><img src="gambar/6-kode.jpg" alt=""></div>
+    <div class="teks">
+      <h2><span class="nomor">6</span>Masukkan kode dari email</h2>
+      <ol>
+        <li>Buka kotak masuk email Anda. Cari email dari <b>noreply@al-wafi.sch.id</b>.</li>
+        <li>Salin <b>kode 6 angka</b> di email itu ke kolom yang tersedia.</li>
+        <li>Ketuk <span class="tombol">Buktikan email</span>.</li>
+      </ol>
+      <p class="catatan">Kode berlaku <b>10 menit</b>. Tidak ada di Kotak Masuk? Periksa folder
+        <b>Spam</b> atau <b>Promosi</b>. Bila sudah lewat 10 menit, kembali dan minta kode baru.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HALAMAN 5: LANGKAH 7–8 ============ -->
+<section class="halaman">
+  <div class="langkah">
+    <div class="ponsel"><img src="gambar/7-pernyataan.jpg" alt=""></div>
+    <div class="teks">
+      <h2><span class="nomor">7</span>Centang pernyataan &amp; buat password</h2>
+      <p>Setelah email terbukti, bagian 3 bertanda centang hijau <b>"Terbukti aktif"</b>.</p>
+      <ol>
+        <li>Centang kotak <b>"Saya sudah memeriksa data keluarga dan santri… sudah benar &amp; sesuai Kartu Keluarga"</b>.</li>
+        <li>Buat <b>password</b> untuk masuk Portal Wali — <b>minimal 8 karakter</b>.</li>
+        <li>Ketik ulang password yang sama di kolom <b>Ulangi password</b>.</li>
+        <li>Ketuk <span class="tombol">Selesai — data sudah benar</span>.</li>
+      </ol>
+      <p class="catatan">Catat dan simpan password ini baik-baik. Jangan beritahukan kepada siapa pun,
+        termasuk kepada petugas.</p>
+    </div>
+  </div>
+
+  <div class="langkah">
+    <div class="ponsel"><img src="gambar/8-selesai.jpg" alt=""></div>
+    <div class="teks">
+      <h2><span class="nomor">8</span>Selesai!</h2>
+      <p>Muncul tanda centang hijau dan tulisan <b>"Syukron, pembaharuan data telah selesai"</b>, berikut
+        ringkasan nama santri, nama penanggung jawab, email, dan nomor HP.</p>
+      <p>Ketuk <span class="tombol">Tutup</span>. Verifikasi keluarga Anda sudah tercatat di pesantren.</p>
+      <p class="catatan hijau">Mulai sekarang, Bapak/Ibu bisa masuk <b>Portal Wali</b> memakai
+        <b>email</b> dan <b>password</b> yang baru dibuat.</p>
+      <p style="margin-top:4mm">Jazakumullah khairan atas waktunya.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HALAMAN 6: KENDALA ============ -->
+<section class="halaman">
+  <h2 class="judul-hal">Jika ada kendala</h2>
+
+  <table class="kendala">
+    <tr><th>Masalah</th><th>Yang perlu dilakukan</th></tr>
+    <tr><td>Link tidak bisa dibuka / muncul pesan link kedaluwarsa</td>
+        <td>Masa berlaku link (30 hari) sudah habis, atau keluarga Anda sudah menyelesaikan verifikasi.
+          Hubungi bagian kesantrian untuk dikirimi link baru.</td></tr>
+    <tr><td>NIS dianggap tidak cocok</td>
+        <td>Periksa kembali NIS di rapor atau kartu santri, dan pastikan Anda memilih peran yang benar
+          (Ayah/Ibu/Wali). Setelah 5 kali salah, tunggu sekitar 1 jam sebelum mencoba lagi.</td></tr>
+    <tr><td>Kode tidak masuk ke email</td>
+        <td>Tunggu 1–2 menit, lalu periksa folder <b>Spam</b> / <b>Promosi</b>. Pastikan alamat email yang
+          diketik benar. Bila tetap tidak ada, kembali ke halaman verifikasi dan kirim kode lagi.</td></tr>
+    <tr><td>Kode ditolak</td>
+        <td>Kode hanya berlaku 10 menit dan hanya kode <b>terbaru</b> yang berlaku. Minta kode baru lalu
+          ketik ulang dengan teliti.</td></tr>
+    <tr><td>Email ditolak karena sudah tercatat di keluarga lain</td>
+        <td>Satu email hanya untuk satu keluarga. Gunakan email lain, atau hubungi bagian kesantrian bila
+          menurut Anda itu keliru.</td></tr>
+    <tr><td>Tombol "Selesai" masih abu-abu</td>
+        <td>Email belum dibuktikan (langkah 5–6) atau kotak pernyataan belum dicentang.</td></tr>
+    <tr><td>Pesan WhatsApp berisi link terhapus / hilang</td>
+        <td>Gunakan jalur cadangan di halaman berikut.</td></tr>
+  </table>
+</section>
+
+<!-- ============ HALAMAN 7: JALUR CADANGAN ============ -->
+<section class="halaman">
+  <h2 class="judul-hal">Kehilangan link verifikasi?</h2>
+
+  <div class="langkah">
+    <div class="ponsel"><img src="gambar/9-cadangan.jpg" alt=""></div>
+    <div class="teks">
+      <p>Bila pesan WhatsApp-nya terhapus, link bisa dibuka kembali tanpa menghubungi petugas:</p>
+      <ol>
+        <li>Buka alamat <b>erp.al-wafi.sch.id/wali/v</b> di browser HP.</li>
+        <li>Isi <b>NIS anak</b>.</li>
+        <li>Isi <b>tanggal lahir anak</b>.</li>
+        <li>Isi <b>4 angka terakhir nomor HP</b> orang tua yang tercatat di pesantren.</li>
+        <li>Ketuk <span class="tombol">Buka link verifikasi</span>, lalu lanjutkan dari <b>Langkah 1</b>.</li>
+      </ol>
+      <p class="catatan">Jalur ini hanya bisa dipakai bila keluarga Anda <b>sudah pernah dikirimi link</b>
+        oleh pesantren dan masa berlakunya belum habis.</p>
+    </div>
+  </div>
+
+  <div class="kotak biru">
+    <h3>Masih butuh bantuan?</h3>
+    Silakan hubungi <b>bagian kesantrian Al Wafi Islamic Boarding School</b> melalui nomor WhatsApp
+    resmi pesantren. Petugas <b>tidak akan pernah</b> meminta password atau kode 6 angka Anda.
+  </div>
+
+  <div class="kaki">Portal Wali · AL Wafi Islamic Boarding School<br>
+    Gambar dalam panduan ini memakai data contoh.</div>
+</section>
+
+</body>
+</html>

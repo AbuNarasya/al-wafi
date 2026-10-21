@@ -65,7 +65,10 @@ class PortalBayarController extends Controller
             // Bayar online ikut alur transfer (calon santri) — tagihan santri aktif tetap dari dompet.
             'online' => PembayaranPortal::bisaTransfer($alur) && PembayaranMidtrans::siap(),
             'biaya' => PembayaranMidtrans::biaya(),
-            'pesanan' => TransaksiMidtrans::where('id_tagihan', $t->id)->where('status', 'menunggu')->latest('id')->first(),
+            // VA yang belum dibayar — satuan MAUPUN gabungan — dan bukti transfer yang menunggu diperiksa:
+            // keduanya mengurangi ruang, jadi keduanya disebut terpisah di layar.
+            'va' => PembayaranPortal::vaMenunggu(SesiWali::wali()->id, [$t->id]),
+            'menungguVerifikasi' => PembayaranPortal::menungguVerifikasi($t->id),
         ]);
     }
 

@@ -16,6 +16,7 @@ use App\Services\Modules\PembayaranSantriService;
 use App\Services\Ppsb\BayarDompet;
 use App\Services\Ppsb\Tahap;
 use App\Support\Money;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -113,6 +114,40 @@ class PembayaranPortal
             ->whereHas('transaksi', fn ($q) => $q->where('status', 'menunggu'))->sum('nominal');
 
         return Money::sub(Money::sub(Money::sub($t->sisa, (string) $menunggu), (string) $online), (string) $onlineKelompok);
+    }
+
+    /** Bukti transfer / setoran yang masih menunggu diperiksa keuangan (bagian dari yang dikurangkan ruang()). */
+    public static function menungguVerifikasi(int $idTagihan): string
+    {
+        return Money::of(PembayaranSantri::where('id_tagihan', $idTagihan)->where('status', 'menunggu_verifikasi')->sum('nominal'));
+    }
+
+    /**
+     * Pesanan VA wali yang belum dibayar — satu tagihan maupun gabungan (bukan isi dompet), terbaru
+     * dulu, rinciannya ikut dimuat. Ditampilkan supaya wali yang keluar dari halaman VA tetap bisa
+     * kembali membayarnya atau mengganti cara bayar (21 Okt 2026): tanpa itu tagihannya tertahan
+     * ruang() sampai VA kedaluwarsa.
+     *
+     * @param  int[]|null  $idTagihan  hanya pesanan yang memuat salah satu tagihan ini
+     * @return Collection<int, \App\Models\TransaksiMidtrans>
+     */
+    public static function vaMenunggu(int $idWali, ?array $idTagihan = null): Collection
+    {
+        return \App\Models\TransaksiMidtrans::with(['tagihan.santri', 'tagihan.jenis', 'rincian.tagihan.santri', 'rincian.tagihan.jenis'])
+            ->where('id_wali', $idWali)->where('status', 'menunggu')->whereIn('jenis', ['bayar_tagihan', 'bayar_kelompok'])
+            ->when($idTagihan !== null, fn ($q) => $q->where(fn ($q) => $q->whereIn('id_tagihan', $idTagihan)
+                ->orWhereHas('rincian', fn ($r) => $r->whereIn('id_tagihan', $idTagihan))))
+            ->orderByDesc('id')->get();
+    }
+
+    /** Bagian satu tagihan di dalam pesanan VA (pesanan gabungan memuat beberapa tagihan). */
+    public static function bagianVa(\App\Models\TransaksiMidtrans $p, int $idTagihan): string
+    {
+        if ($p->jenis !== 'bayar_kelompok') {
+            return (int) $p->id_tagihan === $idTagihan ? Money::of($p->nominal) : '0';
+        }
+
+        return Money::of($p->rincian->where('id_tagihan', $idTagihan)->sum('nominal'));
     }
 
     // ---- Bayar beberapa tagihan sekaligus (keputusan user 13 Okt 2026) ----

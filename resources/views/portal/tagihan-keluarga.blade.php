@@ -20,6 +20,8 @@
         <p class="mt-1 text-sm text-slate-500">Ketuk nama anak untuk melihat rinciannya.</p>
     </div>
 
+    @include('portal._va-menunggu', ['daftar' => $va])
+
     <div class="mt-4 space-y-2">
         @foreach ($anak as $a)
             <a href="{{ route('portal.tagihan', ['anak' => $a['id']]) }}" class="flex items-center gap-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">

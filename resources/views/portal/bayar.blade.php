@@ -17,8 +17,12 @@
         @endif
         <p class="mt-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Sisa tagihan</p>
         <p class="text-3xl font-bold tabular-nums text-slate-900">{{ $rp($tagihan->sisa) }}</p>
-        @if ((float) $ruang < (float) $tagihan->sisa)
-            <p class="mt-1 text-sm font-medium text-amber-700">{{ $rp((float) $tagihan->sisa - (float) $ruang) }} sedang menunggu verifikasi.</p>
+        @php $diVa = $va->reduce(fn ($n, $p) => $n + (float) \App\Services\PortalWali\PembayaranPortal::bagianVa($p, $tagihan->id), 0.0); @endphp
+        @if ((float) $menungguVerifikasi > 0)
+            <p class="mt-1 text-sm font-medium text-amber-700">{{ $rp($menungguVerifikasi) }} sedang menunggu verifikasi keuangan.</p>
+        @endif
+        @if ($diVa > 0)
+            <p class="mt-1 text-sm font-medium text-amber-700">{{ $rp($diVa) }} menunggu dibayar lewat Virtual Account.</p>
         @endif
     </div>
 
@@ -39,13 +43,19 @@
         ]);
     @endphp
 
-    @if ($pesanan)
-        <a href="{{ route('portal.online.lihat', $pesanan->order_id) }}" class="mt-4 flex items-center justify-between gap-2 rounded-3xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
-            <span>Pembayaran online {{ $rp($pesanan->total) }} menunggu dibayar</span>
-            <span class="font-semibold">Lanjutkan &rarr;</span>
-        </a>
-    @endif
+    @include('portal._va-menunggu', ['daftar' => $va, 'idTagihan' => $tagihan->id])
 
+    @if ((float) $ruang <= 0)
+        {{-- Seluruh sisa sudah tertutup VA / bukti transfer yang menunggu: formulir nominal 0 hanya membingungkan. --}}
+        <div class="mt-4 rounded-3xl bg-white p-5 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200">
+            @if ($va->isNotEmpty())
+                Seluruh sisa tagihan ini sudah masuk pesanan Virtual Account di atas. Bayar VA tersebut, atau ketuk
+                <b>Ganti metode</b> untuk membatalkannya dan memilih cara bayar lain.
+            @else
+                Seluruh sisa tagihan ini sedang diperiksa bagian keuangan. Bila bukti transfer ditolak, tagihan ini bisa dibayar kembali.
+            @endif
+        </div>
+    @else
     <div x-data="{ cara: @js($caraAwal) }">
     {{-- Lebih dari satu cara bayar (dompet / online / transfer): wali memilih. --}}
     @if (count($pilihan) > 1)
@@ -118,4 +128,5 @@
         </form>
     @endif
     </div>
+    @endif
 @endsection

@@ -46,6 +46,8 @@
             </p>
         </div>
 
+        @include('portal._va-menunggu', ['daftar' => $va])
+
         <div class="mt-4 grid grid-cols-2 gap-1 rounded-2xl bg-slate-200 p-1 text-center text-sm">
             <a href="{{ route('portal.tagihan', ['anak' => $dipilih->id]) }}" @class(['rounded-xl py-2', 'bg-white font-semibold text-slate-900 shadow-sm' => $tab === 'tagihan', 'text-slate-600' => $tab !== 'tagihan'])>Tagihan</a>
             <a href="{{ route('portal.tagihan', ['anak' => $dipilih->id, 'tab' => 'riwayat']) }}" @class(['rounded-xl py-2', 'bg-white font-semibold text-slate-900 shadow-sm' => $tab === 'riwayat', 'text-slate-600' => $tab !== 'riwayat'])>Riwayat bayar</a>
@@ -94,6 +96,9 @@
                                 @endif
                                 @if ((float) $t['menunggu'] > 0)
                                     <span class="block font-medium text-amber-700">{{ $rp($t['menunggu']) }} menunggu verifikasi</span>
+                                @endif
+                                @if ((float) $t['di_va'] > 0)
+                                    <span class="block font-medium text-amber-700">{{ $rp($t['di_va']) }} menunggu dibayar lewat VA</span>
                                 @endif
                             </div>
                             @if ($t['status'] !== 'lunas')
