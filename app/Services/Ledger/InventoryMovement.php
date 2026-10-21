@@ -82,7 +82,9 @@ final class InventoryMovement
                 'tanggal' => $tanggal,
                 'kuantiti_awal' => $qty,
                 'kuantiti_sisa' => $qty,
-                'harga_satuan' => Money::div($nilai, $qty),
+                // Kuantiti pada skala 4 (dulu skala 2: 0,005 → pembagi nol, 0,125 → 0,12).
+                'harga_satuan' => bcdiv(Money::of($nilai), Money::of($qty, 4), 6),
+                'nilai_sisa' => Money::of($nilai),
                 'mutasi_id' => $mutasi->id,
                 'sumber_modul' => $p['sumber_modul'],
                 'sumber_ref' => $p['sumber_ref'] ?? null,
@@ -242,6 +244,7 @@ final class InventoryMovement
                 }
                 $lapisan->update([
                     'kuantiti_sisa' => Money::add($lapisan->kuantiti_sisa, $r['kuantiti'], 4),
+                    'nilai_sisa' => Money::add($lapisan->nilai_sisa, $r['nilai']),
                 ]);
             }
 
@@ -291,9 +294,17 @@ final class InventoryMovement
             $ambil = Money::lte($sisaDiminta, $l->kuantiti_sisa, 4)
                 ? $sisaDiminta
                 : Money::of($l->kuantiti_sisa, 4);
-            $nilaiAmbil = Money::mul($ambil, $l->harga_satuan);
+            // Habis → sisa nilainya PERSIS; sebagian → porsinya dari sisa nilai (dibulatkan). Selama hidup lapisan,
+            // nilai keluar = nilai masuk tanpa sen tertinggal (audit 21 Okt 2026).
+            $habis = Money::eq($ambil, $l->kuantiti_sisa, 4);
+            $nilaiAmbil = $habis
+                ? Money::of($l->nilai_sisa)
+                : self::bulat(bcdiv(bcmul(Money::of($l->nilai_sisa), $ambil, 8), Money::of($l->kuantiti_sisa, 4), 8));
 
-            $l->update(['kuantiti_sisa' => Money::sub($l->kuantiti_sisa, $ambil, 4)]);
+            $l->update([
+                'kuantiti_sisa' => Money::sub($l->kuantiti_sisa, $ambil, 4),
+                'nilai_sisa' => $habis ? '0.00' : Money::sub($l->nilai_sisa, $nilaiAmbil),
+            ]);
 
             $rincian[] = [
                 'lapisan_id' => $l->id,
@@ -347,17 +358,18 @@ final class InventoryMovement
         return $hasil;
     }
 
-    /** Nilai persediaan saat ini = Σ (sisa × harga) tiap lapisan. */
+    /** Nilai persediaan saat ini = Σ sisa nilai tiap lapisan (hanya yang masih bersisa). */
     public static function nilai(string $kodePersediaan, ?string $kodeLokasi = null): string
     {
-        $nilai = '0';
-        foreach (LapisanPersediaan::where('kode_persediaan', $kodePersediaan)
+        return Money::of(LapisanPersediaan::where('kode_persediaan', $kodePersediaan)
             ->when($kodeLokasi, fn ($q) => $q->where('kode_lokasi', $kodeLokasi))
-            ->get(['kuantiti_sisa', 'harga_satuan']) as $l) {
-            $nilai = Money::add($nilai, Money::mul($l->kuantiti_sisa, $l->harga_satuan));
-        }
+            ->where('kuantiti_sisa', '>', 0)->sum('nilai_sisa'));
+    }
 
-        return $nilai;
+    /** Bulatkan ke 2 desimal (setengah menjauhi nol) — bcmath hanya memotong. */
+    private static function bulat(string $v): string
+    {
+        return bcadd($v, str_starts_with(ltrim($v), '-') ? '-0.005' : '0.005', 2);
     }
 
     /**
@@ -385,7 +397,7 @@ final class InventoryMovement
             // harga terakhir DIPERTAHANKAN: nol akan membuat pembelian
             // berikutnya dan laporan lama terbaca seolah barangnya tak bernilai.
             'harga_perolehan' => Money::gtZero($stok, 4)
-                ? Money::div($nilai, $stok)
+                ? bcdiv(Money::of($nilai), Money::of($stok, 4), 2)   // stok skala 4: 0,005 tak jadi pembagi nol
                 : Money::of($item->harga_perolehan),
         ]);
     }

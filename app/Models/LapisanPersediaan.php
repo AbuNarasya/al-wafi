@@ -19,7 +19,7 @@ class LapisanPersediaan extends Model
 
     protected $fillable = [
         'kode_persediaan', 'kode_lokasi', 'tanggal', 'kuantiti_awal', 'kuantiti_sisa',
-        'harga_satuan', 'mutasi_id', 'sumber_modul', 'sumber_ref',
+        'harga_satuan', 'nilai_sisa', 'mutasi_id', 'sumber_modul', 'sumber_ref',
     ];
 
     protected function casts(): array
@@ -28,7 +28,9 @@ class LapisanPersediaan extends Model
             'tanggal' => 'date',
             'kuantiti_awal' => 'decimal:4',
             'kuantiti_sisa' => 'decimal:4',
-            'harga_satuan' => 'decimal:2',
+            // 6 desimal hanya untuk tampilan; nilai rupiah yang tersisa dipegang `nilai_sisa` (migrasi 000086).
+            'harga_satuan' => 'decimal:6',
+            'nilai_sisa' => 'decimal:2',
         ];
     }
 

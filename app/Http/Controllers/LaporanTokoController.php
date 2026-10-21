@@ -146,7 +146,7 @@ class LaporanTokoController extends Controller
         $stok = DB::table('lapisan_persediaan')->where('kuantiti_sisa', '>', 0)
             ->when($lokasi !== '', fn ($q) => $q->where('kode_lokasi', $lokasi))
             ->groupBy('kode_persediaan')
-            ->selectRaw('kode_persediaan, SUM(kuantiti_sisa) AS stok, SUM(kuantiti_sisa * harga_satuan) AS nilai, MIN(tanggal) AS tertua')
+            ->selectRaw('kode_persediaan, SUM(kuantiti_sisa) AS stok, SUM(nilai_sisa) AS nilai, MIN(tanggal) AS tertua')
             ->get()->keyBy('kode_persediaan');
         $terakhir = DB::table('penjualan_detail as d')->join('penjualan as p', 'p.id_penjualan', '=', 'd.id_penjualan')
             ->where('p.status', 'selesai')->when($lokasi !== '', fn ($q) => $q->where('p.kode_lokasi', $lokasi))

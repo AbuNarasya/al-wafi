@@ -116,7 +116,8 @@ class KasirService
             if (! Money::gtZero($qtyInput, 4)) {
                 throw new AppException(422, "Jumlah {$item->nama_persediaan} harus lebih dari nol.");
             }
-            $kotor = Money::mul($qtyInput, $harga);
+            // Kuantiti skala 4 lalu dibulatkan (dulu terpotong ke 2 desimal: 0,125 kg × 20.000 = 2.400, bukan 2.500).
+            $kotor = self::bulat(bcmul($qtyInput, Money::of($harga), 6));
             $potong = Money::of($l['diskon'] ?? 0);
             if (Money::isNegative($potong) || Money::gt($potong, $kotor)) {
                 throw new AppException(422, "Diskon {$item->nama_persediaan} tidak boleh negatif atau melebihi harganya.");

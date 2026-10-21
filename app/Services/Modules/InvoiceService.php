@@ -55,12 +55,12 @@ class InvoiceService
         foreach ($input['details'] as $i => $l) {
             $no = $i + 1;
             $lineTotal = Money::mul($l['kuantiti'], $l['harga_satuan']);
-            $total = Money::add($total, $lineTotal);
             $ketBaris = $l['keterangan'] ?? "Invoice {$input['nomor_invoice']}";
 
             // ---- Baris yang MENAGIH penerimaan barang: stoknya sudah masuk saat diterima. ----
             if (! empty($l['id_penerimaan_detail'])) {
                 [$baris, $jurnal, $poTerima] = $this->barisPenerimaan($l, $no, $lineTotal, $ketBaris, $input['kode_vendor'], $ditagihPerTerima);
+                $total = Money::add($total, $baris['total']);   // bisa disamakan dengan nilai terima (pembulatan)
                 if ($poTerima) {
                     // Invoice tanpa PO mewarisi PO penerimaannya; PO yang berbeda ditolak —
                     // satu invoice memajukan satu PO saja.
@@ -74,6 +74,8 @@ class InvoiceService
 
                 continue;
             }
+
+            $total = Money::add($total, $lineTotal);
 
             // `kode_persediaan` AKHIRNYA ditulis. Sebelum ini kolomnya ada di
             // tabel, terbawa dari baris PO, lalu mati di sini — dan pencocokan
@@ -370,6 +372,14 @@ class InvoiceService
             ? Money::sub($pd->sisaNilai(), $ditagihPerTerima['nilai:'.$pd->id] ?? '0')
             : Money::div(Money::mul($qty, $pd->total), $pd->kuantiti);
         $ditagihPerTerima['nilai:'.$pd->id] = Money::add($ditagihPerTerima['nilai:'.$pd->id] ?? '0', $nilaiTerima);
+
+        // Menagih SELURUH sisa penerimaan & bedanya hanya pembulatan harga satuan 2 desimal (≤ ½ sen per unit,
+        // mis. 72 × 2.083,33 = 149.999,76 vs 150.000) → bukan selisih harga sungguhan: total baris disamakan dengan
+        // nilai terima. Dulu muncul "selisih Rp 0,24" yang memaksa petugas memilih Bagian (audit 21 Okt 2026).
+        $beda = Money::sub($lineTotal, $nilaiTerima);
+        if (Money::eq($qty, $sisaQty, 4) && Money::lte(ltrim($beda, '-'), bcmul($qty, '0.005', 2))) {
+            $lineTotal = $nilaiTerima;
+        }
 
         $jurnal = [];
         if (Money::gtZero($nilaiTerima)) {

@@ -108,7 +108,8 @@ class PenerimaanBarangService
                 throw new AppException(422, "Baris {$no}: harga tidak boleh negatif.");
             }
             $qtyDasar = Money::mul($qtyInput, $isi, 4);
-            $nilai = Money::mul($qtyInput, $hargaInput);
+            // Kuantiti pada skala 4 lalu dibulatkan (dulu Money::mul memotong kuantiti ke 2 desimal: 0,125 → 0,12).
+            $nilai = bcadd(bcmul($qtyInput, $hargaInput, 6), '0.005', 2);
 
             $idPoDetail = $l['id_po_detail'] ?? null;
             if ($idPoDetail) {

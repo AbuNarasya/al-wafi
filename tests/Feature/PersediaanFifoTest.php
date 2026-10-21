@@ -126,7 +126,7 @@ class PersediaanFifoTest extends TestCase
         // Lapisan tertua habis, lapisan kedua tersisa 50.
         $sisa = LapisanPersediaan::where('kode_persediaan', 'BRG0001')->where('kuantiti_sisa', '>', 0)->get();
         $this->assertCount(1, $sisa);
-        $this->assertSame('15000.00', $sisa->first()->harga_satuan);
+        $this->assertSame('15000.000000', $sisa->first()->harga_satuan);   // 6 desimal sejak audit 21 Okt 2026
     }
 
     public function test_stok_tak_cukup_ditolak(): void
@@ -403,5 +403,23 @@ class PersediaanFifoTest extends TestCase
             ->assertSee('Lapisan FIFO tersisa')
             ->assertSee('BELI-1')
             ->assertDontSee('Belum ada pergerakan untuk barang ini');
+    }
+
+    public function test_nilai_lapisan_habis_persis_tanpa_sen_tertinggal(): void
+    {
+        // Audit 21 Okt 2026: 3 dus @50.000 = 72 pcs Rp 150.000 → harga 2.083,33 → dulu HPP total 149.999,76.
+        $this->barang('BRG0001');
+        $this->beli('BRG0001', '72', '150000', '2026-07-01');
+        $hpp = '0';
+        foreach (['10', '25', '7', '30'] as $i => $q) {
+            $hpp = Money::add($hpp, InventoryMovement::keluar(['kode_persediaan' => 'BRG0001', 'kuantiti' => $q,
+                'sumber_modul' => 'Persediaan', 'sumber_ref' => 'MP-'.$i])->nilai);
+        }
+        $this->assertSame('150000.00', $hpp);
+        $this->assertSame('0.00', InventoryMovement::nilai('BRG0001'));
+
+        // Kuantiti berdesimal 3+ tak lagi membagi dengan nol.
+        $this->beli('BRG0001', '0.005', '50', '2026-07-02', 'UJI-2');
+        $this->assertSame('50.00', InventoryMovement::nilai('BRG0001'));
     }
 }

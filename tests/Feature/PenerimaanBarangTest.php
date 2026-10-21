@@ -236,6 +236,19 @@ class PenerimaanBarangTest extends TestCase
         $this->assertSame(['3.0000', '10000.00'], [$d->fresh()->qty_ditagih, $d->fresh()->nilai_ditagih]);
     }
 
+    public function test_tagih_seluruh_penerimaan_dus_beda_pembulatan_bukan_selisih(): void
+    {
+        // Audit 21 Okt 2026: 3 DUS isi 24 @50.000 = 72 pcs Rp 150.000; invoice 72 × 2.083,33 = 149.999,76 dulu
+        // dianggap "selisih Rp 0,24" yang memaksa memilih Bagian. Kini total baris disamakan dengan nilai terima.
+        SatuanPersediaan::create(['kode_persediaan' => 'BRG0001', 'satuan' => 'KRT', 'isi' => '24']);
+        $d = $this->terima(null, [['kode_persediaan' => 'BRG0001', 'satuan' => 'KRT', 'kuantiti' => '3', 'harga_satuan' => '50000']])->details[0];
+
+        $inv = $this->invoice([['kode_coa' => self::GRNI, 'kuantiti' => '72', 'harga_satuan' => '2083.33', 'id_penerimaan_detail' => $d->id]]);
+
+        $this->assertSame('150000.00', Money::of($inv->total));
+        $this->assertSame('0.00', $this->saldo(self::GRNI));
+    }
+
     public function test_tagih_melebihi_yang_diterima_atau_vendor_lain_ditolak(): void
     {
         $d = $this->terima(null, [['kode_persediaan' => 'BRG0001', 'kuantiti' => '10', 'harga_satuan' => '3750']])->details[0];

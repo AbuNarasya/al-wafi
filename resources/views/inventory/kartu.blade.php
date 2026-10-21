@@ -97,7 +97,7 @@
                         <td class="px-4 py-1.5 text-gray-500">{{ $l->sumber_modul }}{{ $l->sumber_ref ? " · {$l->sumber_ref}" : '' }}</td>
                         <td class="px-4 py-1.5 text-right tabular-nums">{{ rtrim(rtrim(number_format((float) $l->kuantiti_sisa, 4, '.', ''), '0'), '.') }}</td>
                         <td class="px-4 py-1.5 text-right tabular-nums">@rp($l->harga_satuan)</td>
-                        <td class="px-4 py-1.5 text-right tabular-nums">@rp((float) $l->kuantiti_sisa * (float) $l->harga_satuan)</td>
+                        <td class="px-4 py-1.5 text-right tabular-nums">@rp($l->nilai_sisa)</td>
                     </tr>
                 @empty
                     <tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">Stok habis — tidak ada lapisan tersisa.</td></tr>
