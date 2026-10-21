@@ -55,8 +55,8 @@ class KelasTest extends TestCase
         $this->assertNull(KelasService::pecah('SEVILLA'));
         $this->assertSame(['tingkat' => 7, 'kelas' => null], PemetaSantriLama::tingkatKelas('7'));
         $this->assertSame(['L', 'P', 'L', null], array_map([PemetaSantriLama::class, 'jenisKelamin'], ['Laki-laki', 'PEREMPUAN', 'l', '']));
-        $this->assertSame(['2019-04-29', '2012-08-27', '2011-12-26', '2011-05-17', null, null],
-            array_map([PemetaSantriLama::class, 'tanggalNormal'], ['29 April 2019', '27/08/2012', '40903', '2011-05-17', '0', '31/02/2012']));
+        $this->assertSame(['2019-04-29', '2012-08-27', '2011-12-26', '2011-05-17', null, null, '2018-12-21'],
+            array_map([PemetaSantriLama::class, 'tanggalNormal'], ['29 April 2019', '27/08/2012', '40903', '2011-05-17', '0', '31/02/2012', '21-Desember-2018']));
     }
 
     public function test_penempatan_menjaga_tingkat_jenis_kelamin_dan_status(): void

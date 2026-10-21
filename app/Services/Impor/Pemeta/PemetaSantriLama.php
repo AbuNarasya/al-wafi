@@ -401,7 +401,8 @@ class PemetaSantriLama implements Pemeta
         [$y, $m, $d] = match (true) {
             (bool) preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $v, $x) => [(int) $x[1], (int) $x[2], (int) $x[3]],
             (bool) preg_match('#^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})$#', $v, $x) => [(int) $x[3], (int) $x[2], (int) $x[1]],
-            (bool) preg_match('/^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})$/', $v, $x) => [(int) $x[3], self::BULAN[strtolower($x[2])] ?? 0, (int) $x[1]],
+            // "29 April 2019", "21-Desember-2018", "5 Jan. 2019"
+            (bool) preg_match('/^(\d{1,2})[\s\-]+([A-Za-z]+)\.?[\s\-]+(\d{4})$/', $v, $x) => [(int) $x[3], self::BULAN[strtolower($x[2])] ?? 0, (int) $x[1]],
             default => [0, 0, 0],
         };
 
