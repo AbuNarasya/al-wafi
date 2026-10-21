@@ -112,6 +112,12 @@ class KasirService
         $adaDiskon = false;
         foreach ($baris as $i => $l) {
             [$item, $satuan, $isi, $harga, $barcode, $normal] = $this->resolusi($l, $i + 1);
+            // Barcode yang dipindai di layar disimpan sebagai CATATAN baris (audit 21 Okt 2026: dulu selalu kosong)
+            // — hanya bila memang milik barang itu; barang & satuannya tetap dari pilihan di keranjang.
+            $catatan = trim((string) ($l['catatan_barcode'] ?? ''));
+            if ($barcode === null && $catatan !== '' && BarcodePersediaan::where('barcode', $catatan)->where('kode_persediaan', $item->kode_persediaan)->exists()) {
+                $barcode = $catatan;
+            }
             $qtyInput = Money::of($l['kuantiti'], 4);
             if (! Money::gtZero($qtyInput, 4)) {
                 throw new AppException(422, "Jumlah {$item->nama_persediaan} harus lebih dari nol.");

@@ -13,10 +13,12 @@ set -euo pipefail
 VPS="${VPS:-deploy@31.97.108.145}"
 KUNCI="${KUNCI:-$HOME/.ssh/alwafi_ed25519}"
 DEV_HOST="${DEV_HOST:-alwafi}"
-# SEMENTARA (21 Okt 2026): kotak surat di paket Premium Web Hosting erp.al-wafi.sch.id (zona DNS `erp` bisa dikelola
-# kolaborator; domain utama belum dibagikan pemilik akun). Paket itu berakhir 19 Nov 2026. Kelak, setelah
-# noreply@al-wafi.sch.id ada:  PENGIRIM=noreply@al-wafi.sch.id bash deploy/pasang-smtp.sh
-PENGIRIM="${PENGIRIM:-noreply@erp.al-wafi.sch.id}"
+# 21 Okt 2026: kotak surat noreply@mail.al-wafi.sch.id dibuat tim IT Al Wafi (MX & SPF Hostinger sudah ada).
+# Ganti tanpa menyunting skrip:  PENGIRIM=… SMTP_HOST=… NAMA_ALWAFI=… bash deploy/pasang-smtp.sh
+PENGIRIM="${PENGIRIM:-noreply@mail.al-wafi.sch.id}"
+SMTP_HOST="${SMTP_HOST:-smtp.hostinger.co.id}"
+NAMA_ALWAFI="${NAMA_ALWAFI:-Yayasan Al Sudais Indonesia}"
+NAMA_WAFIMART="${NAMA_WAFIMART:-Wafi Mart}"
 [ $# -eq 0 ] && set -- erp wafimart dev
 
 read -rsp "Sandi ${PENGIRIM}: " SANDI; echo
@@ -37,7 +39,7 @@ cat >> .env.baru <<ENV
 
 MAIL_MAILER=smtp
 MAIL_SCHEME=smtps
-MAIL_HOST=smtp.hostinger.com
+MAIL_HOST='"$SMTP_HOST"'
 MAIL_PORT=465
 MAIL_USERNAME='"$PENGIRIM"'
 MAIL_PASSWORD='"'"'${SANDI}'"'"'
@@ -59,9 +61,9 @@ kirim() { # $1 = tujuan ssh (beserta opsi), $2 = folder, $3 = nama pengirim
 
 for s in "$@"; do
     case "$s" in
-        erp)      kirim "-i $KUNCI -o BatchMode=yes $VPS" /var/www/erp "Al Wafi" ;;
-        wafimart) kirim "-i $KUNCI -o BatchMode=yes $VPS" /var/www/wafimart "Wafi Mart" ;;
-        dev)      kirim "-o BatchMode=yes $DEV_HOST" domains/dev.erp.al-wafi.sch.id/app-laravel "Al Wafi (dev)" ;;
+        erp)      kirim "-i $KUNCI -o BatchMode=yes $VPS" /var/www/erp "$NAMA_ALWAFI" ;;
+        wafimart) kirim "-i $KUNCI -o BatchMode=yes $VPS" /var/www/wafimart "$NAMA_WAFIMART" ;;
+        dev)      kirim "-o BatchMode=yes $DEV_HOST" domains/dev.erp.al-wafi.sch.id/app-laravel "$NAMA_ALWAFI (dev)" ;;
         *) echo "Instans tak dikenal: $s (erp | wafimart | dev)" >&2 ;;
     esac
 done

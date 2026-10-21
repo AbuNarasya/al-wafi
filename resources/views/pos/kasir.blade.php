@@ -268,7 +268,10 @@
                 },
                 tambah(h) {
                     const satuan = h.satuan_dipilih || h.opsi[0].satuan;
-                    const o = h.opsi.find(x => x.satuan === satuan) || h.opsi[0];
+                    // Dicocokkan TANPA membedakan huruf besar-kecil, dan bila tetap tak ketemu DITOLAK — dulu jatuh
+                    // diam-diam ke satuan dasar: pindaian 1 dus terjual sebagai 1 pcs (audit 21 Okt 2026).
+                    const o = h.opsi.find(x => String(x.satuan).toLowerCase() === String(satuan).toLowerCase());
+                    if (!o) { this.beri('Satuan "' + satuan + '" pada barcode ini tidak dikenal untuk ' + h.nama + ' — perbaiki di master barang.'); return; }
                     const ada = this.keranjang.find(r => r.kode === h.kode && r.satuan === o.satuan);
                     if (ada) { ada.qty += 1; ada.stok = h.stok; }
                     else this.keranjang.push({ kode: h.kode, nama: h.nama, satuan: o.satuan, isi: o.isi, harga: o.harga, normal: o.normal ?? o.harga, qty: 1,

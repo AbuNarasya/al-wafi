@@ -34,9 +34,23 @@ class PosController extends Controller
     {
         $shift = $this->shiftTerbuka($request);
         if (! $shift) {
+            $toko = LokasiPersediaan::where('status', 'aktif')->where('jenis', 'toko')->orderBy('urutan')->orderBy('kode')->get();
+
             return view('pos.buka', [
-                'tokoOptions' => LokasiPersediaan::where('status', 'aktif')->where('jenis', 'toko')
-                    ->orderBy('urutan')->orderBy('kode')->get(),
+                'tokoOptions' => $toko,
+                // Uang yang SEHARUSNYA masih di laci tiap toko menurut shift terakhirnya (audit 21 Okt 2026) — dulu
+                // modal diketik bebas, sehingga kekurangan laci shift lalu terbaca sebagai selisih kasir berikutnya.
+                'sisaLaci' => $toko->mapWithKeys(function ($t) {
+                    $s = \App\Models\ShiftKasir::where('kode_lokasi', $t->kode)->whereIn('status', ['tutup', 'diserahkan'])
+                        ->latest('ditutup_pada')->first();
+                    if (! $s) {
+                        return [];
+                    }
+                    // Belum diserahkan → seluruh uang dihitung masih di laci; sudah → tinggal modalnya (setoran = dihitung − modal).
+                    $sisa = $s->status === 'tutup' ? (float) $s->uang_dihitung : min((float) $s->uang_dihitung, (float) $s->modal_awal);
+
+                    return [$t->kode => ['sisa' => $sisa, 'shift' => $s->nomor]];
+                })->all(),
             ]);
         }
 
@@ -138,6 +152,7 @@ class PosController extends Controller
         // Barcode hanya catatan baris; barang & satuannya sudah ditentukan saat dipindai.
         $baris = array_map(fn ($b) => [
             'kode_persediaan' => $b['kode_persediaan'], 'satuan' => $b['satuan'] ?? null, 'kuantiti' => $b['kuantiti'],
+            'catatan_barcode' => $b['barcode'] ?? null,
             'diskon' => $b['diskon'] ?? 0,
         ], $data['baris']);
 

@@ -64,7 +64,7 @@ class PenghubungDompetTokoTest extends TestCase
     private function kirim(string $method, string $path, array $isi = [], ?string $rahasia = null, ?int $waktu = null): TestResponse
     {
         $waktu = (string) ($waktu ?? time());
-        $badan = $method === 'GET' ? '' : json_encode($isi);
+        $badan = $method === 'GET' ? TandaTanganToko::kueri($isi) : json_encode($isi);
         $url = $method === 'GET' && $isi ? $path.'?'.http_build_query($isi) : $path;
         $tanda = TandaTanganToko::tanda($rahasia ?? self::RAHASIA, $method, $path, $waktu, $badan);
 
@@ -154,6 +154,12 @@ class PenghubungDompetTokoTest extends TestCase
         $this->kirim('POST', '/api/dompet-toko/v1/kartu', ['uid' => self::UID], 'kunci-salah')->assertStatus(401);
         $this->kirim('POST', '/api/dompet-toko/v1/kartu', ['uid' => self::UID], null, time() - 600)->assertStatus(401);
         $this->postJson('/api/dompet-toko/v1/potong', ['nomor' => 'X', 'uid' => self::UID, 'nominal' => 1000])->assertStatus(401);
+
+        // GET: query string ikut ditandatangani — mengganti ?tanggal= sesudah ditandatangani ditolak.
+        $waktu = (string) time();
+        $tanda = TandaTanganToko::tanda(self::RAHASIA, 'GET', '/api/dompet-toko/v1/transaksi', $waktu, TandaTanganToko::kueri(['tanggal' => '2026-10-01']));
+        $this->getJson('/api/dompet-toko/v1/transaksi?tanggal=2026-10-02', ['X-Penghubung-Waktu' => $waktu, 'X-Penghubung-Tanda' => $tanda])->assertStatus(401);
+        $this->getJson('/api/dompet-toko/v1/transaksi?tanggal=2026-10-01', ['X-Penghubung-Waktu' => $waktu, 'X-Penghubung-Tanda' => $tanda])->assertOk();
 
         config(['penghubung.ip' => '10.9.9.9']);
         $this->kirim('POST', '/api/dompet-toko/v1/kartu', ['uid' => self::UID])->assertStatus(403);

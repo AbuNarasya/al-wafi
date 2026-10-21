@@ -35,12 +35,22 @@ class TandaTanganToko
         if (! ctype_digit($waktu) || abs(time() - (int) $waktu) > (int) config('penghubung.toleransi_detik', 300)) {
             return response()->json(['message' => 'Waktu permintaan tidak sah atau kedaluwarsa.'], 401);
         }
-        $harap = self::tanda($rahasia, $request->method(), '/'.ltrim($request->path(), '/'), $waktu, $request->getContent());
+        // GET: query string IKUT ditandatangani (audit 21 Okt 2026) — dulu `?tanggal=` bisa diganti selama 300 detik.
+        $isi = $request->isMethod('GET') ? self::kueri($request->query()) : $request->getContent();
+        $harap = self::tanda($rahasia, $request->method(), '/'.ltrim($request->path(), '/'), $waktu, $isi);
         if ($tanda === '' || ! hash_equals($harap, $tanda)) {
             return response()->json(['message' => 'Tanda tangan tidak sah.'], 401);
         }
 
         return $next($request);
+    }
+
+    /** Bentuk baku query string untuk ditandatangani: kunci diurutkan, pengodean RFC 3986. */
+    public static function kueri(array $q): string
+    {
+        ksort($q);
+
+        return http_build_query($q, '', '&', PHP_QUERY_RFC3986);
     }
 
     /** Satu rumus untuk pengirim & penerima. */

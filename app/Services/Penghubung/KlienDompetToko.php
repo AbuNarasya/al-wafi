@@ -77,7 +77,7 @@ class KlienDompetToko
             throw new AppException(503, 'Penghubung dompet belum diatur (PENGHUBUNG_TOKO_URL / _RAHASIA) — terima pembayaran tunai.');
         }
         $waktu = (string) time();
-        $badan = $method === 'GET' ? '' : json_encode($isi);
+        $badan = $method === 'GET' ? TandaTanganToko::kueri($isi) : json_encode($isi);
         $tanda = TandaTanganToko::tanda($rahasia, $method, $path, $waktu, $badan);
         $req = Http::timeout(8)->connectTimeout(4)->acceptJson()
             ->withHeaders(['X-Penghubung-Waktu' => $waktu, 'X-Penghubung-Tanda' => $tanda]);

@@ -44,7 +44,7 @@ class InvoiceRequest extends FormRequest
             'details.*.id_po_detail' => ['nullable', 'integer', 'exists:purchase_order_details,id'],
             'details.*.id_penerimaan_detail' => ['nullable', 'integer', 'exists:penerimaan_barang_detail,id'],
             // Lokasi stok untuk baris barang yang dibeli TANPA penerimaan. Kosong = lokasi bawaan.
-            'kode_lokasi' => ['nullable', 'string', Rule::exists('lokasi_persediaan', 'kode')->where('status', 'aktif')],
+            'kode_lokasi' => ['nullable', 'string', Rule::exists('lokasi_persediaan', 'kode')->where('status', 'aktif')->whereNot('jenis', 'transit')],
         ];
     }
 

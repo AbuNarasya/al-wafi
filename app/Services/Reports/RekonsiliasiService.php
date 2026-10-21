@@ -27,10 +27,13 @@ class RekonsiliasiService
      */
     public function ringkasan(string $asOf): array
     {
+        // Baris santri (piutang & titipan dompet) hanya di instans yang mengenal santri — di Wafi Mart dulu tampil
+        // sebagai baris nol yang membingungkan (audit 21 Okt 2026).
+        $santri = \App\Support\Instans::modulHidup('santri');
         $baris = [
-            $this->piutangSantri($asOf),
+            ...($santri ? [$this->piutangSantri($asOf)] : []),
             $this->hutangVendor($asOf),
-            ...$this->titipanDompet($asOf),
+            ...($santri ? $this->titipanDompet($asOf) : []),
             $this->persediaan($asOf),
             $this->asetTetap($asOf),
             $this->uangMukaOperasional($asOf),

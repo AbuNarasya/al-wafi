@@ -101,6 +101,17 @@ class InventoryController extends Controller
         // Stok TIDAK diubah di sini — ia turunan kartu stok. Pakai Pemakaian/Opname.
         [$data, $satuanLain, $barcode] = $this->validasi($request, $inventory);
 
+        // Barang yang sudah punya riwayat stok (audit 21 Okt 2026):
+        //  • akun persediaan tak boleh berganti — nilai lama tertinggal di akun lama, penjualan berikutnya mengkredit
+        //    akun baru sampai minus;
+        //  • harga perolehan adalah TURUNAN lapisan FIFO, bukan isian bebas (dipakai menilai kelebihan opname).
+        if (\App\Models\MutasiPersediaan::where('kode_persediaan', $inventory->kode_persediaan)->exists()) {
+            if ($data['kode_coa'] !== $inventory->kode_coa) {
+                throw ValidationException::withMessages(['kode_coa' => 'Barang ini sudah punya riwayat stok — Akun Persediaan tak bisa diganti. Buat barang baru bila memang perlu akun lain.']);
+            }
+            unset($data['harga_perolehan']);
+        }
+
         DB::transaction(function () use ($inventory, $data, $satuanLain, $barcode) {
             $inventory->update($data);
             $this->simpanSatuanDanBarcode($inventory, $satuanLain, $barcode);
@@ -147,10 +158,16 @@ class InventoryController extends Controller
             // Bagian yang memakai barangnya — dipilih di sini, bukan di master:
             // barang yang sama bisa dipakai bagian mana saja.
             'kode_bagian' => ['required', 'string', 'exists:bagian,kode_bagian'],
-            // Kosong = lokasi bawaan (satu-satunya lokasi bagi yang belum memakai lokasi).
-            'kode_lokasi' => ['nullable', 'string', Rule::exists('lokasi_persediaan', 'kode')->where('status', 'aktif')],
+            // Kosong = lokasi bawaan (satu-satunya lokasi bagi yang belum memakai lokasi). TRANSIT (lokasi sistem
+            // transfer) tak boleh dipakai langsung — menggerus lapisan transfer yang sedang di jalan.
+            'kode_lokasi' => ['nullable', 'string', Rule::exists('lokasi_persediaan', 'kode')->where('status', 'aktif')->whereNot('jenis', 'transit')],
             'keterangan' => ['nullable', 'string', 'max:255'],
         ]);
+        // Opname per barang melangkahi persetujuan dua orang opname berdokumen (audit 21 Okt 2026): hanya pemegang
+        // hak persetujuan persediaan yang boleh menyesuaikan stok langsung dari sini.
+        if ($data['jenis'] === 'opname' && ! \App\Support\Akses::boleh('persetujuan-persediaan', 'ubah')) {
+            return back()->with('error', 'Penyesuaian stok langsung butuh hak Persetujuan Persediaan. Pakai Opname Persediaan (berdokumen, disetujui orang lain).');
+        }
 
         $service = new PersediaanService;
         $idPengguna = $request->user()->id_pengguna;
@@ -265,21 +282,24 @@ class InventoryController extends Controller
         unset($data['satuan_lain'], $data['barcode']);
 
         $dasar = mb_strtolower(trim($data['satuan']));
-        $dikenal = [$dasar];
+        // huruf kecil → ejaan RESMI satuan konversi (seperti tersimpan di satuan_persediaan).
+        $dikenal = [];
         foreach ($satuanLain as $s) {
             if (mb_strtolower(trim($s['satuan'])) === $dasar) {
                 throw ValidationException::withMessages(['satuan_lain' => "Satuan konversi \"{$s['satuan']}\" sama dengan satuan dasar."]);
             }
-            $dikenal[] = mb_strtolower(trim($s['satuan']));
+            $dikenal[mb_strtolower(trim($s['satuan']))] = trim($s['satuan']);
         }
 
         foreach ($barcode as $i => $b) {
             $satuan = trim((string) ($b['satuan'] ?? ''));
-            if ($satuan !== '' && ! in_array(mb_strtolower($satuan), $dikenal, true)) {
+            $kecil = mb_strtolower($satuan);
+            if ($satuan !== '' && $kecil !== $dasar && ! isset($dikenal[$kecil])) {
                 throw ValidationException::withMessages(["barcode.{$i}.satuan" => "Satuan \"{$satuan}\" pada barcode {$b['barcode']} belum terdaftar di barang ini."]);
             }
-            // Barcode satuan dasar disimpan kosong — satu bentuk saja untuk "satuan dasar".
-            $barcode[$i]['satuan'] = ($satuan === '' || mb_strtolower($satuan) === $dasar) ? null : $satuan;
+            // Barcode satuan dasar disimpan kosong — satu bentuk saja untuk "satuan dasar". Satuan konversi disimpan
+            // dengan EJAAN RESMINYA (audit 21 Okt 2026): "dus" vs "DUS" dulu membuat kasir diam-diam menjual 1 pcs.
+            $barcode[$i]['satuan'] = ($satuan === '' || $kecil === $dasar) ? null : $dikenal[$kecil];
         }
 
         // Barcode unik di SELURUH barang: kasir memindai satu kode, harus satu barang.
@@ -331,11 +351,10 @@ class InventoryController extends Controller
 
     private function nextKode(): string
     {
-        $last = Inventory::where('kode_persediaan', 'like', 'BRG%')->orderByDesc('kode_persediaan')->value('kode_persediaan');
-        $n = 1;
-        if ($last && is_numeric($tail = substr($last, 3))) {
-            $n = (int) $tail + 1;
-        }
+        // MAX numerik, bukan urutan teks (audit 21 Okt 2026): sesudah BRG9999, "BRG9999" > "BRG10000" secara teks
+        // sehingga BRG10000 lahir berulang-ulang dan bentrok. Sama dengan pengimpor barang toko.
+        $n = (int) Inventory::where('kode_persediaan', '~', '^BRG[0-9]+$')
+            ->selectRaw('MAX(CAST(SUBSTRING(kode_persediaan FROM 4) AS INTEGER)) AS n')->value('n') + 1;
 
         return 'BRG'.str_pad((string) $n, 4, '0', STR_PAD_LEFT);
     }

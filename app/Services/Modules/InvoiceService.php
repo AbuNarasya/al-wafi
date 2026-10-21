@@ -120,6 +120,17 @@ class InvoiceService
                 throw new AppException(422,
                     "Baris {$no}: barang ini sudah diterima lewat Penerimaan Barang untuk PO {$po->nomor_po}. "
                     .'Tagih lewat "Muat dari Penerimaan".');
+            } elseif ($kodePersediaan && ! $po && ($terima = \App\Models\PenerimaanBarangDetail::query()
+                ->join('penerimaan_barang as p', 'p.id_penerimaan', '=', 'penerimaan_barang_detail.id_penerimaan')
+                ->where('p.status', 'aktif')->where('p.kode_vendor', $input['kode_vendor'])
+                ->where('penerimaan_barang_detail.kode_persediaan', $kodePersediaan)
+                ->whereColumn('penerimaan_barang_detail.qty_ditagih', '<', 'penerimaan_barang_detail.kuantiti')
+                ->value('p.nomor'))) {
+                // Invoice langsung tanpa PO atas barang yang SUDAH diterima vendor ini & belum ditagih: stoknya akan
+                // masuk dua kali dan GRNI tak pernah nol (audit 21 Okt 2026).
+                throw new AppException(422,
+                    "Baris {$no}: {$item->nama_persediaan} dari vendor ini sudah diterima lewat {$terima} dan belum ditagih. "
+                    .'Tagih lewat "Muat dari Penerimaan" supaya stoknya tak masuk dua kali.');
             }
 
             $details[] = [

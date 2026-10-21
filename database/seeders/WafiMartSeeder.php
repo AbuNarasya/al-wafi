@@ -123,6 +123,20 @@ class WafiMartSeeder extends DatabaseSeeder
         foreach ($akun as [$kode, $nama, $saldo]) {
             CoaDetail::updateOrCreate(['kode_coa' => $kode], ['kode_coa' => $kode, 'nama_coa' => $nama, 'kode_grup' => substr($kode, 0, 6), 'jenis_saldo' => $saldo]);
         }
+        self::klasifikasiArusKas();
+    }
+
+    /**
+     * Klasifikasi arus kas akun NERACA ritel (audit 21 Okt 2026) — hook CoaDetail hanya mengisi kelompok 3/4/5,
+     * sehingga piutang Al Wafi, persediaan & hutang usaha dulu jatuh ke "Belum Diklasifikasikan" di Arus Kas.
+     * Kas/bank (1.1.01–02) sengaja kosong: itulah kasnya sendiri. Hanya yang masih kosong yang diisi.
+     */
+    public static function klasifikasiArusKas(): void
+    {
+        foreach (['1.1.03' => 'operasi', '1.1.04' => 'operasi', '1.1.05' => 'operasi', '1.2.' => 'investasi',
+            '2.1.' => 'operasi', '2.2.' => 'pendanaan'] as $awalan => $klasifikasi) {
+            CoaDetail::where('kode_coa', 'like', $awalan.'%')->whereNull('klasifikasi_arus_kas')->update(['klasifikasi_arus_kas' => $klasifikasi]);
+        }
     }
 
     private function seedUnitToko(): void

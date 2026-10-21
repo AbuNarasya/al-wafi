@@ -341,4 +341,54 @@ class PersediaanLokasiTokoTest extends TestCase
         $this->assertStringContainsString('{"v":"ATK","l":"Alat Tulis"}', $html);
         $this->assertStringContainsString('{"v":"JOY","l":"Joyko"}', $html);
     }
+
+    // ---- Audit 21 Okt 2026 (Paket 5) ----
+
+    public function test_satuan_barcode_disimpan_dengan_ejaan_resminya(): void
+    {
+        $this->actingAs($this->admin)->post(route('inventory.store'), $this->formBarang([
+            'dijual_di_toko' => '1', 'harga_jual' => '4000',
+            'satuan_lain' => [['satuan' => 'DUS', 'isi' => '24', 'harga_jual' => '90000']],
+            'barcode' => [['barcode' => '111222333', 'satuan' => 'dus']],
+        ]))->assertSessionHasNoErrors();
+        $this->assertSame('DUS', \App\Models\BarcodePersediaan::find('111222333')->satuan);
+    }
+
+    public function test_barang_berriwayat_stok_terkunci_akunnya_dan_harga_perolehan_turunan(): void
+    {
+        $this->barang();
+        $this->masuk('L001', '10', '30000', '2026-07-01', 'M-1');
+        CoaDetail::create(['kode_coa' => '1.ZZLK.LAIN', 'nama_coa' => 'Persediaan Lain', 'kode_grup' => self::GRP, 'jenis_saldo' => 'debet']);
+
+        $this->actingAs($this->admin)->put(route('inventory.update', 'BRG0001'), $this->formBarang(['nama_persediaan' => 'Air Mineral', 'kode_coa' => '1.ZZLK.LAIN']))
+            ->assertSessionHasErrors('kode_coa');
+        $this->actingAs($this->admin)->put(route('inventory.update', 'BRG0001'), $this->formBarang(['nama_persediaan' => 'Air Mineral', 'harga_perolehan' => '99999']))
+            ->assertSessionHasNoErrors();
+        $this->assertSame(['1.ZZLK.PRS', '3000.00'], [Inventory::find('BRG0001')->kode_coa, Inventory::find('BRG0001')->harga_perolehan]);
+    }
+
+    public function test_transit_dan_opname_langsung_tanpa_hak_persetujuan_ditolak(): void
+    {
+        $this->barang();
+        $this->masuk('L001', '10', '30000', '2026-07-01', 'M-1');
+        $this->actingAs($this->admin)->post(route('inventory.mutasi', 'BRG0001'), [
+            'jenis' => 'pemakaian', 'tanggal' => '2026-07-02', 'jumlah' => '1', 'kode_bagian' => self::BAGIAN, 'kode_lokasi' => LokasiPersediaan::TRANSIT,
+        ])->assertSessionHasErrors('kode_lokasi');
+
+        $gudang = User::create(['username' => 'gdg', 'nama' => 'Gudang', 'password_hash' => 'x', 'kode_level' => $this->admin->kode_level, 'is_admin' => false, 'status' => 'aktif'])->fresh();
+        \App\Models\HakAksesModul::create(['id_pengguna' => $gudang->id_pengguna, 'kode_modul' => 'inventory', 'lihat' => true, 'buat' => false, 'ubah' => true, 'hapus' => false, 'menu' => true]);
+        \App\Support\Akses::lupakan();
+        $this->actingAs($gudang)->post(route('inventory.mutasi', 'BRG0001'), [
+            'jenis' => 'opname', 'tanggal' => '2026-07-02', 'stok_fisik' => '0', 'kode_bagian' => self::BAGIAN, 'kode_lokasi' => 'L001',
+        ])->assertSessionHas('error');
+        $this->assertSame('10.0000', InventoryMovement::stok('BRG0001', 'L001'));
+    }
+
+    public function test_kode_barang_berikutnya_memakai_urutan_angka(): void
+    {
+        $this->barang('BRG9999');
+        $this->barang('BRG10000');
+        $this->actingAs($this->admin)->post(route('inventory.store'), $this->formBarang())->assertSessionHasNoErrors();
+        $this->assertNotNull(Inventory::find('BRG10001'));
+    }
 }

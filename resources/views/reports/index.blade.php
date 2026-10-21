@@ -16,6 +16,8 @@
             ['persediaan', 'Laporan Persediaan', 'Stok & nilai persediaan.'],
             ['jurnal', 'Jurnal Mentah', 'Semua baris jurnal (export).'],
         ] as [$rute, $judul, $desc])
+            {{-- Laporan yang alamatnya dimatikan di instans ini (mis. Aset Neto nirlaba di Wafi Mart) tak ditampilkan. --}}
+            @continue(\App\Support\Instans::alamatMati('reports/'.$rute))
             <a href="{{ route('reports.' . str_replace('-', '_', $rute)) }}"
                class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-emerald-300 hover:shadow">
                 <div class="text-base font-semibold text-gray-900">{{ $judul }}</div>

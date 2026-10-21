@@ -79,6 +79,12 @@ class PeriodCloseService
         if ($existing?->status === 'closed') {
             throw new AppException(409, 'Periode sudah ditutup.');
         }
+        // Shift kasir yang dibuka di bulan ini & belum ditutup akan dijurnal bertanggal bulan ini — kalau bulannya
+        // sudah ditutup, tutup shift ditolak dan shift-nya macet (audit 21 Okt 2026). Tutup shift-nya dulu.
+        $akhir = \Illuminate\Support\Carbon::create($tahun, $bulan, 1)->endOfMonth()->toDateString();
+        if ($shift = \App\Models\ShiftKasir::where('status', 'buka')->whereDate('dibuka_pada', '<=', $akhir)->value('nomor')) {
+            throw new AppException(409, "Masih ada shift kasir terbuka ({$shift}) yang dijurnal di periode ini — tutup dulu shift-nya.");
+        }
         $data = ['status' => 'closed', 'closed_by' => $idPengguna, 'nama_closed_by' => $nama, 'closed_at' => now(), 'keterangan' => $keterangan];
         if ($existing) {
             $existing->update($data);

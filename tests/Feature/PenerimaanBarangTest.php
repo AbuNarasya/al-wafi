@@ -249,6 +249,18 @@ class PenerimaanBarangTest extends TestCase
         $this->assertSame('0.00', $this->saldo(self::GRNI));
     }
 
+    public function test_invoice_langsung_atas_barang_yang_sudah_diterima_ditolak(): void
+    {
+        // Audit 21 Okt 2026: stok masuk dua kali & GRNI tak pernah nol.
+        $this->terima(null, [['kode_persediaan' => 'BRG0001', 'satuan' => 'pcs', 'kuantiti' => '10', 'harga_satuan' => '3750']]);
+        try {
+            $this->invoice([['kode_coa' => self::PERSEDIAAN, 'kode_persediaan' => 'BRG0001', 'kuantiti' => '10', 'harga_satuan' => '3750']], ['kode_lokasi' => 'L002']);
+            $this->fail('Harus ditolak.');
+        } catch (AppException $e) {
+            $this->assertStringContainsString('Muat dari Penerimaan', $e->getMessage());
+        }
+    }
+
     public function test_tagih_melebihi_yang_diterima_atau_vendor_lain_ditolak(): void
     {
         $d = $this->terima(null, [['kode_persediaan' => 'BRG0001', 'kuantiti' => '10', 'harga_satuan' => '3750']])->details[0];

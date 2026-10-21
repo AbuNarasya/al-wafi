@@ -118,7 +118,8 @@ class PenerimaanBarangController extends Controller
             'tanggal' => ['required', 'date'],
             'id_po' => ['nullable', 'integer', 'exists:purchase_orders,id_po'],
             'kode_vendor' => ['required', 'string', 'exists:vendors,kode_vendor'],
-            'kode_lokasi' => ['required', 'string', Rule::exists('lokasi_persediaan', 'kode')->where('status', 'aktif')],
+            // TRANSIT = lokasi sistem transfer; barang yang diterima ke sana tak bisa dipindahkan lagi (audit 21 Okt 2026).
+            'kode_lokasi' => ['required', 'string', Rule::exists('lokasi_persediaan', 'kode')->where('status', 'aktif')->whereNot('jenis', 'transit')],
             'kode_unit' => ['nullable', 'string', 'exists:business_units,kode_unit'],
             'nomor_surat_jalan' => ['nullable', 'string', 'max:100'],
             'keterangan' => ['nullable', 'string', 'max:500'],

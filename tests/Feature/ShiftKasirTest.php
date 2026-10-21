@@ -140,6 +140,19 @@ class ShiftKasirTest extends TestCase
         $this->assertSame('48.0000', InventoryMovement::stok('BRG0001', 'L002'));   // 50 − 7 terjual + 5 dibatalkan
     }
 
+    public function test_tutup_bulan_ditolak_selama_ada_shift_terbuka(): void
+    {
+        // Audit 21 Okt 2026: shift yang terbuka saat bulannya ditutup macet — tak bisa ditutup, kasir tak bisa buka baru.
+        $shift = $this->shiftBerjualan();
+        $tgl = $shift->dibuka_pada;
+        try {
+            (new \App\Services\Modules\PeriodCloseService)->tutupBulan((int) $tgl->format('Y'), (int) $tgl->format('n'), $this->pengawas->id_pengguna, 'SPV');
+            $this->fail('Harus ditolak.');
+        } catch (\App\Exceptions\AppException $e) {
+            $this->assertStringContainsString($shift->nomor, $e->getMessage());
+        }
+    }
+
     public function test_pengawas_menutup_shift_yang_terlupa_dan_akses_laporan(): void
     {
         $shift = $this->shiftBerjualan();

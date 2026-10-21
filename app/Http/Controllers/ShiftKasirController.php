@@ -45,6 +45,18 @@ class ShiftKasirController extends Controller
                 COALESCE(SUM(penjualan.total), 0) AS omzet,
                 COALESCE(SUM(penjualan.total - penjualan.hpp), 0) AS laba_kotor')
             ->orderByDesc('tanggal')->orderBy('shift_kasir.kode_lokasi')->get();
+        // Retur di shift itu mengurangi omzet (uang kembali) & laba kotor (uang kembali − harga pokok barang layak yang
+        // kembali ke rak) — sama dengan jurnal shift. Dulu tak dikurangkan sehingga rekap lebih besar dari buku.
+        $retur = (clone $dasar)->join('retur_penjualan as r', 'r.id_shift', '=', 'shift_kasir.id_shift')
+            ->groupBy(DB::raw('DATE(shift_kasir.dibuka_pada)'), 'shift_kasir.kode_lokasi')
+            ->selectRaw('DATE(shift_kasir.dibuka_pada) AS tanggal, shift_kasir.kode_lokasi, SUM(r.total) AS total, SUM(r.hpp_kembali) AS hpp')
+            ->get()->keyBy(fn ($r) => $r->tanggal.'|'.$r->kode_lokasi);
+        foreach ($rekap as $baris) {
+            if ($r = $retur[$baris->tanggal.'|'.$baris->kode_lokasi] ?? null) {
+                $baris->omzet = (float) $baris->omzet - (float) $r->total;
+                $baris->laba_kotor = (float) $baris->laba_kotor - ((float) $r->total - (float) $r->hpp);
+            }
+        }
         $selisih = (clone $dasar)->groupBy(DB::raw('DATE(dibuka_pada)'), 'kode_lokasi')
             ->selectRaw("DATE(dibuka_pada) AS tanggal, kode_lokasi, COALESCE(SUM(selisih), 0) AS selisih,
                 SUM(CASE WHEN status <> 'diserahkan' THEN 1 ELSE 0 END) AS belum_serah")
