@@ -42,6 +42,14 @@
                         <button type="button" @click="ubah = true" class="text-xs text-brand hover:underline">ubah</button>
                     @endif
                 </div>
+                @if ($santri->status === 'aktif')
+                    <div class="mt-0.5 text-sm">
+                        Kelas: @if ($santri->kelas)<b>{{ $santri->kelas->nama }}</b>@else<span class="text-amber-600">belum berkelas</span>@endif
+                        @if (\App\Support\Akses::boleh('kelas', 'ubah'))
+                            <a href="{{ route('kelas.penempatan', ['jenjang' => $santri->kode_jenjang, 'tingkat' => $santri->tingkat, 'tampil' => 'semua']) }}" class="ml-1 text-xs text-brand hover:underline">atur</a>
+                        @endif
+                    </div>
+                @endif
                 @if (\App\Support\Akses::boleh('santri', 'ubah') && $opsiTingkat !== [])
                     <form x-show="ubah" x-cloak method="POST" action="{{ $act('set-tingkat') }}" class="flex items-center gap-1">
                         @csrf

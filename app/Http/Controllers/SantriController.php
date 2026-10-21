@@ -106,7 +106,7 @@ class SantriController extends Controller
 
         // `jenjang` ikut dimuat supaya kolomnya bisa menyebut NAMA jenjang tanpa
         // satu kueri per baris — kode `J001` tak bercerita apa pun bagi pembaca.
-        $rows = $this->kueriDaftar($request, $lingkup)->with(['wali', 'jalurPendaftaran', 'jenjang'])
+        $rows = $this->kueriDaftar($request, $lingkup)->with(['wali', 'jalurPendaftaran', 'jenjang', 'kelas:id,nama'])
             ->orderByDesc('id')->paginate(25)->withQueryString();
 
         // Seluruh master jalur (bukan hanya baris di halaman ini) agar warna
@@ -553,7 +553,7 @@ class SantriController extends Controller
 
     public function show(int $id): View
     {
-        $santri = Santri::with(['wali', 'tagihan.jenis', 'pendaftaran', 'jenjang', 'jalurPendaftaran',
+        $santri = Santri::with(['wali', 'tagihan.jenis', 'pendaftaran', 'jenjang', 'jalurPendaftaran', 'kelas',
             // Riwayat bayar per tagihan — untuk menelusuri ke rekening koran.
             // Yang ditolak & di-void tak pernah menjadi uang, jadi tak ditampilkan.
             'tagihan.pembayaran' => fn ($q) => $q->whereNotIn('status', ['ditolak', 'void'])

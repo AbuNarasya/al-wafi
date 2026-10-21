@@ -180,6 +180,24 @@ class Santri extends Model
         return $this->belongsTo(Jenjang::class, 'kode_jenjang', 'kode');
     }
 
+    /** Kelas (rombel) saat ini — boleh kosong: santri baru & sesudah kenaikan ditempatkan admin. */
+    public function kelas(): BelongsTo
+    {
+        return $this->belongsTo(Kelas::class, 'id_kelas', 'id');
+    }
+
+    protected static function booted(): void
+    {
+        // Kelas milik SATU jenjang, tingkat & tahun: begitu salah satunya berganti (naik, mengulang,
+        // lanjut jenjang), kelasnya dikosongkan supaya admin menempatkannya ulang (keputusan user
+        // 21 Okt 2026). Di model, supaya berlaku bagi setiap jalur yang mengubahnya.
+        static::updating(function (Santri $s) {
+            if ($s->id_kelas && ! $s->isDirty('id_kelas') && $s->isDirty(['kode_jenjang', 'tingkat', 'tahun_ajaran_berjalan'])) {
+                $s->id_kelas = null;
+            }
+        });
+    }
+
     public function dokumen(): HasMany
     {
         return $this->hasMany(DokumenSantri::class, 'id_santri', 'id');

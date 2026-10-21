@@ -94,7 +94,7 @@ class PemetaSantriLama implements Pemeta
         $kolom = [
             'nis' => ['wajib' => true, 'contoh' => '230015', 'ket' => 'NIS asli santri. Harus unik.'],
             'nama' => ['wajib' => true, 'contoh' => 'Ahmad Fauzi', 'ket' => 'Nama lengkap.'],
-            'jenis_kelamin' => ['wajib' => true, 'contoh' => 'L', 'ket' => 'L atau P.'],
+            'jenis_kelamin' => ['wajib' => true, 'contoh' => 'L', 'ket' => 'L / P, atau Laki-laki / Perempuan.'],
             'kode_jenjang' => [
                 'wajib' => true,
                 'contoh' => Jenjang::orderBy('urutan')->orderBy('kode')->value('nama') ?? 'SMP',
@@ -102,9 +102,11 @@ class PemetaSantriLama implements Pemeta
             ],
             // Tingkat WAJIB: tanpa itu proses kenaikan tahun depan tak tahu harus
             // menaikkan dari mana, dan ratusan santri harus diisi satu per satu.
-            'tingkat' => ['wajib' => true, 'contoh' => '2', 'ket' => 'Tingkat/kelas yang sedang dijalani. Harus dalam jangkauan jenjangnya (lihat Jumlah Tingkat di master Jenjang).'],
-            'tahun_ajaran' => ['wajib' => true, 'contoh' => '2026/2027', 'ket' => 'T.A yang sedang dijalani.'],
-            'jalur' => ['wajib' => true, 'contoh' => 'LAMA', 'ket' => 'Kode jalur dari master. Disarankan jalur khusus "Santri Lama".'],
+            // 21 Okt 2026: boleh berisi NAMA KELAS seperti di data sekolah ("7A - ABU BAKAR ASH SHIDDIQ",
+            // "9 CHECHNYA", "1 (ABU BAKAR ASH SIDDIQ)") — angka di depan = tingkat, seluruh teks = kelas.
+            'tingkat' => ['wajib' => true, 'contoh' => '7A - ABU BAKAR ASH SHIDDIQ', 'ket' => 'Tingkat saja ("7") atau nama kelas yang diawali tingkatnya ("7A - ABU BAKAR…", "9 CHECHNYA"). Kelas yang belum ada dibuat otomatis di master Kelas. Tingkat harus dalam jangkauan jenjangnya.'],
+            'tahun_ajaran' => ['wajib' => false, 'contoh' => '2026/2027', 'ket' => 'T.A yang sedang dijalani. Kosong = pakai pilihan "Tahun ajaran" di form impor.'],
+            'jalur' => ['wajib' => false, 'contoh' => 'LAMA', 'ket' => 'Kode jalur dari master. Kosong = pakai pilihan "Jalur" di form impor.'],
             'wali_nama' => ['wajib' => true, 'contoh' => 'Bapak Fauzi', 'ket' => 'Dibuat otomatis bila belum ada.'],
             'wali_telepon' => ['wajib' => true, 'contoh' => '08123456789', 'ket' => 'Kunci pengait: telepon sama = wali yang sama, jadi kakak-beradik menempel ke satu wali.'],
             // TIDAK ADA `angkatan`: tabel santri tak punya kolom itu, jadi isinya
@@ -112,7 +114,7 @@ class PemetaSantriLama implements Pemeta
             // mengisi kolom yang tak pernah sampai ke mana-mana.
             // Tahun masuk sudah terwakili `tahun_ajaran`.
             'tempat_lahir' => ['wajib' => false, 'contoh' => 'Bogor', 'ket' => ''],
-            'tanggal_lahir' => ['wajib' => false, 'contoh' => '2011-05-17', 'ket' => 'Format YYYY-MM-DD.'],
+            'tanggal_lahir' => ['wajib' => false, 'contoh' => '2011-05-17', 'ket' => 'YYYY-MM-DD, DD/MM/YYYY, atau "29 April 2019".'],
             'nisn' => ['wajib' => false, 'contoh' => '0071234567', 'ket' => ''],
         ];
 
@@ -155,7 +157,19 @@ class PemetaSantriLama implements Pemeta
             'lain' => '',
         ];
 
-        $hasil = [];
+        // Berkas sekolah lazim tak mengisi T.A & jalur per baris — cukup dipilih sekali untuk seluruh berkas.
+        $hasil = [
+            'tahun_ajaran_bawaan' => [
+                'label' => 'Tahun ajaran (untuk baris yang kolomnya kosong)', 'tipe' => 'pilih',
+                'opsi' => TahunAjaran::orderByDesc('kode')->pluck('kode', 'kode')->all(),
+                'ket' => 'Dipakai bila kolom tahun_ajaran di berkas kosong.',
+            ],
+            'jalur_bawaan' => [
+                'label' => 'Jalur (untuk baris yang kolomnya kosong)', 'tipe' => 'pilih',
+                'opsi' => JalurPendaftaran::orderBy('urutan')->orderBy('kode')->get()->mapWithKeys(fn ($j) => [$j->kode => "{$j->kode} — {$j->nama}"])->all(),
+                'ket' => 'Dipakai bila kolom jalur di berkas kosong. Disarankan jalur khusus "Santri Lama".',
+            ],
+        ];
         foreach (self::TUNGGAKAN as $k => $t) {
             $hasil["jenis_tunggakan_{$k}"] = [
                 'label' => "Jenis biaya untuk tunggakan {$t['label']}",
@@ -334,6 +348,66 @@ class PemetaSantriLama implements Pemeta
      * NISN TIDAK ikut: kolomnya memang tak berindeks unik, dan berkas pindahan
      * kerap membiarkannya kosong atau sementara diisi seadanya.
      */
+    // ---- Pembaca isian berkas sekolah (21 Okt 2026, "Data FIX 100%") ----
+
+    /** "L"/"P", "Laki-laki", "LAKI-LAKI", "Perempuan", "Pria", "Wanita" → L / P; selain itu null. */
+    public static function jenisKelamin(?string $v): ?string
+    {
+        $v = strtoupper(preg_replace('/[^A-Za-z]/', '', (string) $v));
+
+        return match (true) {
+            in_array($v, ['L', 'LAKILAKI', 'LAKI', 'PRIA', 'PUTRA'], true) => 'L',
+            in_array($v, ['P', 'PEREMPUAN', 'WANITA', 'PUTRI'], true) => 'P',
+            default => null,
+        };
+    }
+
+    /** "7" → tingkat 7 tanpa kelas; "7A - ABU BAKAR…" → tingkat 7, kelas "7A - ABU BAKAR…"; null bila tak terbaca. */
+    public static function tingkatKelas(?string $v): ?array
+    {
+        $v = trim((string) $v);
+        if ($v !== '' && ctype_digit($v)) {
+            return ['tingkat' => (int) $v, 'kelas' => null];
+        }
+        $p = \App\Services\Modules\KelasService::pecah($v);
+
+        return $p ? ['tingkat' => $p['tingkat'], 'kelas' => $p['nama']] : null;
+    }
+
+    private static function taBaris(array $b, array $param): string
+    {
+        return trim($b['tahun_ajaran'] ?? '') ?: trim($param['tahun_ajaran_bawaan'] ?? '');
+    }
+
+    private static function jalurBaris(array $b, array $param): string
+    {
+        return trim($b['jalur'] ?? '') ?: trim($param['jalur_bawaan'] ?? '');
+    }
+
+    private const BULAN = ['januari' => 1, 'january' => 1, 'jan' => 1, 'februari' => 2, 'february' => 2, 'feb' => 2, 'pebruari' => 2,
+        'maret' => 3, 'march' => 3, 'mar' => 3, 'april' => 4, 'apr' => 4, 'mei' => 5, 'may' => 5, 'juni' => 6, 'june' => 6, 'jun' => 6,
+        'juli' => 7, 'july' => 7, 'jul' => 7, 'agustus' => 8, 'august' => 8, 'agu' => 8, 'aug' => 8, 'september' => 9, 'sep' => 9, 'sept' => 9,
+        'oktober' => 10, 'october' => 10, 'okt' => 10, 'oct' => 10, 'november' => 11, 'nov' => 11, 'nopember' => 11,
+        'desember' => 12, 'december' => 12, 'des' => 12, 'dec' => 12];
+
+    /** YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, atau "29 April 2019" → YYYY-MM-DD; null bila kosong/tak terbaca. */
+    public static function tanggalNormal(?string $v): ?string
+    {
+        $v = trim((string) $v);
+        // Nomor seri tanggal Excel (mis. 40903 = 2011-12-26) — muncul bila sel tanggal disimpan tanpa format teks.
+        if (preg_match('/^\d{5}$/', $v) && (int) $v > 20000 && (int) $v < 60000) {
+            return \Illuminate\Support\Carbon::create(1899, 12, 30)->addDays((int) $v)->toDateString();
+        }
+        [$y, $m, $d] = match (true) {
+            (bool) preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $v, $x) => [(int) $x[1], (int) $x[2], (int) $x[3]],
+            (bool) preg_match('#^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})$#', $v, $x) => [(int) $x[3], (int) $x[2], (int) $x[1]],
+            (bool) preg_match('/^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})$/', $v, $x) => [(int) $x[3], self::BULAN[strtolower($x[2])] ?? 0, (int) $x[1]],
+            default => [0, 0, 0],
+        };
+
+        return checkdate($m, $d, $y) ? sprintf('%04d-%02d-%02d', $y, $m, $d) : null;
+    }
+
     public function kolomUnik(): array
     {
         return ['nis'];
@@ -351,8 +425,8 @@ class PemetaSantriLama implements Pemeta
         if (trim($baris['nama'] ?? '') === '') {
             return $this->masalah('Nama kosong.');
         }
-        if (! in_array(strtoupper(trim($baris['jenis_kelamin'] ?? '')), ['L', 'P'], true)) {
-            return $this->masalah('Jenis kelamin harus L atau P.');
+        if (self::jenisKelamin($baris['jenis_kelamin'] ?? '') === null) {
+            return $this->masalah('Jenis kelamin harus L / P (atau Laki-laki / Perempuan).');
         }
 
         $kodeJenjang = trim($baris['kode_jenjang'] ?? '');
@@ -362,10 +436,11 @@ class PemetaSantriLama implements Pemeta
         }
 
         // Tingkat dibatasi jenjangnya — aturan yang sama dengan form pendaftaran.
-        $tingkat = trim($baris['tingkat'] ?? '');
-        if ($tingkat === '' || ! ctype_digit($tingkat)) {
-            return $this->masalah('Tingkat kosong atau bukan angka bulat.');
+        $tk = self::tingkatKelas($baris['tingkat'] ?? '');
+        if ($tk === null) {
+            return $this->masalah('Tingkat kosong, atau nama kelas tidak diawali angka tingkatnya (mis. "7A - …").');
         }
+        $tingkat = (string) $tk['tingkat'];
         if (! $jenjang->jumlah_tingkat) {
             return $this->masalah("Jumlah tingkat jenjang \"{$jenjang->nama}\" belum diisi di master Jenjang, jadi tingkat santri tak bisa diperiksa.");
         }
@@ -377,13 +452,19 @@ class PemetaSantriLama implements Pemeta
                 ."(hanya tingkat {$jenjang->tingkatMulai()}–{$jenjang->tingkatAkhir()}).");
         }
 
-        $ta = trim($baris['tahun_ajaran'] ?? '');
+        $ta = self::taBaris($baris, $param);
+        if ($ta === '') {
+            return $this->masalah('Tahun ajaran kosong — isi kolomnya atau pilih "Tahun ajaran" di form impor.');
+        }
         if (! $this->tahunAjaranAda($ta)) {
             return $this->masalah("Tahun ajaran \"{$ta}\" tidak ada di master Tahun Ajaran.");
         }
 
         // Jalur berlaku lintas tahun ajaran, jadi cukup diperiksa keberadaannya.
-        $jalur = trim($baris['jalur'] ?? '');
+        $jalur = self::jalurBaris($baris, $param);
+        if ($jalur === '') {
+            return $this->masalah('Jalur kosong — isi kolomnya atau pilih "Jalur" di form impor.');
+        }
         if (! $this->jalurAda($jalur)) {
             return $this->masalah("Jalur \"{$jalur}\" tidak ada di master Jalur Pendaftaran.");
         }
@@ -398,8 +479,8 @@ class PemetaSantriLama implements Pemeta
             return $this->masalah("Telepon {$telepon} sudah dipakai wali bernama \"{$waliAda->nama}\" — periksa apakah datanya keliru.");
         }
 
-        if (($t = trim($baris['tanggal_lahir'] ?? '')) !== '' && ! $this->tanggalSah($t)) {
-            return $this->masalah("Tanggal lahir \"{$t}\" tidak terbaca. Pakai format YYYY-MM-DD.");
+        if (($t = trim($baris['tanggal_lahir'] ?? '')) !== '' && self::tanggalNormal($t) === null) {
+            return $this->masalah("Tanggal lahir \"{$t}\" tidak terbaca. Pakai YYYY-MM-DD, DD/MM/YYYY, atau \"29 April 2019\".");
         }
 
         foreach (array_keys(self::TUNGGAKAN) as $k) {
@@ -448,7 +529,7 @@ class PemetaSantriLama implements Pemeta
         $idBatch = $param['id_batch'] ?? null;
 
         $dibuat['wali'] = $this->simpanWali($baris, $idBatch, $now);
-        [$idPerNis, $dibuat['santri']] = $this->simpanSantri($baris, $idBatch, $now);
+        [$idPerNis, $dibuat['santri']] = $this->simpanSantri($baris, $param, $idBatch, $now);
         $dibuat['tagihan'] = $this->simpanTurunan($baris, $idPerNis, $param, $idBatch, $now);
 
         return $dibuat;
@@ -514,11 +595,19 @@ class PemetaSantriLama implements Pemeta
      *
      * @return array{0: array<string,int>, 1: int}
      */
-    private function simpanSantri(array $baris, ?int $idBatch, $now): array
+    private function simpanSantri(array $baris, array $param, ?int $idBatch, $now): array
     {
         $urut = $this->urutTerakhirNoPendaftaran();
         $rows = [];
         foreach ($baris as $b) {
+            $kodeJenjang = $this->cariJenjang(trim($b['kode_jenjang']))?->kode;
+            $tk = self::tingkatKelas($b['tingkat']);
+            $jk = self::jenisKelamin($b['jenis_kelamin']);
+            // Kelas dari data sekolah: dicari, atau dibuat di master Kelas (sekali per nama kelas).
+            $idKelas = ($tk['kelas'] ?? null) && $kodeJenjang
+                ? \App\Services\Modules\KelasService::untukImpor($kodeJenjang, $tk['tingkat'], $tk['kelas'], $jk)->id
+                : null;
+            $ta = self::taBaris($b, $param);
             $rows[] = [
                 // Awalan sendiri supaya santri lama langsung terbedakan dari
                 // pendaftar PPSB dan tak mengacaukan penomoran PSB.
@@ -526,23 +615,24 @@ class PemetaSantriLama implements Pemeta
                 'nis' => trim($b['nis']),
                 // `insert` melewati mutator model — kapitalnya ditegakkan di sini.
                 'nama' => Santri::rapikanNama($b['nama']),
-                'jenis_kelamin' => strtoupper(trim($b['jenis_kelamin'])),
+                'jenis_kelamin' => $jk,
                 'tempat_lahir' => $this->kosongJadiNull($b['tempat_lahir'] ?? ''),
-                'tanggal_lahir' => $this->kosongJadiNull($b['tanggal_lahir'] ?? ''),
+                'tanggal_lahir' => self::tanggalNormal($b['tanggal_lahir'] ?? ''),
                 'nisn' => $this->kosongJadiNull($b['nisn'] ?? ''),
-                'kode_jenjang' => $this->cariJenjang(trim($b['kode_jenjang']))?->kode,
-                'tingkat' => (int) trim($b['tingkat']),
+                'kode_jenjang' => $kodeJenjang,
+                'tingkat' => $tk['tingkat'],
+                'id_kelas' => $idKelas,
                 // `angkatan` SENGAJA TIDAK ditulis: tabel santri tak punya kolom
                 // itu. Kode lama mengopernya ke Santri::create() dan Eloquent
                 // membuangnya diam-diam lewat penyaringan $fillable, jadi isian
                 // itu tak pernah tersimpan sejak awal. `insert()` tak menyaring
                 // apa pun, dan justru itulah yang menyingkapkannya.
-                'tahun_ajaran' => trim($b['tahun_ajaran']),
+                'tahun_ajaran' => $ta,
                 // Santri lama masuk langsung sebagai aktif, jadi tahun yang sedang
                 // DIJALANI sama dengan tahun pada berkasnya. Tanpa ini, pencarian
                 // tarif SPP mereka akan buntu karena kolomnya kosong.
-                'tahun_ajaran_berjalan' => trim($b['tahun_ajaran']),
-                'jalur' => trim($b['jalur']),
+                'tahun_ajaran_berjalan' => $ta,
+                'jalur' => self::jalurBaris($b, $param),
                 // Tanpa gelombang: santri lama tak boleh kena hitungan potongan gelombang.
                 'gelombang' => null,
                 'status' => 'aktif',
@@ -584,8 +674,8 @@ class PemetaSantriLama implements Pemeta
                 continue; // tak mungkin terjadi; dilewati daripada menulis baris yatim
             }
             $kodeJenjang = $this->cariJenjang(trim($b['kode_jenjang']))?->kode;
-            $tingkat = (int) trim($b['tingkat']);
-            $ta = trim($b['tahun_ajaran']);
+            $tingkat = self::tingkatKelas($b['tingkat'])['tingkat'];
+            $ta = self::taBaris($b, $param);
 
             // Baris pertama riwayat tingkatnya. Santri lama tak melewati daftar
             // ulang PPSB, jadi tanpa ini riwayatnya kosong dan kenaikan pertama

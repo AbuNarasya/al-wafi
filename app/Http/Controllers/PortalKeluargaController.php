@@ -310,7 +310,7 @@ class PortalKeluargaController extends Controller
     /** Semua yang berkaitan dengan SATU anak — hanya anak keluarga yang sedang masuk (selain itu 404). */
     public function anak(int $id): View
     {
-        $s = Santri::with(['jenjang:kode,nama', 'dompet', 'tabungan'])->where('id_wali', SesiWali::wali()->id)->findOrFail($id);
+        $s = Santri::with(['jenjang:kode,nama', 'kelas:id,nama', 'dompet', 'tabungan'])->where('id_wali', SesiWali::wali()->id)->findOrFail($id);
 
         $tagihan = TagihanSantri::query()->berlaku()->with('jenis:kode,nama')->where('id_santri', $s->id)->get();
         $belum = $tagihan->where('status', '!=', 'lunas')->sortBy('jatuh_tempo')->values();

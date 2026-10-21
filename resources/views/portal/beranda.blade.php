@@ -97,7 +97,7 @@
                                     'bg-slate-100 text-slate-600' => $a['final'],
                                 ])>{{ $a['label'] }}</span>
                             </div>
-                            <p class="text-sm text-slate-500">{{ $a['jenjang'] }}{{ $a['tingkat'] ? ' · kelas '.$a['tingkat'] : '' }} · T.A {{ $a['tahun_ajaran'] }}</p>
+                            <p class="text-sm text-slate-500">{{ $a['jenjang'] }}{{ $a['kelas'] ? ' · kelas '.$a['kelas'] : ($a['tingkat'] ? ' · kelas '.$a['tingkat'] : '') }} · T.A {{ $a['tahun_ajaran'] }}</p>
                         </div>
                         <x-portal.ikon nama="kanan" kelas="mt-3 h-4 w-4 shrink-0 text-slate-400" />
                     </a>

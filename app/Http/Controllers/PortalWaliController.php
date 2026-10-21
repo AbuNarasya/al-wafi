@@ -192,7 +192,7 @@ class PortalWaliController extends Controller
         $wali = SesiWali::wali();
         $peran = SesiWali::peran($request);
 
-        $anak = Santri::with(['jenjang:kode,nama', 'tagihan' => fn ($q) => $q->where('perilaku', 'registrasi')
+        $anak = Santri::with(['jenjang:kode,nama', 'kelas:id,nama', 'tagihan' => fn ($q) => $q->where('perilaku', 'registrasi')
             ->whereNotIn('status', ['batal', 'dihapus'])])
             ->where('id_wali', $wali->id)->orderBy('nama')->get()
             ->map(function (Santri $s) {
@@ -201,6 +201,7 @@ class PortalWaliController extends Controller
                 return [
                     'id' => $s->id,
                     'nama' => $s->nama, 'jenjang' => $s->jenjang?->nama ?? $s->kode_jenjang, 'tingkat' => $s->tingkat,
+                    'kelas' => $s->kelas?->nama,
                     'tahun_ajaran' => $s->tahun_ajaran, 'nomor' => $s->no_pendaftaran,
                     'status' => $s->status, 'label' => Tahap::labelStatus((string) $s->status),
                     'psb' => $tahap !== false && $s->status !== 'aktif',

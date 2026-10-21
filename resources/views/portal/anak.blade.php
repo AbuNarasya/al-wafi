@@ -11,7 +11,7 @@
             <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand text-xl font-bold text-white">{{ mb_strtoupper(mb_substr($santri->nama, 0, 1)) }}</span>
             <div class="min-w-0 flex-1">
                 <p class="text-lg font-bold text-slate-900">{{ $santri->nama }}</p>
-                <p class="text-sm text-slate-500">{{ $santri->jenjang?->nama ?? $santri->kode_jenjang }}{{ $santri->tingkat ? ' · kelas '.$santri->tingkat : '' }}</p>
+                <p class="text-sm text-slate-500">{{ $santri->jenjang?->nama ?? $santri->kode_jenjang }}{{ $santri->kelas ? ' · kelas '.$santri->kelas->nama : ($santri->tingkat ? ' · kelas '.$santri->tingkat : '') }}</p>
             </div>
             <span @class(['shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold',
                 'bg-emerald-50 text-emerald-700' => $aktif, 'bg-blue-50 text-brand' => $tahapPsb !== null,

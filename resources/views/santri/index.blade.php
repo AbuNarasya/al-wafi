@@ -134,7 +134,9 @@
                         {{-- Nama jenjangnya; kodenya baru dipakai bila baris masternya
                              sudah dihapus, supaya barisnya tak jadi sel kosong. --}}
                         <td class="px-4 py-3 text-gray-500">{{ $r->jenjang?->nama ?? $r->kode_jenjang ?? '—' }}</td>
-                        <td class="px-4 py-3 text-gray-500">{{ $r->tingkat ? 'Tingkat '.$r->tingkat : '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500">{{ $r->tingkat ? 'Tingkat '.$r->tingkat : '—' }}
+                            @if ($r->kelas)<div class="text-xs text-gray-700">{{ $r->kelas->nama }}</div>@elseif ($r->status === 'aktif')<div class="text-xs text-amber-600">belum berkelas</div>@endif
+                        </td>
                         {{-- Jalur pendaftaran: nama dari master (Pindahan, Anak Karyawan, …);
                              turun ke kode mentah bila baris masternya sudah dihapus. --}}
                         <td class="px-4 py-3">

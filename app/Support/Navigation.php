@@ -208,6 +208,8 @@ final class Navigation
         // santri yang benar-benar bersekolah. Modul hak aksesnya tetap `santri`.
         ['url' => '/kesantrian/alumni', 'label' => 'Alumni', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
         ['url' => '/kesantrian/santri-keluar', 'label' => 'Santri Keluar', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        ['url' => '/kesantrian/kelas', 'label' => 'Kelas', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kelas'],
+        ['url' => '/kesantrian/kelas/penempatan', 'label' => 'Penempatan Kelas', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kelas'],
         ['url' => '/kartu-santri', 'label' => 'Kartu Santri (RFID)', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kartu-santri'],
 
         // ---- 6. PPSB & Kependidikan ----

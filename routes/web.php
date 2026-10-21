@@ -775,6 +775,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/laporan/{shift}', [$k, 'laporan'])->name('laporan')->whereNumber('shift');
     });
 
+    // Kelas (rombel) & penempatan santri aktif ke kelas — 21 Okt 2026.
+    Route::prefix('kesantrian/kelas')->name('kelas.')->controller(\App\Http\Controllers\KelasController::class)->group(function () {
+        Route::get('/', 'index')->name('index')->middleware('hakakses:kelas,lihat');
+        Route::post('/', 'store')->name('store')->middleware('hakakses:kelas,buat');
+        Route::get('/penempatan', 'penempatan')->name('penempatan')->middleware('hakakses:kelas,lihat');
+        Route::post('/penempatan', 'tempatkan')->name('tempatkan')->middleware('hakakses:kelas,ubah');
+        Route::put('/{kelas}', 'update')->name('update')->middleware('hakakses:kelas,ubah')->whereNumber('kelas');
+        Route::delete('/{kelas}', 'destroy')->name('destroy')->middleware('hakakses:kelas,hapus')->whereNumber('kelas');
+    });
+
     // Kartu RFID santri: pasang (tempel kartu), blokir, buka blokir.
     Route::prefix('kartu-santri')->name('kartu_santri.')->group(function () {
         $c = KartuSantriController::class;
