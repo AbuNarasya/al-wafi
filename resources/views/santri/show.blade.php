@@ -59,6 +59,9 @@
                         @endif
                     </div>
                 @endif
+                @if (\App\Support\Akses::boleh('klinik', 'lihat'))
+                    <a href="{{ route('klinik.riwayat', $santri->id) }}" class="mt-0.5 block text-xs text-brand hover:underline">Riwayat klinik</a>
+                @endif
                 @if ($santri->status === 'aktif')
                     <div class="mt-0.5 text-sm">
                         Kelas: @if ($santri->kelas)<b>{{ $santri->kelas->nama }}</b>@else<span class="text-amber-600">belum berkelas</span>@endif

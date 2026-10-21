@@ -366,6 +366,8 @@ class PortalKeluargaController extends Controller
                 'diganti' => $registrasi->where('status', 'perlu_diganti')->count(),
             ],
             'santri' => $s, 'aktif' => $aktif, 'tahapPsb' => $tahapPsb === false ? null : $tahapPsb,
+            // Riwayat klinik (21 Okt 2026) — 5 kunjungan terakhir, lengkap dengan obat.
+            'klinik' => \App\Models\KunjunganKlinik::with('obat')->where('id_santri', $s->id)->orderByDesc('datang_pada')->limit(5)->get(),
             'label' => \App\Services\Ppsb\Tahap::labelStatus((string) $s->status),
             'sisa' => $belum->sum(fn ($t) => (float) $t->sisa),
             'belum' => $belum->take(5)->map(fn (TagihanSantri $t) => [

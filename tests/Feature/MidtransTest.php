@@ -350,12 +350,18 @@ class MidtransTest extends TestCase
         $this->assertSame(0, MutasiDompet::count());
     }
 
-    public function test_tagihan_santri_aktif_tidak_bisa_dibayar_online(): void
+    /** Sejak 21 Okt 2026 santri aktif boleh VA — SPP tetap harus lunas sekaligus (sama dengan dompet). */
+    public function test_tagihan_santri_aktif_bisa_dibayar_online_lunas_sekaligus(): void
     {
         $spp = $this->tagihan($this->santri('Ahmad', 'aktif'), 'spp', 300000);
 
-        $this->sebagaiIbu()->post(route('portal.online.tagihan', $spp->id), ['nominal' => 300000])->assertSessionHas('error');
+        $this->sebagaiIbu()->post(route('portal.online.tagihan', $spp->id), ['nominal' => 100000])->assertSessionHas('error');
         $this->assertSame(0, TransaksiMidtrans::count());
+        $this->sebagaiIbu()->post(route('portal.online.tagihan', $spp->id), ['nominal' => 300000]);
+        $t = TransaksiMidtrans::sole();
+        $this->apiMenjawab($t, 'settlement');
+        $this->notifikasi($t)->assertOk();
+        $this->assertSame('lunas', $spp->refresh()->status);
     }
 
     public function test_pesanan_baru_membatalkan_va_lama_tagihan_yang_sama(): void

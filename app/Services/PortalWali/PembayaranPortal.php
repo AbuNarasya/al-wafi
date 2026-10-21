@@ -64,8 +64,8 @@ class PembayaranPortal
     /**
      * 'dompet' | 'transfer' | 'keduanya' | null (tak bisa dibayar dari portal) — beserta alasannya.
      *
-     *  • santri AKTIF: semua tagihannya dari Dompet Wali — termasuk registrasi
-     *    pendaftaran lanjutan (gerbang tahapnya ditangani bayarDariDompet).
+     *  • santri AKTIF: Dompet Wali, VA, atau transfer + bukti (keputusan user 21 Okt 2026; dulu dompet saja)
+     *    — termasuk registrasi pendaftaran lanjutan (gerbang tahapnya ditangani bayarDariDompet).
      *  • CALON: tagihan PSB lewat transfer; bila keluarganya SUDAH punya anak
      *    aktif (berarti punya Dompet Wali), boleh juga dari dompet — 'keduanya'.
      */
@@ -76,7 +76,7 @@ class PembayaranPortal
         }
         $status = (string) $t->santri->status;
         if ($status === 'aktif') {
-            return ['dompet', null];
+            return ['keduanya', null];
         }
         if (! Tahap::isFinal($status) && in_array($t->perilaku, self::PSB, true)) {
             return [self::keluargaBerdompet((int) $t->santri->id_wali) ? 'keduanya' : 'transfer', null];
@@ -86,6 +86,20 @@ class PembayaranPortal
     }
 
     /** Keluarga yang sudah punya anak berstatus aktif — merekalah yang ber-Dompet Wali. */
+    /** Menu verifikasi staf untuk tagihan ini: PPSB (registrasi, uang pangkal, perlengkapan) atau Kependidikan. */
+    public static function lingkup(TagihanSantri $t): string
+    {
+        return in_array($t->perilaku, self::PSB, true) ? 'ppsb' : 'kesantrian';
+    }
+
+    /** SPP & tagihan lain-lain dilunasi sekaligus — di dompet, VA, maupun transfer. */
+    public static function assertPenuh(TagihanSantri $t, string $nominal, string $nama = 'Tagihan ini'): void
+    {
+        if (in_array($t->perilaku, self::PENUH, true) && ! Money::eq($nominal, $t->sisa)) {
+            throw new AppException(422, "{$nama} harus dilunasi sekaligus (Rp ".number_format((float) $t->sisa, 0, ',', '.').'), tidak bisa dicicil.');
+        }
+    }
+
     public static function keluargaBerdompet(int $idWali): bool
     {
         // Sengaja tanpa cache statis: ia hidup melewati batas test dalam satu proses.
@@ -202,6 +216,7 @@ class PembayaranPortal
             if (Money::lte($n, '0') || Money::gt($n, $ruang)) {
                 throw new AppException(422, "{$nama}: nominal harus antara Rp 1 dan Rp ".number_format((float) $ruang, 0, ',', '.').'.');
             }
+            self::assertPenuh($t, $n, $nama);
             $semuaDompet = $semuaDompet && self::bisaDompet($alur);
             $semuaTransfer = $semuaTransfer && self::bisaTransfer($alur);
             $daftar->push($t);
@@ -302,7 +317,7 @@ class PembayaranPortal
             'nominal' => (string) $k['nominal'][$t->id], 'kode_rekening' => $data['kode_rekening'], 'metode' => 'transfer',
             'bukti_path' => $data['bukti_path'], 'catatan' => 'Dikirim dari Portal Wali (satu bukti untuk '.$k['tagihan']->count().' tagihan).',
             'kelompok_bayar' => $kelompok,
-        ], null, 'ppsb', $this->pencatat)));
+        ], null, self::lingkup($t), $this->pencatat)));
 
         $layanan->kabariKelompok($baris);
 
@@ -393,15 +408,16 @@ class PembayaranPortal
         $t = $this->tagihan($idTagihan);
         [$alur, $alasan] = self::alur($t);
         if (! self::bisaTransfer($alur)) {
-            throw new AppException(422, $alasan ?? 'Tagihan santri aktif dibayar dari Dompet Wali.');
+            throw new AppException(422, $alasan ?? 'Tagihan ini tidak bisa dibayar lewat transfer.');
         }
+        self::assertPenuh($t, Money::of($data['nominal']));
         $this->pastikanRekeningPortal($data['kode_rekening']);
 
         return (new PembayaranSantriService)->catat([
             'id_santri' => $t->id_santri, 'id_tagihan' => $t->id, 'tanggal' => $data['tanggal'],
             'nominal' => $data['nominal'], 'kode_rekening' => $data['kode_rekening'], 'metode' => 'transfer',
             'bukti_path' => $data['bukti_path'], 'catatan' => 'Dikirim dari Portal Wali.',
-        ], null, 'ppsb', $this->pencatat);
+        ], null, self::lingkup($t), $this->pencatat);
     }
 
     // ---- D. Pindah saldo ----

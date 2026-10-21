@@ -59,7 +59,7 @@ class PortalBayarController extends Controller
 
         return view('portal.bayar', [
             'tagihan' => $t, 'alur' => $alur, 'ruang' => PembayaranPortal::ruang($t),
-            'penuh' => PembayaranPortal::bisaDompet($alur) && in_array($t->perilaku, PembayaranPortal::PENUH, true),
+            'penuh' => in_array($t->perilaku, PembayaranPortal::PENUH, true), // berlaku di dompet, VA & transfer
             'saldo' => DompetWali::where('id_wali', SesiWali::wali()->id)->value('saldo') ?? '0',
             'rekening' => PembayaranPortal::bisaTransfer($alur) ? $this->rekening() : [],
             // Bayar online ikut alur transfer (calon santri) — tagihan santri aktif tetap dari dompet.

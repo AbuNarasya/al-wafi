@@ -30,7 +30,7 @@ class NotifikasiWali extends Model
         'pembayaran_santri_ditolak' => 'tagihan', 'pembayaran_santri_diverifikasi' => 'tagihan',
         'midtrans_lunas' => 'tagihan', 'tagihan_terbit' => 'tagihan', 'va_dibatalkan' => 'tagihan',
         'topup_dompet_ditolak' => 'dompet', 'mutasi_dompet' => 'dompet',
-        'tarik_tunai' => 'pengajuan', 'tarik_tabungan' => 'pengajuan', 'pengunduran_diri' => 'pengajuan',
+        'tarik_tunai' => 'pengajuan', 'tarik_tabungan' => 'pengajuan', 'pengunduran_diri' => 'pengajuan', 'klinik' => 'kesehatan',
     ];
 
     protected $table = 'notifikasi_wali';

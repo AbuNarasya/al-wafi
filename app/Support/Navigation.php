@@ -208,6 +208,7 @@ final class Navigation
         // santri yang benar-benar bersekolah. Modul hak aksesnya tetap `santri`.
         ['url' => '/kesantrian/alumni', 'label' => 'Alumni', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
         ['url' => '/kesantrian/santri-keluar', 'label' => 'Santri Keluar', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        ['url' => '/klinik', 'label' => 'Klinik', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'klinik'],
         ['url' => '/kesantrian/pengunduran-diri', 'label' => 'Pengunduran Diri', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'pengunduran-diri'],
         ['url' => '/kesantrian/kelas', 'label' => 'Kelas', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kelas'],
         ['url' => '/kesantrian/kelas/penempatan', 'label' => 'Penempatan Kelas', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kelas'],

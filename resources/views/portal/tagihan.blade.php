@@ -107,7 +107,7 @@
                         </div>
                         @if ($t['bisa_bayar'])
                             <a href="{{ route('portal.bayar', $t['id']) }}" class="mt-3 block rounded-2xl bg-brand py-2.5 text-center text-sm font-semibold text-white">
-                                {{ match ($t['alur']) { 'dompet' => 'Bayar dari Dompet', 'keduanya' => 'Bayar (dompet / transfer)', default => 'Bayar lewat transfer' } }}
+                                {{ match ($t['alur']) { 'dompet' => 'Bayar dari Dompet', 'keduanya' => \App\Services\Midtrans\PembayaranMidtrans::siap() ? 'Bayar (dompet / VA / transfer)' : 'Bayar (dompet / transfer)', default => 'Bayar lewat transfer' } }}
                             </a>
                         @endif
                     </div>

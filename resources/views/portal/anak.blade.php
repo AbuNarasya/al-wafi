@@ -252,6 +252,27 @@
         </section>
     @endif
 
+    {{-- Riwayat klinik (21 Okt 2026) — wali juga dikabari lewat push tiap kunjungan. --}}
+    @if ($klinik->isNotEmpty())
+        <section class="mt-5">
+            <h2 class="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span> Riwayat klinik</h2>
+            <div class="divide-y divide-slate-100 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
+                @foreach ($klinik as $kk)
+                    <div class="px-4 py-3 text-sm">
+                        <div class="flex items-start justify-between gap-2">
+                            <p class="font-medium text-slate-900">{{ $kk->keluhan }}</p>
+                            <span class="shrink-0 text-xs text-slate-500">{{ $kk->datang_pada->timezone('Asia/Jakarta')->locale('id')->translatedFormat('j M, H:i') }}</span>
+                        </div>
+                        @if ($kk->pemeriksaan)<p class="text-xs text-slate-600">{{ $kk->pemeriksaan }}</p>@endif
+                        @if ($kk->obat->isNotEmpty())<p class="text-xs text-slate-600">Obat: {{ $kk->obat->map(fn ($o) => trim($o->nama.' '.$o->dosis))->join(', ') }}</p>@endif
+                        <p @class(['text-xs font-semibold', 'text-amber-700' => in_array($kk->tindak_lanjut, ['dirawat', 'dirujuk', 'dijemput'], true), 'text-slate-500' => ! in_array($kk->tindak_lanjut, ['dirawat', 'dirujuk', 'dijemput'], true)])>
+                            {{ $kk->labelTindakLanjut() }}{{ $kk->rujukan_ke ? ' — '.$kk->rujukan_ke : '' }}{{ $kk->status === 'dirawat' ? ' (masih dirawat)' : '' }}</p>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     {{-- Pengunduran diri (21 Okt 2026): untuk santri aktif, atau bila sudah ada pengajuannya. --}}
     @if ($aktif || \App\Models\PengajuanKeluar::where('id_santri', $santri->id)->exists())
         <a href="{{ route('portal.mundur', $santri->id) }}" class="mt-8 block text-center text-sm font-semibold text-slate-500 underline">Pengunduran diri santri</a>

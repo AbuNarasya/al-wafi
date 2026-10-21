@@ -106,6 +106,7 @@ class PembayaranMidtrans
         if (Money::lte($nominal, '0') || Money::gt($nominal, $ruang)) {
             throw new AppException(422, 'Nominal melebihi sisa tagihan yang belum tercatat (Rp '.number_format((float) $ruang, 0, ',', '.').').');
         }
+        PembayaranPortal::assertPenuh($tagihan, $nominal);
 
         $nama = \App\Http\Controllers\PortalKeluargaController::namaTagihan($tagihan).' — '.$tagihan->santri->nama;
 

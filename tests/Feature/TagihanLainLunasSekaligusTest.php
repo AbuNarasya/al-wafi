@@ -140,6 +140,21 @@ class TagihanLainLunasSekaligusTest extends TestCase
         $this->assertSame('lunas', $t->fresh()->status);
     }
 
+    /** 21 Okt 2026 (opsi a): wali sedang membayar lewat VA → auto-debet tak ikut memotong dompet. */
+    public function test_auto_debet_melewati_tagihan_yang_punya_va_menunggu(): void
+    {
+        $t = $this->tagihan('LDR', 'lain', '87500');
+        $this->isiDompet('100000');
+        \App\Models\TransaksiMidtrans::create(['order_id' => 'AW-UJI-1', 'id_wali' => $this->wali->id, 'peran' => 'ayah', 'jenis' => 'bayar_tagihan',
+            'id_tagihan' => $t->id, 'nominal' => 87500, 'biaya' => 4440, 'total' => 91940, 'status' => 'menunggu']);
+
+        $hasil = (new AutoDebetService)->jalankan($this->petugas->id_pengguna, '2026-09-01');
+
+        $this->assertSame(0, $hasil['tagihan']);
+        $this->assertSame('belum_bayar', $t->fresh()->status);
+        $this->assertSame(0, bccomp(DompetWali::first()->saldo, '100000', 2));
+    }
+
     public function test_uang_pangkal_tetap_boleh_terpotong_sebagian(): void
     {
         // Batas aturannya: uang pangkal punya modul Angsuran tersendiri, jadi

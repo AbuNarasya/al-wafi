@@ -69,7 +69,7 @@
     @if ($online)
         <div class="mt-4" x-show="cara === 'online'" @if ($caraAwal !== 'online') x-cloak @endif>
             @include('portal._online', ['aksi' => route('portal.online.tagihan', $tagihan->id), 'nominalAwal' => (int) $ruang,
-                'min' => 1, 'maks' => (int) $ruang, 'biaya' => $biaya])
+                'min' => $penuh ? (int) $ruang : 1, 'maks' => (int) $ruang, 'biaya' => $biaya])
         </div>
     @endif
 
@@ -121,7 +121,7 @@
               x-show="cara === 'transfer'" @if ($caraAwal !== 'transfer') x-cloak @endif
               data-confirm="Kirim bukti transfer ini? Keuangan akan memeriksanya sebelum pembayaran diakui.">
             @csrf
-            @include('portal._transfer', ['nominalAwal' => (int) $ruang])
+            @include('portal._transfer', ['nominalAwal' => (int) $ruang, 'kunciNominal' => $penuh])
             @if ($rekening !== [])
                 <button class="mt-5 w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white">Kirim bukti transfer</button>
             @endif

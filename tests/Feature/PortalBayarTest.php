@@ -292,16 +292,17 @@ class PortalBayarTest extends TestCase
         $this->assertSame('lunas', $reg->refresh()->status);
     }
 
-    public function test_santri_aktif_tidak_membayar_lewat_transfer_langsung(): void
+    /** Sejak 21 Okt 2026: santri aktif boleh transfer + bukti; diverifikasi lewat menu Pembayaran Kependidikan. */
+    public function test_santri_aktif_boleh_transfer_langsung_ke_lingkup_kependidikan(): void
     {
         $du = $this->tagihan($this->aktif, 'DU', 'daftar_ulang', 600000);
 
         $this->sebagaiIbu()->post(route('portal.bayar.transfer', $du->id), [
             'kode_rekening' => self::BANK, 'nominal' => 600000, 'tanggal' => now()->toDateString(), 'bukti' => $this->bukti(),
-        ])->assertSessionHas('error');
+        ])->assertSessionHas('status');
 
-        $this->assertSame(0, PembayaranSantri::count());
-        Storage::disk('local')->assertDirectoryEmpty('pembayaran-bukti');
+        $this->assertSame(['menunggu_verifikasi', 'manual'], [PembayaranSantri::sole()->status, PembayaranSantri::sole()->sumber]);
+        $this->assertSame('kesantrian', \App\Services\PortalWali\PembayaranPortal::lingkup($du));
     }
 
     // ---- B. Isi dompet ----

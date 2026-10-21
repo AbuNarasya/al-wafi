@@ -800,6 +800,18 @@ Route::middleware('auth')->group(function () {
             Route::post('/{pengajuan}/dapodik', 'dapodik')->name('dapodik')->whereNumber('pengajuan');
         });
 
+    // Klinik — catatan kunjungan santri (21 Okt 2026).
+    Route::prefix('klinik')->name('klinik.')->controller(\App\Http\Controllers\KlinikController::class)->group(function () {
+        Route::get('/', 'index')->name('index')->middleware('hakakses:klinik,lihat');
+        Route::get('/rekap', 'rekap')->name('rekap')->middleware('hakakses:klinik,lihat');
+        Route::get('/catat', 'create')->name('create')->middleware('hakakses:klinik,buat');
+        Route::post('/catat', 'store')->name('store')->middleware('hakakses:klinik,buat');
+        Route::get('/santri/{id}', 'riwayat')->name('riwayat')->middleware('hakakses:klinik,lihat')->whereNumber('id');
+        Route::get('/{kunjungan}', 'show')->name('show')->middleware('hakakses:klinik,lihat')->whereNumber('kunjungan');
+        Route::post('/{kunjungan}/selesai', 'selesai')->name('selesai')->middleware('hakakses:klinik,ubah')->whereNumber('kunjungan');
+        Route::post('/{kunjungan}/tagihan', 'tagihan')->name('tagihan')->middleware('hakakses:klinik,buat')->whereNumber('kunjungan');
+    });
+
     // Kelas (rombel) & penempatan santri aktif ke kelas — 21 Okt 2026.
     Route::prefix('kesantrian/kelas')->name('kelas.')->controller(\App\Http\Controllers\KelasController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:kelas,lihat');

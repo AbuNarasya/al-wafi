@@ -164,16 +164,16 @@ class BayarBanyakTest extends TestCase
         $this->assertEquals(500000, (float) DompetWali::sole()->saldo);
     }
 
-    public function test_spp_dan_ekskul_sekaligus_dan_campuran_hanya_lewat_dompet(): void
+    public function test_spp_dan_ekskul_sekaligus_dan_campuran_dari_dompet(): void
     {
         DompetWali::create(['id_wali' => $this->wali->id, 'saldo' => 2000000]);
         $spp = $this->tagihan($this->aktif, 'spp', 300000);
         $ekskul = $this->tagihan($this->aktif, 'lain', 150000);
         $reg = $this->tagihan($this->calon, 'registrasi', 500000);
 
-        // Campuran santri aktif + calon: hanya Dompet yang ditawarkan.
+        // Sejak 21 Okt 2026 santri aktif juga boleh VA & transfer — campuran aktif + calon menawarkan ketiganya.
         $this->sebagaiIbu()->get(route('portal.bayar_banyak.form', ['t' => [$spp->id, $reg->id]]))->assertOk()
-            ->assertSee('Bayar 2 tagihan sekaligus')->assertDontSee('Transfer + bukti')->assertDontSee('Online (VA)');
+            ->assertSee('Bayar 2 tagihan sekaligus')->assertSee('Dompet Wali')->assertSee('Transfer + bukti');
 
         $this->sebagaiIbu()->post(route('portal.bayar_banyak.dompet'), $this->isian([$spp, $ekskul, $reg]) + ['pin' => self::PIN])
             ->assertSessionHas('status');

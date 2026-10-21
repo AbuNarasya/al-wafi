@@ -45,7 +45,8 @@
         <div>
             <label for="nominal" class="mb-1 block text-sm font-medium text-slate-700">Nominal yang ditransfer</label>
             <input id="nominal" name="nominal" type="number" min="1" step="1" required
-                   value="{{ old('nominal', $nominalAwal ?? '') }}" class="{{ $kelasInput }}">
+                   value="{{ old('nominal', $nominalAwal ?? '') }}" @if ($kunciNominal ?? false) readonly @endif class="{{ $kelasInput }}">
+            @if ($kunciNominal ?? false)<p class="mt-1 text-xs text-slate-500">Tagihan ini dilunasi sekaligus.</p>@endif
             @error('nominal')<p class="mt-1 text-xs text-red-700">{{ $message }}</p>@enderror
         </div>
         @endunless

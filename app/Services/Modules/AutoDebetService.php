@@ -99,6 +99,11 @@ class AutoDebetService
                 if (Money::lte($ruang, '0')) {
                     continue;
                 }
+                // Wali sedang membayar tagihan ini lewat VA / transfer (sejak 21 Okt 2026 santri aktif boleh
+                // keduanya) → dompet tak ikut memotong, supaya tak terbayar dua kali.
+                if (Money::gtZero($menunggu) || \App\Services\PortalWali\PembayaranPortal::vaMenunggu((int) $t->santri->id_wali, [$t->id])->isNotEmpty()) {
+                    continue;
+                }
 
                 if (in_array($t->perilaku, self::PENUH_ATAU_TIDAK, true)) {
                     // Penuh atau tidak sama sekali. `continue` — bukan `break` —
