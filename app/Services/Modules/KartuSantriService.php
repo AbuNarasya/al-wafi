@@ -58,15 +58,20 @@ class KartuSantriService
         if ($ada && $ada->status === 'aktif') {
             return $ada;   // sudah terpasang — tak ada yang berubah
         }
-        if ($ada) {
-            throw new AppException(422, 'Kartu ini pernah diblokir. Buka blokirnya dari daftar kartu bila memang ditemukan kembali.');
-        }
-
-        return DB::transaction(function () use ($santri, $uid, $idPengguna, $idBatch) {
+        return DB::transaction(function () use ($santri, $uid, $idPengguna, $idBatch, $ada) {
             // Kartu lama yang masih aktif = digantikan; diblokir supaya tak bisa dipakai lagi.
             KartuSantri::where('id_santri', $santri->id)->where('status', 'aktif')->get()
                 ->each(fn ($k) => $k->update(['status' => 'diblokir', 'alasan_blokir' => 'Diganti kartu baru',
                     'diblokir_pada' => now(), 'diblokir_oleh' => $idPengguna]));
+
+            // Kartu milik santri ini sendiri yang dulu diblokir, ditempel ulang oleh staf = ditemukan /
+            // dipakai lagi → langsung aktif kembali (21 Okt 2026), tanpa harus lewat tab Kartu diblokir.
+            if ($ada) {
+                $ada->update(['status' => 'aktif', 'alasan_blokir' => null, 'diblokir_pada' => null,
+                    'diblokir_oleh' => null, 'diblokir_oleh_wali' => null]);
+
+                return $ada;
+            }
 
             return KartuSantri::create([
                 'uid' => $uid, 'id_santri' => $santri->id, 'status' => 'aktif',

@@ -201,6 +201,22 @@ class KartuSantriTest extends TestCase
         $this->k->bukaBlokir($dipakai);
     }
 
+    /** 21 Okt 2026: kartu lama milik santri yang sama, ditempel ulang → aktif kembali; kartu penggantinya diblokir. */
+    public function test_tempel_ulang_kartu_lama_milik_sendiri_mengaktifkannya_kembali(): void
+    {
+        $lama = $this->k->pasang($this->ahmad->id, 'LAMA1111', $this->staf->id_pengguna);
+        $baru = $this->k->pasang($this->ahmad->id, 'BARU2222', $this->staf->id_pengguna);
+        $this->assertSame(['diblokir', 'Diganti kartu baru'], [$lama->refresh()->status, $lama->alasan_blokir]);
+
+        $this->actingAs($this->staf)->post(route('kartu_santri.pasang'), ['id_santri' => $this->ahmad->id, 'uid' => 'LAMA1111'])
+            ->assertSessionHas('status');
+
+        $this->assertSame(['aktif', null], [$lama->refresh()->status, $lama->alasan_blokir]);
+        $this->assertSame('diblokir', $baru->refresh()->status);
+        $this->assertSame($lama->id, $this->ahmad->refresh()->kartuAktif->id);
+        $this->assertSame(2, KartuSantri::count(), 'tak ada baris baru');
+    }
+
     public function test_layar_staf_pasang_blokir_buka(): void
     {
         $this->actingAs($this->staf)->get(route('kartu_santri.index'))->assertOk()->assertSee('AHMAD')->assertSee('0 dari 2 santri aktif sudah berkartu', false);
