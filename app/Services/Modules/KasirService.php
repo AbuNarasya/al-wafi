@@ -93,8 +93,14 @@ class KasirService
      *         Diskon manual (nominal per baris di `$baris[*]['diskon']`, per struk di `struk`) SELALU
      *         butuh PIN pengawas — keputusan user 19 Okt 2026. Promo terjadwal tak butuh apa pun.
      */
-    public function jual(int $idShift, array $baris, string|int|float $bayar, int $idKasir, array $diskon = [], ?array $kartu = null): Penjualan
+    public function jual(int $idShift, array $baris, string|int|float $bayar, int $idKasir, array $diskon = [], ?array $kartu = null, ?string $kunci = null): Penjualan
     {
+        // Kunci klien (audit 21 Okt 2026, Paket 3): kiriman ULANG keranjang yang sama — koneksi putus sesudah server
+        // menyimpan — mengembalikan struk yang sudah ada, bukan struk/potongan kartu kedua.
+        $kunci = ($kunci = trim((string) $kunci)) !== '' ? mb_substr($kunci, 0, 64) : null;
+        if ($kunci && ($ada = Penjualan::where('kunci_klien', $kunci)->where('id_kasir', $idKasir)->first())) {
+            return $ada->load('details');
+        }
         $bayarAwal = $bayar;
         $shift = $this->shiftKasir($idShift, $idKasir);
         if (! $baris) {
@@ -171,16 +177,22 @@ class KasirService
 
         // Kartu lewat penghubung: NIAT BAYAR disimpan dulu, di luar transaksi struk (Fase 3c-1) — nomor rujukannya
         // tetap, jadi pembayaran yang jawabannya hilang bisa dipastikan, bukan ditebak "gagal".
-        $permintaan = $kartuJauh ? $this->siapkanPermintaan($kartu, $total, $shift, $idKasir) : null;
+        $permintaan = $kartuJauh ? $this->siapkanPermintaan($kartu, $total, $shift, $idKasir, $kunci) : null;
         $dipotong = null;   // jawaban potong bila sudah terjadi di dalam transaksi (diisi lewat referensi)
 
         try {
             return $this->simpanJual($shift, $rincian, $total, $bayar, $idKasir, $diskonStruk, $penyetuju, $adaDiskon, $alasan,
-                $santri, $pinBenar, $kartu, $kartuJauh, $permintaan, $dipotong);
+                $santri, $pinBenar, $kartu, $kartuJauh, $permintaan, $dipotong, $kunci);
         } catch (PenghubungTakPasti) {
             // Jawaban hilang di jalan — tanyakan nasib nomornya; berhasil → simpan struk tanpa memotong lagi.
             return $this->setelahDipastikan($permintaan,
-                fn () => $this->jual($idShift, $baris, $bayarAwal, $idKasir, $diskon, ['permintaan' => $permintaan->id] + $kartu));
+                fn () => $this->jual($idShift, $baris, $bayarAwal, $idKasir, $diskon, ['permintaan' => $permintaan->id] + $kartu, $kunci));
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            // Dua kiriman dengan kunci yang sama bersamaan: yang kedua mengembalikan struk yang pertama.
+            if ($kunci && ($ada = Penjualan::where('kunci_klien', $kunci)->where('id_kasir', $idKasir)->first())) {
+                return $ada->load('details');
+            }
+            throw $e;
         } catch (\Throwable $e) {
             if ($permintaan && ! $e instanceof PermintaanKartuTertunda) {
                 $this->catatPermintaanGagal($permintaan, $dipotong, $e);
@@ -191,9 +203,9 @@ class KasirService
 
     private function simpanJual(ShiftKasir $shift, array $rincian, string $total, string $bayar, int $idKasir, string $diskonStruk,
         $penyetuju, bool $adaDiskon, string $alasan, $santri, bool $pinBenar, ?array $kartu, bool $kartuJauh,
-        ?PermintaanKartu $permintaan, ?array &$dipotong): Penjualan
+        ?PermintaanKartu $permintaan, ?array &$dipotong, ?string $kunci = null): Penjualan
     {
-        return DB::transaction(function () use ($shift, $rincian, $total, $bayar, $idKasir, $diskonStruk, $penyetuju, $adaDiskon, $alasan, $santri, $pinBenar, $kartu, $kartuJauh, $permintaan, &$dipotong) {
+        return DB::transaction(function () use ($shift, $rincian, $total, $bayar, $idKasir, $diskonStruk, $penyetuju, $adaDiskon, $alasan, $santri, $pinBenar, $kartu, $kartuJauh, $permintaan, &$dipotong, $kunci) {
             // Shift dikunci: struk tak boleh tersimpan ke shift yang baru saja ditutup (paksa) — stoknya keluar
             // tetapi pendapatannya tak pernah dijurnal (audit 21 Okt 2026).
             $this->kunciShift($shift->id_shift, ['buka'], 'Shift sudah ditutup — muat ulang halaman.');
@@ -220,6 +232,7 @@ class KasirService
                 'id_kasir' => $idKasir,
                 'disetujui_oleh' => $penyetuju?->id_pengguna,
                 'alasan_diskon' => $adaDiskon ? $alasan : null,
+                'kunci_klien' => $kunci,
             ]);
 
             $hpp = '0';
@@ -308,12 +321,41 @@ class KasirService
 
     public const PESAN_BELUM_PASTI = 'Status pembayaran kartu BELUM PASTI — JANGAN terima tunai dulu. Tekan "Cek lagi" sebentar lagi.';
 
-    public const PESAN_TIDAK_TERJADI = 'Pembayaran kartu TIDAK terjadi (penghubung tak menjawab tepat waktu) — aman: ulangi bayar kartu, atau terima tunai.';
+    public const PESAN_KEMBALI_BELUM_PASTI = 'Status pengembalian ke dompet santri BELUM PASTI (penghubung tak menjawab) — JANGAN beri uang tunai. Ulangi sebentar lagi: aman, tidak akan dikembalikan dua kali.';
+
+    /**
+     * Pengembalian lewat penghubung (batal/retur kartu) yang jawabannya hilang bisa saja SUDAH masuk ke dompet santri.
+     * Pesan "bayar tunai" bawaan TakPasti menyesatkan di sini (santri bisa dapat tunai + saldo kembali) — audit 21 Okt.
+     * Nomornya tetap, jadi mengulang aman.
+     */
+    private static function kembalikanPasti(callable $panggil): array
+    {
+        try {
+            return $panggil();
+        } catch (PenghubungTakPasti) {
+            throw new AppException(503, self::PESAN_KEMBALI_BELUM_PASTI);
+        }
+    }
+
+    public const PESAN_TIDAK_TERJADI ='Pembayaran kartu TIDAK terjadi (penghubung tak menjawab tepat waktu) — aman: ulangi bayar kartu, atau terima tunai.';
 
     /** Niat bayar baru (status menunggu), atau lanjutan "Cek lagi" atas permintaan yang sudah pasti terpotong. */
-    private function siapkanPermintaan(array $kartu, string $total, ShiftKasir $shift, int $idKasir): PermintaanKartu
+    private function siapkanPermintaan(array $kartu, string $total, ShiftKasir $shift, int $idKasir, ?string $kunci = null): PermintaanKartu
     {
         $uid = KartuSantriService::bersihkanUid($kartu['uid']);
+        // Kiriman ULANG dengan kunci klien yang sama (koneksi putus di tengah): lanjutkan niat bayar yang lama —
+        // dipastikan dulu bila nasibnya belum jelas — alih-alih membuat niat baru yang memotong kartu kedua kalinya.
+        if (empty($kartu['permintaan']) && $kunci
+            && ($lama = PermintaanKartu::where('kunci_klien', $kunci)->where('id_kasir', $idKasir)->where('jenis', 'potong')
+                ->whereNull('id_penjualan')->latest('id')->first())) {
+            $status = $this->pastikanPermintaan($lama);
+            if ($status === 'belum_pasti') {
+                throw new PermintaanKartuTertunda($lama->id, self::PESAN_BELUM_PASTI);
+            }
+            if ($status === 'berhasil') {
+                $kartu['permintaan'] = $lama->id;
+            }
+        }
         if (! empty($kartu['permintaan'])) {
             $p = PermintaanKartu::where('id', (int) $kartu['permintaan'])->where('id_kasir', $idKasir)->where('jenis', 'potong')->first()
                 ?? throw new AppException(404, 'Pembayaran kartu yang dilanjutkan tidak ditemukan.');
@@ -335,6 +377,7 @@ class KasirService
         return PermintaanKartu::create([
             'nomor' => 'WM-'.now()->format('ymd').'-'.strtoupper(Str::random(10)), 'jenis' => 'potong', 'nominal' => $total,
             'uid_kartu' => $uid, 'id_shift' => $shift->id_shift, 'id_kasir' => $idKasir, 'status' => 'menunggu',
+            'kunci_klien' => $kunci,
         ]);
     }
 
@@ -469,7 +512,7 @@ class KasirService
                 // Kartu lewat penghubung: nomornya tetap (bukan acak) supaya mengulang pembatalan yang
                 // tergulung tak mengembalikan uang dua kali — ERP Al Wafi menjawab ulang transaksi yang sama.
                 $ref = 'WM-BATAL-'.$jual->ref_dompet;
-                app(\App\Services\Penghubung\KlienDompetToko::class)->kembalikan($ref, $jual->ref_dompet, Money::of($jual->total), "Batal struk Wafi Mart {$jual->nomor}");
+                self::kembalikanPasti(fn () => app(KlienDompetToko::class)->kembalikan($ref, $jual->ref_dompet, Money::of($jual->total), "Batal struk Wafi Mart {$jual->nomor}"));
                 $jual->ref_dompet_batal = $ref;
             }
             $jual->update(['status' => 'batal', 'alasan_batal' => $alasan, 'dibatalkan_oleh' => $idPenyetuju, 'dibatalkan_pada' => now()]);
@@ -746,9 +789,14 @@ class KasirService
                 $retur->update(['id_mutasi_dompet' => $m->id]);
             } elseif ($retur->metode === 'dompet' && $jual->ref_dompet) {
                 // Paling akhir: penghubung menolak/tak menjawab → retur tergulung utuh, stok tak jadi masuk.
-                $ref = 'WM-'.$nomor.'-'.strtoupper(\Illuminate\Support\Str::random(6));
-                app(\App\Services\Penghubung\KlienDompetToko::class)->kembalikan($ref, $jual->ref_dompet, $total, "Retur {$nomor} dari {$jual->nomor}",
-                    RincianBelanja::dariRetur($retur->load('details.persediaan', 'details.baris'), $jual, $shift->lokasi?->nama));
+                // Nomor TETAP per niat retur (audit 21 Okt 2026): sidik struk + yang sudah diretur + baris retur ini.
+                // Mengulang retur yang tergulung (jawaban hilang) memakai nomor yang sama → Al Wafi menjawab ulang,
+                // tak mengembalikan dua kali. Retur sah berikutnya punya "yang sudah diretur" berbeda → nomor baru.
+                $sidik = sha1($jual->ref_dompet.'|'.json_encode($jual->details->map(fn ($d) => Money::of($sudah[$d->id]->qty ?? '0', 4))->all())
+                    .'|'.json_encode(array_map(fn ($r) => [$r['d']->id, $r['qty']], $rincian)));
+                $ref = 'WM-RT-'.strtoupper(substr($sidik, 0, 24));
+                self::kembalikanPasti(fn () => app(KlienDompetToko::class)->kembalikan($ref, $jual->ref_dompet, $total, "Retur {$nomor} dari {$jual->nomor}",
+                    RincianBelanja::dariRetur($retur->load('details.persediaan', 'details.baris'), $jual, $shift->lokasi?->nama)));
                 $retur->update(['ref_dompet' => $ref]);
             }
 

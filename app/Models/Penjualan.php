@@ -25,7 +25,7 @@ class Penjualan extends Model
         'diskon_struk', 'disetujui_oleh', 'alasan_diskon',
         'id_santri', 'uid_kartu', 'id_mutasi_dompet', 'id_pencairan',
         // Kartu lewat penghubung (instans Wafi Mart): snapshot dari ERP Al Wafi.
-        'nama_kartu', 'ref_dompet', 'sisa_saldo_kartu', 'ref_dompet_batal',
+        'nama_kartu', 'ref_dompet', 'sisa_saldo_kartu', 'ref_dompet_batal', 'kunci_klien',
     ];
 
     public function santri(): BelongsTo

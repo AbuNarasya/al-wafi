@@ -195,6 +195,23 @@ class PenghubungDompetTokoTest extends TestCase
             $r->json('transaksi'));
     }
 
+    public function test_pengembalian_atas_belanja_kemarin_tak_menambah_jatah_hari_ini(): void
+    {
+        // Audit 21 Okt 2026: yatim kemarin yang dikembalikan malam tadi dulu membuka jatah belanja hari ini.
+        $this->travel(-1)->days();
+        $this->potong('WM-K', 20000)->assertOk();          // kemarin (batas 30.000)
+        $this->travelBack();
+        $this->kirim('POST', '/api/dompet-toko/v1/kembalikan', ['nomor' => 'WM-YATIM-WM-K', 'nomor_asal' => 'WM-K', 'nominal' => 20000])->assertOk();
+
+        $this->assertSame('0.00', \App\Services\Modules\DompetBelanja::hariIni($this->ahmad->id));
+        $this->potong('WM-H1', 25000)->assertOk();
+        $this->potong('WM-H2', 10000)->assertStatus(409);   // 35.000 > 30.000 → butuh PIN, walau ada pengembalian 20.000 hari ini
+
+        // Pengembalian atas belanja HARI INI tetap mengembalikan jatah.
+        $this->kirim('POST', '/api/dompet-toko/v1/kembalikan', ['nomor' => 'WM-R-H1', 'nomor_asal' => 'WM-H1', 'nominal' => 10000])->assertOk();
+        $this->assertSame('15000.00', \App\Services\Modules\DompetBelanja::hariIni($this->ahmad->id));
+    }
+
     public function test_pastikan_jawabannya_final(): void
     {
         $pastikan = fn (string $nomor, int $n = 20000) => $this->kirim('POST', '/api/dompet-toko/v1/pastikan', ['nomor' => $nomor, 'jenis' => 'potong', 'nominal' => $n]);

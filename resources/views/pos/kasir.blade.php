@@ -130,7 +130,7 @@
                         class="w-full rounded-xl bg-sky-600 py-3 text-base font-bold text-white shadow hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-40">
                     BAYAR KARTU SANTRI  (F8)
                 </button>
-                <button type="button" x-show="keranjang.length" @click="if (confirm('Kosongkan keranjang?')) { keranjang = []; bayar = ''; fokus(); }"
+                <button type="button" x-show="keranjang.length" @click="if (confirm('Kosongkan keranjang?')) { keranjang = []; bayar = ''; kunci = null; fokus(); }"
                         class="w-full text-xs text-gray-500 hover:text-red-600">Kosongkan keranjang</button>
             </div>
 
@@ -232,7 +232,7 @@
             return {
                 q: '', hasil: [], keranjang: [], bayar: '', sibuk: false, pesan: '', pesanJenis: '', terakhir: null, ringkas,
                 diskonStruk: 0, minta: false, idPengawas: '', pin: '', alasanDiskon: '',
-                kartuBuka: false, uid: '', info: null, pinSantri: '', kartuGalat: '', tertunda: null,
+                kartuBuka: false, uid: '', info: null, pinSantri: '', kartuGalat: '', tertunda: null, kunci: null,
 
                 get totalDiskon() { return this.keranjang.reduce((s, r) => s + (r.diskon || 0), 0) + (this.diskonStruk || 0); },
                 get adaDiskon() { return this.totalDiskon > 0; },
@@ -319,7 +319,7 @@
                 // Jalan keluar bila Al Wafi lama tak terjangkau: pencocokan malam mengembalikan potongan tanpa struk.
                 lepaskan() {
                     if (!confirm('Lepaskan pembayaran kartu ini? Bila kartu ternyata sudah terpotong, uangnya dikembalikan otomatis ke santri malam ini.')) return;
-                    this.tertunda = null; this.kartuGalat = ''; this.kartuBuka = false; this.uid = ''; this.info = null;
+                    this.tertunda = null; this.kartuGalat = ''; this.kartuBuka = false; this.uid = ''; this.info = null; this.kunci = null;
                 },
                 // "Cek lagi": terpotong → simpan struk tanpa memotong lagi; tidak terjadi → aman, tahanan dilepas.
                 async cekTertunda() {
@@ -349,6 +349,9 @@
 
                 async kirim(opsi = {}) {
                     this.sibuk = true;
+                    // Satu kunci per keranjang, dipertahankan sampai struknya tersimpan: kiriman ulang sesudah koneksi
+                    // putus mengembalikan struk yang sama, tak menggandakan struk/potongan kartu (audit 21 Okt 2026).
+                    if (!this.kunci) this.kunci = (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2));
                     try {
                         const r = await fetch(url.jual, {
                             method: 'POST',
@@ -364,6 +367,7 @@
                                 alasan_diskon: this.adaDiskon ? this.alasanDiskon : null,
                                 id_pengawas: this.adaDiskon ? (parseInt(this.idPengawas, 10) || null) : null,
                                 pin: this.adaDiskon ? this.pin : null,
+                                kunci: this.kunci,
                             }),
                         });
                         const data = await r.json();
@@ -376,12 +380,14 @@
                         }
                         this.terakhir = data; this.ringkas = data.ringkas;
                         this.keranjang = []; this.bayar = ''; this.diskonStruk = 0; this.alasanDiskon = ''; this.idPengawas = '';
-                        this.uid = ''; this.info = null; this.tertunda = null; this.kartuGalat = '';
+                        this.uid = ''; this.info = null; this.tertunda = null; this.kartuGalat = ''; this.kunci = null;
                         this.cetak(data.struk);
                         this.fokus();
                         return true;
                     } catch (e) {
-                        const pesan = 'Koneksi ke server terputus — struk BELUM tersimpan. Coba lagi.';
+                        // Putus/bukan JSON: server MUNGKIN sudah menyimpan. Jangan terima tunai lain — ulangi saja;
+                        // kunci yang sama membuat struknya tak tersimpan dua kali.
+                        const pesan = 'Koneksi bermasalah — status struk BELUM PASTI. Tekan bayar lagi (aman: tidak akan tersimpan atau terpotong dua kali).';
                         if (opsi.kartu) this.kartuGalat = pesan; else this.beri(pesan);
                         return false;
                     } finally {

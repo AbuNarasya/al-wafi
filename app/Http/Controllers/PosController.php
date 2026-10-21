@@ -127,6 +127,8 @@ class PosController extends Controller
             'pin_santri' => ['nullable', 'string', 'max:6'],
             // Lanjutan "Cek lagi": niat bayar kartu yang sudah dipastikan terpotong — struk disimpan tanpa memotong lagi.
             'permintaan_kartu' => ['nullable', 'integer'],
+            // Kunci acak per keranjang dari layar — kiriman ulang sesudah koneksi putus tak menggandakan struk.
+            'kunci' => ['nullable', 'string', 'max:64'],
         ]);
         $shift = $this->shiftTerbuka($request);
         if (! $shift) {
@@ -146,7 +148,7 @@ class PosController extends Controller
                 'id_pengawas' => $data['id_pengawas'] ?? null,
                 'pin' => $data['pin'] ?? null,
             ], ($data['kartu_uid'] ?? '') !== '' ? ['uid' => $data['kartu_uid'], 'pin' => $data['pin_santri'] ?? null,
-                'permintaan' => $data['permintaan_kartu'] ?? null] : null);
+                'permintaan' => $data['permintaan_kartu'] ?? null] : null, $data['kunci'] ?? null);
         } catch (\App\Services\Penghubung\PermintaanKartuTertunda $e) {
             // Kartu belum pasti / sudah terpotong tanpa struk: layar menahan keranjang & menawarkan "Cek lagi".
             return response()->json(['message' => $e->getMessage(), 'kode' => $e->status, 'tertunda' => $e->idPermintaan], 422);

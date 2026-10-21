@@ -13,7 +13,7 @@ class PermintaanKartu extends Model
     protected $table = 'permintaan_kartu';
 
     protected $fillable = [
-        'nomor', 'jenis', 'nominal', 'uid_kartu', 'nomor_asal', 'id_shift', 'id_kasir', 'status', 'hasil', 'pesan', 'id_penjualan',
+        'nomor', 'jenis', 'nominal', 'uid_kartu', 'nomor_asal', 'id_shift', 'id_kasir', 'status', 'hasil', 'pesan', 'id_penjualan', 'kunci_klien',
     ];
 
     protected function casts(): array

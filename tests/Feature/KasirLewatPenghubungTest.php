@@ -222,7 +222,7 @@ class KasirLewatPenghubungTest extends TestCase
         $r = $this->k->retur($this->shift->id_shift, $b->nomor, [['id_penjualan_detail' => $b->details[0]->id, 'kuantiti' => 1, 'kondisi' => 'layak']],
             'salah ambil', $this->pengawas->id_pengguna, '482915', $this->kasir->id_pengguna);
         $this->assertSame(['dompet', '4000.00'], [$r->metode, $r->total]);
-        $this->assertStringStartsWith('WM-'.$r->nomor.'-', $r->ref_dompet);
+        $this->assertMatchesRegularExpression('/^WM-RT-[0-9A-F]{24}$/', $r->ref_dompet);   // nomor tetap per niat retur
         Http::assertSent(fn (Request $q) => str_ends_with($q->url(), '/kembalikan') && $q['nomor'] === $r->ref_dompet
             && $q['nomor_asal'] === $b->ref_dompet && Money::eq($q['nominal'], '4000')
             && $q['rincian']['jenis'] === 'retur' && $q['rincian']['struk_asal'] === $b->nomor
@@ -466,6 +466,49 @@ class KasirLewatPenghubungTest extends TestCase
             $this->assertSame(KasirService::PESAN_TIDAK_TERJADI, $e->getMessage());   // dipastikan dulu, tak dianggap lunas
         }
         $this->assertSame(0, Penjualan::count());
+    }
+
+    // ---- Audit Paket 3 ----
+
+    public function test_kiriman_ulang_dengan_kunci_sama_tak_menggandakan_struk_maupun_potongan(): void
+    {
+        $this->penghubungSetuju();
+        $kirim = fn (array $tambahan = []) => $this->actingAs($this->kasir)->postJson(route('pos.jual'), [
+            'bayar' => 0, 'baris' => [['kode_persediaan' => 'BRG0001', 'kuantiti' => 2]], 'kunci' => 'keranjang-1', ...$tambahan,
+        ]);
+        $pertama = $kirim(['kartu_uid' => self::UID])->assertOk()->json('nomor');
+        $kedua = $kirim(['kartu_uid' => self::UID])->assertOk()->json('nomor');   // koneksi putus → kasir menekan lagi
+        $this->assertSame($pertama, $kedua);
+        $this->assertSame(1, Penjualan::count());
+        $this->assertSame(1, $this->hitung('/potong'));
+
+        // Tunai pun sama.
+        $t1 = $kirim(['bayar' => 10000, 'kunci' => 'keranjang-2'])->assertOk()->json('nomor');
+        $this->assertSame($t1, $kirim(['bayar' => 10000, 'kunci' => 'keranjang-2'])->assertOk()->json('nomor'));
+        $this->assertSame(2, Penjualan::count());
+    }
+
+    public function test_retur_kartu_yang_jawabannya_hilang_aman_diulang_dengan_nomor_sama(): void
+    {
+        $this->penghubungSetuju();
+        $b = $this->jualKartu(3);
+        $nomorKembali = [];
+        $putus = true;
+        $this->penghubung(function (Request $r) use (&$nomorKembali, &$putus) {
+            $nomorKembali[] = $r['nomor'];
+
+            return $putus ? Http::failedConnection() : Http::response(['nomor' => $r['nomor'], 'jenis' => 'kembalikan', 'nominal' => $r['nominal'], 'sisa_saldo' => '50000.00']);
+        });
+        $baris = [['id_penjualan_detail' => $b->details[0]->id, 'kuantiti' => 1, 'kondisi' => 'layak']];
+        try {
+            $this->k->retur($this->shift->id_shift, $b->nomor, $baris, 'salah ambil', $this->pengawas->id_pengguna, '482915', $this->kasir->id_pengguna);
+            $this->fail('Harus belum pasti.');
+        } catch (AppException $e) {
+            $this->assertSame(KasirService::PESAN_KEMBALI_BELUM_PASTI, $e->getMessage());   // bukan "bayar tunai"
+        }
+        $putus = false;
+        $r = $this->k->retur($this->shift->id_shift, $b->nomor, $baris, 'salah ambil', $this->pengawas->id_pengguna, '482915', $this->kasir->id_pengguna);
+        $this->assertSame([$r->ref_dompet, $r->ref_dompet], $nomorKembali);   // percobaan ulang memakai nomor yang SAMA
     }
 
     public function test_cek_lagi_hanya_milik_kasirnya_sendiri(): void

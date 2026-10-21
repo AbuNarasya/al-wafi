@@ -26,8 +26,23 @@ class DompetBelanja
             return '0';
         }
 
-        return Money::sub('0', Money::of(MutasiDompet::where('pemilik', 'santri')->where('id_dompet', $idDompet)
-            ->where('jenis', 'jajan')->whereDate('tanggal', now()->toDateString())->sum('nominal')));
+        // Pengembalian HARI INI atas belanja HARI LAIN (retur struk kemarin, potongan yatim yang dikembalikan
+        // rekonsiliasi malam) TIDAK menambah jatah hari ini — dulu ia membuat batas harian terlampaui tanpa PIN
+        // (audit 21 Okt 2026). Yang dikurangkan hanya pengembalian atas belanja hari ini juga.
+        $hariIni = now()->toDateString();
+        $sum = MutasiDompet::query()->from('mutasi_dompet as m')
+            ->where('m.pemilik', 'santri')->where('m.id_dompet', $idDompet)->where('m.jenis', 'jajan')->whereDate('m.tanggal', $hariIni)
+            ->where(fn ($q) => $q->where('m.nominal', '<', 0)
+                ->orWhere(fn ($k) => $k
+                    ->whereNotExists(fn ($s) => $s->selectRaw('1')->from('transaksi_dompet_toko as t')
+                        ->join('transaksi_dompet_toko as a', 'a.nomor_toko', '=', 't.nomor_asal')
+                        ->whereColumn('t.id_mutasi_dompet', 'm.id')->whereDate('a.tanggal', '<', $hariIni))
+                    ->whereNotExists(fn ($s) => $s->selectRaw('1')->from('retur_penjualan as r')
+                        ->join('penjualan as p', 'p.id_penjualan', '=', 'r.id_penjualan')
+                        ->whereColumn('r.id_mutasi_dompet', 'm.id')->whereDate('p.waktu', '<', $hariIni))))
+            ->sum('m.nominal');
+
+        return Money::sub('0', Money::of($sum));
     }
 
     /** Lewat batas harian bila belanja ini ditambahkan? (PIN belanja anak wajib) */
