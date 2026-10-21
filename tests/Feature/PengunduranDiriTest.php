@@ -76,13 +76,13 @@ class PengunduranDiriTest extends TestCase
         DompetSantri::create(['id_santri' => $this->ahmad->id, 'saldo' => 15000]); // titipan yang belum dikembalikan
 
         $this->sebagaiIbu()->get(route('portal.anak', $this->ahmad->id))->assertSee('Pengunduran diri santri');
-        $this->sebagaiIbu()->post(route('portal.keluar.ajukan', $this->ahmad->id), ['alasan' => 'Pindah kota', 'surat' => $this->surat(), 'pin' => '000000'])
+        $this->sebagaiIbu()->post(route('portal.mundur.ajukan', $this->ahmad->id), ['alasan' => 'Pindah kota', 'surat' => $this->surat(), 'pin' => '000000'])
             ->assertSessionHas('error');
-        $this->sebagaiIbu()->post(route('portal.keluar.ajukan', $this->ahmad->id), ['alasan' => 'Pindah kota', 'surat' => $this->surat(), 'pin' => self::PIN])
-            ->assertRedirect(route('portal.keluar', $this->ahmad->id))->assertSessionHas('status');
+        $this->sebagaiIbu()->post(route('portal.mundur.ajukan', $this->ahmad->id), ['alasan' => 'Pindah kota', 'surat' => $this->surat(), 'pin' => self::PIN])
+            ->assertRedirect(route('portal.mundur', $this->ahmad->id))->assertSessionHas('status');
         $p = PengajuanKeluar::sole();
         $this->assertSame(['menunggu_wali_kelas', 1], [$p->status, $p->dokumen()->count()]);
-        $this->sebagaiIbu()->post(route('portal.keluar.ajukan', $this->ahmad->id), ['alasan' => 'lagi', 'surat' => $this->surat(), 'pin' => self::PIN])
+        $this->sebagaiIbu()->post(route('portal.mundur.ajukan', $this->ahmad->id), ['alasan' => 'lagi', 'surat' => $this->surat(), 'pin' => self::PIN])
             ->assertSessionHas('error'); // satu pengajuan berjalan per santri
 
         // Wali kelas: orang lain ditolak; kembalikan wajib bercatatan.
@@ -92,8 +92,8 @@ class PengunduranDiriTest extends TestCase
         $this->actingAs($this->u['walikelas'])->post(route('pengunduran_diri.verifikasi', $p->id), ['keputusan' => 'kembalikan', 'catatan' => 'Lampirkan surat bertanda tangan'])
             ->assertSessionHas('status');
         $this->assertSame('dikembalikan', $p->refresh()->status);
-        $this->sebagaiIbu()->get(route('portal.keluar', $this->ahmad->id))->assertSee('Lampirkan surat bertanda tangan')->assertSee('Kirim ulang');
-        $this->sebagaiIbu()->post(route('portal.keluar.ulang', $this->ahmad->id), ['alasan' => 'Pindah kota (ayah dinas)', 'surat' => $this->surat(), 'pin' => self::PIN])
+        $this->sebagaiIbu()->get(route('portal.mundur', $this->ahmad->id))->assertSee('Lampirkan surat bertanda tangan')->assertSee('Kirim ulang');
+        $this->sebagaiIbu()->post(route('portal.mundur.ulang', $this->ahmad->id), ['alasan' => 'Pindah kota (ayah dinas)', 'surat' => $this->surat(), 'pin' => self::PIN])
             ->assertSessionHas('status');
 
         $this->actingAs($this->u['walikelas'])->post(route('pengunduran_diri.verifikasi', $p->id), ['keputusan' => 'lanjut'])->assertSessionHas('status');
@@ -123,13 +123,13 @@ class PengunduranDiriTest extends TestCase
         // Wali: dikabari tiap tahap, dan bisa mengunduh surat mutasi.
         $this->assertGreaterThanOrEqual(5, NotifikasiWali::where('jenis', 'pengunduran_diri')->count());
         $mutasi = $p->dokumen()->where('jenis', 'surat_mutasi')->sole();
-        $this->sebagaiIbu()->get(route('portal.keluar', $this->ahmad->id))->assertSee('Selesai')->assertSee('Surat mutasi');
-        $this->sebagaiIbu()->get(route('portal.keluar.dokumen', $mutasi->id))->assertOk();
+        $this->sebagaiIbu()->get(route('portal.mundur', $this->ahmad->id))->assertSee('Selesai')->assertSee('Surat mutasi');
+        $this->sebagaiIbu()->get(route('portal.mundur.dokumen', $mutasi->id))->assertOk();
     }
 
     public function test_kepala_sekolah_menolak_dan_wali_bisa_membatalkan_sebelumnya(): void
     {
-        $this->sebagaiIbu()->post(route('portal.keluar.ajukan', $this->ahmad->id), ['alasan' => 'Ingin pindah', 'surat' => $this->surat(), 'pin' => self::PIN]);
+        $this->sebagaiIbu()->post(route('portal.mundur.ajukan', $this->ahmad->id), ['alasan' => 'Ingin pindah', 'surat' => $this->surat(), 'pin' => self::PIN]);
         $p = PengajuanKeluar::sole();
         $this->actingAs($this->u['walikelas'])->post(route('pengunduran_diri.verifikasi', $p->id), ['keputusan' => 'lanjut']);
         $this->actingAs($this->u['kepsek'])->post(route('pengunduran_diri.putuskan', $p->id), ['keputusan' => 'tidak'])->assertSessionHas('error');
@@ -138,9 +138,9 @@ class PengunduranDiriTest extends TestCase
         $this->assertSame(['ditolak', 'aktif'], [$p->refresh()->status, $this->ahmad->refresh()->status]);
 
         // Pengajuan baru boleh, lalu dibatalkan wali sendiri sebelum diputus.
-        $this->sebagaiIbu()->post(route('portal.keluar.ajukan', $this->ahmad->id), ['alasan' => 'Ingin pindah lagi', 'surat' => $this->surat(), 'pin' => self::PIN])
+        $this->sebagaiIbu()->post(route('portal.mundur.ajukan', $this->ahmad->id), ['alasan' => 'Ingin pindah lagi', 'surat' => $this->surat(), 'pin' => self::PIN])
             ->assertSessionHas('status');
-        $this->sebagaiIbu()->post(route('portal.keluar.batal', $this->ahmad->id), ['pin' => self::PIN])->assertSessionHas('status');
+        $this->sebagaiIbu()->post(route('portal.mundur.batal', $this->ahmad->id), ['pin' => self::PIN])->assertSessionHas('status');
         $this->assertSame('dibatalkan', PengajuanKeluar::latest('id')->first()->status);
     }
 }

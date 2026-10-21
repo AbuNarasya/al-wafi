@@ -54,14 +54,14 @@
                 <p class="mt-4 text-xs font-semibold uppercase tracking-widest text-slate-500">Dokumen</p>
                 <ul class="mt-1 space-y-1 text-sm">
                     @foreach ($p->dokumen as $d)
-                        <li><a href="{{ route('portal.keluar.dokumen', $d->id) }}" class="font-medium text-brand">{{ \App\Models\DokumenPengajuanKeluar::JENIS[$d->jenis] ?? $d->jenis }}</a>
+                        <li><a href="{{ route('portal.mundur.dokumen', $d->id) }}" class="font-medium text-brand">{{ \App\Models\DokumenPengajuanKeluar::JENIS[$d->jenis] ?? $d->jenis }}</a>
                             <span class="text-xs text-slate-500">{{ $d->keterangan }}</span></li>
                     @endforeach
                 </ul>
             @endif
 
             @if (in_array($p->status, ['menunggu_wali_kelas', 'dikembalikan', 'menunggu_kepala_sekolah'], true))
-                <form method="POST" action="{{ route('portal.keluar.batal', $santri->id) }}" class="mt-4 text-center" data-no-confirm
+                <form method="POST" action="{{ route('portal.mundur.batal', $santri->id) }}" class="mt-4 text-center" data-no-confirm
                       x-data="pinPad(@js($punyaPin), @js(route('portal.pin')))" @submit.prevent="buka()">
                     @csrf
                     <button class="text-sm font-semibold text-red-700">Batalkan pengajuan</button>
@@ -73,7 +73,7 @@
 
     @if ($bolehAjukan || $p?->status === 'dikembalikan')
         @php $ulang = $p?->status === 'dikembalikan'; @endphp
-        <form method="POST" action="{{ $ulang ? route('portal.keluar.ulang', $santri->id) : route('portal.keluar.ajukan', $santri->id) }}" enctype="multipart/form-data"
+        <form method="POST" action="{{ $ulang ? route('portal.mundur.ulang', $santri->id) : route('portal.mundur.ajukan', $santri->id) }}" enctype="multipart/form-data"
               class="mt-4 space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200" data-no-confirm
               x-data="pinPad(@js($punyaPin), @js(route('portal.pin')))" @submit.prevent="buka()">
             @csrf

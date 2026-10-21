@@ -254,6 +254,6 @@
 
     {{-- Pengunduran diri (21 Okt 2026): untuk santri aktif, atau bila sudah ada pengajuannya. --}}
     @if ($aktif || \App\Models\PengajuanKeluar::where('id_santri', $santri->id)->exists())
-        <a href="{{ route('portal.keluar', $santri->id) }}" class="mt-8 block text-center text-sm font-semibold text-slate-500 underline">Pengunduran diri santri</a>
+        <a href="{{ route('portal.mundur', $santri->id) }}" class="mt-8 block text-center text-sm font-semibold text-slate-500 underline">Pengunduran diri santri</a>
     @endif
 @endsection

@@ -99,6 +99,6 @@ class PortalPengunduranDiriController extends Controller
             return back()->withInput($request->except(['pin', 'surat']))->with('error', $e->getMessage());
         }
 
-        return redirect()->route('portal.keluar', $s->id)->with('status', $pesan);
+        return redirect()->route('portal.mundur', $s->id)->with('status', $pesan);
     }
 }

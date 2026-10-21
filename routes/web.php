@@ -222,11 +222,11 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\A
 });
 // Pengunduran diri santri aktif (21 Okt 2026) — di bawah /wali/anak, BUKAN /wali/data (mode verifikasi).
 Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalPengunduranDiriController::class)->group(function () {
-    Route::get('/anak/{id}/pengunduran-diri', 'form')->name('keluar')->whereNumber('id');
-    Route::post('/anak/{id}/pengunduran-diri', 'ajukan')->name('keluar.ajukan')->middleware('throttle:10,1')->whereNumber('id');
-    Route::post('/anak/{id}/pengunduran-diri/ulang', 'ajukanUlang')->name('keluar.ulang')->middleware('throttle:10,1')->whereNumber('id');
-    Route::post('/anak/{id}/pengunduran-diri/batal', 'batal')->name('keluar.batal')->middleware('throttle:10,1')->whereNumber('id');
-    Route::get('/pengunduran-diri/dokumen/{dokumen}', 'dokumen')->name('keluar.dokumen')->whereNumber('dokumen');
+    Route::get('/anak/{id}/pengunduran-diri', 'form')->name('mundur')->whereNumber('id');
+    Route::post('/anak/{id}/pengunduran-diri', 'ajukan')->name('mundur.ajukan')->middleware('throttle:10,1')->whereNumber('id');
+    Route::post('/anak/{id}/pengunduran-diri/ulang', 'ajukanUlang')->name('mundur.ulang')->middleware('throttle:10,1')->whereNumber('id');
+    Route::post('/anak/{id}/pengunduran-diri/batal', 'batal')->name('mundur.batal')->middleware('throttle:10,1')->whereNumber('id');
+    Route::get('/pengunduran-diri/dokumen/{dokumen}', 'dokumen')->name('mundur.dokumen')->whereNumber('dokumen');
 });
 // Penarikan tunai kegiatan (uang saku untuk outbound/rihlah) — di /wali/tarik-tunai, BUKAN /wali/data.
 Route::prefix('wali/tarik-tunai')->name('portal.tarik_tunai.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalTarikTunaiController::class)->group(function () {
