@@ -13,9 +13,10 @@ set -euo pipefail
 VPS="${VPS:-deploy@31.97.108.145}"
 KUNCI="${KUNCI:-$HOME/.ssh/alwafi_ed25519}"
 DEV_HOST="${DEV_HOST:-alwafi}"
-# 21 Okt 2026: kotak surat noreply@mail.al-wafi.sch.id dibuat tim IT Al Wafi (MX & SPF Hostinger sudah ada).
+# 21 Okt 2026: kotak surat noreply@al-wafi.sch.id (dibuat tim IT Al Wafi; MX & SPF Hostinger sudah ada). Alamat
+# "noreply@mail.al-wafi.sch.id" di pesan awal ternyata tak bisa login.
 # Ganti tanpa menyunting skrip:  PENGIRIM=… SMTP_HOST=… NAMA_ALWAFI=… bash deploy/pasang-smtp.sh
-PENGIRIM="${PENGIRIM:-noreply@mail.al-wafi.sch.id}"
+PENGIRIM="${PENGIRIM:-noreply@al-wafi.sch.id}"
 SMTP_HOST="${SMTP_HOST:-smtp.hostinger.co.id}"
 NAMA_ALWAFI="${NAMA_ALWAFI:-Yayasan Al Sudais Indonesia}"
 NAMA_WAFIMART="${NAMA_WAFIMART:-Wafi Mart}"
@@ -53,17 +54,19 @@ if [ -n "$3" ]; then php artisan email:uji "$3" || echo "(email:uji gagal / belu
 echo "Selesai: $1"'
 
 # Baris pertama stdin = sandi (dibaca & diekspor), sisanya = skrip untuk bash -s.
-kirim() { # $1 = tujuan ssh (beserta opsi), $2 = folder, $3 = nama pengirim
-    local perintah
-    perintah="IFS= read -r SANDI; export SANDI; exec bash -s -- $(printf '%q ' "$2" "$3" "$UJI")"
-    { printf '%s\n' "$SANDI"; printf '%s\n' "$SKRIP_SERVER"; } | ssh $1 "$perintah"
+# Opsi ssh lewat ARRAY: jalur kunci di folder home yang mengandung spasi ("C:/Users/Abu Narasya") tak boleh terpecah.
+kirim() { # $1 = folder, $2 = nama pengirim, sisanya = argumen ssh (opsi + tujuan)
+    local folder="$1" nama="$2" perintah
+    shift 2
+    perintah="IFS= read -r SANDI; export SANDI; exec bash -s -- $(printf '%q ' "$folder" "$nama" "$UJI")"
+    { printf '%s\n' "$SANDI"; printf '%s\n' "$SKRIP_SERVER"; } | ssh "$@" "$perintah"
 }
 
 for s in "$@"; do
     case "$s" in
-        erp)      kirim "-i $KUNCI -o BatchMode=yes $VPS" /var/www/erp "$NAMA_ALWAFI" ;;
-        wafimart) kirim "-i $KUNCI -o BatchMode=yes $VPS" /var/www/wafimart "$NAMA_WAFIMART" ;;
-        dev)      kirim "-o BatchMode=yes $DEV_HOST" domains/dev.erp.al-wafi.sch.id/app-laravel "$NAMA_ALWAFI (dev)" ;;
+        erp)      kirim /var/www/erp "$NAMA_ALWAFI" -i "$KUNCI" -o BatchMode=yes "$VPS" ;;
+        wafimart) kirim /var/www/wafimart "$NAMA_WAFIMART" -i "$KUNCI" -o BatchMode=yes "$VPS" ;;
+        dev)      kirim domains/dev.erp.al-wafi.sch.id/app-laravel "$NAMA_ALWAFI (dev)" -o BatchMode=yes "$DEV_HOST" ;;
         *) echo "Instans tak dikenal: $s (erp | wafimart | dev)" >&2 ;;
     esac
 done
