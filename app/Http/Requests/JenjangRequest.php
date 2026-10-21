@@ -40,6 +40,8 @@ class JenjangRequest extends FormRequest
             // halaman daftar (lihat UrutanTampilService).
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
             'keterangan' => ['nullable', 'string'],
+            // Kepala sekolah jenjang ini — memutus pengajuan pengunduran diri (21 Okt 2026).
+            'id_kepala_sekolah' => ['nullable', 'integer', 'exists:users,id_pengguna'],
         ];
     }
 

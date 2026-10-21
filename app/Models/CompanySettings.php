@@ -28,6 +28,8 @@ class CompanySettings extends Model
         'npwp',
         'mata_uang',
         'periode_awal_pembukuan',
+        'kupon_makan_orang',
+        'perhatian_kartu_ujian',
         'bulan_awal_anggaran',
         'topup_tunai_dompet_santri',
         'kode_unit_neraca',

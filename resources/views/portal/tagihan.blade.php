@@ -145,6 +145,8 @@
                             <p class="text-xs text-slate-500">{{ $r['tanggal']->format('d/m/Y') }} &middot; {{ $r['sumber'] }}</p>
                             @if ($r['status'] === 'menunggu_verifikasi')
                                 <p class="text-xs font-medium text-amber-700">Menunggu verifikasi</p>
+                            @else
+                                <a href="{{ route('portal.receipt', $r['id']) }}" class="mt-1 inline-block text-xs font-semibold text-brand">Unduh receipt (PDF)</a>
                             @endif
                         </div>
                         <p class="shrink-0 text-sm font-bold tabular-nums text-slate-900">{{ $rp($r['nominal']) }}</p>

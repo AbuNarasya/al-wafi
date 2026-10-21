@@ -15,6 +15,7 @@
     },
     "dependencies": {
         "alpinejs": "^3.15.12",
-        "pdfjs-dist": "^6.1.200"
+        "pdfjs-dist": "^6.1.200",
+        "qrcode": "^1.5.4"
     }
 }

@@ -88,11 +88,12 @@ class KuitansiRekapTest extends TestCase
 
         (new PembayaranSantriService)->verifikasi($bayar->id, $this->admin);
 
-        $res = $this->get(route('pembayaran_ppsb.kuitansi', $bayar->id))->assertOk();
-        $res->assertSee($bayar->nomor);
-        $res->assertSee('AHMAD');
-        $res->assertSee('dua ratus ribu rupiah');
-        $res->assertSee('Kuitansi Pembayaran');
+        // Sejak 21 Okt 2026: RECEIPT berformat PDF (sama dengan unduhan wali). Isinya diperiksa lewat HTML sumbernya.
+        $this->get(route('pembayaran_ppsb.kuitansi', $bayar->id))->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $html = view('receipt.pembayaran', ['r' => \App\Support\Receipt::data(collect([$bayar->fresh()]))])->render();
+        foreach ([$bayar->nomor, 'AHMAD', 'Dua ratus ribu rupiah', 'RECEIPT', 'RINCIAN TAGIHAN', '200.000', 'Budi'] as $teks) {
+            $this->assertStringContainsString($teks, $html);
+        }
     }
 
     /** Halaman detail santri: tombol Cetak kuitansi per pembayaran — hanya yang sudah diverifikasi. */

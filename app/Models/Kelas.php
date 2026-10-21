@@ -11,7 +11,12 @@ class Kelas extends Model
 {
     protected $table = 'kelas';
 
-    protected $fillable = ['kode_jenjang', 'tingkat', 'nama', 'peruntukan', 'status'];
+    protected $fillable = ['kode_jenjang', 'tingkat', 'nama', 'peruntukan', 'status', 'id_wali_kelas'];
+
+    public function waliKelas(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'id_wali_kelas', 'id_pengguna');
+    }
 
     public const PERUNTUKAN = ['L' => 'Putra', 'P' => 'Putri', 'C' => 'Campur'];
 

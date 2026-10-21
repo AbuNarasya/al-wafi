@@ -53,6 +53,8 @@
                          hint="Nonaktif = tidak muncul di dropdown, data lama tetap utuh." />
             </div>
 
+            <x-field name="id_kepala_sekolah" label="Kepala sekolah (memutus pengunduran diri)" :value="old('id_kepala_sekolah', $row->id_kepala_sekolah)"
+                     :options="['' => '— belum ditetapkan —'] + \App\Models\User::where('status', 'aktif')->orderBy('nama')->pluck('nama', 'id_pengguna')->all()" />
             <x-field name="keterangan" label="Keterangan" :value="old('keterangan', $row->keterangan)" textarea />
 
             <div class="flex items-center justify-end gap-2 border-t border-gray-100 pt-4">

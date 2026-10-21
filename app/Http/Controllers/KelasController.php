@@ -24,7 +24,8 @@ class KelasController extends Controller
 
         return view('kelas.index', [
             'jenjang' => $jenjang, 'pilih' => $pilih,
-            'kelas' => Kelas::withCount('santri')->where('kode_jenjang', $pilih)->orderBy('tingkat')->orderBy('nama')->get(),
+            'kelas' => Kelas::with('waliKelas:id_pengguna,nama')->withCount('santri')->where('kode_jenjang', $pilih)->orderBy('tingkat')->orderBy('nama')->get(),
+            'pengguna' => \App\Models\User::where('status', 'aktif')->orderBy('nama')->pluck('nama', 'id_pengguna'),
             'belum' => Santri::where('status', 'aktif')->whereNull('id_kelas')->where('kode_jenjang', $pilih)->count(),
         ]);
     }
@@ -108,6 +109,7 @@ class KelasController extends Controller
             'nama' => ['required', 'string', 'max:120'],
             'peruntukan' => ['required', Rule::in(array_keys(Kelas::PERUNTUKAN))],
             'status' => ['nullable', Rule::in(['aktif', 'nonaktif'])],
+            'id_wali_kelas' => ['nullable', 'integer', 'exists:users,id_pengguna'],
         ]);
     }
 }

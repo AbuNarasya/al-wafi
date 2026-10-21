@@ -49,6 +49,7 @@ class JenjangService
             'urutan' => $data['urutan'] ?? UrutanTampilService::berikutnya(Jenjang::class),
             'status' => $data['status'] ?? 'aktif',
             'keterangan' => $data['keterangan'] ?? null,
+            'id_kepala_sekolah' => $data['id_kepala_sekolah'] ?? null,
         ]);
     }
 
@@ -64,6 +65,7 @@ class JenjangService
             'urutan' => $data['urutan'] ?? $row->urutan,
             'status' => $data['status'] ?? $row->status,
             'keterangan' => array_key_exists('keterangan', $data) ? $data['keterangan'] : $row->keterangan,
+            'id_kepala_sekolah' => array_key_exists('id_kepala_sekolah', $data) ? ($data['id_kepala_sekolah'] ?: null) : $row->id_kepala_sekolah,
         ]);
 
         return $row;

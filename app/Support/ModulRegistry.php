@@ -147,6 +147,12 @@ final class ModulRegistry
         ['kode' => 'dokumen-santri', 'nama' => 'Berkas Santri (KTP, akta, KK, med check)', 'grup' => 'DATA SISWA/SANTRI'],
         // Kelas/rombel: buat/ubah/hapus = master kelas; ubah juga = menempatkan santri ke kelas.
         ['kode' => 'kelas', 'nama' => 'Kelas (rombel) & Penempatan Kelas', 'grup' => 'DATA SISWA/SANTRI'],
+        // Pengunduran diri santri aktif: lihat = membuka daftar. Wali kelas & kepala sekolah ditetapkan di
+        // master Kelas/Jenjang; clearance per pihak lewat tiga modul di bawah (admin: ubah = mengeluarkan santri).
+        ['kode' => 'pengunduran-diri', 'nama' => 'Pengunduran Diri Santri (daftar & detail)', 'grup' => 'DATA SISWA/SANTRI'],
+        ['kode' => 'clearance-keuangan', 'nama' => 'Clearance Pengunduran Diri — Keuangan', 'grup' => 'DATA SISWA/SANTRI'],
+        ['kode' => 'clearance-kesantrian', 'nama' => 'Clearance Pengunduran Diri — Kesantrian', 'grup' => 'DATA SISWA/SANTRI'],
+        ['kode' => 'clearance-admin', 'nama' => 'Clearance Pengunduran Diri — Admin Sekolah (surat & pengeluaran)', 'grup' => 'DATA SISWA/SANTRI'],
         // Kartu RFID belanja Wafi Mart: buat = pasang/ganti kartu, ubah = blokir & buka blokir.
         ['kode' => 'kartu-santri', 'nama' => 'Kartu Santri (RFID belanja Wafi Mart)', 'grup' => 'DATA SISWA/SANTRI'],
 
@@ -165,6 +171,9 @@ final class ModulRegistry
         ['kode' => 'potongan-gelombang', 'nama' => 'Gelombang & Potongan Uang Pangkal', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
         ['kode' => 'target-santri', 'nama' => 'Target Santri per Tahun Ajaran & Jenjang', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
         ['kode' => 'termin-filter', 'nama' => 'Setting Filter Termin Jatuh Tempo', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
+        // Ujian seleksi (21 Okt 2026): jadwal & isi kartu peserta; absensi = memindai QR kartu + daftar hadir.
+        ['kode' => 'jadwal-ujian', 'nama' => 'Jadwal Ujian Seleksi & Kartu Peserta', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],
+        ['kode' => 'absensi-ujian', 'nama' => 'Absensi Ujian Seleksi (pindai QR kartu)', 'grup' => 'PPSB', 'sub' => 'Transaksi'],
         // Turun ke Transaksi bersama menunya: ia mengatur uang, bukan master.
         ['kode' => 'angsuran-uang-pangkal', 'nama' => 'Angsuran Uang Pangkal (Termin & Reminder)', 'grup' => 'PPSB', 'sub' => 'Transaksi'],
         ['kode' => 'pembayaran-ppsb', 'nama' => 'Pembayaran Tagihan PPSB (registrasi & uang pangkal)', 'grup' => 'PPSB', 'sub' => 'Transaksi'],

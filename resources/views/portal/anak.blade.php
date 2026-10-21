@@ -37,6 +37,11 @@
                 </div>
                 <p class="mt-2 text-sm text-slate-600">Tahap {{ $tahapPsb + 1 }} dari 7 &middot; {{ $label }}</p>
                 @include('portal._status-diterima', ['status' => $santri->status])
+                @if (\App\Services\Ppsb\UjianSeleksi::bolehKartu($santri))
+                    <a href="{{ route('portal.kartu_ujian', $santri->id) }}" class="mt-3 flex items-center justify-between rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white">
+                        <span>Kartu Peserta Ujian</span><span>Cetak &rarr;</span>
+                    </a>
+                @endif
             </div>
         </section>
     @endif
@@ -245,5 +250,10 @@
                 @endforeach
             </div>
         </section>
+    @endif
+
+    {{-- Pengunduran diri (21 Okt 2026): untuk santri aktif, atau bila sudah ada pengajuannya. --}}
+    @if ($aktif || \App\Models\PengajuanKeluar::where('id_santri', $santri->id)->exists())
+        <a href="{{ route('portal.keluar', $santri->id) }}" class="mt-8 block text-center text-sm font-semibold text-slate-500 underline">Pengunduran diri santri</a>
     @endif
 @endsection

@@ -194,6 +194,7 @@ class PortalKeluargaController extends Controller
             'menunggu' => $menunggu->reduce(fn ($t, $x) => Money::add($t, $x), '0'),
         ];
         $data['riwayat'] = $bayar->map(fn (PembayaranSantri $p) => [
+            'id' => $p->id,
             'tanggal' => $p->tanggal, 'nominal' => Money::of($p->nominal), 'status' => $p->status,
             'tagihan' => $p->tagihan ? self::namaTagihan($p->tagihan) : 'Pembayaran',
             'keterangan' => $p->tagihan ? self::keteranganTagihan($p->tagihan) : null,
@@ -232,7 +233,7 @@ class PortalKeluargaController extends Controller
                 'status' => (float) $t->sisa <= 0 ? 'lunas' : ((float) $t->sisa < (float) $t->nominal ? 'sebagian' : 'belum'),
             ]),
             'bayar' => $bayar->map(fn (PembayaranSantri $p) => [
-                'anak' => $nama[$p->id_santri] ?? '', 'tanggal' => $p->tanggal, 'nominal' => (float) $p->nominal,
+                'id' => $p->id, 'anak' => $nama[$p->id_santri] ?? '', 'tanggal' => $p->tanggal, 'nominal' => (float) $p->nominal,
                 'tagihan' => $p->tagihan ? self::namaTagihan($p->tagihan) : 'Pembayaran',
                 'keterangan' => $p->tagihan ? self::keteranganTagihan($p->tagihan) : null,
                 'sumber' => self::LABEL_SUMBER[$p->sumber] ?? 'Transfer / tunai', 'menunggu' => $p->status === 'menunggu_verifikasi',
@@ -306,6 +307,26 @@ class PortalKeluargaController extends Controller
     }
 
     // ---- Detail anak ----
+
+    /** Kartu peserta ujian seleksi anak sendiri — sejak registrasi lunas sampai seleksi selesai. */
+    public function kartuUjian(int $id): View
+    {
+        $s = Santri::where('id_wali', SesiWali::wali()->id)->findOrFail($id);
+        abort_unless(\App\Services\Ppsb\UjianSeleksi::bolehKartu($s), 403, 'Kartu peserta tersedia sesudah biaya registrasi lunas.');
+
+        return view('ujian.kartu', ['k' => \App\Services\Ppsb\UjianSeleksi::dataKartu($s), 'kembali' => route('portal.anak', $s->id)]);
+    }
+
+    /** Receipt PDF pembayaran tagihan anak sendiri — hanya yang sudah terverifikasi. */
+    public function receipt(int $id): \Symfony\Component\HttpFoundation\Response
+    {
+        $p = PembayaranSantri::whereHas('santri', fn ($q) => $q->where('id_wali', SesiWali::wali()->id))
+            ->where('status', 'terverifikasi')->findOrFail($id);
+
+        return \App\Support\Receipt::unduh($p->kelompok_bayar
+            ? PembayaranSantri::where('kelompok_bayar', $p->kelompok_bayar)->where('status', 'terverifikasi')->orderBy('id')->get()
+            : collect([$p]));
+    }
 
     /** Semua yang berkaitan dengan SATU anak — hanya anak keluarga yang sedang masuk (selain itu 404). */
     public function anak(int $id): View

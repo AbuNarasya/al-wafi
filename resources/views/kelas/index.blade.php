@@ -54,7 +54,7 @@
                     <tr x-data="{ ubah: false }">
                         <td class="px-4 py-2 tabular-nums">{{ $k->tingkat }}</td>
                         <td class="px-4 py-2 font-medium text-gray-900">
-                            <span x-show="! ubah">{{ $k->nama }}</span>
+                            <span x-show="! ubah">{{ $k->nama }}<span class="block text-xs font-normal text-gray-500">Wali kelas: {{ $k->waliKelas?->nama ?? '—' }}</span></span>
                             @if ($bolehUbah)
                                 <form x-show="ubah" x-cloak method="POST" action="{{ route('kelas.update', $k->id) }}" class="flex flex-wrap items-center gap-2">
                                     @csrf @method('PUT')
@@ -62,6 +62,10 @@
                                     <input name="nama" value="{{ $k->nama }}" required maxlength="120" class="w-72 rounded border-gray-300 text-sm">
                                     <select name="peruntukan" class="rounded border-gray-300 text-sm">
                                         @foreach (\App\Models\Kelas::PERUNTUKAN as $p => $l)<option value="{{ $p }}" @selected($k->peruntukan === $p)>{{ $l }}</option>@endforeach
+                                    </select>
+                                    <select name="id_wali_kelas" class="rounded border-gray-300 text-sm" title="Wali kelas">
+                                        <option value="">— wali kelas —</option>
+                                        @foreach ($pengguna as $id => $n)<option value="{{ $id }}" @selected((int) $k->id_wali_kelas === (int) $id)>{{ $n }}</option>@endforeach
                                     </select>
                                     <select name="status" class="rounded border-gray-300 text-sm">
                                         <option value="aktif" @selected($k->status === 'aktif')>aktif</option><option value="nonaktif" @selected($k->status === 'nonaktif')>nonaktif</option>

@@ -208,6 +208,7 @@ final class Navigation
         // santri yang benar-benar bersekolah. Modul hak aksesnya tetap `santri`.
         ['url' => '/kesantrian/alumni', 'label' => 'Alumni', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
         ['url' => '/kesantrian/santri-keluar', 'label' => 'Santri Keluar', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        ['url' => '/kesantrian/pengunduran-diri', 'label' => 'Pengunduran Diri', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'pengunduran-diri'],
         ['url' => '/kesantrian/kelas', 'label' => 'Kelas', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kelas'],
         ['url' => '/kesantrian/kelas/penempatan', 'label' => 'Penempatan Kelas', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kelas'],
         ['url' => '/kartu-santri', 'label' => 'Kartu Santri (RFID)', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kartu-santri'],
@@ -227,6 +228,8 @@ final class Navigation
         ['url' => '/ppsb/gelombang/potongan', 'label' => 'Potongan Gelombang', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'potongan-gelombang'],
         ['url' => '/ppsb/target-santri', 'label' => 'Target Santri', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'target-santri'],
         ['url' => '/ppsb/termin-filter', 'label' => 'Setting Filter Termin Jatuh Tempo', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'termin-filter'],
+        ['url' => '/ppsb/jadwal-ujian', 'label' => 'Jadwal Ujian & Kartu Peserta', 'group' => 'PPSB', 'sub' => 'Setting Awal', 'modul' => 'jadwal-ujian'],
+        ['url' => '/ppsb/daftar-hadir-ujian', 'label' => 'Daftar Hadir Ujian', 'group' => 'PPSB', 'sub' => 'Transaksi', 'modul' => 'absensi-ujian'],
         // Sub "Data Master" grup ini sudah kosong: daftar orangnya (wali, calon,
         // siap aktivasi, mundur) pindah ke grup DATA SISWA/SANTRI, dan Angsuran
         // Uang Pangkal turun ke Transaksi — ia memang urusan uang, bukan master.

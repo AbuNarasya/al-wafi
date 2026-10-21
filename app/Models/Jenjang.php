@@ -15,7 +15,7 @@ class Jenjang extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['kode', 'nama', 'jumlah_tingkat', 'tingkat_mulai', 'kode_jenjang_lanjutan', 'urutan', 'status', 'keterangan'];
+    protected $fillable = ['kode', 'nama', 'jumlah_tingkat', 'tingkat_mulai', 'kode_jenjang_lanjutan', 'urutan', 'status', 'keterangan', 'id_kepala_sekolah'];
 
     protected function casts(): array
     {

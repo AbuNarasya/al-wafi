@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\AppException;
 use App\Models\BankAccount;
-use App\Models\CompanySettings;
 use App\Models\DompetWali;
 use App\Models\Jenjang;
 use App\Models\PembayaranSantri;
@@ -223,20 +222,13 @@ class PembayaranSantriController extends Controller
      * dipastikan masuk & jurnal terposting), agar tak ada bukti bayar "sakti".
      * Urutan param ikut route (`{id}` dulu, `lingkup` dari defaults).
      */
-    public function kuitansi(string $id, string $lingkup): View
+    public function kuitansi(string $id, string $lingkup): \Symfony\Component\HttpFoundation\Response
     {
-        $pembayaran = PembayaranSantri::with([
-            // `santri.jenjang` — kuitansi menyebut NAMA jenjang, bukan kode `J001`.
-            'santri.wali', 'santri.jenjang', 'tagihan.jenis', 'pencatat', 'pemverifikasi', 'rekening',
-        ])->findOrFail((int) $id);
-
+        $pembayaran = PembayaranSantri::findOrFail((int) $id);
         abort_unless($pembayaran->status === 'terverifikasi', 403, 'Kuitansi hanya bisa dicetak untuk pembayaran yang sudah diverifikasi keuangan.');
 
-        return view('pembayaran-santri.kuitansi', [
-            'p' => $pembayaran,
-            'lingkup' => $lingkup,
-            'company' => CompanySettings::find(1),
-        ]);
+        // Format RECEIPT (21 Okt 2026) — sama dengan yang diunduh wali di portal. Dibuka di tab (inline).
+        return \App\Support\Receipt::unduh(collect([$pembayaran]), false);
     }
 
     public function verifikasi(Request $request, string $id, string $lingkup): RedirectResponse
@@ -290,14 +282,11 @@ class PembayaranSantriController extends Controller
     }
 
     /** Kuitansi gabungan — seluruh tagihan yang dibayar sekaligus, hanya yang terverifikasi. */
-    public function kuitansiKelompok(string $kelompok, string $lingkup): View
+    public function kuitansiKelompok(string $kelompok, string $lingkup): \Symfony\Component\HttpFoundation\Response
     {
-        $baris = PembayaranSantri::with(['santri.wali', 'santri.jenjang', 'tagihan.jenis', 'pemverifikasi', 'rekening'])
-            ->where('kelompok_bayar', $kelompok)->where('status', 'terverifikasi')->orderBy('id')->get();
+        $baris = PembayaranSantri::where('kelompok_bayar', $kelompok)->where('status', 'terverifikasi')->orderBy('id')->get();
         abort_if($baris->isEmpty(), 403, 'Kuitansi gabungan hanya untuk pembayaran yang sudah diverifikasi keuangan.');
 
-        return view('pembayaran-santri.kuitansi-kelompok', [
-            'baris' => $baris, 'kelompok' => $kelompok, 'lingkup' => $lingkup, 'company' => CompanySettings::find(1),
-        ]);
+        return \App\Support\Receipt::unduh($baris, false);
     }
 }

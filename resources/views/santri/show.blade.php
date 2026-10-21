@@ -42,6 +42,23 @@
                         <button type="button" @click="ubah = true" class="text-xs text-brand hover:underline">ubah</button>
                     @endif
                 </div>
+                @if (\App\Services\Ppsb\UjianSeleksi::bolehKartu($santri))
+                    @php $jadwalUjian = \App\Services\Ppsb\UjianSeleksi::jadwal($santri); @endphp
+                    <div class="mt-1 text-sm" x-data="{ tgl: false }">
+                        Ujian: <b>{{ $jadwalUjian ? $jadwalUjian['tanggal']->locale('id')->translatedFormat('l, j F Y') : 'jadwal menyusul' }}</b>
+                        @if ($jadwalUjian && $jadwalUjian['asal'] === 'peserta')<span class="text-xs text-gray-400">(khusus peserta)</span>@endif
+                        <a href="{{ route('ujian.kartu', $santri->id) }}" target="_blank" class="ml-1 text-xs font-semibold text-brand hover:underline">Kartu peserta</a>
+                        @if (\App\Support\Akses::boleh('santri', 'ubah'))
+                            <button type="button" @click="tgl = ! tgl" class="ml-1 text-xs text-brand hover:underline">atur tanggal</button>
+                            <form x-show="tgl" x-cloak method="POST" action="{{ route('ujian.tanggal_peserta', $santri->id) }}" class="mt-1 flex items-center gap-2">
+                                @csrf @method('PUT')
+                                <input type="date" name="tanggal_ujian" value="{{ $santri->tanggal_ujian?->toDateString() }}" class="rounded border-gray-300 text-xs">
+                                <button class="rounded bg-brand px-2 py-1 text-xs font-semibold text-white">Simpan</button>
+                                <span class="text-[11px] text-gray-400">kosongkan = ikut jadwal</span>
+                            </form>
+                        @endif
+                    </div>
+                @endif
                 @if ($santri->status === 'aktif')
                     <div class="mt-0.5 text-sm">
                         Kelas: @if ($santri->kelas)<b>{{ $santri->kelas->nama }}</b>@else<span class="text-amber-600">belum berkelas</span>@endif

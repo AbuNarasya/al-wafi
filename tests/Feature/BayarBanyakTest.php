@@ -218,7 +218,16 @@ class BayarBanyakTest extends TestCase
         $this->assertSame(2, JournalEntry::count());
 
         $this->actingAs($this->keuangan)->get(route('pembayaran_ppsb.kuitansi_kelompok', $baris[0]->kelompok_bayar))->assertOk()
-            ->assertSee('Kuitansi Pembayaran Gabungan')->assertSee('6.300.000')->assertSee('enam juta tiga ratus ribu');
+            ->assertHeader('Content-Type', 'application/pdf');
+        $html = view('receipt.pembayaran', ['r' => \App\Support\Receipt::data(PembayaranSantri::where('kelompok_bayar', $baris[0]->kelompok_bayar)->orderBy('id')->get())])->render();
+        foreach (['6.300.000', 'Enam juta tiga ratus ribu', '5.000.000', '1.300.000'] as $teks) {
+            $this->assertStringContainsString($teks, $html);
+        }
+
+        // Wali mengunduh receipt yang sama dari portal (lampiran PDF); pembayaran keluarga lain tak bisa.
+        $this->sebagaiIbu()->get(route('portal.receipt', $baris[0]->id))->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')->assertHeader('Content-Disposition');
+        $this->sebagaiIbu()->get(route('portal.tagihan', ['anak' => $this->calon->id, 'tab' => 'riwayat']))->assertSee('Unduh receipt (PDF)');
     }
 
     public function test_tolak_kelompok_satu_kabar_ke_wali(): void

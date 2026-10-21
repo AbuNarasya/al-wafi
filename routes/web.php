@@ -163,6 +163,8 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(Po
     Route::get('/akun', 'akun')->name('akun');
     Route::get('/kabar', 'kabar')->name('kabar');
     Route::get('/anak/{id}', 'anak')->name('anak')->whereNumber('id');
+    Route::get('/anak/{id}/kartu-ujian', 'kartuUjian')->name('kartu_ujian')->whereNumber('id');
+    Route::get('/receipt/{id}', 'receipt')->name('receipt')->whereNumber('id');
     Route::get('/tagihan/riwayat', 'riwayatTagihan')->name('tagihan.riwayat');
     Route::get('/dompet/mutasi-anak', 'mutasiAnak')->name('dompet.mutasi_anak');
     Route::get('/dompet/mutasi/{id}/rincian', 'rincianMutasi')->name('dompet.rincian')->whereNumber('id');
@@ -217,6 +219,14 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\A
     Route::post('/anak/{id}/kartu/batas', 'batas')->name('kartu.batas')->middleware('throttle:10,1')->whereNumber('id');
     Route::post('/anak/{id}/kartu/pin', 'pinAnak')->name('kartu.pin')->middleware('throttle:10,1')->whereNumber('id');
     Route::post('/anak/{id}/kartu/blokir', 'blokir')->name('kartu.blokir')->middleware('throttle:10,1')->whereNumber('id');
+});
+// Pengunduran diri santri aktif (21 Okt 2026) — di bawah /wali/anak, BUKAN /wali/data (mode verifikasi).
+Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalPengunduranDiriController::class)->group(function () {
+    Route::get('/anak/{id}/pengunduran-diri', 'form')->name('keluar')->whereNumber('id');
+    Route::post('/anak/{id}/pengunduran-diri', 'ajukan')->name('keluar.ajukan')->middleware('throttle:10,1')->whereNumber('id');
+    Route::post('/anak/{id}/pengunduran-diri/ulang', 'ajukanUlang')->name('keluar.ulang')->middleware('throttle:10,1')->whereNumber('id');
+    Route::post('/anak/{id}/pengunduran-diri/batal', 'batal')->name('keluar.batal')->middleware('throttle:10,1')->whereNumber('id');
+    Route::get('/pengunduran-diri/dokumen/{dokumen}', 'dokumen')->name('keluar.dokumen')->whereNumber('dokumen');
 });
 // Penarikan tunai kegiatan (uang saku untuk outbound/rihlah) — di /wali/tarik-tunai, BUKAN /wali/data.
 Route::prefix('wali/tarik-tunai')->name('portal.tarik_tunai.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalTarikTunaiController::class)->group(function () {
@@ -775,6 +785,21 @@ Route::middleware('auth')->group(function () {
         Route::get('/laporan/{shift}', [$k, 'laporan'])->name('laporan')->whereNumber('shift');
     });
 
+    // Pengunduran diri santri aktif (21 Okt 2026). Siapa memutus apa diperiksa di PengunduranDiriService
+    // (wali kelas & kepala sekolah lewat master Kelas/Jenjang; clearance lewat modul clearance-*).
+    Route::prefix('kesantrian/pengunduran-diri')->name('pengunduran_diri.')->controller(\App\Http\Controllers\PengunduranDiriController::class)
+        ->middleware('hakakses:pengunduran-diri,lihat')->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/keluarkan', 'keluarkan')->name('keluarkan')->middleware('hakakses:clearance-admin,ubah');
+            Route::get('/dokumen/{dokumen}', 'dokumen')->name('dokumen')->whereNumber('dokumen');
+            Route::get('/{pengajuan}', 'show')->name('show')->whereNumber('pengajuan');
+            Route::post('/{pengajuan}/verifikasi', 'verifikasi')->name('verifikasi')->whereNumber('pengajuan');
+            Route::post('/{pengajuan}/putuskan', 'putuskan')->name('putuskan')->whereNumber('pengajuan');
+            Route::post('/{pengajuan}/clearance/{pihak}', 'clearance')->name('clearance')->whereNumber('pengajuan')->whereIn('pihak', ['keuangan', 'kesantrian', 'admin']);
+            Route::post('/{pengajuan}/dokumen', 'unggah')->name('unggah')->whereNumber('pengajuan');
+            Route::post('/{pengajuan}/dapodik', 'dapodik')->name('dapodik')->whereNumber('pengajuan');
+        });
+
     // Kelas (rombel) & penempatan santri aktif ke kelas — 21 Okt 2026.
     Route::prefix('kesantrian/kelas')->name('kelas.')->controller(\App\Http\Controllers\KelasController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:kelas,lihat');
@@ -1057,6 +1082,19 @@ Route::middleware('auth')->group(function () {
         $t = TerminFilterController::class;
         Route::get('/', [$t, 'edit'])->name('edit')->middleware('hakakses:termin-filter,lihat');
         Route::put('/', [$t, 'update'])->name('update')->middleware('hakakses:termin-filter,ubah');
+    });
+
+    // Ujian seleksi PSB: jadwal & pengaturan kartu, kartu peserta, tanggal khusus peserta, absensi QR (21 Okt 2026).
+    Route::controller(\App\Http\Controllers\UjianSeleksiController::class)->name('ujian.')->group(function () {
+        Route::get('/ppsb/jadwal-ujian', 'jadwal')->name('jadwal')->middleware('hakakses:jadwal-ujian,lihat');
+        Route::post('/ppsb/jadwal-ujian', 'simpanJadwal')->name('jadwal.simpan')->middleware('hakakses:jadwal-ujian,buat');
+        Route::put('/ppsb/jadwal-ujian/pengaturan', 'pengaturanKartu')->name('pengaturan')->middleware('hakakses:jadwal-ujian,ubah');
+        Route::delete('/ppsb/jadwal-ujian/{jadwal}', 'hapusJadwal')->name('jadwal.hapus')->middleware('hakakses:jadwal-ujian,hapus')->whereNumber('jadwal');
+        Route::get('/santri/{id}/kartu-ujian', 'kartu')->name('kartu')->middleware('hakakses:santri,lihat')->whereNumber('id');
+        Route::put('/santri/{id}/tanggal-ujian', 'tanggalPeserta')->name('tanggal_peserta')->middleware('hakakses:santri,ubah')->whereNumber('id');
+        // Dibuka dari QR kartu: tautan bertanda tangan + login staf berhak absensi.
+        Route::get('/ppsb/hadir-ujian/{santri}', 'hadir')->name('hadir')->middleware(['signed', 'hakakses:absensi-ujian,buat'])->whereNumber('santri');
+        Route::get('/ppsb/daftar-hadir-ujian', 'daftarHadir')->name('daftar_hadir')->middleware('hakakses:absensi-ujian,lihat');
     });
 
     // Jalur Pendaftaran (master, CRUD).

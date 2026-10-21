@@ -61,7 +61,8 @@
                         <p class="text-sm font-medium text-slate-900">{{ $p['tagihan'] }}</p>
                         @if ($p['keterangan'])<p class="text-xs text-slate-600">{{ $p['keterangan'] }}</p>@endif
                         <p class="text-xs text-slate-500">{{ $p['anak'] }} &middot; {{ $p['tanggal']->format('d/m/Y') }} &middot; {{ $p['sumber'] }}</p>
-                        @if ($p['menunggu'])<p class="text-xs font-medium text-amber-700">Menunggu verifikasi</p>@endif
+                        @if ($p['menunggu'])<p class="text-xs font-medium text-amber-700">Menunggu verifikasi</p>
+                        @else<a href="{{ route('portal.receipt', $p['id']) }}" class="mt-1 inline-block text-xs font-semibold text-brand">Unduh receipt (PDF)</a>@endif
                     </div>
                     <p class="shrink-0 text-sm font-bold tabular-nums text-slate-900">{{ $rp($p['nominal']) }}</p>
                 </div>

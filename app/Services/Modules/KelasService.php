@@ -48,7 +48,9 @@ class KelasService
             throw new AppException(422, "Kelas \"{$nama}\" sudah ada di {$jenjang->nama} tingkat {$tingkat}.");
         }
         $isi = ['kode_jenjang' => $jenjang->kode, 'tingkat' => $tingkat, 'nama' => $nama,
-            'peruntukan' => $data['peruntukan'] ?? 'C', 'status' => $data['status'] ?? 'aktif'];
+            'peruntukan' => $data['peruntukan'] ?? 'C', 'status' => $data['status'] ?? 'aktif',
+            // Wali kelas memverifikasi pengajuan pengunduran diri santri kelasnya (21 Okt 2026).
+            'id_wali_kelas' => array_key_exists('id_wali_kelas', $data) ? ($data['id_wali_kelas'] ?: null) : $kelas?->id_wali_kelas];
 
         if ($kelas) {
             $berpenghuni = $kelas->santri()->exists();
