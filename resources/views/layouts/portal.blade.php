@@ -53,16 +53,18 @@
         // x-data="pinPad(punyaPin, urlBuatPin)" @submit.prevent="buka()". PIN dikirim
         // bersama transaksinya dan diperiksa di server — layar ini hanya pengetiknya.
         window.pinPad = (punya, urlBuat) => ({
-            pin: '', terbuka: false,
+            pin: '', terbuka: false, memproses: false,
             // Belum punya PIN → ke pembuatan PIN, membawa alamat halaman ini supaya sesudahnya wali kembali ke sini.
             buka() { if (! this.$root.reportValidity()) return; if (! punya) { location.href = urlBuat + (urlBuat.includes('?') ? '&' : '?') + 'kembali=' + encodeURIComponent(location.pathname + location.search); return; } this.pin = ''; this.terbuka = true; },
-            tutup() { this.terbuka = false; this.pin = ''; },
+            tutup() { if (this.memproses) return; this.terbuka = false; this.pin = ''; },
+            // PIN lengkap → papan berganti animasi "Memproses…" sampai halaman berikutnya termuat (21 Okt 2026),
+            // supaya jeda server tak terlihat macet dan papan tak bisa diketik/ditutup dua kali.
             ketik(d) {
-                if (this.pin.length >= 6) return;
+                if (this.pin.length >= 6 || this.memproses) return;
                 this.pin += d;
-                if (this.pin.length === 6) this.$nextTick(() => this.$root.submit());
+                if (this.pin.length === 6) { this.memproses = true; this.$nextTick(() => this.$root.submit()); }
             },
-            hapus() { this.pin = this.pin.slice(0, -1); },
+            hapus() { if (! this.memproses) this.pin = this.pin.slice(0, -1); },
         });
 
         // Pemilih berkas (bukti transfer, berkas PSB): FOTO DIKECILKAN DI HP sebelum dikirim.
