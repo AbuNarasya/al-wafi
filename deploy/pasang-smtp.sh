@@ -48,7 +48,11 @@ MAIL_FROM_ADDRESS='"$PENGIRIM"'
 MAIL_FROM_NAME="$2"
 ENV
 cat .env.baru > .env && rm -f .env.baru
+# umask DIKEMBALIKAN sebelum config:cache: dengan umask 077 berkas bootstrap/cache/config.php lahir berizin 600,
+# PHP-FPM (www-data) tak bisa membacanya → seluruh ERP galat 500 (terjadi 21 Okt 2026 di erp produksi).
+umask 002
 php artisan config:cache >/dev/null
+chmod g+r bootstrap/cache/*.php 2>/dev/null || true
 # email:uji baru ada sesudah kode ini sampai di instans itu (erp produksi: sesudah "rilis") — tak menggagalkan pemasangan.
 if [ -n "$3" ]; then php artisan email:uji "$3" || echo "(email:uji gagal / belum tersedia di instans ini — lihat pesan di atas)"; fi
 echo "Selesai: $1"'
