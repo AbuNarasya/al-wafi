@@ -248,6 +248,15 @@ class PembayaranSantriService
                 'diverifikasi_pada' => Carbon::now(), 'journal_entry_id' => $entry->id,
             ]);
 
+            // Kabar & push ke keluarga (kategori "tagihan") — sesudah transaksi tersimpan, tak pernah menggagalkannya.
+            DB::afterCommit(function () use ($pembayaran, $tagihan) {
+                try {
+                    \App\Services\PortalWali\KabarKeluarga::pembayaranDiverifikasi($pembayaran, $tagihan);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            });
+
             return $pembayaran;
         });
 

@@ -168,6 +168,12 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(Po
     Route::get('/dompet/mutasi/{id}/rincian', 'rincianMutasi')->name('dompet.rincian')->whereNumber('id');
     Route::post('/akun/perangkat/{id}/cabut', 'cabutPerangkat')->name('cabut_perangkat')->whereNumber('id');
 });
+// Push notification wali: langganan per perangkat + kategori pilihan (keputusan user 21 Okt 2026).
+Route::prefix('wali/akun')->name('portal.push.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalPushController::class)->group(function () {
+    Route::post('/push', 'langganan')->name('langganan')->middleware('throttle:20,1');
+    Route::delete('/push', 'berhenti')->middleware('throttle:20,1');
+    Route::post('/push/kategori', 'kategori')->name('kategori')->middleware('throttle:20,1');
+});
 Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(PortalBayarController::class)->group(function () {
     Route::get('/bayar/{id}', 'form')->name('bayar')->whereNumber('id');
     Route::post('/bayar/{id}/dompet', 'dariDompet')->name('bayar.dompet')->whereNumber('id')->middleware('throttle:10,1');

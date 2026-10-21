@@ -428,6 +428,9 @@ class PortalKeluargaController extends Controller
         $tokenIni = (string) $request->cookie(IngatPerangkat::COOKIE);
 
         return view('portal.akun', [
+            'pushKunci' => app(\App\Services\Modules\PushService::class)->kunciPublik(),
+            'kategori' => NotifikasiWali::KATEGORI,
+            'kategoriNyala' => app(\App\Services\PortalWali\PushWaliService::class)->kategoriNyala($wali->id, $peran),
             'nama' => $wali->{"nama_{$peran}"} ?: $wali->nama,
             'peran' => \App\Models\Wali::PERAN[$peran] ?? $peran,
             'email' => MasukWali::samarkanEmail((string) $wali->{"email_{$peran}"}),

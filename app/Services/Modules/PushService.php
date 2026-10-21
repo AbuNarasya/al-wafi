@@ -348,7 +348,8 @@ class PushService
         ];
     }
 
-    private function webPush(): WebPush
+    /** Juga dipakai pengirim push wali ([[App\Services\PortalWali\PushWaliService]]). */
+    public function webPush(): WebPush
     {
         return new WebPush(['VAPID' => [
             'subject' => (string) config('push.vapid.subject'),

@@ -52,6 +52,41 @@ Artisan::command('dompet:jurnal-belanja-toko', function (App\Services\Modules\Ju
 })->purpose('Jurnal ringkas belanja kartu santri di Wafi Mart (penghubung)');
 Schedule::command('dompet:jurnal-belanja-toko')->dailyAt('00:15')->withoutOverlapping();
 
+// Uji pengiriman email (keputusan user 21 Okt 2026: SMTP Email Hostinger, noreply@al-wafi.sch.id). Email gagal
+// SENYAP — kode masuk wali tak sampai tanpa galat di layar — jadi alat ini menampilkan pengaturan & galat SMTP apa adanya.
+Artisan::command('email:uji {alamat : Alamat tujuan email uji}', function (string $alamat) {
+    $m = config('mail.default');
+    $c = config("mail.mailers.{$m}", []);
+    $this->line("Mailer: {$m}".($m === 'smtp' ? " · {$c['host']}:{$c['port']} ".($c['scheme'] ?? '').' · user '.($c['username'] ?: '-') : ''));
+    $this->line('Pengirim: '.config('mail.from.name').' <'.config('mail.from.address').'>');
+    if ($m === 'log') {
+        $this->warn('MAIL_MAILER=log — email hanya ditulis ke storage/logs, TIDAK dikirim. Isi pengaturan SMTP di .env lalu `php artisan config:cache`.');
+    }
+    try {
+        Illuminate\Support\Facades\Mail::raw(
+            'Ini email uji dari '.config('app.name').' ('.now()->format('d/m/Y H:i:s').'). Bila sampai, pengiriman email sudah berfungsi.',
+            fn ($pesan) => $pesan->to($alamat)->subject('Uji email '.config('app.name'))
+        );
+    } catch (Throwable $e) {
+        $this->error('GAGAL: '.class_basename($e).' — '.$e->getMessage());
+
+        return 1;
+    }
+    $this->info($m === 'log' ? 'Ditulis ke log (tidak terkirim).' : "Terkirim ke {$alamat} — periksa kotak masuk & folder spam.");
+
+    return 0;
+})->purpose('Kirim email uji & tampilkan galat SMTP');
+
+// Kabar "tagihan baru" ke keluarga (portal & push wali, kategori tagihan) — satu kabar per anak per sapuan.
+// Tagihan dari impor tak dikabarkan. Aman diulang: yang sudah dikabarkan bertanda `dikabarkan_pada`.
+Artisan::command('kabar:tagihan-baru', function () {
+    $n = App\Services\PortalWali\KabarKeluarga::sapuTagihanBaru();
+    if ($n > 0) {
+        $this->info("{$n} tagihan baru dikabarkan ke keluarga.");
+    }
+})->purpose('Kabarkan tagihan baru terbit ke wali (portal & push)');
+Schedule::command('kabar:tagihan-baru')->everyFiveMinutes()->withoutOverlapping();
+
 // Sisi Wafi Mart (Fase 3c-2): cocokkan transaksi penghubung kemarin (dan tanggal tertunda ≤ 7 hari) dengan struk toko;
 // potongan tanpa struk dikembalikan otomatis ke santri. Di instans Al Wafi tak berbuat apa-apa.
 Artisan::command('toko:rekonsiliasi-dompet {--tanggal= : Satu tanggal tertentu (YYYY-MM-DD)}', function (App\Services\Modules\RekonsiliasiDompetToko $r) {

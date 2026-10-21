@@ -27,6 +27,13 @@ class PushKirim extends Command
             return $this->uji($push, (string) $username);
         }
 
+        // Kabar portal wali (per kategori pilihan wali) — antrean & penjaganya sendiri, satu jadwal dengan staf.
+        $w = app(\App\Services\PortalWali\PushWaliService::class)->kirimYangBelum();
+        if ($w['disapu'] > 0) {
+            $this->info("Push wali: {$w['terkirim']} terkirim, {$w['gagal']} gagal, dari {$w['disapu']} kabar".
+                ($w['langganan_dibuang'] ? ", {$w['langganan_dibuang']} langganan mati dibuang" : '').'.');
+        }
+
         $h = $push->kirimYangBelum();
 
         if ($h['disapu'] === 0) {
