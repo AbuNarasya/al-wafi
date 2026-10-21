@@ -181,7 +181,8 @@ class LinkVerifikasi
 
     public static function url(VerifikasiWali $v): string
     {
-        return route('portal.verifikasi.buka', self::kode($v));
+        // Dibuat dari layar staf → harus memakai domain portal bila ada, bukan domain ERP.
+        return \App\Support\AlamatPortal::rute('portal.verifikasi.buka', self::kode($v));
     }
 
     /** Nomor kontak utama dalam format WhatsApp (62…), atau null. */

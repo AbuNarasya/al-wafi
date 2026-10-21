@@ -28,6 +28,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Rute yang tak berlaku di instans ini (Portal Wali di Wafi Mart, dst.) → 404.
         $middleware->web(append: [\App\Http\Middleware\SaklarInstans::class]);
 
+        // Domain portal wali sendiri (config/portal.php): di sana hanya /wali/…; /wali/… di domain staf dialihkan.
+        // Paling depan — pengalihan tak perlu membuka sesi.
+        $middleware->web(prepend: [\App\Http\Middleware\DomainPortal::class]);
+
         // Notifikasi Midtrans datang dari server Midtrans, tanpa sesi & token CSRF.
         // Pengamannya tanda tangan SHA-512 + status yang ditanyakan ulang ke API.
         // Penghubung dompet toko: pengamannya tanda tangan HMAC (TandaTanganToko).
