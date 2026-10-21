@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AppException;
 use App\Models\DompetSantri;
 use App\Models\MutasiDompet;
 use App\Models\NotifikasiWali;
@@ -308,6 +309,55 @@ class PortalKeluargaController extends Controller
 
     // ---- Detail anak ----
 
+    // ---- Menu Lengkap & atur menu utama (21 Okt 2026) ----
+
+    public function menu(Request $request): View
+    {
+        $wali = SesiWali::wali();
+        $peran = (string) SesiWali::peran($request);
+        $tersedia = \App\Services\PortalWali\MenuPortal::tersedia($wali);
+
+        return view('portal.menu', [
+            'grup' => collect(\App\Services\PortalWali\MenuPortal::GRUP)->map(fn ($label, $kode) => ['label' => $label,
+                'menu' => array_filter($tersedia, fn ($m) => $m[4] === $kode)])->filter(fn ($g) => $g['menu'] !== []),
+            'tersedia' => $tersedia,
+            'pilihan' => \App\Services\PortalWali\MenuPortal::pilihan($wali, $peran),
+        ]);
+    }
+
+    public function simpanMenu(Request $request): RedirectResponse
+    {
+        $wali = SesiWali::wali();
+        $peran = (string) SesiWali::peran($request);
+        if ($request->boolean('bawaan')) {
+            \App\Services\PortalWali\MenuPortal::kembalikanBawaan($wali, $peran);
+
+            return redirect()->route('portal.beranda')->with('status', 'Menu utama dikembalikan ke susunan bawaan.');
+        }
+        $data = $request->validate(['menu' => ['nullable', 'array'], 'menu.*' => ['string', 'max:40']]);
+        try {
+            \App\Services\PortalWali\MenuPortal::simpan($wali, $peran, $data['menu'] ?? []);
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('portal.beranda')->with('status', 'Menu utama disimpan.');
+    }
+
+    /** Riwayat klinik seluruh anak (bisa disaring per anak) — dulu 5 terakhir di halaman anak. */
+    public function klinik(Request $request): View
+    {
+        $anak = $this->anakKeluarga();
+        $pilih = $anak->firstWhere('id', (int) $request->query('anak'));
+
+        return view('portal.klinik', [
+            'anak' => $anak, 'pilih' => $pilih,
+            'kunjungan' => \App\Models\KunjunganKlinik::with(['obat', 'santri:id,nama'])
+                ->whereIn('id_santri', $pilih ? [$pilih->id] : $anak->pluck('id'))
+                ->orderByDesc('datang_pada')->paginate(20)->withQueryString(),
+        ]);
+    }
+
     /** Kartu peserta ujian seleksi anak sendiri — sejak registrasi lunas sampai seleksi selesai. */
     public function kartuUjian(int $id): View
     {
@@ -366,8 +416,6 @@ class PortalKeluargaController extends Controller
                 'diganti' => $registrasi->where('status', 'perlu_diganti')->count(),
             ],
             'santri' => $s, 'aktif' => $aktif, 'tahapPsb' => $tahapPsb === false ? null : $tahapPsb,
-            // Riwayat klinik (21 Okt 2026) — 5 kunjungan terakhir, lengkap dengan obat.
-            'klinik' => \App\Models\KunjunganKlinik::with('obat')->where('id_santri', $s->id)->orderByDesc('datang_pada')->limit(5)->get(),
             'label' => \App\Services\Ppsb\Tahap::labelStatus((string) $s->status),
             'sisa' => $belum->sum(fn ($t) => (float) $t->sisa),
             'belum' => $belum->take(5)->map(fn (TagihanSantri $t) => [

@@ -22,6 +22,8 @@
         'unggah' => 'M12 16V4M7 9l5-5 5 5M5 20h14',
         'otomatis' => 'M20 11a8 8 0 10-2.3 5.7M20 4v7h-7',
         'kartu' => 'M3 6h18v12H3zM3 10h18M7 15h4',
+        'klinik' => 'M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zM12 8v8M8 12h8',
+        'menu' => 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
     ];
 @endphp
 <svg {{ $attributes->merge(['class' => $kelas]) }} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ $jalur[$nama] ?? 'M12 21a9 9 0 100-18 9 9 0 000 18z' }}"/></svg>

@@ -162,6 +162,10 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(Po
     Route::get('/dompet', 'dompet')->name('dompet');
     Route::get('/akun', 'akun')->name('akun');
     Route::get('/kabar', 'kabar')->name('kabar');
+    // Menu Lengkap & atur menu utama, riwayat klinik (21 Okt 2026).
+    Route::get('/menu', 'menu')->name('menu');
+    Route::post('/menu', 'simpanMenu')->name('menu.simpan')->middleware('throttle:20,1');
+    Route::get('/klinik', 'klinik')->name('klinik');
     Route::get('/anak/{id}', 'anak')->name('anak')->whereNumber('id');
     Route::get('/anak/{id}/kartu-ujian', 'kartuUjian')->name('kartu_ujian')->whereNumber('id');
     Route::get('/receipt/{id}', 'receipt')->name('receipt')->whereNumber('id');

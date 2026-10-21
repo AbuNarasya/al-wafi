@@ -208,7 +208,6 @@ final class Navigation
         // santri yang benar-benar bersekolah. Modul hak aksesnya tetap `santri`.
         ['url' => '/kesantrian/alumni', 'label' => 'Alumni', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
         ['url' => '/kesantrian/santri-keluar', 'label' => 'Santri Keluar', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
-        ['url' => '/klinik', 'label' => 'Klinik', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'klinik'],
         ['url' => '/kesantrian/pengunduran-diri', 'label' => 'Pengunduran Diri', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'pengunduran-diri'],
         ['url' => '/kesantrian/kelas', 'label' => 'Kelas', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kelas'],
         ['url' => '/kesantrian/kelas/penempatan', 'label' => 'Penempatan Kelas', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kelas'],
@@ -298,6 +297,11 @@ final class Navigation
         ['url' => '/kesantrian/setoran-pemakaian', 'label' => 'Setoran Laundry', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi', 'modul' => 'setoran-laundry'],
         ['url' => '/kesantrian/tagihan-lain', 'label' => 'Daftar & Terbitkan', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi', 'modul' => 'tagihan-lain'],
 
+        // ---- Klinik (grup sendiri, permintaan user 21 Okt 2026). Catat kunjungan = santri TAP KARTU RFID. ----
+        ['url' => '/klinik', 'label' => 'Klinik Hari Ini', 'group' => 'KLINIK', 'modul' => 'klinik'],
+        ['url' => '/klinik/catat', 'label' => 'Catat Kunjungan (tap kartu)', 'group' => 'KLINIK', 'modul' => 'klinik'],
+        ['url' => '/klinik/rekap', 'label' => 'Rekap Klinik', 'group' => 'KLINIK', 'modul' => 'klinik'],
+
         // ---- 8. Sistem ----
         ['url' => '/approvals', 'label' => 'Persetujuan Saya', 'group' => 'SISTEM'],
         // "Outstanding Approval" (/void-approvals) dibuang 2026-07-28 — tak ada
@@ -306,7 +310,7 @@ final class Navigation
 
     // DATA SISWA/SANTRI mendahului PPSB & KEPENDIDIKAN: isinya orang yang jadi
     // rujukan kedua grup itu, dan itu pula yang paling sering dibuka.
-    public const GROUP_ORDER = ['', 'SETTING AWAL', 'ANGGARAN', 'PENGAJUAN PEMBAYARAN', 'KEUANGAN', 'WAFI MART', 'DATA SISWA/SANTRI', 'PPSB', 'KEPENDIDIKAN', 'TAGIHAN LAIN-LAIN', 'SISTEM'];
+    public const GROUP_ORDER = ['', 'SETTING AWAL', 'ANGGARAN', 'PENGAJUAN PEMBAYARAN', 'KEUANGAN', 'WAFI MART', 'DATA SISWA/SANTRI', 'PPSB', 'KEPENDIDIKAN', 'KLINIK', 'TAGIHAN LAIN-LAIN', 'SISTEM'];
 
     public const SUB_ORDER = [
         'SETTING AWAL' => ['Setting Umum', 'Setting Biaya'],

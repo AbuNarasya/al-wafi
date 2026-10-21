@@ -6,28 +6,21 @@
     <a href="{{ route('klinik.index') }}" class="text-sm text-brand hover:underline">&larr; Klinik</a>
 
     @unless ($santri)
-        {{-- Pembaca kartu RFID mengetik UID lalu Enter — formulir cari langsung terkirim. --}}
-        <form method="GET" class="mt-3 flex max-w-xl gap-2">
-            <input name="q" value="{{ $q }}" autofocus placeholder="Nama / NIS santri, atau tempelkan kartu santri…" class="flex-1 rounded-lg border-gray-300 text-sm">
-            <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white">Cari</button>
+        {{-- Santri WAJIB tap kartu RFID. Pembaca kartu USB mengetik UID lalu Enter — formulir langsung terkirim. --}}
+        <form method="GET" class="mx-auto mt-6 max-w-md rounded-2xl border-2 border-dashed border-brand/40 bg-white p-8 text-center shadow-sm">
+            <p class="text-lg font-bold text-gray-900">Tap kartu santri</p>
+            <p class="mt-1 text-sm text-gray-500">Tempelkan kartu RFID santri ke pembaca kartu.</p>
+            <input name="kartu" autofocus autocomplete="off" placeholder="Menunggu kartu…" class="mt-4 w-full rounded-lg border-gray-300 text-center font-mono text-sm">
+            @if ($galat)<p class="mt-3 rounded-lg bg-red-50 p-2 text-sm text-red-700">{{ $galat }}</p>@endif
         </form>
-        @if ($q !== '')
-            <div class="mt-3 max-w-xl divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white text-sm shadow-sm">
-                @forelse ($hasil as $s)
-                    <a href="{{ route('klinik.create', ['santri' => $s->id]) }}" class="block px-4 py-2 hover:bg-gray-50">{{ $s->nama }} <span class="text-xs text-gray-500">{{ $s->nis }}</span></a>
-                @empty
-                    <p class="px-4 py-3 text-gray-500">Santri aktif tidak ditemukan.</p>
-                @endforelse
-            </div>
-        @endif
     @else
         <div class="mt-3 grid gap-4 lg:grid-cols-3">
             <form method="POST" action="{{ route('klinik.store') }}" class="space-y-3 rounded-xl border border-gray-200 bg-white p-4 text-sm shadow-sm lg:col-span-2"
                   x-data="{ tl: @js(old('tindak_lanjut', 'kembali_kelas')), obat: @js(old('obat', [['nama' => '', 'dosis' => '', 'jumlah' => '']])) }">
-                @csrf <input type="hidden" name="id_santri" value="{{ $santri->id }}">
+                @csrf <input type="hidden" name="kartu" value="{{ $uid }}">
                 <div class="flex items-center justify-between">
                     <p class="text-base font-semibold text-gray-900">{{ $santri->nama }} <span class="text-sm font-normal text-gray-500">{{ $santri->nis }} · {{ $santri->jenjang?->nama }}{{ $santri->kelas ? ' · '.$santri->kelas->nama : '' }}</span></p>
-                    <a href="{{ route('klinik.create') }}" class="text-xs text-brand hover:underline">ganti santri</a>
+                    <a href="{{ route('klinik.create') }}" class="text-xs text-brand hover:underline">tap kartu lain</a>
                 </div>
                 <label class="block"><span class="text-xs text-gray-500">Keluhan *</span>
                     <textarea name="keluhan" rows="2" required class="w-full rounded-lg border-gray-300 text-sm">{{ old('keluhan') }}</textarea></label>

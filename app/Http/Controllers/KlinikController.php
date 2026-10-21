@@ -31,29 +31,34 @@ class KlinikController extends Controller
         ]);
     }
 
-    /** Langkah 1: cari santri (nama / NIS) atau tempel kartu RFID. Langkah 2: formulir untuk santri terpilih. */
+    /**
+     * Langkah 1: santri TAP KARTU RFID (keputusan user 21 Okt 2026 — tak ada pencarian nama/NIS, supaya catatan
+     * benar-benar milik santri yang datang). Langkah 2: formulir untuk santri pemilik kartu.
+     */
     public function create(Request $request): View
     {
-        $q = trim((string) $request->query('q', ''));
-        $santri = $request->query('santri') ? Santri::with(['kelas:id,nama', 'jenjang:kode,nama'])->where('status', 'aktif')->find($request->query('santri')) : null;
-        $hasil = collect();
-        if (! $santri && $q !== '') {
-            $kartu = (new KartuSantriService)->cariAktif($q);
-            $hasil = $kartu ? collect([$kartu->santri]) : Santri::where('status', 'aktif')
-                ->where(fn ($w) => $w->where('nama', 'ilike', "%{$q}%")->orWhere('nis', 'ilike', "%{$q}%"))->orderBy('nama')->limit(20)->get();
-            if ($hasil->count() === 1) {
-                $santri = $hasil->first()->load(['kelas:id,nama', 'jenjang:kode,nama']);
+        $uid = trim((string) $request->query('kartu', ''));
+        $santri = null;
+        $galat = null;
+        if ($uid !== '') {
+            $kartu = (new KartuSantriService)->cariAktif($uid);
+            if (! $kartu) {
+                $galat = 'Kartu tidak dikenal atau diblokir. Santri yang belum punya kartu aktif dipasangkan kartu dulu di menu Kartu Santri (RFID).';
+            } elseif ($kartu->santri?->status !== 'aktif') {
+                $galat = "{$kartu->santri?->nama} bukan santri aktif.";
+            } else {
+                $santri = $kartu->santri->load(['kelas:id,nama', 'jenjang:kode,nama']);
             }
         }
 
-        return view('klinik.create', ['q' => $q, 'santri' => $santri, 'hasil' => $hasil,
+        return view('klinik.create', ['santri' => $santri, 'galat' => $galat, 'uid' => $santri ? KartuSantriService::bersihkanUid($uid) : null,
             'riwayat' => $santri ? KunjunganKlinik::where('id_santri', $santri->id)->orderByDesc('datang_pada')->limit(5)->get() : collect()]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $d = $request->validate([
-            'id_santri' => ['required', 'integer'], 'keluhan' => ['required', 'string', 'max:2000'],
+            'kartu' => ['required', 'string', 'max:80'], 'keluhan' => ['required', 'string', 'max:2000'],
             'suhu' => ['nullable', 'numeric', 'between:30,45'], 'tensi' => ['nullable', 'string', 'max:15'],
             'nadi' => ['nullable', 'integer', 'between:20,250'], 'berat' => ['nullable', 'numeric', 'between:5,250'],
             'pemeriksaan' => ['nullable', 'string', 'max:3000'], 'tindakan' => ['nullable', 'string', 'max:3000'],
@@ -61,6 +66,12 @@ class KlinikController extends Controller
             'obat' => ['nullable', 'array', 'max:20'], 'obat.*.nama' => ['nullable', 'string', 'max:255'],
             'obat.*.dosis' => ['nullable', 'string', 'max:255'], 'obat.*.jumlah' => ['nullable', 'string', 'max:50'],
         ]);
+        // Santri ditentukan dari KARTU yang ditap, bukan id kiriman formulir.
+        $kartu = (new KartuSantriService)->cariAktif($d['kartu']);
+        if (! $kartu) {
+            return redirect()->route('klinik.create')->with('error', 'Kartu tidak dikenal atau diblokir — tap ulang kartu santri.');
+        }
+        $d['id_santri'] = $kartu->id_santri;
         try {
             $k = $this->svc->catat($d, $d['obat'] ?? [], $request->user()->id_pengguna);
         } catch (AppException $e) {

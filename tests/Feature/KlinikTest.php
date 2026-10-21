@@ -66,12 +66,14 @@ class KlinikTest extends TestCase
     public function test_catat_kunjungan_dirawat_lalu_selesai_dan_wali_dikabari(): void
     {
         KartuSantri::create(['uid' => 'ABCD1234', 'id_santri' => $this->ahmad->id, 'status' => 'aktif']);
-        $this->actingAs($this->perawat)->get(route('klinik.create', ['q' => 'ABCD1234']))->assertOk()->assertSee('AHMAD')->assertSee('Simpan kunjungan');
+        $this->actingAs($this->perawat)->get(route('klinik.create'))->assertSee('Tap kartu santri');
+        $this->actingAs($this->perawat)->get(route('klinik.create', ['kartu' => 'AHMAD']))->assertSee('Kartu tidak dikenal'); // nama bukan kartu
+        $this->actingAs($this->perawat)->get(route('klinik.create', ['kartu' => 'ABCD1234']))->assertOk()->assertSee('AHMAD')->assertSee('Simpan kunjungan');
 
-        $this->actingAs($this->perawat)->post(route('klinik.store'), ['id_santri' => $this->ahmad->id, 'keluhan' => 'Demam dan pusing',
+        $this->actingAs($this->perawat)->post(route('klinik.store'), ['kartu' => 'ABCD1234', 'keluhan' => 'Demam dan pusing',
             'suhu' => 38.4, 'tensi' => '110/70', 'pemeriksaan' => 'Febris', 'tindakan' => 'Kompres', 'tindak_lanjut' => 'dirujuk'])
             ->assertSessionHas('error'); // rujukan wajib menyebut tujuan
-        $this->actingAs($this->perawat)->post(route('klinik.store'), ['id_santri' => $this->ahmad->id, 'keluhan' => 'Demam dan pusing',
+        $this->actingAs($this->perawat)->post(route('klinik.store'), ['kartu' => 'ABCD1234', 'keluhan' => 'Demam dan pusing',
             'suhu' => 38.4, 'tensi' => '110/70', 'pemeriksaan' => 'Febris', 'tindakan' => 'Kompres', 'tindak_lanjut' => 'dirawat',
             'obat' => [['nama' => 'Paracetamol', 'dosis' => '3x1', 'jumlah' => '6'], ['nama' => '', 'dosis' => '', 'jumlah' => '']]])->assertRedirect();
 
@@ -88,13 +90,16 @@ class KlinikTest extends TestCase
 
         // Wali melihat riwayatnya di portal.
         $this->actingAs($this->wali, 'wali')->withSession(['portal.peran' => 'ibu', 'portal.punya_sandi' => true])
-            ->get(route('portal.anak', $this->ahmad->id))->assertSee('Riwayat klinik')->assertSee('Demam dan pusing')->assertSee('Paracetamol');
+            ->get(route('portal.klinik'))->assertOk()->assertSee('Riwayat klinik')->assertSee('Demam dan pusing')->assertSee('Paracetamol');
+        $this->actingAs($this->wali, 'wali')->withSession(['portal.peran' => 'ibu', 'portal.punya_sandi' => true])
+            ->get(route('portal.anak', $this->ahmad->id))->assertDontSee('Demam dan pusing'); // tak lagi di detail anak
         $this->actingAs($this->perawat)->get(route('klinik.rekap'))->assertOk()->assertSee('demam');
     }
 
     public function test_tagihan_klinik_terbit_sekali_dan_butuh_hak_tagihan_lain(): void
     {
-        $this->actingAs($this->perawat)->post(route('klinik.store'), ['id_santri' => $this->ahmad->id, 'keluhan' => 'Luka', 'tindak_lanjut' => 'dirujuk', 'rujukan_ke' => 'RS Umum']);
+        KartuSantri::create(['uid' => 'ABCD1234', 'id_santri' => $this->ahmad->id, 'status' => 'aktif']);
+        $this->actingAs($this->perawat)->post(route('klinik.store'), ['kartu' => 'ABCD1234', 'keluhan' => 'Luka', 'tindak_lanjut' => 'dirujuk', 'rujukan_ke' => 'RS Umum']);
         $k = KunjunganKlinik::sole();
 
         $this->actingAs($this->perawat)->post(route('klinik.tagihan', $k->id), ['kode_jenis' => 'KLN', 'nominal' => 150000])->assertForbidden();

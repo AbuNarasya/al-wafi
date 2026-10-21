@@ -56,24 +56,19 @@
     {{-- Menu utama: ikon kotak berwarna --}}
     <section class="mt-5">
         <h2 class="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span> Menu utama</h2>
-        @php
-            $menuUtama = array_values(array_filter([
-                // Bukan tiruan kartu di atas: kartu = sisa & saldo SAAT INI, ikon = HISTORINYA.
-                ['portal.tagihan.riwayat', 'Riwayat tagihan', 'riwayat', '#b8956a'],
-                $saldoDompet !== null ? ['portal.dompet.mutasi_anak', 'Mutasi dompet anak', 'dompet', '#164a9e'] : null,
-                $saldoDompet !== null ? ['portal.dompet.isi', 'Isi saldo', 'isi', '#4f7a5c'] : null,
-                ['portal.daftar', 'Pendaftaran', 'psb', '#9b7bb0'],
-                ['portal.kabar', 'Kabar', 'lonceng', '#c98a5e'],
-                ['portal.akun', 'Akun', 'profil', '#64748b'],
-            ]));
-        @endphp
         <div class="grid grid-cols-4 gap-x-2 gap-y-4">
-            @foreach ($menuUtama as [$rute, $label, $ikon, $warna])
+            @foreach ($menuUtama as $kunci)
+                @php [$rute, $label, $ikon, $warna] = \App\Services\PortalWali\MenuPortal::KATALOG[$kunci]; @endphp
                 <a href="{{ route($rute) }}" class="flex flex-col items-center gap-1.5 text-center">
                     <span class="flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-sm" style="background: {{ $warna }}"><x-portal.ikon :nama="$ikon" /></span>
                     <span class="text-[11px] leading-tight text-slate-700">{{ $label }}</span>
                 </a>
             @endforeach
+            {{-- Selalu ada: seluruh menu dikelompokkan + atur menu utama. --}}
+            <a href="{{ route('portal.menu') }}" class="flex flex-col items-center gap-1.5 text-center">
+                <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-brand shadow-sm ring-1 ring-slate-200"><x-portal.ikon nama="menu" /></span>
+                <span class="text-[11px] leading-tight text-slate-700">Menu Lengkap</span>
+            </a>
         </div>
     </section>
 

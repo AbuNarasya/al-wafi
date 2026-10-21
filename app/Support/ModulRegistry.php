@@ -147,7 +147,7 @@ final class ModulRegistry
         ['kode' => 'dokumen-santri', 'nama' => 'Berkas Santri (KTP, akta, KK, med check)', 'grup' => 'DATA SISWA/SANTRI'],
         // Klinik: lihat = daftar/riwayat/rekap, buat = mencatat kunjungan (+ menerbitkan tagihan bila juga berhak
         // Tagihan Lain-lain), ubah = menyelesaikan rawat di klinik.
-        ['kode' => 'klinik', 'nama' => 'Klinik (kunjungan santri)', 'grup' => 'DATA SISWA/SANTRI'],
+        ['kode' => 'klinik', 'nama' => 'Klinik (kunjungan santri)', 'grup' => 'KLINIK'],
         // Kelas/rombel: buat/ubah/hapus = master kelas; ubah juga = menempatkan santri ke kelas.
         ['kode' => 'kelas', 'nama' => 'Kelas (rombel) & Penempatan Kelas', 'grup' => 'DATA SISWA/SANTRI'],
         // Pengunduran diri santri aktif: lihat = membuka daftar. Wali kelas & kepala sekolah ditetapkan di
@@ -275,6 +275,7 @@ final class ModulRegistry
         'DATA SISWA/SANTRI',
         'PPSB',
         'KEPENDIDIKAN',
+        'KLINIK',
         'TAGIHAN LAIN-LAIN',
         'SISTEM',
         'TANPA MENU',

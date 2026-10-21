@@ -228,6 +228,8 @@ class PortalWaliController extends Controller
             'sisaTagihan' => $belumLunas->sum(fn ($t) => (float) $t->sisa), 'lembarTagihan' => $belumLunas->count(),
             'adaTagihan' => \App\Models\TagihanSantri::whereIn('id_santri', Santri::where('id_wali', $wali->id)->pluck('id'))->exists(),
             'saldoDompet' => $punyaDompet ? (\App\Models\DompetWali::where('id_wali', $wali->id)->value('saldo') ?? 0) : null,
+            // Ikon menu utama pilihan wali (paling banyak 7) — sisanya di "Menu Lengkap".
+            'menuUtama' => \App\Services\PortalWali\MenuPortal::pilihan($wali, (string) $peran),
         ]);
     }
 
