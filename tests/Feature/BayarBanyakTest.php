@@ -270,6 +270,35 @@ class BayarBanyakTest extends TestCase
             ->assertDontSee('Pembayaran online menunggu dibayar')->assertSee('Lanjut ke pembayaran');
     }
 
+    /**
+     * 21 Okt 2026 (kasus nyata dev.erp): VA gabungan menunggu, lalu staf mencatat pembayaran tagihan yang sama.
+     * Dulu VA tetap hidup (wali bisa membayar dua kali) dan portal menulis "antara Rp 1 dan Rp -5.000.000".
+     */
+    public function test_pembayaran_staf_membatalkan_va_yang_jadi_basi(): void
+    {
+        $up = $this->tagihan($this->calon, 'uang_pangkal', 5000000);
+        $plk = $this->tagihan($this->calon, 'perlengkapan', 1300000);
+        Http::fake(fn (PermintaanHttp $r) => str_ends_with($r->url(), '/snap/v1/transactions')
+            ? Http::response(['token' => 'TOK', 'redirect_url' => 'https://app.sandbox.midtrans.com/x'], 201)
+            : Http::response(['status_code' => '404'], 404)); // VA belum dibayar
+        $this->sebagaiIbu()->post(route('portal.bayar_banyak.online'), $this->isian([$up, $plk]));
+        $va = TransaksiMidtrans::sole();
+        $this->actingAs($this->keuangan)->get(route('pembayaran_ppsb.create'))->assertOk();
+
+        // Setoran tunai di loket sebesar sisa Uang Pangkal — tetap diterima walau ada VA.
+        (new \App\Services\Modules\PembayaranSantriService)->catat(['id_tagihan' => $up->id, 'id_santri' => $this->calon->id,
+            'tanggal' => now()->toDateString(), 'nominal' => 5000000, 'kode_rekening' => self::BANK], $this->keuangan->id_pengguna, 'ppsb');
+
+        $this->assertSame('batal', $va->refresh()->status);
+        $this->assertSame('Dibatalkan otomatis: tagihannya sudah dibayar lewat cara lain.', $va->catatan);
+        $this->assertTrue(NotifikasiWali::where('jenis', 'va_dibatalkan')->exists());
+        $this->assertSame('0.00', \App\Services\PortalWali\PembayaranPortal::ruang($up->refresh()));
+        $this->assertSame('1300000.00', \App\Services\PortalWali\PembayaranPortal::ruang($plk->refresh()), 'perlengkapan terbuka lagi');
+
+        $this->sebagaiIbu()->post(route('portal.bayar_banyak.online'), $this->isian([$up, $plk]))
+            ->assertSessionHas('error', fn ($p) => str_contains($p, 'seluruh sisanya sedang menunggu') && ! str_contains($p, '-'));
+    }
+
     public function test_ganti_metode_tak_mengarah_ke_tagihan_di_luar_pesanan(): void
     {
         $up = $this->tagihan($this->calon, 'uang_pangkal', 5000000);

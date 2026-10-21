@@ -100,6 +100,9 @@ class PembayaranMidtrans
 
         $nominal = $this->rupiahBulat($nominal);
         $ruang = PembayaranPortal::ruang($tagihan);
+        if (Money::isZero($ruang)) {
+            throw new AppException(422, 'Tagihan ini: '.PembayaranPortal::PESAN_RUANG_HABIS);
+        }
         if (Money::lte($nominal, '0') || Money::gt($nominal, $ruang)) {
             throw new AppException(422, 'Nominal melebihi sisa tagihan yang belum tercatat (Rp '.number_format((float) $ruang, 0, ',', '.').').');
         }
@@ -266,7 +269,7 @@ class PembayaranMidtrans
     }
 
     /** Batalkan pesanan yang belum dibayar — kecuali ternyata sudah lunas di Midtrans. */
-    public function batalkan(TransaksiMidtrans $t): TransaksiMidtrans
+    public function batalkan(TransaksiMidtrans $t, string $catatan = 'Dibatalkan wali / diganti pesanan baru.'): TransaksiMidtrans
     {
         if ($t->status !== 'menunggu') {
             return $t;
@@ -283,10 +286,47 @@ class PembayaranMidtrans
         if ($t->status === 'menunggu') {
             // Belum pernah memilih bank (Midtrans menjawab 404) atau masih pending sesudah dibatalkan:
             // pesanan ditutup di sisi kita. VA-nya — bila ada — ikut dibatalkan di atas.
-            $t->update(['status' => 'batal', 'catatan' => 'Dibatalkan wali / diganti pesanan baru.']);
+            $t->update(['status' => 'batal', 'catatan' => $catatan]);
         }
 
         return $t;
+    }
+
+    /**
+     * VA BASI (21 Okt 2026): tagihan dibayar lewat jalan lain (dicatat staf, dompet) selagi VA wali untuk
+     * tagihan itu masih menunggu → VA-nya kini melebihi sisa (ruang portal minus) dan, bila tetap dibayar,
+     * wali membayar dua kali. VA semacam itu dibatalkan — lewat batalkan(), yang lebih dulu bertanya ke
+     * Midtrans: yang ternyata sudah dibayar dibukukan (kelebihannya ke Dompet Wali), bukan dibatalkan.
+     *
+     * Dipanggil SESUDAH pembayaran staf tersimpan dan TAK PERNAH menggagalkannya: Midtrans yang tak bisa
+     * dihubungi hanya dicatat di log; VA-nya tetap tampil di portal dengan tombol "Ganti metode".
+     */
+    public function tutupVaBasi(int $idTagihan): void
+    {
+        $tagihan = TagihanSantri::find($idTagihan);
+        if (! $tagihan || ! Money::isNegative(PembayaranPortal::ruangMentah($tagihan))) {
+            return;
+        }
+        $basi = TransaksiMidtrans::where('status', 'menunggu')
+            ->where(fn ($q) => $q->where('id_tagihan', $idTagihan)->orWhereHas('rincian', fn ($r) => $r->where('id_tagihan', $idTagihan)))
+            ->get();
+        foreach ($basi as $t) {
+            try {
+                $t = $this->batalkan($t, 'Dibatalkan otomatis: tagihannya sudah dibayar lewat cara lain.');
+            } catch (\Throwable $e) {
+                Log::warning('VA basi belum bisa dibatalkan', ['order_id' => $t->order_id, 'pesan' => $e->getMessage()]);
+
+                continue;
+            }
+            if ($t->status === 'batal') {
+                KabarWali::keKeluarga($t->wali, [
+                    'judul' => 'Virtual Account dibatalkan',
+                    'pesan' => "VA {$t->order_id} (Rp ".number_format((float) $t->total, 0, ',', '.').') dibatalkan karena tagihannya sudah dibayar lewat cara lain. Mohon tidak membayar VA tersebut.',
+                    'jenis' => 'va_dibatalkan', 'ref_jenis' => 'TransaksiMidtrans', 'ref_id' => (string) $t->id,
+                    'id_santri' => $tagihan->id_santri,
+                ]);
+            }
+        }
     }
 
     /** @param  array<string,mixed>  $s  jawaban API status Midtrans */

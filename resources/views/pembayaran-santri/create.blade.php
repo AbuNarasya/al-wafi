@@ -57,6 +57,10 @@
                         <option value="">— pilih tagihan —</option>
                         <template x-for="t in tagihanList" :key="t.id"><option :value="t.id" x-text="t.label"></option></template>
                     </select>
+                    <p class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200" x-show="vaMenunggu > 0" x-cloak>
+                        Wali punya Virtual Account <b x-text="fmt(vaMenunggu)"></b> yang belum dibayar untuk tagihan ini. Mencatat pembayaran
+                        akan membatalkan VA tersebut bila nominalnya tak lagi muat di sisa tagihan.
+                    </p>
                 </div>
 
                 <div class="grid gap-4 sm:grid-cols-2">
@@ -117,6 +121,7 @@
                 get selectedSantri() { return this.list.find(s => s.id === this.santriId) || null; },
                 get tagihanList() { return this.selectedSantri?.tagihan || []; },
                 get maxSisa() { return this.tagihanList.find(t => t.id === this.tagihanId)?.sisa || 0; },
+                get vaMenunggu() { return this.tagihanList.find(t => t.id === this.tagihanId)?.va || 0; },
                 fmt(n) { return 'Rp ' + (n || 0).toLocaleString('id-ID'); },
                 init() {
                     this.$watch('santriId', () => { this.tagihanId = ''; this.nominal = ''; });

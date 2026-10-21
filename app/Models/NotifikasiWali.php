@@ -11,7 +11,7 @@ class NotifikasiWali extends Model
 
     /**
      * Kategori push yang bisa dipilih wali (keputusan user 21 Okt 2026). Urutan = urutan di layar Akun.
-     * Laundry, akademik & pengumuman belum punya sumber kabar — pilihannya sudah tersedia supaya begitu fiturnya
+     * Laundry, akademik, pengumuman & kesehatan belum punya sumber kabar — pilihannya sudah tersedia supaya begitu fiturnya
      * ada, kabarnya langsung mengikuti pilihan wali.
      */
     public const KATEGORI = [
@@ -21,13 +21,14 @@ class NotifikasiWali extends Model
         'akademik' => 'Akademik dan kepengasuhan',
         'pengajuan' => 'Status pengajuan (perizinan, penarikan tabungan, kepulangan, dll.)',
         'pengumuman' => 'Pengumuman dan berita',
+        'kesehatan' => 'Klinik dan kesehatan', // ditambahkan 21 Okt 2026; belum punya sumber kabar
         'lainnya' => 'Lainnya',
     ];
 
     /** Jenis kabar → kategori. Jenis yang tak terdaftar masuk "lainnya". */
     public const JENIS_KATEGORI = [
         'pembayaran_santri_ditolak' => 'tagihan', 'pembayaran_santri_diverifikasi' => 'tagihan',
-        'midtrans_lunas' => 'tagihan', 'tagihan_terbit' => 'tagihan',
+        'midtrans_lunas' => 'tagihan', 'tagihan_terbit' => 'tagihan', 'va_dibatalkan' => 'tagihan',
         'topup_dompet_ditolak' => 'dompet', 'mutasi_dompet' => 'dompet',
         'tarik_tunai' => 'pengajuan', 'tarik_tabungan' => 'pengajuan',
     ];

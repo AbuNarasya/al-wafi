@@ -123,6 +123,7 @@ class PembayaranSantriService
                 'status' => 'menunggu_verifikasi', 'kelompok_bayar' => $data['kelompok_bayar'] ?? null,
             ] + \App\Services\PortalWali\Pencatat::kolom($idPengguna, $wali));
         });
+        $this->tutupVaBasiSesudahnya($tagihan->id);
 
         // Anggota kelompok: pemanggilnya mengirim SATU kabar untuk seluruh kelompok.
         if (empty($data['kelompok_bayar'])) {
@@ -256,6 +257,7 @@ class PembayaranSantriService
                     report($e);
                 }
             });
+            $this->tutupVaBasiSesudahnya($tagihan->id);
 
             return $pembayaran;
         });
@@ -405,6 +407,7 @@ class PembayaranSantriService
             if (! empty($data['kelompok_bayar'])) {
                 $bayar->update(['kelompok_bayar' => $data['kelompok_bayar']]);
             }
+            $this->tutupVaBasiSesudahnya($tagihan->id);
 
             return $bayar;
         });
@@ -487,6 +490,22 @@ class PembayaranSantriService
         if (! $user || (! $user->tim_keuangan && ! $user->is_admin)) {
             throw new AppException(403, 'Hanya tim keuangan yang boleh memverifikasi pembayaran santri.');
         }
+    }
+
+    /**
+     * Pembayaran di sini tak memperhitungkan VA wali yang belum dibayar (uang tunai di loket tak boleh
+     * ditolak), jadi VA itu bisa jadi melebihi sisa → dibatalkan (PembayaranMidtrans::tutupVaBasi).
+     * Sesudah transaksi tersimpan & tak pernah menggagalkannya.
+     */
+    private function tutupVaBasiSesudahnya(int $idTagihan): void
+    {
+        DB::afterCommit(function () use ($idTagihan) {
+            try {
+                (new \App\Services\Midtrans\PembayaranMidtrans)->tutupVaBasi($idTagihan);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        });
     }
 
     /** Sisa yang belum tercatat = sisa - setoran menunggu verifikasi. */

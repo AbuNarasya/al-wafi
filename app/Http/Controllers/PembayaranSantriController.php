@@ -125,6 +125,11 @@ class PembayaranSantriController extends Controller
         // yang namanya mirip, dan petugas biasanya memegang nomornya. Jenjang
         // disebut lewat NAMA — kode `J001` tak bercerita apa pun bagi pembaca.
         $petaJenjang = Jenjang::pluck('nama', 'kode')->all();
+        // VA wali yang belum dibayar per tagihan — petugas diperingatkan: mencatat pembayaran bisa membatalkannya.
+        $va = \App\Models\TransaksiMidtrans::where('status', 'menunggu')->whereIn('id_tagihan', $tagihan->pluck('id'))
+            ->get(['id_tagihan', 'nominal'])->concat(\App\Models\TransaksiMidtransTagihan::whereIn('id_tagihan', $tagihan->pluck('id'))
+                ->whereHas('transaksi', fn ($q) => $q->where('status', 'menunggu'))->get(['id_tagihan', 'nominal']))
+            ->groupBy('id_tagihan')->map(fn ($g) => $g->sum(fn ($x) => (float) $x->nominal));
         $santriData = $tagihan->groupBy('id_santri')->map(fn ($items) => [
             'id' => $items->first()->id_santri,
             'nama' => $items->first()->santri?->nama,
@@ -134,6 +139,7 @@ class PembayaranSantriController extends Controller
             'tingkat' => $items->first()->santri?->tingkat,
             'tagihan' => $items->map(fn ($t) => [
                 'id' => $t->id, 'label' => "{$t->jenis?->nama} — sisa Rp ".number_format((float) $t->sisa, 0, ',', '.'), 'sisa' => (float) $t->sisa,
+                'va' => $va[$t->id] ?? 0,
             ])->values(),
         ])->values();
 

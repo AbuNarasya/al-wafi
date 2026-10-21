@@ -106,7 +106,19 @@ class PembayaranPortal
      * Sisa yang belum tertutup setoran lain yang masih menunggu verifikasi — termasuk
      * VA Midtrans yang sudah dipesan tapi belum dibayar.
      */
+    public const PESAN_RUANG_HABIS = 'seluruh sisanya sedang menunggu — Virtual Account yang belum dibayar atau bukti transfer yang sedang diperiksa keuangan. Lihat kotak di halaman Tagihan untuk melanjutkan atau mengganti metode.';
+
     public static function ruang(TagihanSantri $t): string
+    {
+        // Tak pernah minus (21 Okt 2026): pembayaran staf tak menghitung VA, jadi VA yang lebih dulu
+        // dipesan bisa melebihi sisa — dulu berbuah pesan "antara Rp 1 dan Rp -15.000.000".
+        $ruang = self::ruangMentah($t);
+
+        return Money::isNegative($ruang) ? Money::of('0') : $ruang;
+    }
+
+    /** ruang() tanpa batas bawah — minus = ada VA menunggu yang melebihi sisa (VA basi). */
+    public static function ruangMentah(TagihanSantri $t): string
     {
         $menunggu = PembayaranSantri::where('id_tagihan', $t->id)->where('status', 'menunggu_verifikasi')->sum('nominal');
         $online = \App\Models\TransaksiMidtrans::where('id_tagihan', $t->id)->where('status', 'menunggu')->sum('nominal');
@@ -184,6 +196,9 @@ class PembayaranPortal
             }
             $n = Money::of($n);
             $ruang = self::ruang($t);
+            if (Money::isZero($ruang)) {
+                throw new AppException(422, "{$nama}: ".self::PESAN_RUANG_HABIS);
+            }
             if (Money::lte($n, '0') || Money::gt($n, $ruang)) {
                 throw new AppException(422, "{$nama}: nominal harus antara Rp 1 dan Rp ".number_format((float) $ruang, 0, ',', '.').'.');
             }
@@ -332,6 +347,9 @@ class PembayaranPortal
                 throw new AppException(422, 'Nominal harus lebih dari nol.');
             }
             $ruang = self::ruang($t);
+            if (Money::isZero($ruang)) {
+                throw new AppException(422, self::PESAN_RUANG_HABIS);
+            }
             if (Money::gt($nominal, $ruang)) {
                 throw new AppException(422, 'Nominal melebihi sisa tagihan (Rp '.number_format((float) $ruang, 0, ',', '.').').');
             }
