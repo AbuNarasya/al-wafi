@@ -39,6 +39,12 @@ class OpnamePersediaanService
             throw new AppException(422, 'Lokasi opname tidak ditemukan atau tidak aktif.');
         }
 
+        // Satu opname berjalan per lokasi (audit 21 Okt 2026): dua dokumen yang sama-sama memuat barang X dulu
+        // bisa sama-sama disetujui — selisihnya diterapkan dua kali.
+        if ($jalan = OpnamePersediaan::where('kode_lokasi', $lokasi->kode)->whereIn('status', ['draft', 'diajukan'])->value('nomor')) {
+            throw new AppException(409, "Masih ada opname {$jalan} yang belum selesai di {$lokasi->nama} — selesaikan atau batalkan dulu.");
+        }
+
         $kode = Inventory::where('status', 'aktif')
             ->when($input['kode_kategori'] ?? null, fn ($q, $k) => $q->where('kode_kategori', $k))
             ->when(($input['cakupan'] ?? 'pernah') === 'pernah', fn ($q) => $q->whereIn('kode_persediaan',
@@ -123,9 +129,9 @@ class OpnamePersediaanService
             throw new AppException(422, 'Ada selisih — pilih dulu Bagian yang menanggung selisih persediaan.');
         }
 
-        $doc->update(['status' => 'diajukan', 'diajukan_oleh' => $idPengguna, 'diajukan_pada' => now(), 'catatan_putusan' => null]);
+        $this->pindah($doc, 'draft', ['status' => 'diajukan', 'diajukan_oleh' => $idPengguna, 'diajukan_pada' => now(), 'catatan_putusan' => null]);
 
-        return $doc;
+        return $doc->refresh();
     }
 
     /** Kembalikan ke draft beserta catatan — hitungannya tetap, bisa diperbaiki lalu diajukan lagi. */
@@ -133,9 +139,9 @@ class OpnamePersediaanService
     {
         $doc = $this->dokumen($id, 'diajukan');
         $this->bukanPengaju($doc, $idPengguna);
-        $doc->update(['status' => 'draft', 'catatan_putusan' => "Ditolak: {$catatan}"]);
+        $this->pindah($doc, 'diajukan', ['status' => 'draft', 'catatan_putusan' => "Ditolak: {$catatan}"]);
 
-        return $doc;
+        return $doc->refresh();
     }
 
     public function setujui(int $id, ?int $idPengguna): OpnamePersediaan
@@ -144,6 +150,8 @@ class OpnamePersediaanService
         $this->bukanPengaju($doc, $idPengguna);
 
         return DB::transaction(function () use ($doc, $idPengguna) {
+            // Dikunci & diperiksa ULANG (audit 21 Okt 2026): klik ganda / dua penyetuju dulu menerapkan selisih 2×.
+            $this->kunci($doc->getKey(), 'diajukan');
             $layanan = new PersediaanService;
             foreach ($doc->details->whereNotNull('stok_fisik') as $d) {
                 $selisih = $d->selisih();
@@ -178,9 +186,29 @@ class OpnamePersediaanService
         if (! in_array($doc->status, ['draft', 'diajukan'], true)) {
             throw new AppException(409, 'Opname yang sudah disetujui tak bisa dibatalkan — buat opname baru untuk mengoreksinya.');
         }
-        $doc->update(['status' => 'batal']);
+        $this->pindah($doc, $doc->status, ['status' => 'batal']);
+
+        return $doc->refresh();
+    }
+
+    /** Kunci baris dokumen di dalam transaksi & pastikan statusnya masih seperti yang diharapkan. */
+    private function kunci(int $id, string $status): OpnamePersediaan
+    {
+        $doc = OpnamePersediaan::lockForUpdate()->find($id) ?? throw new AppException(404, 'Dokumen opname tidak ditemukan.');
+        if ($doc->status !== $status) {
+            throw new AppException(409, "Opname {$doc->nomor} baru saja diubah orang lain (kini ".mb_strtolower(OpnamePersediaan::STATUS[$doc->status]).') — muat ulang.');
+        }
 
         return $doc;
+    }
+
+    /**
+     * Ganti status hanya bila masih `$dari` — baris dikunci dulu, jadi dua klik bersamaan → yang kedua ditolak.
+     * Lewat model (bukan update query) supaya jejak auditnya tetap tercatat.
+     */
+    private function pindah(OpnamePersediaan $doc, string $dari, array $isi): void
+    {
+        DB::transaction(fn () => $this->kunci($doc->getKey(), $dari)->update($isi));
     }
 
     private function dokumen(int $id, string $status): OpnamePersediaan

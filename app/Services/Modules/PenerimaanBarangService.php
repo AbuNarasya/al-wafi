@@ -221,7 +221,13 @@ class PenerimaanBarangService
 
                 if ($b['id_po_detail']) {
                     $pd = PurchaseOrderDetail::lockForUpdate()->find($b['id_po_detail']);
-                    $pd->update(['qty_diterima' => Money::add($pd->qty_diterima, $b['kuantiti'], 4)]);
+                    $baru = Money::add($pd->qty_diterima, $b['kuantiti'], 4);
+                    // Diperiksa ULANG di bawah kunci (audit 21 Okt 2026): dua penerimaan bersamaan dulu sama-sama
+                    // lolos pemeriksaan sisa di luar transaksi → PO terlampaui.
+                    if (Money::gt($baru, $pd->kuantiti, 4)) {
+                        throw new AppException(409, 'Baris PO ini baru saja diterima lewat penerimaan lain — sisanya tak cukup lagi. Muat ulang.');
+                    }
+                    $pd->update(['qty_diterima' => $baru]);
                 }
             }
 
@@ -248,6 +254,14 @@ class PenerimaanBarangService
         }
 
         return DB::transaction(function () use ($doc, $alasan, $idPengguna) {
+            // Dikunci & diperiksa ULANG (audit 21 Okt 2026): batal ganda dulu mengurangi qty_diterima PO dua kali.
+            $kini = PenerimaanBarang::lockForUpdate()->find($doc->id_penerimaan);
+            if ($kini->status === 'batal') {
+                throw new AppException(409, 'Penerimaan ini sudah dibatalkan.');
+            }
+            if ($kini->load('details')->sudahDitagih()) {
+                throw new AppException(409, 'Sebagian barang sudah ditagih lewat invoice vendor. Void invoice-nya dulu.');
+            }
             $entry = JournalEntry::where('sumber_modul', PenerimaanBarang::SUMBER)
                 ->where('id_sumber', (string) $doc->id_penerimaan)->where('status', 'aktif')->first();
             if ($entry) {

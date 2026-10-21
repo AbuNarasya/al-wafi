@@ -160,24 +160,35 @@ class KartuSantriService
      */
     public function periksaPin(int $idSantri, ?string $pin): void
     {
-        $rec = PinSantri::find($idSantri);
-        if (! $rec) {
-            throw new AppException(428, 'Belanja di atas batas harian butuh PIN, tetapi wali belum memasang PIN belanja anak ini.');
-        }
-        if ($rec->terkunci_sampai && $rec->terkunci_sampai->isFuture()) {
-            throw new AppException(423, 'PIN belanja terkunci sampai '.$rec->terkunci_sampai->format('H:i').' karena terlalu sering salah.');
-        }
-        if (Hash::check((string) $pin, $rec->pin_hash)) {
-            if ($rec->gagal > 0) {
-                $rec->update(['gagal' => 0]);
+        // Baris PIN DIKUNCI selama diperiksa (audit 21 Okt 2026): tebakan serentak dulu sama-sama membaca gagal=0
+        // sehingga batas 5 kali bisa dilampaui. Galat dilempar SESUDAH transaksi pendek ini tersimpan.
+        [$kode, $info] = DB::transaction(function () use ($idSantri, $pin) {
+            $rec = PinSantri::lockForUpdate()->find($idSantri);
+            if (! $rec) {
+                return [428, null];
             }
+            if ($rec->terkunci_sampai && $rec->terkunci_sampai->isFuture()) {
+                return [423, $rec->terkunci_sampai->format('H:i')];
+            }
+            if (Hash::check((string) $pin, $rec->pin_hash)) {
+                if ($rec->gagal > 0) {
+                    $rec->update(['gagal' => 0]);
+                }
 
-            return;
-        }
+                return [0, null];
+            }
+            $gagal = $rec->gagal + 1;
+            $kunci = $gagal >= self::MAKS_GAGAL_PIN;
+            $rec->update(['gagal' => $kunci ? 0 : $gagal, 'terkunci_sampai' => $kunci ? now()->addMinutes(self::MENIT_KUNCI_PIN) : null]);
 
-        $gagal = $rec->gagal + 1;
-        $kunci = $gagal >= self::MAKS_GAGAL_PIN;
-        $rec->update(['gagal' => $kunci ? 0 : $gagal, 'terkunci_sampai' => $kunci ? now()->addMinutes(self::MENIT_KUNCI_PIN) : null]);
-        throw new AppException(422, $kunci ? 'PIN salah 5 kali — terkunci '.self::MENIT_KUNCI_PIN.' menit.' : 'PIN belanja salah.');
+            return [422, $kunci];
+        });
+
+        match ($kode) {
+            0 => null,
+            428 => throw new AppException(428, 'Belanja di atas batas harian butuh PIN, tetapi wali belum memasang PIN belanja anak ini.'),
+            423 => throw new AppException(423, "PIN belanja terkunci sampai {$info} karena terlalu sering salah."),
+            default => throw new AppException(422, $info ? 'PIN salah 5 kali — terkunci '.self::MENIT_KUNCI_PIN.' menit.' : 'PIN belanja salah.'),
+        };
     }
 }

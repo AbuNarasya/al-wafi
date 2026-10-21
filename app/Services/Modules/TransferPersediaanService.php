@@ -117,8 +117,11 @@ class TransferPersediaanService
         if ($tanggal < $doc->tanggal_kirim->toDateString()) {
             throw new AppException(422, 'Tanggal terima tidak boleh sebelum tanggal kirim.');
         }
+        // Dua langkah, dua orang (audit 21 Okt 2026): pengirim tak mencatat penerimaan kirimannya sendiri.
+        $this->bukanOrangYangSama($doc->dikirim_oleh, $idPengguna, 'Penerimaan harus dicatat orang di lokasi tujuan, bukan pengirimnya.');
 
         return DB::transaction(function () use ($doc, $tanggal, $diterima, $catatan, $idPengguna) {
+            $this->kunciStatus($doc, 'dikirim');
             $adaSelisih = false;
             foreach ($doc->details as $d) {
                 $input = $diterima[$d->id] ?? null;
@@ -174,8 +177,10 @@ class TransferPersediaanService
         if ($putusan === 'hilang' && ! $kodeBagian) {
             throw new AppException(422, 'Pilih Bagian yang menanggung kehilangan.');
         }
+        $this->bukanOrangYangSama($doc->dikirim_oleh, $idPengguna, 'Selisih harus diputus orang lain, bukan pengirimnya.');
 
         return DB::transaction(function () use ($doc, $putusan, $kodeBagian, $catatan, $idPengguna) {
+            $this->kunciStatus($doc, 'selisih');
             $hariIni = now()->toDateString();
             foreach ($doc->details as $d) {
                 $selisih = $d->selisih();
@@ -223,6 +228,7 @@ class TransferPersediaanService
         }
 
         return DB::transaction(function () use ($doc, $alasan, $idPengguna) {
+            $this->kunciStatus($doc, 'dikirim');
             InventoryMovement::batalkanDokumen(TransferPersediaan::SUMBER, $doc->nomor, $idPengguna);
             $doc->update(['status' => 'batal', 'catatan_putusan' => "Dibatalkan: {$alasan}"]);
 
@@ -258,6 +264,25 @@ class TransferPersediaanService
         }
 
         return $l;
+    }
+
+    /**
+     * Kunci baris dokumen DI DALAM transaksi & periksa ulang statusnya (audit 21 Okt 2026): `lockForUpdate()` di
+     * luar transaksi langsung lepas, jadi terima/batal/putus ganda dulu hanya tertahan oleh kebetulan.
+     */
+    private function kunciStatus(TransferPersediaan $doc, string $status): void
+    {
+        $kini = TransferPersediaan::lockForUpdate()->whereKey($doc->getKey())->value('status');
+        if ($kini !== $status) {
+            throw new AppException(409, "Transfer {$doc->nomor} baru saja diubah orang lain — muat ulang.");
+        }
+    }
+
+    private function bukanOrangYangSama(?int $a, ?int $b, string $pesan): void
+    {
+        if ($a !== null && $a === $b && ! User::find($b)?->is_admin) {
+            throw new AppException(403, $pesan);
+        }
     }
 
     private function angka(string $v): string

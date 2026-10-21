@@ -64,19 +64,24 @@ class KasirService
             throw new AppException(409, "Anda masih punya shift terbuka ({$buka->nomor}). Tutup dulu sebelum membuka yang baru.");
         }
 
-        return DB::transaction(function () use ($lokasi, $modal, $idKasir) {
-            $base = DocNumber::docBase('SK', now());
-            $last = ShiftKasir::where('nomor', 'like', $base.'%')->lockForUpdate()->orderByDesc('nomor')->value('nomor');
+        try {
+            return DB::transaction(function () use ($lokasi, $modal, $idKasir) {
+                $base = DocNumber::docBase('SK', now());
+                $last = ShiftKasir::where('nomor', 'like', $base.'%')->lockForUpdate()->orderByDesc('nomor')->value('nomor');
 
-            return ShiftKasir::create([
-                'nomor' => DocNumber::nextDocNumber($base, $last),
-                'kode_lokasi' => $lokasi->kode,
-                'id_kasir' => $idKasir,
-                'dibuka_pada' => now(),
-                'modal_awal' => $modal,
-                'status' => 'buka',
-            ]);
-        });
+                return ShiftKasir::create([
+                    'nomor' => DocNumber::nextDocNumber($base, $last),
+                    'kode_lokasi' => $lokasi->kode,
+                    'id_kasir' => $idKasir,
+                    'dibuka_pada' => now(),
+                    'modal_awal' => $modal,
+                    'status' => 'buka',
+                ]);
+            });
+        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+            // Dua kiriman "buka shift" bersamaan: indeks unik `shift_kasir_satu_terbuka` menolak yang kedua.
+            throw new AppException(409, 'Anda sudah punya shift terbuka — muat ulang halaman.');
+        }
     }
 
     /**
@@ -189,6 +194,9 @@ class KasirService
         ?PermintaanKartu $permintaan, ?array &$dipotong): Penjualan
     {
         return DB::transaction(function () use ($shift, $rincian, $total, $bayar, $idKasir, $diskonStruk, $penyetuju, $adaDiskon, $alasan, $santri, $pinBenar, $kartu, $kartuJauh, $permintaan, &$dipotong) {
+            // Shift dikunci: struk tak boleh tersimpan ke shift yang baru saja ditutup (paksa) — stoknya keluar
+            // tetapi pendapatannya tak pernah dijurnal (audit 21 Okt 2026).
+            $this->kunciShift($shift->id_shift, ['buka'], 'Shift sudah ditutup — muat ulang halaman.');
             // Nomor struk harian per toko; kunci advisori supaya dua kasir yang menyimpan
             // bersamaan tak berebut nomor yang sama.
             DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('penjualan-nomor')]);
@@ -255,6 +263,12 @@ class KasirService
                 // menggulung seluruh struk. Nomor rujukan = nomor NIAT BAYAR (tetap, disimpan sebelum transaksi ini).
                 // Permintaan yang sudah dipastikan terpotong (lanjutan "Cek lagi") tak memotong untuk kedua kalinya.
                 if ($permintaan->status === 'berhasil') {
+                    // Dikunci & diperiksa ULANG (audit 21 Okt 2026): rekonsiliasi malam bisa saja baru mengembalikan
+                    // potongan ini (status → gagal) — struknya tak boleh tersimpan juga (barang gratis).
+                    $kini = PermintaanKartu::lockForUpdate()->find($permintaan->id);
+                    if ($kini->status !== 'berhasil' || $kini->id_penjualan) {
+                        throw new AppException(409, $kini->id_penjualan ? 'Pembayaran kartu ini sudah tersimpan sebagai struk.' : self::PESAN_TIDAK_TERJADI);
+                    }
                     $h = $permintaan->hasil ?? [];
                 } else {
                     $lokasi = $shift->lokasi ?? LokasiPersediaan::find($shift->kode_lokasi);
@@ -437,6 +451,16 @@ class KasirService
         }
 
         return DB::transaction(function () use ($jual, $alasan, $idPenyetuju) {
+            // Dikunci & diperiksa ULANG (audit 21 Okt 2026): dua kiriman batal bersamaan dulu sama-sama lolos →
+            // stok & uang dompet kembali dua kali. Urutan kunci: shift dulu, baru struk.
+            $this->kunciShift($jual->id_shift, ['buka'], 'Shift struk ini sudah ditutup dan dijurnal — pembatalan tak bisa lagi lewat sini.');
+            $jual = Penjualan::lockForUpdate()->find($jual->id_penjualan);
+            if ($jual->status === 'batal') {
+                throw new AppException(409, "Struk {$jual->nomor} sudah dibatalkan.");
+            }
+            if (ReturPenjualan::where('id_penjualan', $jual->id_penjualan)->exists()) {
+                throw new AppException(409, "Struk {$jual->nomor} sudah pernah diretur — pembatalan utuh tak bisa lagi.");
+            }
             InventoryMovement::batalkanDokumen(Penjualan::SUMBER, $jual->nomor, $idPenyetuju);
             if ($jual->metode === 'dompet' && $jual->id_santri) {
                 // Struk kartu: uangnya kembali ke dompet santri, bukan dari laci.
@@ -491,6 +515,9 @@ class KasirService
         }
 
         return DB::transaction(function () use ($shift, $rincian, $uang, $catatan, $idPengguna) {
+            // Dikunci & diperiksa ULANG: tutup oleh kasir + tutup paksa pengawas (atau Enter dua kali) dulu
+            // menerbitkan DUA jurnal shift. Struk & retur baru pun menunggu kunci ini (simpanJual/retur).
+            $shift = $this->kunciShift($shift->id_shift, ['buka'], "Shift {$shift->nomor} sudah ditutup.");
             $jual = Penjualan::with('details.persediaan')->where('id_shift', $shift->id_shift)->where('status', 'selesai')->get();
             $retur = ReturPenjualan::with('details.persediaan')->where('id_shift', $shift->id_shift)->get();
             $tunai = Money::of($jual->where('metode', 'tunai')->sum('total'));
@@ -551,9 +578,10 @@ class KasirService
             throw new AppException(422, 'Kas tujuan tidak boleh sama dengan kas laci toko.');
         }
 
-        $setoran = Money::sub($shift->uang_dihitung, $shift->modal_awal);
-
-        return DB::transaction(function () use ($shift, $tujuan, $setoran, $idPenerima) {
+        return DB::transaction(function () use ($shift, $tujuan, $idPenerima) {
+            // Dikunci & diperiksa ULANG: dua kiriman bersamaan dulu menerbitkan dua jurnal setoran.
+            $shift = $this->kunciShift($shift->id_shift, ['tutup'], 'Setoran shift ini sudah diterima.');
+            $setoran = Money::sub($shift->uang_dihitung, $shift->modal_awal);
             $entry = null;
             if (Money::gtZero($setoran)) {
                 $ket = "Setoran kasir {$shift->nomor} — {$shift->lokasi->nama}";
@@ -635,7 +663,8 @@ class KasirService
         foreach ($baris as $l) {
             $d = $jual->details->firstWhere('id', (int) $l['id_penjualan_detail'])
                 ?? throw new AppException(422, 'Baris retur tidak cocok dengan struknya.');
-            $qty = Money::of($l['kuantiti'], 4);
+            // Baris yang sudah habis diretur terkirim tanpa jumlah (isiannya disabled) — dulu galat 500.
+            $qty = Money::of($l['kuantiti'] ?? 0, 4);
             if (! Money::gtZero($qty, 4)) {
                 continue;
             }
@@ -665,7 +694,20 @@ class KasirService
 
         $pengawas = (new PinPengawasService)->verifikasi($idPengawas, $pin, $idKasir);
 
-        return DB::transaction(function () use ($shift, $jual, $rincian, $total, $alasan, $pengawas, $idKasir) {
+        return DB::transaction(function () use ($shift, $jual, $rincian, $total, $alasan, $pengawas, $idKasir, $sudah) {
+            // Dikunci & diperiksa ULANG (audit 21 Okt 2026): dua retur bersamaan atas struk yang sama dulu sama-sama
+            // melihat sisa penuh → uang & stok kembali dua kali. Urutan kunci: shift, lalu struk.
+            $shift = $this->kunciShift($shift->id_shift, ['buka'], 'Shift sudah ditutup — muat ulang halaman.');
+            if (Penjualan::lockForUpdate()->whereKey($jual->id_penjualan)->value('status') !== 'selesai') {
+                throw new AppException(409, "Struk {$jual->nomor} baru saja dibatalkan — tak bisa diretur.");
+            }
+            $kini = ReturPenjualanDetail::whereIn('id_penjualan_detail', $jual->details->pluck('id'))->groupBy('id_penjualan_detail')
+                ->selectRaw('id_penjualan_detail, SUM(kuantiti_input) AS qty')->pluck('qty', 'id_penjualan_detail');
+            foreach ($jual->details as $d) {
+                if (! Money::eq($kini[$d->id] ?? '0', $sudah[$d->id]->qty ?? '0', 4)) {
+                    throw new AppException(409, "Struk {$jual->nomor} baru saja diretur di tempat lain — muat ulang lalu ulangi.");
+                }
+            }
             DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('retur-nomor')]);
             $base = 'RT-'.now()->format('ymd').'-';
             $nomor = DocNumber::nextDocNumber($base, ReturPenjualan::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor'));
@@ -838,6 +880,22 @@ class KasirService
      *
      * @return array{0:Inventory,1:string,2:string,3:string,4:?string,5:string} [.., harga berlaku, barcode, harga normal]
      */
+    /**
+     * Kunci baris shift & periksa ULANG statusnya di DALAM transaksi (audit 21 Okt 2026). Urutan kunci di seluruh
+     * kasir: shift dulu, baru struk — supaya batal, retur, jual & tutup shift tak saling menunggu (deadlock).
+     *
+     * @param  list<string>  $status  status yang diizinkan
+     */
+    private function kunciShift(int $idShift, array $status, string $pesan): ShiftKasir
+    {
+        $s = ShiftKasir::with('lokasi')->lockForUpdate()->find($idShift) ?? throw new AppException(404, 'Shift tidak ditemukan.');
+        if (! in_array($s->status, $status, true)) {
+            throw new AppException(409, $pesan);
+        }
+
+        return $s;
+    }
+
     /** Bulatkan ke 2 desimal (setengah menjauhi nol) — bcmath hanya memotong. */
     private static function bulat(string $v): string
     {

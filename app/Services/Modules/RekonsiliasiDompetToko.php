@@ -8,8 +8,10 @@ use App\Models\PermintaanKartu;
 use App\Models\RekonsiliasiDompetToko as Rekon;
 use App\Models\ReturPenjualan;
 use App\Services\Penghubung\KlienDompetToko;
+use App\Services\Penghubung\PenghubungTakPasti;
 use App\Support\Money;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * REKONSILIASI MALAM BELANJA KARTU — Fase 3c-2 (keputusan user 20 Okt 2026), dijalankan di instans Wafi Mart.
@@ -38,15 +40,19 @@ class RekonsiliasiDompetToko
     {
         $sudah = Rekon::where('status', '!=', 'gagal')->where('tanggal', '>=', now()->subDays(self::HARI_MUNDUR)->toDateString())
             ->pluck('tanggal')->map(fn ($t) => $t->toDateString())->all();
-        $hasil = [];
+        $tanggal = [];
         for ($i = self::HARI_MUNDUR; $i >= 1; $i--) {
             $tgl = now()->subDays($i)->toDateString();
             if (! in_array($tgl, $sudah, true)) {
-                $hasil[] = $this->jalankan($tgl);
+                $tanggal[] = $tgl;
             }
         }
+        // Tanggal yang GAGAL diulang berapa pun umurnya (audit 21 Okt 2026) — dulu yang lebih tua dari 7 hari
+        // terlupakan, padahal potongan yatimnya belum kembali ke santri.
+        $gagalLama = Rekon::where('status', 'gagal')->where('tanggal', '<', now()->subDays(self::HARI_MUNDUR)->toDateString())
+            ->orderBy('tanggal')->pluck('tanggal')->map(fn ($t) => $t->toDateString())->all();
 
-        return $hasil;
+        return array_map(fn ($t) => $this->jalankan($t), array_merge($gagalLama, $tanggal));
     }
 
     public function jalankan(string $tanggal): Rekon
@@ -83,6 +89,7 @@ class RekonsiliasiDompetToko
         $yatim = 0;
         $nilaiYatim = '0';
         $perlu = 0;
+        $takPasti = 0;
 
         foreach ($potong as $t) {
             if (isset($adaStruk[$t['nomor']])) {
@@ -94,15 +101,32 @@ class RekonsiliasiDompetToko
 
                 continue;
             }
+            // KLAIM dulu secara atomik (audit 21 Okt 2026): kasir yang menekan "Cek lagi" tepat saat ini tak boleh
+            // menyimpan struknya sementara potongannya dikembalikan (barang gratis). Siapa yang mengunci niat bayar
+            // lebih dulu, dia yang menang; simpanJual memeriksa ulang status di bawah kunci yang sama.
+            $diklaim = DB::transaction(function () use ($t, $tanggal) {
+                $p = PermintaanKartu::where('nomor', $t['nomor'])->lockForUpdate()->first();
+                if ($p?->id_penjualan || Penjualan::where('ref_dompet', $t['nomor'])->exists()) {
+                    return false;
+                }
+                $p?->update(['status' => 'gagal', 'pesan' => "Dikembalikan otomatis oleh rekonsiliasi {$tanggal}."]);
+
+                return true;
+            });
+            if (! $diklaim) {
+                continue;   // struknya baru saja tersimpan — bukan yatim
+            }
             $nomor = self::AWALAN_YATIM.$t['nomor'];
             try {
                 $this->klien->kembalikan($nomor, $t['nomor'], $sisa, "Dikembalikan otomatis: bayar kartu tanpa struk (rekonsiliasi {$tanggal})");
                 $yatim++;
                 $nilaiYatim = Money::add($nilaiYatim, $sisa);
                 $rincian[] = $this->butir($t, 'Potongan tanpa struk', "Dikembalikan otomatis ke santri ({$nomor}).");
-                // Kasir yang masih menahan pembayaran ini tak boleh lagi menyimpannya sebagai struk.
-                PermintaanKartu::where('nomor', $t['nomor'])->whereNull('id_penjualan')
-                    ->update(['status' => 'gagal', 'pesan' => "Dikembalikan otomatis oleh rekonsiliasi {$tanggal}."]);
+            } catch (PenghubungTakPasti) {
+                // Bisa jadi SUDAH masuk — jangan dilaporkan "gagal" (staf lalu mengembalikan manual = ganda).
+                // Nomornya tetap, jadi aman diulang: tanggal ini ditandai gagal agar diulang otomatis.
+                $takPasti++;
+                $rincian[] = $this->butir($t, 'Potongan tanpa struk', "Pengembalian BELUM PASTI (jawaban hilang) — diulang otomatis ({$nomor}). Jangan dikembalikan manual.");
             } catch (AppException $e) {
                 $perlu++;
                 $rincian[] = $this->butir($t, 'Potongan tanpa struk', 'GAGAL dikembalikan: '.$e->getMessage(), true);
@@ -142,10 +166,11 @@ class RekonsiliasiDompetToko
         $bersih = $berhasil->reduce(fn ($s, $t) => $t['jenis'] === 'potong' ? Money::add($s, $t['nominal']) : Money::sub($s, $t['nominal']), '0');
 
         return $this->simpan($tanggal, [
-            'status' => $perlu > 0 ? 'perlu_diputus' : ($yatim > 0 ? 'dibereskan' : 'cocok'),
+            // Ada pengembalian yang belum pasti → "gagal" supaya diulang otomatis (nomornya idempoten di Al Wafi).
+            'status' => $takPasti > 0 ? 'gagal' : ($perlu > 0 ? 'perlu_diputus' : ($yatim > 0 ? 'dibereskan' : 'cocok')),
             'jumlah_transaksi' => $berhasil->count(), 'bersih_al_wafi' => $bersih,
             'jumlah_yatim' => $yatim, 'nilai_yatim' => $nilaiYatim, 'perlu_diputus' => $perlu,
-            'rincian' => $rincian, 'pesan' => null,
+            'rincian' => $rincian, 'pesan' => $takPasti > 0 ? "{$takPasti} pengembalian belum pasti — diulang otomatis malam berikutnya / tombol Jalankan." : null,
         ]);
     }
 

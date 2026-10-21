@@ -244,8 +244,13 @@ class TransferOpnamePersediaanTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
         $doc = TransferPersediaan::with('details')->sole();
 
-        $this->actingAs($gudang)->get(route('transfer_persediaan.show', $doc->id_transfer))->assertOk()->assertSee('Catat Penerimaan');
+        // Dua langkah, dua orang (audit 21 Okt 2026): pengirim tak mencatat penerimaannya sendiri.
         $this->actingAs($gudang)->post(route('transfer_persediaan.terima', $doc->id_transfer), [
+            'tanggal_terima' => '2026-10-11', 'diterima' => [$doc->details[0]->id => '9'],
+        ])->assertRedirect()->assertSessionHas('error');
+        $toko = $this->pengguna('toko', false, ['transfer-persediaan' => ['ubah']]);
+        $this->actingAs($toko)->get(route('transfer_persediaan.show', $doc->id_transfer))->assertOk()->assertSee('Catat Penerimaan');
+        $this->actingAs($toko)->post(route('transfer_persediaan.terima', $doc->id_transfer), [
             'tanggal_terima' => '2026-10-11', 'diterima' => [$doc->details[0]->id => '9'],
         ])->assertRedirect()->assertSessionHas('status');
 
@@ -278,7 +283,16 @@ class TransferOpnamePersediaanTest extends TestCase
             'kode_coa' => self::PERSEDIAAN, 'kode_coa_selisih' => self::SELISIH, 'status' => 'aktif']);
         $this->masuk('L002', '5', '15000', 'T-1');
 
-        $this->assertSame(['BRG0001'], $this->lembar()->details()->pluck('kode_persediaan')->all());
+        $pertama = $this->lembar();
+        $this->assertSame(['BRG0001'], $pertama->details()->pluck('kode_persediaan')->all());
+        // Satu opname berjalan per lokasi (audit 21 Okt 2026): lembar kedua ditolak sampai yang pertama selesai/batal.
+        try {
+            $this->lembar(['cakupan' => 'semua']);
+            $this->fail('Opname kedua di lokasi yang sama harus ditolak.');
+        } catch (\App\Exceptions\AppException $e) {
+            $this->assertSame(409, $e->status);
+        }
+        (new OpnamePersediaanService)->batal($pertama->id_opname, $this->admin->id_pengguna);
         $this->assertSame(['BRG0001', 'BRG0002'], $this->lembar(['cakupan' => 'semua'])->details()->orderBy('kode_persediaan')->pluck('kode_persediaan')->all());
     }
 

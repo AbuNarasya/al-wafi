@@ -197,8 +197,14 @@ class InvoiceService
                     // Stoknya sudah masuk saat diterima — yang bergerak di sini hanya
                     // catatan "sudah ditagih" pada baris penerimaannya.
                     $pd = PenerimaanBarangDetail::lockForUpdate()->find($d->id_penerimaan_detail);
+                    $ditagihBaru = Money::add($pd->qty_ditagih, $d->kuantiti, 4);
+                    // Diperiksa ULANG di bawah kunci (audit 21 Okt 2026): dua invoice bersamaan dulu bisa menagih
+                    // penerimaan yang sama → GRNI terdebit ganda.
+                    if (Money::gt($ditagihBaru, $pd->kuantiti, 4)) {
+                        throw new AppException(409, 'Penerimaan barang ini baru saja ditagih invoice lain — muat ulang lalu ulangi.');
+                    }
                     $pd->update([
-                        'qty_ditagih' => Money::add($pd->qty_ditagih, $d->kuantiti, 4),
+                        'qty_ditagih' => $ditagihBaru,
                         'nilai_ditagih' => Money::add($pd->nilai_ditagih, $d->nilai_penerimaan),
                     ]);
 
