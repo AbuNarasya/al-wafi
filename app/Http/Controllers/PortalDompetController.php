@@ -39,7 +39,9 @@ class PortalDompetController extends Controller
     public static function tanganiGalat(AppException $e, Request $request): RedirectResponse
     {
         if ($e->status === 428) {
-            return redirect()->route('portal.pin')->with('status', 'Buat PIN transaksi dulu untuk mengamankan dompet Anda.');
+            $asal = parse_url(url()->previous(), PHP_URL_PATH).(($q = parse_url(url()->previous(), PHP_URL_QUERY)) ? "?{$q}" : '');
+
+            return redirect()->route('portal.pin', ['kembali' => $asal])->with('status', 'Buat PIN transaksi dulu untuk mengamankan dompet Anda.');
         }
 
         return back()->withInput($request->except('pin'))->with('error', $e->getMessage());
@@ -47,8 +49,25 @@ class PortalDompetController extends Controller
 
     // ---- PIN ----
 
+    public const PIN_KEMBALI = 'portal.pin_kembali';
+
+    /**
+     * Halaman proses yang memicu pembuatan PIN (pindah saldo, bayar, kartu, …) — sesudah PIN jadi, wali
+     * dikembalikan ke sana, bukan ke Beranda (permintaan user 21 Okt 2026). Hanya alamat portal sendiri
+     * (/wali/…) yang diterima, supaya parameter ini tak bisa dipakai mengarahkan ke situs lain.
+     */
+    private static function ingatKembali(Request $request, ?string $alamat): void
+    {
+        // Dibuka tanpa alamat asal (mis. dari menu Akun) → tujuan lama dilupakan, sesudahnya ke Beranda.
+        $request->session()->forget(self::PIN_KEMBALI);
+        if (is_string($alamat) && preg_match('#^/wali/(?!pin\b)[A-Za-z0-9/_\-?=&%.]*$#', $alamat) && ! str_contains($alamat, '//')) {
+            $request->session()->put(self::PIN_KEMBALI, $alamat);
+        }
+    }
+
     public function pin(Request $request): View
     {
+        self::ingatKembali($request, $request->query('kembali'));
         $pin = $this->portal($request)->pin();
 
         return view('portal.pin', ['punya' => $pin->punya(), 'terkunci' => $pin->terkunci()]);
@@ -92,10 +111,11 @@ class PortalDompetController extends Controller
         $this->portal($request)->pin()->simpan(Crypt::decryptString($terenkripsi));
         $request->session()->forget(self::PIN_BARU);
 
-        // Selalu ke BERANDA, bukan kembali ke halaman asal: tombol kembali di kiri
-        // atas memakai riwayat browser, dan dari halaman lain ia membawa wali
-        // kembali ke formulir PIN yang baru saja selesai.
-        return redirect()->route('portal.beranda')->with('status', 'PIN transaksi berhasil disimpan. Gunakan PIN ini setiap membayar atau memindah saldo.');
+        // Kembali ke halaman proses yang memicunya (mis. pindah saldo pertama kali); tanpa itu ke Beranda.
+        $kembali = $request->session()->pull(self::PIN_KEMBALI);
+
+        return ($kembali ? redirect($kembali) : redirect()->route('portal.beranda'))
+            ->with('status', 'PIN transaksi berhasil disimpan. Gunakan PIN ini setiap membayar atau memindah saldo.');
     }
 
     /** Ganti PIN: cukup PIN lama, tanpa kode email. */

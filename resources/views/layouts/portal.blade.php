@@ -54,7 +54,8 @@
         // bersama transaksinya dan diperiksa di server — layar ini hanya pengetiknya.
         window.pinPad = (punya, urlBuat) => ({
             pin: '', terbuka: false,
-            buka() { if (! this.$root.reportValidity()) return; if (! punya) { location.href = urlBuat; return; } this.pin = ''; this.terbuka = true; },
+            // Belum punya PIN → ke pembuatan PIN, membawa alamat halaman ini supaya sesudahnya wali kembali ke sini.
+            buka() { if (! this.$root.reportValidity()) return; if (! punya) { location.href = urlBuat + (urlBuat.includes('?') ? '&' : '?') + 'kembali=' + encodeURIComponent(location.pathname + location.search); return; } this.pin = ''; this.terbuka = true; },
             tutup() { this.terbuka = false; this.pin = ''; },
             ketik(d) {
                 if (this.pin.length >= 6) return;
@@ -70,7 +71,19 @@
         // jadi yang terlalu besar diberi tahu sebelum terkirim. `kirim` = langsung kirim
         // formulirnya begitu berkas siap (dipakai di halaman Berkas).
         window.unggahBukti = (maks, kirim = false) => ({
-            nama: '', keterangan: 'Foto dikecilkan otomatis sebelum dikirim.', pratinjau: null, galat: '', sibuk: false,
+            nama: '', keterangan: 'Foto dikecilkan otomatis sebelum dikirim.', pratinjau: null, galat: '', sibuk: false, seret: false,
+        // Seret & lepas dari komputer (21 Okt 2026): berkas yang dilepas di kotak unggah diperlakukan
+        // sama dengan yang dipilih — masuk ke <input type=file> di dalam kotak itu, lalu lewat pilih().
+        jatuhkan(e) {
+            this.seret = false;
+            const berkas = e.dataTransfer?.files?.[0], input = e.currentTarget.querySelector('input[type=file]');
+            if (! berkas || ! input || this.sibuk) return;
+            if (! (berkas.type.startsWith('image/') || berkas.type === 'application/pdf')) {
+                this.galat = 'Hanya foto atau PDF.'; return;
+            }
+            const dt = new DataTransfer(); dt.items.add(berkas); input.files = dt.files;
+            this.pilih({ target: input });
+        },
             async pilih(e) {
                 const input = e.target, berkas = input.files[0];
                 this.galat = ''; this.pratinjau = null;

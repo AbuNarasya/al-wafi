@@ -73,10 +73,12 @@
                                 @if ($b['jenis'] === 'lainnya')
                                     <input name="keterangan" required maxlength="255" placeholder="Berkas apa ini?" class="mb-2 w-full rounded-2xl border border-slate-300 px-4 py-2.5 text-sm">
                                 @endif
-                                <label class="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 py-2.5 text-sm font-semibold text-brand"
-                                       :class="sibuk && 'opacity-60'">
+                                <label class="flex cursor-pointer flex-wrap items-center justify-center gap-x-2 rounded-2xl border-2 border-dashed border-slate-300 py-2.5 text-sm font-semibold text-brand"
+                                       :class="{ 'opacity-60': sibuk, 'border-brand bg-blue-50': seret }"
+                                       @dragover.prevent="seret = true" @dragleave.prevent="seret = false" @drop.prevent="jatuhkan($event)">
                                     <x-portal.ikon nama="unggah" kelas="h-5 w-5" />
-                                    <span x-text="sibuk ? 'Mengirim…' : @js($b['berkas']->isEmpty() ? 'Unggah berkas' : 'Unggah berkas pengganti')"></span>
+                                    <span x-text="sibuk ? 'Mengirim…' : (seret ? 'Lepaskan berkas di sini' : @js($b['berkas']->isEmpty() ? 'Unggah berkas' : 'Unggah berkas pengganti'))"></span>
+                                    <span x-show="! sibuk && ! seret" class="hidden text-xs font-normal text-slate-500 sm:inline">atau seret berkas ke sini</span>
                                     <input type="file" name="berkas" accept="image/*,application/pdf" class="sr-only" @change="pilih($event)">
                                 </label>
                                 <p x-show="galat" x-text="galat" x-cloak class="mt-1 text-xs text-red-700"></p>

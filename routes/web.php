@@ -782,6 +782,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [$c, 'pasang'])->name('pasang')->middleware('hakakses:kartu-santri,buat');
         Route::post('/{kartu}/blokir', [$c, 'blokir'])->name('blokir')->middleware('hakakses:kartu-santri,ubah')->whereNumber('kartu');
         Route::post('/{kartu}/buka', [$c, 'buka'])->name('buka')->middleware('hakakses:kartu-santri,ubah')->whereNumber('kartu');
+        Route::delete('/{kartu}', [$c, 'hapus'])->name('hapus')->middleware('hakakses:kartu-santri,hapus')->whereNumber('kartu');
     });
 
     // Pencairan belanja kartu santri ke kas toko (mingguan).

@@ -70,6 +70,17 @@ class KartuSantriController extends Controller
         return back()->with('status', 'Kartu '.$kartu->santri->nama.' diblokir.');
     }
 
+    /** Hapus pendaftaran: tanpa riwayat → dihapus; punya riwayat → dilepas. UID-nya bebas dipasang ke santri lain. */
+    public function hapus(Request $request, KartuSantri $kartu): RedirectResponse
+    {
+        $nama = $kartu->santri?->nama;
+        $hasil = $this->kartu->hapusPendaftaran($kartu, $request->user()->id_pengguna);
+
+        return back()->with('status', $hasil === 'dihapus'
+            ? "Pendaftaran kartu {$nama} dihapus. Kartunya bisa dipasang ke santri lain."
+            : "Kartu {$nama} dilepas (riwayat transaksinya tetap tercatat atas nama {$nama}). Kartunya bisa dipasang ke santri lain.");
+    }
+
     public function buka(KartuSantri $kartu): RedirectResponse
     {
         try {

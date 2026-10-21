@@ -8,6 +8,8 @@
         $samar = fn ($uid) => strlen($uid) > 4 ? str_repeat('•', min(6, strlen($uid) - 4)).substr($uid, -4) : $uid;
         $bolehPasang = \App\Support\Akses::boleh('kartu-santri', 'buat');
         $bolehUbah = \App\Support\Akses::boleh('kartu-santri', 'ubah');
+        $bolehHapus = \App\Support\Akses::boleh('kartu-santri', 'hapus');
+        $tanyaHapus = fn ($nama) => "Hapus pendaftaran kartu {$nama}? Kartu ini tak bisa dipakai lagi oleh {$nama} dan boleh dipasang ke santri lain. Riwayat transaksinya (bila ada) tetap tercatat atas nama {$nama}.";
     @endphp
 
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -57,6 +59,12 @@
                                             <button class="text-xs font-medium text-red-600 hover:underline">Blokir</button>
                                         </form>
                                     @endif
+                                    @if ($bolehHapus && $s->kartuAktif)
+                                        <form method="POST" action="{{ route('kartu_santri.hapus', $s->kartuAktif->id) }}" data-confirm="{{ $tanyaHapus($s->nama) }}">
+                                            @csrf @method('DELETE')
+                                            <button class="text-xs font-medium text-gray-500 hover:text-red-600 hover:underline">Hapus pendaftaran</button>
+                                        </form>
+                                    @endif
                                 </div>
                                 {{-- Pembaca RFID USB mengetik UID lalu Enter — formulirnya langsung terkirim. --}}
                                 <form x-show="buka" x-cloak method="POST" action="{{ route('kartu_santri.pasang') }}" class="mt-2 flex justify-end gap-2">
@@ -88,11 +96,19 @@
                             <td class="px-4 py-2 text-xs">{{ $k->diblokir_pada?->format('d/m/Y H:i') }} · {{ $k->diblokir_oleh_wali ? 'oleh wali' : 'oleh staf' }}</td>
                             <td class="px-4 py-2 text-xs text-gray-600">{{ $k->alasan_blokir }}</td>
                             <td class="px-4 py-2 text-right">
-                                @if ($bolehUbah && $k->alasan_blokir !== 'Diganti kartu baru')
-                                    <form method="POST" action="{{ route('kartu_santri.buka', $k->id) }}" onsubmit="return confirm('Kartu sudah ditemukan & boleh dipakai lagi?')">
-                                        @csrf <button class="text-xs font-medium text-brand hover:underline">Buka blokir</button>
-                                    </form>
-                                @endif
+                                <div class="flex items-center justify-end gap-3">
+                                    @if ($bolehUbah && $k->alasan_blokir !== 'Diganti kartu baru')
+                                        <form method="POST" action="{{ route('kartu_santri.buka', $k->id) }}" onsubmit="return confirm('Kartu sudah ditemukan & boleh dipakai lagi?')">
+                                            @csrf <button class="text-xs font-medium text-brand hover:underline">Buka blokir</button>
+                                        </form>
+                                    @endif
+                                    @if ($bolehHapus)
+                                        <form method="POST" action="{{ route('kartu_santri.hapus', $k->id) }}" data-confirm="{{ $tanyaHapus($k->santri?->nama) }}">
+                                            @csrf @method('DELETE')
+                                            <button class="text-xs font-medium text-gray-500 hover:text-red-600 hover:underline">Hapus pendaftaran</button>
+                                        </form>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     @empty

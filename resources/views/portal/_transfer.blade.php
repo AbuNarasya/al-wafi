@@ -57,11 +57,14 @@
         </div>
         <div x-data="unggahBukti({{ $maksByte }})">
             <label class="mb-1 block text-sm font-medium text-slate-700">Bukti transfer</label>
-            <label class="flex cursor-pointer flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-slate-300 bg-white p-5 text-center">
+            <label class="flex cursor-pointer flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-slate-300 bg-white p-5 text-center"
+                   :class="seret && 'border-brand bg-blue-50'"
+                   @dragover.prevent="seret = true" @dragleave.prevent="seret = false" @drop.prevent="jatuhkan($event)">
                 <template x-if="pratinjau"><img :src="pratinjau" alt="Pratinjau bukti" class="max-h-48 rounded-xl"></template>
                 <span x-show="! pratinjau" class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><x-portal.ikon nama="unggah" /></span>
                 <span class="text-sm font-semibold text-brand" x-text="nama || 'Pilih foto / PDF bukti transfer'"></span>
                 <span class="text-xs text-slate-500" x-text="keterangan"></span>
+                <span x-show="! nama" class="hidden text-xs text-slate-400 sm:inline" x-text="seret ? 'Lepaskan berkas di sini' : 'atau seret berkas ke kotak ini'"></span>
                 <input type="file" name="bukti" accept="image/*,application/pdf" required class="sr-only" @change="pilih($event)">
             </label>
             <p x-show="galat" x-text="galat" x-cloak class="mt-1 text-xs text-red-700"></p>

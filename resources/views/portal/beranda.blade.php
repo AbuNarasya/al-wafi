@@ -108,6 +108,7 @@
                                 <div @class(['h-1.5 flex-1 rounded-full', 'bg-brand' => $i <= $a['tahap'], 'bg-slate-200' => $i > $a['tahap']])></div>
                             @endfor
                         </div>
+                        @include('portal._status-diterima', ['status' => $a['status']])
                         @if ($a['langkah'])
                             <p class="mt-2 text-sm text-slate-600">{{ $a['langkah'] }}</p>
                         @endif

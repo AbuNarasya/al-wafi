@@ -1,7 +1,8 @@
 @extends('layouts.portal')
 
 @section('title', 'Konfirmasi PIN')
-@section('kembali', route('portal.pin'))
+@php $ulang = route('portal.pin', array_filter(['kembali' => session(\App\Http\Controllers\PortalDompetController::PIN_KEMBALI)])); @endphp
+@section('kembali', $ulang)
 
 @section('content')
     <div class="mb-5 mt-4 text-center">
@@ -18,5 +19,5 @@
                class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] focus:border-brand focus:ring-brand">
         <button class="mt-4 w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white">Simpan PIN</button>
     </form>
-    <a href="{{ route('portal.pin') }}" class="mt-5 block text-center text-sm font-semibold text-brand">Ulangi dari awal</a>
+    <a href="{{ $ulang }}" class="mt-5 block text-center text-sm font-semibold text-brand">Ulangi dari awal</a>
 @endsection

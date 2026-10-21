@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\Hash;
  * KARTU RFID & PENGAMAN BELANJA SANTRI (D1) — keputusan user 19 Okt 2026.
  *
  *  • Satu santri satu kartu AKTIF; memasang kartu baru otomatis memblokir yang lama.
- *    UID unik selamanya — kartu yang pernah dipakai orang lain tak bisa dipindahtangankan.
+ *    UID unik di antara kartu yang masih terdaftar; staf bisa MENGHAPUS PENDAFTARAN sebuah kartu
+ *    (21 Okt 2026) supaya kartunya bisa dipasang ke santri lain — lihat hapusPendaftaran().
  *  • Blokir: wali (portal, dengan PIN wali) & staf. Membuka blokir / mengganti: staf saja.
  *  • PIN belanja anak dipasang WALI; belanja di atas batas harian meminta PIN ini.
  *    Lima kali salah → terkunci 30 menit (sama dengan PIN wali).
@@ -49,9 +50,10 @@ class KartuSantriService
             throw new AppException(422, "{$santri->nama} bukan santri aktif.");
         }
 
-        $ada = KartuSantri::with('santri:id,nama')->where('uid', $uid)->first();
+        // Kartu yang pendaftarannya sudah dihapus (`dilepas`) tak lagi mengikat UID-nya.
+        $ada = KartuSantri::with('santri:id,nama')->where('uid', $uid)->where('status', '!=', 'dilepas')->first();
         if ($ada && $ada->id_santri !== $santri->id) {
-            throw new AppException(422, "Kartu ini sudah terdaftar atas nama {$ada->santri?->nama}.");
+            throw new AppException(422, "Kartu ini sudah terdaftar atas nama {$ada->santri?->nama}. Bila kartunya memang dipindahkan, hapus dulu pendaftarannya di baris santri itu (atau di tab Kartu diblokir).");
         }
         if ($ada && $ada->status === 'aktif') {
             return $ada;   // sudah terpasang — tak ada yang berubah
@@ -73,9 +75,51 @@ class KartuSantriService
         });
     }
 
+    /** Jumlah transaksi yang tercatat atas UID ini (belanja, retur, permintaan kartu, transaksi penghubung toko). */
+    public static function riwayat(string $uid): int
+    {
+        return \App\Models\Penjualan::where('uid_kartu', $uid)->count()
+            + \App\Models\TransaksiDompetToko::where('uid_kartu', $uid)->count()
+            + \App\Models\PermintaanKartu::where('uid_kartu', $uid)->count();
+    }
+
+    /**
+     * HAPUS PENDAFTARAN (keputusan user 21 Okt 2026) — staf, hak hapus. Kartu tanpa riwayat dihapus
+     * bersih; yang sudah punya riwayat DILEPAS (baris tetap ada untuk jejak, riwayat tetap milik santri
+     * lama lewat id_santri tiap transaksi). Keduanya membebaskan UID untuk didaftarkan ke santri lain.
+     *
+     * @return 'dihapus'|'dilepas'
+     */
+    public function hapusPendaftaran(KartuSantri $kartu, ?int $idPengguna): string
+    {
+        if ($kartu->status === 'dilepas') {
+            return 'dilepas';
+        }
+        $kartu->loadMissing('santri:id,nama');
+        $riwayat = self::riwayat($kartu->uid);
+        $sebelum = $kartu->status;
+        $hasil = DB::transaction(function () use ($kartu, $riwayat, $idPengguna) {
+            if ($riwayat === 0) {
+                $kartu->delete();
+
+                return 'dihapus';
+            }
+            $kartu->update(['status' => 'dilepas', 'dilepas_pada' => now(), 'dilepas_oleh' => $idPengguna]);
+
+            return 'dilepas';
+        });
+        \App\Support\Audit\Jejak::catat('hapus_pendaftaran_kartu', [
+            'modul' => 'kartu-santri', 'ref_jenis' => 'KartuSantri', 'ref_id' => $kartu->id, 'id_pengguna' => $idPengguna,
+            'detail' => ['uid' => $kartu->uid, 'santri' => $kartu->santri?->nama, 'id_santri' => $kartu->id_santri,
+                'status_sebelum' => $sebelum, 'hasil' => $hasil, 'riwayat' => $riwayat],
+        ]);
+
+        return $hasil;
+    }
+
     public function blokir(KartuSantri $kartu, string $alasan, ?int $idPengguna, ?int $idWali = null): KartuSantri
     {
-        if ($kartu->status === 'diblokir') {
+        if ($kartu->status === 'diblokir' || $kartu->status === 'dilepas') {
             return $kartu;
         }
         $kartu->update([
@@ -91,6 +135,9 @@ class KartuSantriService
     {
         if ($kartu->status === 'aktif') {
             return $kartu;
+        }
+        if ($kartu->status === 'dilepas') {
+            throw new AppException(422, 'Pendaftaran kartu ini sudah dihapus. Pasang ulang kartunya bila ingin dipakai lagi.');
         }
         if (KartuSantri::where('id_santri', $kartu->id_santri)->where('status', 'aktif')->exists()) {
             throw new AppException(422, 'Santri ini sudah memakai kartu lain yang aktif. Blokir kartu itu dulu bila ingin kembali ke kartu ini.');

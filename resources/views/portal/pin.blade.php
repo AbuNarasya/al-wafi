@@ -1,7 +1,7 @@
 @extends('layouts.portal')
 
 @section('title', 'PIN transaksi')
-@section('kembali', route('portal.akun'))
+@section('kembali', session(\App\Http\Controllers\PortalDompetController::PIN_KEMBALI) ?: route('portal.akun'))
 
 @php $kelasInput = 'w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-center text-xl font-bold tracking-[0.5em] focus:border-brand focus:ring-brand'; @endphp
 

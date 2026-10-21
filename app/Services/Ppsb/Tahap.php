@@ -73,6 +73,14 @@ final class Tahap
         return self::LABEL[$s] ?? $s;
     }
 
+    /** Status yang berarti keputusan menerima sudah jatuh (portal wali: "Santri diterima"). */
+    public const SUDAH_DITERIMA = ['diterima', 'lolos_kesehatan', 'siap_aktivasi', 'aktif', 'naik'];
+
+    public static function sudahDiterima(string $s): bool
+    {
+        return in_array($s, self::SUDAH_DITERIMA, true);
+    }
+
     public static function isFinal(string $status, string $jenis = 'baru'): bool
     {
         return in_array($status, $jenis === 'lanjutan' ? self::FINAL_LANJUTAN : self::STATUS_FINAL, true);

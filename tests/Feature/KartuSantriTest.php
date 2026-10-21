@@ -163,6 +163,44 @@ class KartuSantriTest extends TestCase
 
     // ---- Staf & impor ----
 
+    /** 21 Okt 2026: hapus pendaftaran — tanpa riwayat dihapus bersih; punya riwayat dilepas & bisa pindah ke santri lain. */
+    public function test_hapus_pendaftaran_dan_pindah_kartu_ke_santri_lain(): void
+    {
+        $tanpaRiwayat = $this->k->pasang($this->ahmad->id, 'AAAA1111', $this->staf->id_pengguna);
+        $this->actingAs($this->staf)->delete(route('kartu_santri.hapus', $tanpaRiwayat->id))->assertForbidden(); // butuh hak hapus
+
+        HakAksesModul::where('id_pengguna', $this->staf->id_pengguna)->update(['hapus' => true]);
+        Akses::lupakan();
+        $this->actingAs($this->staf)->get(route('kartu_santri.index'))->assertSee('Hapus pendaftaran');
+        $this->actingAs($this->staf)->delete(route('kartu_santri.hapus', $tanpaRiwayat->id))->assertSessionHas('status');
+        $this->assertNull(KartuSantri::find($tanpaRiwayat->id), 'tanpa riwayat → baris dihapus');
+        $this->assertSame('AAAA1111', $this->k->pasang($this->budi->id, 'AAAA1111', $this->staf->id_pengguna)->uid);
+
+        // Kartu Ahmad yang sudah dipakai belanja → dilepas, riwayatnya tetap atas nama Ahmad.
+        $dipakai = $this->k->pasang($this->ahmad->id, 'BBBB2222', $this->staf->id_pengguna);
+        \App\Models\TransaksiDompetToko::create(['nomor_toko' => 'WM-UJI-1', 'jenis' => 'potong', 'id_santri' => $this->ahmad->id,
+            'uid_kartu' => 'BBBB2222', 'nominal' => 5000, 'tanggal' => now()->toDateString()]);
+        try {
+            $this->k->pasang($this->budi->id, 'BBBB2222', $this->staf->id_pengguna);
+            $this->fail('Masih terdaftar atas nama Ahmad — harus ditolak.');
+        } catch (AppException $e) {
+            $this->assertStringContainsString('hapus dulu pendaftarannya', $e->getMessage());
+        }
+
+        $this->actingAs($this->staf)->delete(route('kartu_santri.hapus', $dipakai->id))->assertSessionHas('status');
+        $this->assertSame('dilepas', $dipakai->refresh()->status);
+        $this->assertNull($this->ahmad->refresh()->kartuAktif);
+        $this->assertNull($this->k->cariAktif('BBBB2222'), 'kartu yang dilepas tak bisa dipakai belanja');
+
+        $baru = $this->k->pasang($this->budi->id, 'BBBB2222', $this->staf->id_pengguna);
+        $this->assertSame($this->budi->id, $this->k->cariAktif('BBBB2222')->id_santri);
+        $this->assertNotSame($dipakai->id, $baru->id);
+        $this->assertSame($this->ahmad->id, \App\Models\TransaksiDompetToko::sole()->id_santri);
+        $this->assertSame(2, \App\Models\ActivityLog::where('aksi', 'hapus_pendaftaran_kartu')->count());
+        $this->expectException(AppException::class);
+        $this->k->bukaBlokir($dipakai);
+    }
+
     public function test_layar_staf_pasang_blokir_buka(): void
     {
         $this->actingAs($this->staf)->get(route('kartu_santri.index'))->assertOk()->assertSee('AHMAD')->assertSee('0 dari 2 santri aktif sudah berkartu', false);

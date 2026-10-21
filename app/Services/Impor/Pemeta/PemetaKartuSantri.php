@@ -75,7 +75,7 @@ class PemetaKartuSantri implements Pemeta, PemetaBisaDibatalkan
             return $this->masalah("{$santri->nama} bukan santri aktif.");
         }
 
-        $ada = KartuSantri::with('santri:id,nama')->where('uid', $uid)->first();
+        $ada = KartuSantri::with('santri:id,nama')->where('uid', $uid)->where('status', '!=', 'dilepas')->first();
         if ($ada && $ada->id_santri === $santri->id && $ada->status === 'aktif') {
             return $this->lewati();
         }

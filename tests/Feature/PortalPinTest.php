@@ -87,9 +87,33 @@ class PortalPinTest extends TestCase
     {
         $this->saldo(santri: 100000);
 
-        $this->sebagai()->post(route('portal.dompet.pindah'), ['arah' => 'santri_wali', 'id_santri' => $this->ahmad->id, 'nominal' => 50000])
-            ->assertRedirect(route('portal.pin'));
+        $this->sebagai()->from(route('portal.dompet.pindah'))
+            ->post(route('portal.dompet.pindah'), ['arah' => 'santri_wali', 'id_santri' => $this->ahmad->id, 'nominal' => 50000])
+            ->assertRedirect(route('portal.pin', ['kembali' => '/wali/dompet/pindah']));
         $this->assertSame(0, MutasiDompet::count());
+    }
+
+    /** 21 Okt 2026: PIN pertama dibuat di tengah proses (pindah saldo) → sesudahnya kembali ke proses itu, bukan Beranda. */
+    public function test_sesudah_pin_pertama_kembali_ke_halaman_proses(): void
+    {
+        $this->sebagai()->get(route('portal.pin', ['kembali' => '/wali/dompet/pindah']))->assertOk();
+        $this->sebagai()->post(route('portal.pin.kode'), ['pin_baru' => self::PIN, 'pin_ulang' => self::PIN]);
+        $kode = null;
+        Notification::assertSentOnDemand(KodeMasukWali::class, function ($n) use (&$kode) {
+            $kode = $n->kode;
+
+            return true;
+        });
+
+        $this->post(route('portal.pin.konfirmasi'), ['kode' => $kode])->assertRedirect('/wali/dompet/pindah')->assertSessionHas('status');
+    }
+
+    public function test_alamat_kembali_di_luar_portal_diabaikan(): void
+    {
+        foreach (['https://jahat.example/x', '//jahat.example', '/admin', '/wali/pin/konfirmasi'] as $alamat) {
+            $this->sebagai()->get(route('portal.pin', ['kembali' => $alamat]))->assertOk()
+                ->assertSessionMissing(\App\Http\Controllers\PortalDompetController::PIN_KEMBALI);
+        }
     }
 
     public function test_membuat_pin_wajib_kode_email_dan_pin_lemah_ditolak(): void

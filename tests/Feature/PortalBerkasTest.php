@@ -62,8 +62,14 @@ class PortalBerkasTest extends TestCase
         $this->sebagai()->get(route('portal.berkas', $this->ahmad->id))->assertOk()
             ->assertSee('Kartu Keluarga')->assertSee('Akta Kelahiran')->assertSee('6 dari 6 berkas registrasi')
             ->assertDontSee('Hasil Med Check');
-        $this->sebagai()->get(route('portal.anak', $this->ahmad->id))->assertOk()->assertSee('6 dari 6 berkas registrasi belum diterima');
-        $this->sebagai()->get(route('portal.beranda'))->assertOk()->assertSee('berkas registrasi belum lengkap');
+        $this->sebagai()->get(route('portal.anak', $this->ahmad->id))->assertOk()->assertSee('6 dari 6 berkas registrasi belum diterima')
+            ->assertSee('Santri belum diterima');
+        $this->sebagai()->get(route('portal.beranda'))->assertOk()->assertSee('berkas registrasi belum lengkap')
+            ->assertSee('Santri belum diterima')->assertDontSee('Santri diterima');
+        $this->sebagai()->get(route('portal.berkas', $this->ahmad->id))->assertSee('jatuhkan($event)', false);
+
+        $this->ahmad->update(['status' => 'diterima']);
+        $this->sebagai()->get(route('portal.beranda'))->assertOk()->assertSee('Santri diterima')->assertDontSee('Santri belum diterima');
     }
 
     public function test_wali_mengunggah_staf_dikabari_dan_melihatnya(): void

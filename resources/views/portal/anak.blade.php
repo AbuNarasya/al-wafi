@@ -36,6 +36,7 @@
                     @endfor
                 </div>
                 <p class="mt-2 text-sm text-slate-600">Tahap {{ $tahapPsb + 1 }} dari 7 &middot; {{ $label }}</p>
+                @include('portal._status-diterima', ['status' => $santri->status])
             </div>
         </section>
     @endif
