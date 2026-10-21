@@ -29,7 +29,7 @@ class ExportController extends Controller
             'coaOptions' => ['' => '— pilih akun —'] + CoaDetail::where('status', 'aktif')->orderBy('kode_coa')->get()
                 ->mapWithKeys(fn ($c) => [$c->kode_coa => "{$c->kode_coa} — {$c->nama_coa}"])->all(),
             'kategoriOptions' => ['' => 'Semua kategori'] + \App\Models\AssetCategory::where('status', 'aktif')->orderBy('nama')->pluck('nama', 'nama')->all(),
-            'datasets' => collect(DatasetRegistry::datasets())->groupBy('group'),
+            'datasets' => collect(DatasetRegistry::bolehDiunduh())->groupBy('group'),
             'formats' => Exporter::FORMATS,
         ]);
     }
@@ -108,6 +108,8 @@ class ExportController extends Controller
     {
         $meta = DatasetRegistry::meta($key);
         abort_if($meta === null, 404);
+        $modul = DatasetRegistry::modulTambahan($meta);
+        abort_if($modul !== null && ! \App\Support\Akses::boleh($modul, 'lihat'), 403);
 
         $rows = (new DatasetRegistry)->rows($key);
 

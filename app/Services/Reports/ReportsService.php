@@ -77,10 +77,22 @@ class ReportsService
         return $ctx['rootOfGrup'][$a->kode_grup] ?? null;
     }
 
-    /** +val untuk debet-normal, -val untuk kredit-normal. */
-    private function applySign($val, string $jenisSaldo): string
+    /**
+     * Nilai akun menurut arah KELOMPOKNYA (audit 21 Okt 2026): Aset & Beban = debet − kredit; Liabilitas, Ekuitas &
+     * Pendapatan = kredit − debet. Akun KONTRA (Akumulasi Penyusutan di Aset, Dividen/Prive di Ekuitas, Retur &
+     * Diskon Penjualan di Pendapatan) karena itu bernilai NEGATIF dan mengurangi kelompoknya. Dulu tandanya mengikuti
+     * `jenis_saldo` akun itu sendiri, sehingga akun kontra justru MENAMBAH total dan neraca tak seimbang sejak
+     * penyusutan pertama. Akun tanpa kelompok akar dikenal tetap memakai jenis_saldo-nya.
+     */
+    private function normal(array $ctx, $a, $val): string
     {
-        return $jenisSaldo === 'debet' ? Money::of($val) : Money::sub('0', $val);
+        $debet = match ($this->rootOfAccount($ctx, $a)) {
+            '1', '5' => true,
+            '2', '3', '4' => false,
+            default => $a->jenis_saldo === 'debet',
+        };
+
+        return $debet ? Money::of($val) : Money::sub('0', $val);
     }
 
     private function roundedZero($v): bool
@@ -190,6 +202,20 @@ class ReportsService
         return Money::sub($pend, $beban);
     }
 
+    /**
+     * Laba/rugi bertanggal SEBELUM awal tahun buku yang belum dipindah ke ekuitas lewat tutup buku (audit 21 Okt
+     * 2026). Dulu laporan posisi menghitung aset dari seluruh jurnal tetapi laba hanya sejak awal tahun buku, sehingga
+     * transaksi sebelum periode (mis. uji coba kasir sebelum buku dimulai, atau tahun yang lupa ditutup) membuat
+     * neraca timpang. Tahun yang sudah ditutup bernilai nol di sini karena jurnal TutupBuku-nya ikut terhitung.
+     */
+    private function labaSebelumPeriode(array $ctx, string $fyStart, string $sampai): string
+    {
+        $batas = min(Carbon::parse($fyStart)->subDay()->toDateString(), $sampai);
+        $map = $this->movementDebitMap(null, $batas);
+
+        return $this->labaBerjalan($ctx, fn ($a) => $this->normal($ctx, $a, $map[$a->kode_coa] ?? '0'));
+    }
+
     // ---- Neraca ----
 
     public function neraca(string $asOf): array
@@ -197,7 +223,7 @@ class ReportsService
         $ctx = $this->coaContext();
         $upToAsOf = $this->movementDebitMap(null, $asOf);
 
-        $balNormal = fn ($a) => $this->applySign($upToAsOf[$a->kode_coa] ?? '0', $a->jenis_saldo);
+        $balNormal = fn ($a) => $this->normal($ctx, $a, $upToAsOf[$a->kode_coa] ?? '0');
         $acctsOf = fn ($root) => array_values(array_filter($ctx['accounts'], fn ($a) => $this->rootOfAccount($ctx, $a) === $root));
         $skip = fn ($a, $nilai) => $this->roundedZero($nilai) && $a->status === 'nonaktif';
 
@@ -207,16 +233,18 @@ class ReportsService
 
         $fyStart = $this->fiscalYearStart($asOf);
         $inYear = $this->movementDebitMap($fyStart, $asOf);
-        $laba = $this->labaBerjalan($ctx, fn ($a) => $this->applySign($inYear[$a->kode_coa] ?? '0', $a->jenis_saldo));
+        $laba = $this->labaBerjalan($ctx, fn ($a) => $this->normal($ctx, $a, $inYear[$a->kode_coa] ?? '0'));
+        $labaLalu = $this->labaSebelumPeriode($ctx, $fyStart, $asOf);
 
-        $totalEkuitas = Money::add($ekuitas['total'], $laba);
+        $totalEkuitas = Money::add(Money::add($ekuitas['total'], $laba), $labaLalu);
         $balanced = $this->roundedZero(Money::sub($aset['total'], Money::add($liabilitas['total'], $totalEkuitas)));
 
         return [
             'asOf' => $asOf, 'fiscal_year_start' => $fyStart,
             'aset' => ['title' => 'Aset', 'groups' => $aset['groups'], 'total' => Money::of($aset['total'])],
             'liabilitas' => ['title' => 'Liabilitas', 'groups' => $liabilitas['groups'], 'total' => Money::of($liabilitas['total'])],
-            'ekuitas' => ['title' => 'Ekuitas', 'groups' => $ekuitas['groups'], 'laba_berjalan' => Money::of($laba), 'total' => Money::of($totalEkuitas)],
+            'ekuitas' => ['title' => 'Ekuitas', 'groups' => $ekuitas['groups'], 'laba_berjalan' => Money::of($laba),
+                'laba_sebelum_periode' => Money::of($labaLalu), 'total' => Money::of($totalEkuitas)],
             'total_aset' => Money::of($aset['total']), 'total_liabilitas' => Money::of($liabilitas['total']), 'total_ekuitas' => Money::of($totalEkuitas),
             'balanced' => $balanced,
         ];
@@ -351,7 +379,7 @@ class ReportsService
     {
         $ctx = $this->coaContext();
         $move = $this->movementDebitMap($from, $to, $kodeUnit, tanpaTutupBuku: true);
-        $periodNormal = fn ($a) => $this->applySign($move[$a->kode_coa] ?? '0', $a->jenis_saldo);
+        $periodNormal = fn ($a) => $this->normal($ctx, $a, $move[$a->kode_coa] ?? '0');
         $acctsOf = fn ($root) => array_values(array_filter($ctx['accounts'], fn ($a) => $this->rootOfAccount($ctx, $a) === $root));
         $skip = fn ($a, $nilai) => $this->roundedZero($nilai);
 
@@ -406,8 +434,8 @@ class ReportsService
         $upToAwal = $this->movementDebitMap(null, $dayBefore);
         $inPeriod = $this->movementDebitMap($from, $to);
 
-        $awalNormal = fn ($a) => $this->applySign($upToAwal[$a->kode_coa] ?? '0', $a->jenis_saldo);
-        $mutasiNormal = fn ($a) => $this->applySign($inPeriod[$a->kode_coa] ?? '0', $a->jenis_saldo);
+        $awalNormal = fn ($a) => $this->normal($ctx, $a, $upToAwal[$a->kode_coa] ?? '0');
+        $mutasiNormal = fn ($a) => $this->normal($ctx, $a, $inPeriod[$a->kode_coa] ?? '0');
 
         $rows = [];
         $totalAwal = '0';
@@ -429,12 +457,14 @@ class ReportsService
 
         $fyStart = $this->fiscalYearStart($to);
         $inYear = $this->movementDebitMap($fyStart, $to);
-        $laba = $this->labaBerjalan($ctx, fn ($a) => $this->applySign($inYear[$a->kode_coa] ?? '0', $a->jenis_saldo));
+        $laba = $this->labaBerjalan($ctx, fn ($a) => $this->normal($ctx, $a, $inYear[$a->kode_coa] ?? '0'));
+        $labaLalu = $this->labaSebelumPeriode($ctx, $fyStart, $to);
 
         return [
             'from' => $from, 'to' => $to, 'fiscal_year_start' => $fyStart, 'saldo_awal_label' => $dayBefore, 'rows' => $rows,
             'total_awal' => Money::of($totalAwal), 'total_mutasi' => Money::of($totalMutasi), 'total_sebelum_laba' => Money::of($totalSebelumLaba),
-            'laba_berjalan' => Money::of($laba), 'total_ekuitas_akhir' => Money::of(Money::add($totalSebelumLaba, $laba)),
+            'laba_berjalan' => Money::of($laba), 'laba_sebelum_periode' => Money::of($labaLalu),
+            'total_ekuitas_akhir' => Money::of(Money::add(Money::add($totalSebelumLaba, $laba), $labaLalu)),
         ];
     }
 
@@ -693,7 +723,7 @@ class ReportsService
             if ($akarOf($a) !== '3') {
                 continue;
             }
-            $saldo = $this->applySign($sampaiAwal[$a->kode_coa] ?? '0', $a->jenis_saldo);
+            $saldo = $this->normal($ctx, $a, $sampaiAwal[$a->kode_coa] ?? '0');
             $awal[$sifat($a)] = Money::add($awal[$sifat($a)], $saldo);
         }
 
@@ -708,7 +738,7 @@ class ReportsService
             if ($akar !== '4' && $akar !== '5') {
                 continue;
             }
-            $nilai = $this->applySign($periode[$a->kode_coa] ?? '0', $a->jenis_saldo);
+            $nilai = $this->normal($ctx, $a, $periode[$a->kode_coa] ?? '0');
             if ($this->roundedZero($nilai)) {
                 continue;
             }

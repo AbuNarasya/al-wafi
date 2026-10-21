@@ -35,6 +35,10 @@
                     <td class="px-4 py-2 text-right tabular-nums">@rp($data['total_awal'])</td>
                     <td class="px-4 py-2 text-right tabular-nums">@rp($data['total_mutasi'])</td>
                     <td class="px-4 py-2 text-right tabular-nums">@rp($data['total_sebelum_laba'])</td></tr>
+                @if ((float) $data['laba_sebelum_periode'] != 0)
+                    <tr><td class="px-4 py-2 text-gray-600" colspan="3">Laba/Rugi sebelum {{ \Illuminate\Support\Carbon::parse($data['fiscal_year_start'])->format('d/m/Y') }} (belum ditutup buku)</td>
+                        <td class="px-4 py-2 text-right tabular-nums">@rp($data['laba_sebelum_periode'])</td></tr>
+                @endif
                 <tr><td class="px-4 py-2 text-gray-600" colspan="3">Laba/Rugi Tahun Berjalan</td>
                     <td class="px-4 py-2 text-right tabular-nums">@rp($data['laba_berjalan'])</td></tr>
                 <tr class="border-t-2 border-gray-200 bg-emerald-50 font-semibold text-emerald-900">

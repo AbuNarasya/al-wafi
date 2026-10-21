@@ -85,7 +85,8 @@ class PosController extends Controller
             $items = new EloquentCollection;
         }
 
-        $items = $items->filter(fn ($i) => $i->status === 'aktif' && $i->dijual_di_toko && $i->harga_jual !== null)->values();
+        // Harga Rp 0 = belum diisi → tak muncul (dan ditolak server bila dikirim juga).
+        $items = $items->filter(fn ($i) => $i->status === 'aktif' && $i->dijual_di_toko && (float) $i->harga_jual > 0)->values();
         $stok = InventoryMovement::stokPerLokasi($items->pluck('kode_persediaan')->all());
         $items->load('satuanLain');
 

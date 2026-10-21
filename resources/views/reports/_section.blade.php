@@ -35,13 +35,14 @@
             @empty
                 <tr><td class="px-4 py-4 text-center text-gray-400" colspan="{{ $span }}">Tidak ada saldo.</td></tr>
             @endforelse
-            @if ($extra)
+            {{-- $extra: satu baris ['label','nilai'] atau daftar baris seperti itu. --}}
+            @foreach ($extra === null ? [] : (isset($extra['label']) ? [$extra] : $extra) as $x)
                 <tr class="border-t border-gray-100">
-                    <td class="px-4 py-2 text-gray-600" colspan="2">{{ $extra['label'] }}</td>
-                    <td class="px-4 py-2 text-right text-gray-700 tabular-nums">@rp($extra['nilai'])</td>
+                    <td class="px-4 py-2 text-gray-600" colspan="2">{{ $x['label'] }}</td>
+                    <td class="px-4 py-2 text-right text-gray-700 tabular-nums">@rp($x['nilai'])</td>
                     @if ($detail)<td></td>@endif
                 </tr>
-            @endif
+            @endforeach
             <tr class="border-t-2 border-gray-200 bg-gray-50">
                 <td class="px-4 py-2.5 font-semibold text-gray-900" colspan="2">Total {{ $section['title'] }}</td>
                 <td class="px-4 py-2.5 text-right font-semibold text-gray-900 tabular-nums">@rp($section['total'])</td>

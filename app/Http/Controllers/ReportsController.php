@@ -167,6 +167,7 @@ class ReportsController extends Controller
                     ...$this->flattenSection('ASET', $d['aset']),
                     ...$this->flattenSection('LIABILITAS', $d['liabilitas']),
                     ...$this->flattenSection('EKUITAS', $d['ekuitas']),
+                    ['Bagian' => 'EKUITAS', 'Grup' => 'Laba/Rugi Sebelum Periode', 'Kode COA' => '', 'Akun' => 'Laba/Rugi sebelum '.$d['fiscal_year_start'].' (belum ditutup buku)', 'Nilai' => $d['ekuitas']['laba_sebelum_periode']],
                     ['Bagian' => 'EKUITAS', 'Grup' => 'Laba/Rugi Tahun Berjalan', 'Kode COA' => '', 'Akun' => 'Laba/Rugi Tahun Berjalan', 'Nilai' => $d['ekuitas']['laba_berjalan']],
                     ['Bagian' => 'TOTAL', 'Grup' => '', 'Kode COA' => '', 'Akun' => 'Total Aset', 'Nilai' => $d['total_aset'] ?? $d['aset']['total']],
                     ['Bagian' => 'TOTAL', 'Grup' => '', 'Kode COA' => '', 'Akun' => 'Total Liabilitas + Ekuitas', 'Nilai' => (string) ((float) $d['total_liabilitas'] + (float) $d['total_ekuitas'])],
@@ -200,6 +201,7 @@ class ReportsController extends Controller
                     'Setoran/Penarikan' => $r['mutasi'], 'Saldo Sebelum Laba' => $r['saldo_akhir'],
                 ], $d['rows']);
                 $rows[] = ['Kode COA' => '', 'Akun' => 'Subtotal Modal', 'Saldo Awal' => $d['total_awal'], 'Setoran/Penarikan' => $d['total_mutasi'], 'Saldo Sebelum Laba' => $d['total_sebelum_laba']];
+                $rows[] = ['Kode COA' => '', 'Akun' => 'Laba/Rugi sebelum '.$d['fiscal_year_start'].' (belum ditutup buku)', 'Saldo Awal' => '', 'Setoran/Penarikan' => '', 'Saldo Sebelum Laba' => $d['laba_sebelum_periode']];
                 $rows[] = ['Kode COA' => '', 'Akun' => 'Laba/Rugi Tahun Berjalan', 'Saldo Awal' => '', 'Setoran/Penarikan' => '', 'Saldo Sebelum Laba' => $d['laba_berjalan']];
                 $rows[] = ['Kode COA' => '', 'Akun' => 'Total Ekuitas Akhir', 'Saldo Awal' => '', 'Setoran/Penarikan' => '', 'Saldo Sebelum Laba' => $d['total_ekuitas_akhir']];
 

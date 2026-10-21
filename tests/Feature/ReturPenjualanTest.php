@@ -197,4 +197,48 @@ class ReturPenjualanTest extends TestCase
             ->assertSee('RETUR PENJUALAN')->assertSee($jual->nomor)->assertSee('7.200')->assertSee('rusak');
         $this->actingAs($this->pengawas)->get(route('shift_kasir.show', $retur->id_shift))->assertOk()->assertSee($retur->nomor);
     }
+
+    // ---- Audit 21 Okt 2026 (Paket 1) ----
+
+    public function test_retur_struk_berdiskon_mengembalikan_persis_yang_dibayar(): void
+    {
+        // 26 × 4.000 = 104.000, diskon struk 4.000 → dibayar 100.000 (porsi 0,9615…; dulu terpotong 0,96 → 99.840).
+        $shift = $this->k->bukaShift('L002', 0, $this->kasir->id_pengguna);
+        $jual = $this->k->jual($shift->id_shift, [['kode_persediaan' => 'BRG0001', 'kuantiti' => 26]], 100000, $this->kasir->id_pengguna,
+            ['struk' => 4000, 'alasan' => 'promo', 'id_pengawas' => $this->pengawas->id_pengguna, 'pin' => '482915']);
+        $baris = $jual->details[0]->id;
+
+        $r1 = $this->retur($shift, $jual, [['id_penjualan_detail' => $baris, 'kuantiti' => 13, 'kondisi' => 'layak']]);
+        $this->assertSame('50000.00', $r1->total);
+        $r2 = $this->retur($shift, $jual, [['id_penjualan_detail' => $baris, 'kuantiti' => 13, 'kondisi' => 'layak']]);
+        $this->assertSame('50000.00', $r2->total);   // total kembali = 100.000, persis yang dibayar
+    }
+
+    public function test_barang_berharga_nol_tak_bisa_dijual(): void
+    {
+        Inventory::create(['kode_persediaan' => 'BRG0002', 'nama_persediaan' => 'Sampo', 'satuan' => 'pcs', 'harga_perolehan' => '0',
+            'harga_jual' => '0', 'dijual_di_toko' => true, 'kode_coa' => '1.ZZRT.PRS', 'status' => 'aktif']);
+        InventoryMovement::masuk(['kode_persediaan' => 'BRG0002', 'kode_lokasi' => 'L002', 'kuantiti' => '5', 'nilai' => '50000',
+            'sumber_modul' => 'JurnalUmum', 'sumber_ref' => 'AWAL2']);
+        $shift = $this->k->bukaShift('L002', 0, $this->kasir->id_pengguna);
+        try {
+            $this->k->jual($shift->id_shift, [['kode_persediaan' => 'BRG0002', 'kuantiti' => 1]], 0, $this->kasir->id_pengguna);
+            $this->fail('Harus ditolak.');
+        } catch (AppException $e) {
+            $this->assertStringContainsString('belum punya harga jual', $e->getMessage());
+        }
+        $this->actingAs($this->kasir)->getJson(route('pos.cari', ['q' => 'Sampo']))->assertOk()->assertJsonCount(0, 'items');
+    }
+
+    public function test_barang_yang_punya_riwayat_stok_tak_bisa_dihapus(): void
+    {
+        $admin = User::create(['username' => 'adm', 'nama' => 'Admin', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => true, 'status' => 'aktif']);
+        $this->actingAs($admin)->delete(route('inventory.destroy', 'BRG0001'))->assertSessionHas('error');
+        $this->assertNotNull(Inventory::find('BRG0001'));
+        $this->assertGreaterThan(0, \App\Models\MutasiPersediaan::where('kode_persediaan', 'BRG0001')->count());
+
+        Inventory::create(['kode_persediaan' => 'BRG0009', 'nama_persediaan' => 'Belum dipakai', 'satuan' => 'pcs', 'harga_perolehan' => '0', 'status' => 'aktif']);
+        $this->actingAs($admin)->delete(route('inventory.destroy', 'BRG0009'))->assertSessionHasNoErrors();
+        $this->assertNull(Inventory::find('BRG0009'));
+    }
 }

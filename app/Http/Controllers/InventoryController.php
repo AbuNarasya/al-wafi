@@ -111,6 +111,12 @@ class InventoryController extends Controller
 
     public function destroy(Inventory $inventory): RedirectResponse
     {
+        // Kartu stok & lapisan FIFO ikut terhapus lewat cascade (dipakai pembatalan impor barang, yang hanya
+        // menghapus barang ber-stok-nol), padahal nilainya sudah di buku besar. Barang yang PERNAH bergerak
+        // stoknya tak boleh dihapus dari sini — nonaktifkan saja (audit 21 Okt 2026).
+        if (\App\Models\MutasiPersediaan::where('kode_persediaan', $inventory->kode_persediaan)->exists()) {
+            return back()->with('error', "{$inventory->nama_persediaan} sudah punya riwayat stok (kartu stok & jurnal) — tidak bisa dihapus. Ubah statusnya menjadi nonaktif.");
+        }
         try {
             $inventory->delete();
         } catch (QueryException) {

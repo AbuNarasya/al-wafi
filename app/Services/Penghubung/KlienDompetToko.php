@@ -92,7 +92,15 @@ class KlienDompetToko
         }
 
         if ($res->successful()) {
-            return (array) $res->json();
+            // 2xx yang BUKAN jawaban ERP Al Wafi (halaman HTML CDN/captive portal, JSON kosong, atau nomor lain) tak
+            // boleh dianggap "terpotong" — dulu (array) dari HTML = [] lalu struk kartu tersimpan tanpa potongan.
+            $j = $res->json();
+            if (! is_array($j) || $j === [] || (isset($isi['nomor']) && ($j['nomor'] ?? null) !== $isi['nomor'])) {
+                report(new \RuntimeException("Penghubung dompet {$path} → {$res->status()} bukan jawaban sah: ".mb_substr($res->body(), 0, 200)));
+                throw new PenghubungTakPasti;
+            }
+
+            return $j;
         }
         $status = $res->status();
         $pesan = (string) ($res->json('message') ?? '');

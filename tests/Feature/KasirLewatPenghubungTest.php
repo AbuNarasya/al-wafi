@@ -451,6 +451,23 @@ class KasirLewatPenghubungTest extends TestCase
         $this->actingAs($staf)->get('/pencairan-toko')->assertNotFound();
     }
 
+    public function test_jawaban_2xx_yang_bukan_json_sah_tak_dianggap_terpotong(): void
+    {
+        // Audit 21 Okt 2026: halaman HTML 200 (CDN/captive portal) dulu dibaca sebagai potong berhasil → barang gratis.
+        $this->penghubung(fn (Request $r) => match (true) {
+            str_ends_with($r->url(), '/potong') => Http::response('<html>Checking your browser…</html>', 200),
+            str_ends_with($r->url(), '/pastikan') => Http::response(['status' => 'dibatalkan', 'nomor' => $r['nomor']]),
+            default => Http::response([], 404),
+        });
+        try {
+            $this->jualKartu(1);
+            $this->fail('Harus gagal.');
+        } catch (AppException $e) {
+            $this->assertSame(KasirService::PESAN_TIDAK_TERJADI, $e->getMessage());   // dipastikan dulu, tak dianggap lunas
+        }
+        $this->assertSame(0, Penjualan::count());
+    }
+
     public function test_cek_lagi_hanya_milik_kasirnya_sendiri(): void
     {
         $this->potongPutus(fn () => Http::failedConnection());

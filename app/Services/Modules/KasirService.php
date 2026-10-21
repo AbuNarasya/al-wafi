@@ -624,7 +624,11 @@ class KasirService
 
         // Porsi diskon struk: yang dibayar dibagi jumlah baris (bersih diskon baris).
         $jumlahBaris = Money::of($jual->details->sum('total'));
-        $faktor = Money::gtZero($jumlahBaris) ? Money::div($jual->total, $jumlahBaris, 8) : '0';
+        // Dihitung langsung (baris × dibayar ÷ jumlah baris) lalu DIBULATKAN — dulu lewat faktor yang terpotong ke 2
+        // desimal, sehingga retur atas struk berdiskon struk mengembalikan kurang (105.000 diskon 5.000 → 99.750).
+        $porsi = fn (string $nilaiBaris) => Money::gtZero($jumlahBaris)
+            ? self::bulat(bcdiv(bcmul(Money::of($nilaiBaris), Money::of($jual->total), 8), $jumlahBaris, 8))
+            : '0.00';
 
         $rincian = [];
         $total = '0';
@@ -644,13 +648,13 @@ class KasirService
                 throw new AppException(422, "{$d->persediaan->nama_persediaan}: diretur melebihi yang dibeli (sisa {$this->angka($sisa)} {$d->satuan}).");
             }
 
-            $bersihBaris = Money::mul($d->total, $faktor);
+            $bersihBaris = $porsi($d->total);
             if (Money::eq($qty, $sisa, 4)) {
                 $nilai = Money::sub($bersihBaris, $s->nilai ?? '0');
                 $hpp = Money::sub($d->hpp, $s->hpp ?? '0');
             } else {
-                $nilai = Money::div(Money::mul($bersihBaris, $qty, 4), $d->kuantiti_input);
-                $hpp = Money::div(Money::mul($d->hpp, $qty, 4), $d->kuantiti_input);
+                $nilai = self::bulat(bcdiv(bcmul($bersihBaris, $qty, 8), Money::of($d->kuantiti_input, 4), 8));
+                $hpp = self::bulat(bcdiv(bcmul(Money::of($d->hpp), $qty, 8), Money::of($d->kuantiti_input, 4), 8));
             }
             $rincian[] = ['d' => $d, 'qty' => $qty, 'kondisi' => $l['kondisi'], 'nilai' => $nilai, 'hpp' => $hpp];
             $total = Money::add($total, $nilai);
@@ -834,6 +838,12 @@ class KasirService
      *
      * @return array{0:Inventory,1:string,2:string,3:string,4:?string,5:string} [.., harga berlaku, barcode, harga normal]
      */
+    /** Bulatkan ke 2 desimal (setengah menjauhi nol) — bcmath hanya memotong. */
+    private static function bulat(string $v): string
+    {
+        return bcadd($v, str_starts_with(ltrim($v), '-') ? '-0.005' : '0.005', 2);
+    }
+
     private function resolusi(array $l, int $no): array
     {
         $barcode = trim((string) ($l['barcode'] ?? ''));
@@ -856,8 +866,14 @@ class KasirService
 
         [$satuan, $isi] = $item->satuanKe($satuanDiminta)
             ?? throw new AppException(422, "Satuan {$satuanDiminta} belum terdaftar untuk {$item->nama_persediaan}.");
+        $harga = self::hargaJual($item, $satuan, $isi);
+        // Harga Rp 0 = belum diisi (impor POS lama meninggalkan beberapa), bukan barang gratis (audit 21 Okt 2026).
+        // Barang yang memang digratiskan dijual dengan diskon berpersetujuan pengawas.
+        if (! Money::gtZero($harga)) {
+            throw new AppException(422, "{$item->nama_persediaan} ({$satuan}) belum punya harga jual — isi harganya di master barang dulu.");
+        }
 
-        return [$item, $satuan, $isi, self::hargaJual($item, $satuan, $isi), $barcode, self::hargaNormal($item, $satuan, $isi)];
+        return [$item, $satuan, $isi, $harga, $barcode, self::hargaNormal($item, $satuan, $isi)];
     }
 
     /**

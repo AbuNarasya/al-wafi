@@ -255,6 +255,48 @@ class ReportsTest extends TestCase
         $this->assertContains(self::KAS, $kode);
     }
 
+    public function test_akun_kontra_mengurangi_kelompoknya_dan_neraca_tetap_seimbang(): void
+    {
+        // Audit 21 Okt 2026: Akumulasi Penyusutan (kredit) di Aset, Dividen (debet) di Ekuitas, Retur Penjualan
+        // (debet) di Pendapatan — dulu MENAMBAH total kelompoknya, neraca timpang.
+        CoaDetail::create(['kode_coa' => '1.2.02', 'nama_coa' => 'Akumulasi Penyusutan', 'kode_grup' => '11', 'jenis_saldo' => 'kredit']);
+        CoaDetail::create(['kode_coa' => '3.1.03', 'nama_coa' => 'Dividen', 'kode_grup' => '31', 'jenis_saldo' => 'debet']);
+        CoaDetail::create(['kode_coa' => '4.1.09', 'nama_coa' => 'Retur Penjualan', 'kode_grup' => '41', 'jenis_saldo' => 'debet']);
+        $jurnal = fn ($ref, $d, $k, $n, $bagian = null) => PostingService::postJournal(['referensi' => $ref, 'tanggal' => '2026-07-20', 'sumber_modul' => 'JurnalUmum', 'lines' => [
+            ['kode_coa' => $d, 'debet' => $n, 'kredit' => '0', 'kode_bagian' => $bagian], ['kode_coa' => $k, 'debet' => '0', 'kredit' => $n],
+        ]]);
+        $jurnal('JU-4', self::BEBAN, '1.2.02', '100000', 'B1');   // penyusutan
+        $jurnal('JU-5', '3.1.03', self::KAS, '50000');            // dividen
+        $jurnal('JU-6', '4.1.09', self::KAS, '20000');            // retur penjualan
+
+        $n = (new ReportsService)->neraca('2026-07-31');
+        // Kas 1.300.000 − 50.000 − 20.000 = 1.230.000; akumulasi −100.000 → aset 1.130.000.
+        // Ekuitas: modal 1.000.000 − dividen 50.000 + laba (500.000 − 20.000 − 200.000 − 100.000 = 180.000).
+        $this->assertSame(['1130000.00', '1130000.00', '180000.00'], [$n['total_aset'], $n['total_ekuitas'], $n['ekuitas']['laba_berjalan']]);
+        $this->assertTrue($n['balanced']);
+
+        $lr = (new ReportsService)->labaRugi('2026-07-01', '2026-07-31');
+        $this->assertSame(['480000.00', '300000.00', '180000.00'], [$lr['total_pendapatan'], $lr['total_beban'], $lr['laba_rugi_bersih']]);
+    }
+
+    public function test_laba_sebelum_awal_periode_tak_hilang_dari_neraca(): void
+    {
+        // Audit 21 Okt 2026 (wafimart): transaksi sebelum periode buku dulu hilang dari ekuitas → neraca timpang.
+        \App\Models\CompanySettings::updateOrCreate(['id' => 1], ['nama_perusahaan' => 'X', 'periode_awal_pembukuan' => '2026-08-01']);
+        PostingService::postJournal(['referensi' => 'JU-9', 'tanggal' => '2026-08-03', 'sumber_modul' => 'JurnalUmum', 'lines' => [
+            ['kode_coa' => self::KAS, 'debet' => '70000', 'kredit' => '0'], ['kode_coa' => self::PEND, 'debet' => '0', 'kredit' => '70000'],
+        ]]);
+
+        $n = (new ReportsService)->neraca('2026-08-31');
+        $this->assertSame(['300000.00', '70000.00', '1370000.00'], [$n['ekuitas']['laba_sebelum_periode'], $n['ekuitas']['laba_berjalan'], $n['total_ekuitas']]);
+        $this->assertTrue($n['balanced']);
+
+        // Laporan per tanggal SEBELUM periode pun seimbang (laba sebelum periode dibatasi tanggal laporan).
+        $this->assertTrue((new ReportsService)->neraca('2026-07-08')['balanced']);
+        $pm = (new ReportsService)->perubahanModal('2026-08-01', '2026-08-31');
+        $this->assertSame('1370000.00', $pm['total_ekuitas_akhir']);
+    }
+
     public function test_halaman_neraca_saldo_terbuka_dan_mencetak_barisnya(): void
     {
         Level::create(['kode_level' => 'LNS', 'nama_level' => 'LNS', 'max_transaksi' => null]);

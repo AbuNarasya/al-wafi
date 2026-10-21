@@ -104,6 +104,22 @@ class DatasetRegistry
         ];
     }
 
+    /**
+     * Hak tambahan per dataset di luar hak `reports` (audit 21 Okt 2026): daftar pengguna butuh hak modul Pengguna,
+     * data santri butuh hak modul Santri — dan otomatis mati di instans yang tak mengenal santri (Wafi Mart).
+     */
+    public static function modulTambahan(array $d): ?string
+    {
+        return $d['key'] === 'users' ? 'users' : ($d['group'] === 'Kesantrian' ? 'santri' : null);
+    }
+
+    /** Dataset yang boleh diunduh pengguna yang sedang masuk. */
+    public static function bolehDiunduh(): array
+    {
+        return array_values(array_filter(self::datasets(),
+            fn ($d) => ($m = self::modulTambahan($d)) === null || \App\Support\Akses::boleh($m, 'lihat')));
+    }
+
     public static function meta(string $key): ?array
     {
         foreach (self::datasets() as $d) {

@@ -31,7 +31,12 @@
             @include('reports._section', ['section' => $data['liabilitas']])
             @include('reports._section', [
                 'section' => $data['ekuitas'],
-                'extra' => ['label' => 'Laba/Rugi Tahun Berjalan', 'nilai' => $data['ekuitas']['laba_berjalan']],
+                'extra' => array_values(array_filter([
+                    (float) $data['ekuitas']['laba_sebelum_periode'] != 0
+                        ? ['label' => 'Laba/Rugi sebelum '.\Illuminate\Support\Carbon::parse($data['fiscal_year_start'])->format('d/m/Y').' (belum ditutup buku)', 'nilai' => $data['ekuitas']['laba_sebelum_periode']]
+                        : null,
+                    ['label' => 'Laba/Rugi Tahun Berjalan', 'nilai' => $data['ekuitas']['laba_berjalan']],
+                ])),
             ])
             <div class="rounded-xl border-2 border-emerald-200 bg-emerald-50 px-4 py-3 flex items-center justify-between">
                 <span class="text-sm font-semibold text-emerald-800">Total Liabilitas + Ekuitas</span>

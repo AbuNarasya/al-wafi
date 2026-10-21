@@ -485,7 +485,8 @@ Route::middleware('auth')->group(function () {
     });
 
     // ---- Export Data (CSV / Excel / PDF) ----
-    Route::prefix('export')->name('export.')->group(function () {
+    // Hak `reports` (audit 21 Okt 2026: dulu cukup login — kasir pun bisa mengunduh jurnal & buku besar).
+    Route::prefix('export')->name('export.')->middleware('hakakses:reports,lihat')->group(function () {
         $ex = ExportController::class;
         Route::get('/', [$ex, 'index'])->name('index');
         Route::get('/jurnal-mentah', [$ex, 'jurnalMentah'])->name('jurnal_mentah');
@@ -495,7 +496,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // ---- Kontrol Outstanding (read-only lintas modul) ----
-    Route::prefix('kontrol')->name('kontrol.')->group(function () {
+    Route::prefix('kontrol')->name('kontrol.')->middleware('hakakses:outstanding,lihat')->group(function () {
         $k = KontrolController::class;
         Route::get('/ringkasan', [$k, 'ringkasan'])->name('ringkasan');
         Route::get('/aging-ap', [$k, 'agingAp'])->name('aging_ap');
