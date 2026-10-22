@@ -108,7 +108,7 @@ class PemetaSantriLama implements Pemeta
             'tahun_ajaran' => ['wajib' => false, 'contoh' => '2026/2027', 'ket' => 'T.A yang sedang dijalani. Kosong = pakai pilihan "Tahun ajaran" di form impor.'],
             'jalur' => ['wajib' => false, 'contoh' => 'LAMA', 'ket' => 'Kode jalur dari master. Kosong = pakai pilihan "Jalur" di form impor.'],
             'wali_nama' => ['wajib' => true, 'contoh' => 'Bapak Fauzi', 'ket' => 'Dibuat otomatis bila belum ada.'],
-            'wali_telepon' => ['wajib' => true, 'contoh' => '08123456789', 'ket' => 'Kunci pengait: telepon sama = wali yang sama, jadi kakak-beradik menempel ke satu wali.'],
+            'wali_telepon' => ['wajib' => true, 'contoh' => '08123456789', 'ket' => 'NAMA WALI + TELEPON adalah satu kunci: kakak-beradik wajib ditulis dengan nama & telepon wali yang SAMA persis. Telepon sama dengan nama beda, atau nama sama dengan telepon beda, DITOLAK.'],
             // TIDAK ADA `angkatan`: tabel santri tak punya kolom itu, jadi isinya
             // selalu terbuang. Menawarkannya di templat hanya membuat petugas
             // mengisi kolom yang tak pernah sampai ke mana-mana.
@@ -311,9 +311,79 @@ class PemetaSantriLama implements Pemeta
 
     private function waliBerTelepon(string $telepon): ?Wali
     {
-        $this->waliPerTelepon ??= Wali::get(['id', 'nama', 'telepon'])->keyBy('telepon')->all();
+        $this->waliPerTelepon ??= Wali::get(['id', 'nama', 'telepon'])->keyBy(fn ($w) => self::telp($w->telepon))->all();
 
-        return $this->waliPerTelepon[$telepon] ?? null;
+        return $this->waliPerTelepon[self::telp($telepon)] ?? null;
+    }
+
+    /** @var array<string,list<Wali>>|null nama ternormalkan → wali */
+    private ?array $waliPerNama = null;
+
+    /** @return list<Wali> */
+    private function waliBerNama(string $nama): array
+    {
+        $this->waliPerNama ??= Wali::get(['id', 'nama', 'telepon'])->groupBy(fn ($w) => self::namaWali((string) $w->nama))->map->all()->all();
+
+        return $this->waliPerNama[self::namaWali($nama)] ?? [];
+    }
+
+    /** Telepon ternormalkan: hanya angka, awalan 62/8 → 0 ("+62 813-1745-6467" = "081317456467"). */
+    public static function telp(?string $v): string
+    {
+        $d = preg_replace('/\D/', '', (string) $v);
+
+        return match (true) {
+            str_starts_with($d, '62') => '0'.substr($d, 2),
+            str_starts_with($d, '8') => '0'.$d,
+            default => $d,
+        };
+    }
+
+    public static function namaWali(?string $v): string
+    {
+        return mb_strtolower(trim(preg_replace('/\s+/u', ' ', (string) $v)));
+    }
+
+    /**
+     * KUNCI WALI = NAMA + TELEPON, tak terpisahkan (keputusan user 22 Okt 2026). Di dalam berkas: telepon sama
+     * dengan nama beda, atau nama sama dengan telepon beda, MENOLAK SEMUA baris yang terlibat — sistem tak bisa
+     * menebak mana yang benar (impor 21 Okt menggabungkan anak dari 4 keluarga berbeda karena telepon bersama).
+     *
+     * @return array<int,string> indeks baris → alasan
+     */
+    public function masalahLintasBaris(array $rows): array
+    {
+        $perTelp = $perNama = [];
+        foreach ($rows as $i => $b) {
+            $t = self::telp($b['wali_telepon'] ?? '');
+            $n = self::namaWali($b['wali_nama'] ?? '');
+            if ($t === '' || $n === '') {
+                continue;
+            }
+            $perTelp[$t][$n][] = $i;
+            $perNama[$n][$t][] = $i;
+        }
+        $masalah = [];
+        foreach ($perTelp as $t => $nama) {
+            if (count($nama) > 1) {
+                foreach ($nama as $baris) {
+                    foreach ($baris as $i) {
+                        $masalah[$i] ??= "Telepon wali {$t} dipakai lebih dari satu nama wali di berkas ini (".implode(', ', array_map(fn ($x) => '"'.mb_strtoupper($x).'"', array_keys($nama))).'). Nama + telepon wali harus satu pasangan yang sama.';
+                    }
+                }
+            }
+        }
+        foreach ($perNama as $n => $telp) {
+            if (count($telp) > 1) {
+                foreach ($telp as $baris) {
+                    foreach ($baris as $i) {
+                        $masalah[$i] ??= 'Wali "'.mb_strtoupper($n).'" ditulis dengan telepon berbeda di berkas ini ('.implode(', ', array_keys($telp)).'). Nama + telepon wali harus satu pasangan yang sama.';
+                    }
+                }
+            }
+        }
+
+        return $masalah;
     }
 
     /** Jenis biaya tunggakan sah? Kosong dianggap sah (berkas boleh tanpa tunggakan). */
@@ -475,9 +545,15 @@ class PemetaSantriLama implements Pemeta
         if ($telepon === '' || $namaWali === '') {
             return $this->masalah('Nama atau telepon wali kosong.');
         }
+        // Kunci wali = nama + telepon (keputusan user 22 Okt 2026), dua arah terhadap wali yang sudah ada.
         $waliAda = $this->waliBerTelepon($telepon);
-        if ($waliAda && mb_strtolower((string) $waliAda->nama) !== mb_strtolower($namaWali)) {
-            return $this->masalah("Telepon {$telepon} sudah dipakai wali bernama \"{$waliAda->nama}\" — periksa apakah datanya keliru.");
+        if ($waliAda && self::namaWali($waliAda->nama) !== self::namaWali($namaWali)) {
+            return $this->masalah("Telepon {$telepon} sudah dipakai wali bernama \"{$waliAda->nama}\". Nama + telepon wali harus satu pasangan yang sama.");
+        }
+        foreach ($this->waliBerNama($namaWali) as $w) {
+            if (self::telp($w->telepon) !== self::telp($telepon)) {
+                return $this->masalah("Wali bernama \"{$w->nama}\" sudah terdaftar dengan telepon {$w->telepon}, bukan {$telepon}. Nama + telepon wali harus satu pasangan yang sama.");
+            }
         }
 
         if (($t = trim($baris['tanggal_lahir'] ?? '')) !== '' && self::tanggalNormal($t) === null) {
@@ -547,7 +623,7 @@ class PemetaSantriLama implements Pemeta
     {
         $baru = [];
         foreach ($baris as $b) {
-            $telepon = trim($b['wali_telepon']);
+            $telepon = self::telp($b['wali_telepon']);
             if ($telepon !== '' && ! $this->waliBerTelepon($telepon) && ! isset($baru[$telepon])) {
                 $baru[$telepon] = trim($b['wali_nama']);
             }
@@ -581,7 +657,7 @@ class PemetaSantriLama implements Pemeta
         // Sekali select untuk memungut id-nya, lalu masuk simpanan supaya baris
         // santri di bawah bisa menunjuknya tanpa bertanya lagi.
         foreach (Wali::whereIn('telepon', array_keys($baru))->get(['id', 'nama', 'telepon']) as $w) {
-            $this->waliPerTelepon[$w->telepon] = $w;
+            $this->waliPerTelepon[self::telp($w->telepon)] = $w;
         }
 
         return count($baru);

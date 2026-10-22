@@ -77,7 +77,7 @@ class DokumenSantriService
                     'id_santri' => $data['id_santri'], 'jenis' => $data['jenis'],
                     'tahap' => DokumenPolicy::TAHAP_DOKUMEN[$data['jenis']], // diturunkan
                     'nama_asli' => $berkas->getClientOriginalName(), 'path' => $path,
-                    'mime' => $berkas->getClientMimeType(), 'ukuran' => $berkas->getSize(),
+                    'mime' => \App\Support\Unggahan::mime($berkas), 'ukuran' => $berkas->getSize(),
                     'hash_sha256' => $hash, 'keterangan' => $data['keterangan'] ?? null,
                     'diunggah_oleh' => $wali === null ? $idPengguna : null,
                     'diunggah_wali' => $wali['id_wali'] ?? null, 'diunggah_peran' => $wali['peran'] ?? null,

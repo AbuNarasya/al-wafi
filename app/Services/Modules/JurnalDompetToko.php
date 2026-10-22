@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\DB;
  */
 class JurnalDompetToko
 {
-    /** @return list<array{tanggal:string, bersih:string, transaksi:int, jurnal:?int}> */
+    /** @return list<array{tanggal:string, bersih:string, transaksi:int, jurnal:?int, galat?:string}> */
     public function jalankan(?string $sampaiSebelum = null): array
     {
         $batas = $sampaiSebelum ?? now()->toDateString();
@@ -36,7 +36,17 @@ class JurnalDompetToko
         $hutang = CompanySettings::query()->value('kode_coa_hutang_toko')
             ?? throw new AppException(422, 'Akun "Hutang ke Wafi Mart" belum ditetapkan di Pengaturan Perusahaan.');
 
-        return $tanggal->map(fn (string $tgl) => $this->satuHari($tgl, $hutang))->all();
+        // Satu tanggal yang ditolak (mis. periodenya sudah ditutup) tak boleh menahan tanggal-tanggal
+        // sesudahnya — dulu satu galat menghentikan seluruh jurnal malam (audit 22 Okt 2026).
+        return $tanggal->map(function (string $tgl) use ($hutang) {
+            try {
+                return $this->satuHari($tgl, $hutang);
+            } catch (AppException $e) {
+                report($e);
+
+                return ['tanggal' => $tgl, 'bersih' => '0', 'transaksi' => 0, 'jurnal' => null, 'galat' => $e->getMessage()];
+            }
+        })->all();
     }
 
     private function satuHari(string $tanggal, string $hutang): array

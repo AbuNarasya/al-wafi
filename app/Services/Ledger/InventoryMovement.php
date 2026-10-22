@@ -192,7 +192,13 @@ final class InventoryMovement
      */
     private static function batalkanMasuk(MutasiPersediaan $m, ?int $idPengguna): void
     {
-        $lapisan = LapisanPersediaan::where('mutasi_id', $m->id)->first();
+        DB::transaction(fn () => self::batalkanMasukTerkunci($m, $idPengguna));
+    }
+
+    private static function batalkanMasukTerkunci(MutasiPersediaan $m, ?int $idPengguna): void
+    {
+        // Dikunci sebelum diperiksa: penjualan serentak tak boleh menggerus lapisan yang sedang dicabut.
+        $lapisan = LapisanPersediaan::where('mutasi_id', $m->id)->lockForUpdate()->first();
         if (! $lapisan) {
             return;
         }
@@ -235,7 +241,9 @@ final class InventoryMovement
     {
         DB::transaction(function () use ($m, $idPengguna) {
             foreach ($m->rincian_lapisan ?? [] as $r) {
-                $lapisan = LapisanPersediaan::find($r['lapisan_id']);
+                // Dikunci: penjualan yang serentak menggerus lapisan yang sama dulu bisa menimpa
+                // pengembalian ini (lost update) — audit 22 Okt 2026.
+                $lapisan = LapisanPersediaan::whereKey($r['lapisan_id'])->lockForUpdate()->first();
                 if (! $lapisan) {
                     // Lapisannya sudah ikut terhapus oleh pembatalan pemasukan.
                     // Tak ada yang perlu dipulihkan — dan memaksa membuat lapisan

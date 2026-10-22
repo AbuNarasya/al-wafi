@@ -112,9 +112,7 @@ class PengunduranDiriController extends Controller
 
     public function dokumen(DokumenPengajuanKeluar $dokumen): StreamedResponse
     {
-        abort_unless(Storage::disk('local')->exists($dokumen->path), 404);
-
-        return Storage::disk('local')->response($dokumen->path, $dokumen->nama_asli);
+        return \App\Support\Unggahan::sajikan('local', $dokumen->path, $dokumen->nama_asli);
     }
 
     private function perluTindakan(PengajuanKeluar $p, $u): bool

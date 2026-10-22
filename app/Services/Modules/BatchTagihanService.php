@@ -365,6 +365,21 @@ class BatchTagihanService
      */
     public function rilis(int $id, ?int $idPengguna = null): array
     {
+        // Satu batch hanya boleh dirilis satu proses: tombol "Rilis sekarang", cron, dan pemicu
+        // cadangan dulu bisa sama-sama lolos memeriksa status → tagihan terbit dua kali (audit 22 Okt 2026).
+        $kunci = Cache::lock("batch-tagihan-rilis:{$id}", 600);
+        if (! $kunci->get()) {
+            throw new AppException(409, 'Batch ini sedang dirilis oleh proses lain. Muat ulang halaman sebentar lagi.');
+        }
+        try {
+            return $this->rilisDalamKunci($id, $idPengguna);
+        } finally {
+            $kunci->release();
+        }
+    }
+
+    private function rilisDalamKunci(int $id, ?int $idPengguna): array
+    {
         $batch = $this->cari($id);
         if ($batch->status !== 'diotorisasi') {
             throw new AppException(422, 'Hanya batch yang sudah diotorisasi yang bisa dirilis.');

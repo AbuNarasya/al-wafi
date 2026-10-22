@@ -75,9 +75,9 @@ class PortalPengunduranDiriController extends Controller
     {
         $d = DokumenPengajuanKeluar::findOrFail($dokumen);
         $p = PengajuanKeluar::whereKey($d->id_pengajuan)->where('id_wali', SesiWali::wali()->id)->firstOrFail();
-        abort_unless($p && Storage::disk('local')->exists($d->path), 404);
+        abort_unless((bool) $p, 404);
 
-        return Storage::disk('local')->response($d->path, $d->nama_asli);
+        return \App\Support\Unggahan::sajikan('local', $d->path, $d->nama_asli);
     }
 
     private function anak(int $id): Santri

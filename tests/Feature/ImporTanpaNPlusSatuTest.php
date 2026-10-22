@@ -72,7 +72,8 @@ class ImporTanpaNPlusSatuTest extends TestCase
             // Telepon sengaja BERULANG tiap dua baris: kakak-beradik berbagi wali,
             // dan itu justru yang paling mudah rusak bila simpanannya keliru.
             $telepon = '08'.str_pad((string) intdiv($i + 1, 2), 6, '0', STR_PAD_LEFT);
-            $baris[] = "{$nis},Santri {$i},L,SDTQ,1,".self::TA.",reguler,Wali {$i},{$telepon},150000";
+            // Nama wali mengikuti teleponnya: sejak 22 Okt 2026 nama + telepon wali satu kunci (beda nama = ditolak).
+            $baris[] = "{$nis},Santri {$i},L,SDTQ,1,".self::TA.",reguler,Wali ".intdiv($i + 1, 2).",{$telepon},150000";
         }
 
         $path = tempnam(sys_get_temp_dir(), 'impor').'.csv';

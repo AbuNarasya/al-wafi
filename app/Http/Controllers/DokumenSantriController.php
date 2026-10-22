@@ -150,11 +150,6 @@ class DokumenSantriController extends Controller
     public function berkas(int $dokumen): StreamedResponse
     {
         $row = DokumenSantri::findOrFail($dokumen);
-        abort_unless(Storage::disk('local')->exists($row->path), 404);
-
-        return Storage::disk('local')->response($row->path, $row->nama_asli, [
-            'Content-Type' => $row->mime,
-            'Content-Disposition' => 'inline; filename="'.addslashes($row->nama_asli).'"',
-        ]);
+        return \App\Support\Unggahan::sajikan('local', $row->path, $row->nama_asli);
     }
 }

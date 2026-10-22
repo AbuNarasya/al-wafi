@@ -214,7 +214,7 @@ class PembayaranSantriController extends Controller
         $pembayaran = PembayaranSantri::findOrFail((int) $id);
         abort_if(! $pembayaran->bukti_path || ! Storage::disk('local')->exists($pembayaran->bukti_path), 404);
 
-        return Storage::disk('local')->response($pembayaran->bukti_path);
+        return \App\Support\Unggahan::sajikan('local', $pembayaran->bukti_path, null);
     }
 
     /**

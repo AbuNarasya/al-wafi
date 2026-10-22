@@ -434,7 +434,7 @@ class ApprovalService
     public function approve(int $idInstance, int $idPengguna, ?string $catatan = null): ApprovalInstance
     {
         $hasil = DB::transaction(function () use ($idInstance, $idPengguna, $catatan) {
-            $inst = ApprovalInstance::find($idInstance);
+            $inst = ApprovalInstance::whereKey($idInstance)->lockForUpdate()->first();
             if (! $inst) {
                 throw new AppException(404, 'Pengajuan tidak ditemukan.');
             }
@@ -516,7 +516,7 @@ class ApprovalService
     public function reject(int $idInstance, int $idPengguna, string $alasan): ApprovalInstance
     {
         return DB::transaction(function () use ($idInstance, $idPengguna, $alasan) {
-            $inst = ApprovalInstance::find($idInstance);
+            $inst = ApprovalInstance::whereKey($idInstance)->lockForUpdate()->first();
             if (! $inst) {
                 throw new AppException(404, 'Pengajuan tidak ditemukan.');
             }

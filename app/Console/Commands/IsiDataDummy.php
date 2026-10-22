@@ -764,7 +764,12 @@ class IsiDataDummy extends Command
 
         $grup = intdiv($slot * 8, 10); // ±80 wali untuk 100 santri → ada yang bersaudara
 
-        return ["Bapak {$keluarga}", sprintf('0812%07d', 4000001 + $grup)];
+        // Nama mengikuti GRUP telepon, bukan nama keluarga santrinya: pemeta menegakkan nama + telepon sebagai satu
+        // pasangan (22 Okt 2026) — "Bapak Hidayat" dengan dua nomor berbeda, atau satu nomor dua nama, ditolak.
+        $n = count(self::KELUARGA_LAMA);
+        $nama = 'Bapak '.self::KELUARGA_LAMA[$grup % $n].($grup >= $n ? ' '.(intdiv($grup, $n) + 1) : '');
+
+        return [$nama, sprintf('0812%07d', 4000001 + $grup)];
     }
 
     /** Jenis biaya berpiutang untuk satu perilaku pada satu jenjang. */

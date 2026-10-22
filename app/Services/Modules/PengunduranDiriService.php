@@ -132,6 +132,14 @@ class PengunduranDiriService
         if (! $this->bolehKepalaSekolah($u, $p)) {
             throw new AppException(403, 'Hanya kepala sekolah jenjang ini yang bisa memutuskan.');
         }
+        // Pemisahan tugas (audit 22 Okt 2026): yang memverifikasi sebagai wali kelas tak boleh juga memutuskan —
+        // terutama admin, yang lolos kedua pemeriksaan. Satu-satunya pengecualian: master data memang menetapkan
+        // orang yang sama sebagai wali kelas DAN kepala sekolah (sekolah kecil), selain itu alurnya macet.
+        $rangkap = (int) $p->santri?->kelas?->id_wali_kelas === (int) $u->id_pengguna
+            && (int) $p->santri?->jenjang?->id_kepala_sekolah === (int) $u->id_pengguna;
+        if ($p->wali_kelas_oleh && (int) $p->wali_kelas_oleh === (int) $u->id_pengguna && ! $rangkap) {
+            throw new AppException(403, 'Anda sudah memverifikasi pengajuan ini sebagai wali kelas — keputusan kepala sekolah harus oleh orang lain.');
+        }
         if (! $setuju && trim((string) $catatan) === '') {
             throw new AppException(422, 'Tulis alasan bila pengajuan tidak disetujui.');
         }

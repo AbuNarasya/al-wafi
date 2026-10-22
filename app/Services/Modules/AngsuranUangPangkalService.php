@@ -234,11 +234,18 @@ class AngsuranUangPangkalService
      */
     public function evaluasiPotongan(int $idTagihan, ?int $idPengguna = null): array
     {
-        $potongan = PotonganUangPangkal::where('id_tagihan', $idTagihan)->first();
+        // Satu transaksi + kunci potongan & tagihan: evaluasi sesudah bayar dan evaluasi terjadwal
+        // yang serentak dulu sama-sama "menghanguskan" → potongan ditambahkan dua kali (audit 22 Okt 2026).
+        return DB::transaction(fn () => $this->evaluasiPotonganDalamKunci($idTagihan, $idPengguna));
+    }
+
+    private function evaluasiPotonganDalamKunci(int $idTagihan, ?int $idPengguna): array
+    {
+        $potongan = PotonganUangPangkal::where('id_tagihan', $idTagihan)->lockForUpdate()->first();
         if (! $potongan || $potongan->status !== 'berlaku') {
             return ['status' => $potongan->status ?? null, 'berubah' => false];
         }
-        $tagihan = TagihanSantri::with(['jenis', 'santri'])->findOrFail($idTagihan);
+        $tagihan = TagihanSantri::with(['jenis', 'santri'])->lockForUpdate()->findOrFail($idTagihan);
 
         // Tagihan yang sudah BATAL atau DIHAPUS (calon mundur, santri keluar,
         // koreksi ke nol) tak punya urusan potongan lagi. Dulu potongannya tetap

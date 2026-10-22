@@ -260,6 +260,9 @@ class CashInService
         }
 
         return DB::transaction(function () use ($rec, $input, $idPengguna, $nama, $kodeTransaksi) {
+            if (CashIn::whereKey($kodeTransaksi)->lockForUpdate()->value('status') === 'void') {
+                throw new AppException(409, 'Kas Masuk sudah di-void.');
+            }
             Authorization::authorizeByUser($idPengguna, $rec->nominal);
 
             $tanggal = $input['tanggal'] ?? Carbon::now()->toDateString();

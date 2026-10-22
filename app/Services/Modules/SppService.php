@@ -603,7 +603,7 @@ class SppService
             if (Money::gtZero($sisaSetoran)) {
                 $lines[] = ['kode_coa' => $jenis->kode_coa_diterima_dimuka, 'debet' => '0', 'kredit' => $sisaSetoran];
                 $pra = PrabayarSpp::firstOrCreate(['id_santri' => $data['id_santri']], ['saldo' => '0']);
-                $pra->update(['saldo' => Money::add($pra->saldo, $sisaSetoran)]);
+                \App\Support\SaldoAtomik::tambah($pra, $sisaSetoran);
             }
 
             $base = DocNumber::docBase('PRA', $data['tanggal']);
@@ -618,7 +618,7 @@ class SppService
             ]);
 
             if ($dompet) {
-                $dompet->update(['saldo' => Money::sub($dompet->saldo, $nominal)]);
+                \App\Support\SaldoAtomik::kurangi($dompet, $nominal, 'Saldo Dompet Wali');
                 $baseM = DocNumber::docBase('DMP', $data['tanggal']);
                 $lastM = MutasiDompet::where('nomor', 'like', $baseM.'%')->orderByDesc('nomor')->value('nomor');
                 MutasiDompet::create([
@@ -657,7 +657,8 @@ class SppService
         $total = '0';
         foreach ($saldoList as $p) {
             $tagihan = TagihanSantri::where('id_santri', $p->id_santri)->where('kode_jenis', $jenis->kode)->where('periode', $data['periode'])->first();
-            if (! $tagihan) {
+            // Jurnalnya mengkredit PIUTANG — hanya sah untuk tagihan yang sudah diakrualkan.
+            if (! $tagihan || ! $tagihan->sudah_akrual) {
                 continue;
             }
             $pakai = Money::lt($p->saldo, $tagihan->sisa) ? Money::of($p->saldo) : Money::of($tagihan->sisa);
@@ -666,7 +667,7 @@ class SppService
             }
             $sisaBaru = Money::sub($tagihan->sisa, $pakai);
             $tagihan->update(['sisa' => $sisaBaru, 'status' => Money::isZero($sisaBaru) ? 'lunas' : 'sebagian']);
-            $p->update(['saldo' => Money::sub($p->saldo, $pakai)]);
+            \App\Support\SaldoAtomik::kurangi($p, $pakai, 'Saldo prabayar SPP');
             $total = Money::add($total, $pakai);
         }
         if (Money::gtZero($total)) {

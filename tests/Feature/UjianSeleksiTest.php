@@ -108,6 +108,24 @@ class UjianSeleksiTest extends TestCase
             ->assertSee('1</b> hadir dari <b>2</b> peserta', false)->assertSee('belum hadir');
     }
 
+    /** Audit 22 Okt 2026: kartu dicetak wali dari domain portal tetap ber-QR ke ERP staf, dan sah dipindai di sana. */
+    public function test_qr_yang_dibuat_dari_domain_portal_menuju_erp_staf(): void
+    {
+        $aisyah = $this->calon('Aisyah', 'P');
+        config(['app.url' => 'https://erp.contoh.test']);
+        \Illuminate\Support\Facades\URL::forceRootUrl('https://parents.contoh.test'); // seolah permintaan dari portal
+        try {
+            $url = UjianSeleksi::urlHadir($aisyah);
+        } finally {
+            \Illuminate\Support\Facades\URL::forceRootUrl(null);
+        }
+
+        // Skemanya ikut permintaan (https di produksi); yang diuji host-nya.
+        $this->assertSame('erp.contoh.test', parse_url($url, PHP_URL_HOST));
+        $this->assertStringStartsWith('/ppsb/hadir-ujian/', (string) parse_url($url, PHP_URL_PATH));
+        $this->actingAs($this->admin)->get($url)->assertOk()->assertSee('HADIR');
+    }
+
     public function test_layar_jadwal_dan_pengaturan_kartu(): void
     {
         $this->actingAs($this->admin)->post(route('ujian.jadwal.simpan'), ['tahun_ajaran' => '2027/2028', 'kode_jenjang' => 'J002', 'tanggal' => '2026-11-04', 'jam' => '07.30', 'tempat' => 'Aula'])

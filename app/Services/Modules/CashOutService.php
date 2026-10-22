@@ -404,6 +404,10 @@ class CashOutService
         }
 
         return DB::transaction(function () use ($rec, $kodeTransaksi, $input, $idPengguna, $nama) {
+            // Periksa ulang di bawah kunci: dua void serentak dulu membalik jurnal & PP dua kali.
+            if (CashOut::whereKey($kodeTransaksi)->lockForUpdate()->value('status') === 'void') {
+                throw new AppException(409, 'Kas Keluar sudah di-void.');
+            }
             Authorization::authorizeByUser($idPengguna, $rec->nominal);
 
             // Perintah Pembayaran ikut dikembalikan. TANPA INI, membatalkan Kas

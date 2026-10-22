@@ -44,6 +44,39 @@ final class Unggahan
         ];
     }
 
+    /**
+     * Tipe berkas yang boleh DITAMPILKAN di peramban (audit 22 Okt 2026): hanya gambar & PDF.
+     * Selain itu selalu diunduh sebagai octet-stream — berkas berkedok PDF/JPG yang sebenarnya HTML
+     * tak boleh pernah dijalankan di domain ERP (XSS tersimpan terhadap sesi staf).
+     */
+    public const TAMPIL = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+    /** Tipe berkas menurut ISINYA (deteksi server), BUKAN header Content-Type kiriman peramban. */
+    public static function mime(\Illuminate\Http\UploadedFile $berkas): string
+    {
+        return (string) ($berkas->getMimeType() ?: 'application/octet-stream');
+    }
+
+    /**
+     * Sajikan berkas tersimpan dengan aman: tipe dideteksi ulang dari isi berkas; gambar/PDF boleh inline,
+     * selain itu dipaksa unduh. Ditambah nosniff & CSP sandbox supaya isi berkas tak bisa menjalankan skrip.
+     */
+    public static function sajikan(string $disk, string $path, ?string $namaAsli, bool $inline = true): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $storage = \Illuminate\Support\Facades\Storage::disk($disk);
+        abort_unless($storage->exists($path), 404);
+        $mime = (string) ((new \finfo(FILEINFO_MIME_TYPE))->file($storage->path($path)) ?: 'application/octet-stream');
+        $boleh = in_array($mime, self::TAMPIL, true);
+        $nama = str_replace(['"', "\r", "\n", '\\'], '', (string) ($namaAsli ?: basename($path)));
+
+        return $storage->response($path, $nama, [
+            'Content-Type' => $boleh ? $mime : 'application/octet-stream',
+            'Content-Disposition' => ($boleh && $inline ? 'inline' : 'attachment').'; filename="'.$nama.'"',
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; object-src 'self'",
+        ]);
+    }
+
     /** "500 KB" — untuk ditulis di layar, agar orang tahu batasnya sebelum memilih berkas. */
     public static function maksLabel(): string
     {

@@ -127,6 +127,28 @@ class PengunduranDiriTest extends TestCase
         $this->sebagaiIbu()->get(route('portal.mundur.dokumen', $mutasi->id))->assertOk();
     }
 
+    /**
+     * Pemisahan tugas (audit 22 Okt 2026; keputusan user: posisi ganda boleh). Admin yang memverifikasi sebagai
+     * wali kelas tak boleh juga memutuskan; orang yang di master data memang wali kelas DAN kepala sekolah boleh.
+     */
+    public function test_satu_orang_dua_tahap_hanya_bila_memang_berposisi_ganda(): void
+    {
+        $admin = User::create(['username' => 'adm', 'nama' => 'Admin', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => true, 'status' => 'aktif'])->fresh();
+        $this->sebagaiIbu()->post(route('portal.mundur.ajukan', $this->ahmad->id), ['alasan' => 'Pindah kota', 'surat' => $this->surat(), 'pin' => self::PIN]);
+        $p = PengajuanKeluar::sole();
+
+        $this->actingAs($admin)->post(route('pengunduran_diri.verifikasi', $p->id), ['keputusan' => 'lanjut'])->assertSessionHas('status');
+        $this->actingAs($admin)->post(route('pengunduran_diri.putuskan', $p->id), ['keputusan' => 'ya'])->assertSessionHas('error');
+        $this->assertSame('menunggu_kepala_sekolah', $p->refresh()->status);
+
+        // Posisi ganda yang sah: wali kelas 7A sekaligus kepala sekolah SMP.
+        Jenjang::where('kode', 'J002')->update(['id_kepala_sekolah' => $this->u['walikelas']->id_pengguna]);
+        $p->update(['status' => 'menunggu_wali_kelas', 'wali_kelas_oleh' => null]);
+        $this->actingAs($this->u['walikelas'])->post(route('pengunduran_diri.verifikasi', $p->id), ['keputusan' => 'lanjut'])->assertSessionHas('status');
+        $this->actingAs($this->u['walikelas'])->post(route('pengunduran_diri.putuskan', $p->id), ['keputusan' => 'ya'])->assertSessionHas('status');
+        $this->assertSame('clearance', $p->refresh()->status);
+    }
+
     public function test_kepala_sekolah_menolak_dan_wali_bisa_membatalkan_sebelumnya(): void
     {
         $this->sebagaiIbu()->post(route('portal.mundur.ajukan', $this->ahmad->id), ['alasan' => 'Ingin pindah', 'surat' => $this->surat(), 'pin' => self::PIN]);

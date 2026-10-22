@@ -704,9 +704,9 @@ class KasirService
         $jumlahBaris = Money::of($jual->details->sum('total'));
         // Dihitung langsung (baris × dibayar ÷ jumlah baris) lalu DIBULATKAN — dulu lewat faktor yang terpotong ke 2
         // desimal, sehingga retur atas struk berdiskon struk mengembalikan kurang (105.000 diskon 5.000 → 99.750).
-        $porsi = fn (string $nilaiBaris) => Money::gtZero($jumlahBaris)
-            ? self::bulat(bcdiv(bcmul(Money::of($nilaiBaris), Money::of($jual->total), 8), $jumlahBaris, 8))
-            : '0.00';
+        // Dibagi per baris dengan metode SISA TERBESAR supaya jumlah porsi seluruh baris = yang dibayar, persis.
+        // Pembulatan per baris saja bisa meleset Rp 0,01 saat seluruh struk diretur (audit 22 Okt 2026).
+        $porsiBaris = self::bagiPorsi($jual->details->mapWithKeys(fn ($d) => [$d->id => Money::of($d->total)])->all(), Money::of($jual->total));
 
         $rincian = [];
         $total = '0';
@@ -727,7 +727,7 @@ class KasirService
                 throw new AppException(422, "{$d->persediaan->nama_persediaan}: diretur melebihi yang dibeli (sisa {$this->angka($sisa)} {$d->satuan}).");
             }
 
-            $bersihBaris = $porsi($d->total);
+            $bersihBaris = $porsiBaris[$d->id];
             if (Money::eq($qty, $sisa, 4)) {
                 $nilai = Money::sub($bersihBaris, $s->nilai ?? '0');
                 $hpp = Money::sub($d->hpp, $s->hpp ?? '0');
@@ -952,6 +952,37 @@ class KasirService
     }
 
     /** Bulatkan ke 2 desimal (setengah menjauhi nol) — bcmath hanya memotong. */
+    /**
+     * Membagi $dibayar sebanding $nilai per baris, dalam sen, dengan metode sisa terbesar: jumlah hasilnya
+     * selalu = $dibayar. Seri diputus urutan kunci supaya hasilnya tetap sama tiap kali dihitung ulang.
+     *
+     * @param  array<int|string,string>  $nilai
+     * @return array<int|string,string>
+     */
+    private static function bagiPorsi(array $nilai, string $dibayar): array
+    {
+        $jumlah = array_reduce($nilai, fn ($t, $v) => bcadd($t, $v, 2), '0');
+        if (! Money::gtZero($jumlah)) {
+            return array_map(fn () => '0.00', $nilai);
+        }
+        $hasil = [];
+        $sisaSen = [];
+        $terbagi = '0';
+        foreach ($nilai as $k => $v) {
+            $mentah = bcdiv(bcmul($v, $dibayar, 10), $jumlah, 10);
+            $hasil[$k] = bcadd($mentah, '0', 2); // dipotong ke sen (nilai di sini tak negatif)
+            $sisaSen[$k] = bcsub($mentah, $hasil[$k], 10);
+            $terbagi = bcadd($terbagi, $hasil[$k], 2);
+        }
+        $kurang = (int) bcmul(bcsub($dibayar, $terbagi, 2), '100', 0);
+        uksort($sisaSen, fn ($a, $b) => bccomp($sisaSen[$b], $sisaSen[$a], 10) ?: ($a <=> $b));
+        foreach (array_slice(array_keys($sisaSen), 0, max(0, $kurang)) as $k) {
+            $hasil[$k] = bcadd($hasil[$k], '0.01', 2);
+        }
+
+        return $hasil;
+    }
+
     private static function bulat(string $v): string
     {
         return bcadd($v, str_starts_with(ltrim($v), '-') ? '-0.005' : '0.005', 2);

@@ -205,6 +205,29 @@ class PelepasanAsetTest extends TestCase
         ], $this->admin);
     }
 
+    /** Audit 22 Okt 2026: depresiasi sekali per periode; tarif saldo menurun tak lagi dipotong ke 2 desimal. */
+    public function test_depresiasi_sekali_per_periode_dan_tarif_saldo_menurun_utuh(): void
+    {
+        \Illuminate\Support\Carbon::setTestNow('2026-07-15 09:00:00');
+        $a = $this->aset('AST010', '60000000', '0');
+        $a->update(['metode_depresiasi' => 'saldo_menurun']);
+
+        // 2/60 = 0,033333 → 60 jt × 0,033333 = 1.999.980 (dulu 0,03 → 1.800.000).
+        $this->assertSame('1999980.00', (new AssetService)->monthlyDepreciation($a->refresh()));
+
+        $input = ['kode_coa_beban' => self::BEBAN_DEPR, 'kode_coa_akumulasi' => self::AKUM];
+        (new AssetService)->runDepreciation($input, $this->admin);
+        try {
+            (new AssetService)->runDepreciation($input, $this->admin);
+            $this->fail('periode yang sama dijurnal dua kali');
+        } catch (AppException $e) {
+            $this->assertStringContainsString('sudah dijurnal', $e->getMessage());
+        } finally {
+            \Illuminate\Support\Carbon::setTestNow();
+        }
+        $this->assertSame('1999980.00', (string) Asset::find('AST010')->akumulasi_depresiasi);
+    }
+
     public function test_aset_yang_sudah_dilepas_tak_bisa_dilepas_lagi(): void
     {
         $this->aset('AST007');

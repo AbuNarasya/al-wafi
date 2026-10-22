@@ -101,12 +101,7 @@ class LampiranController extends Controller
     {
         $row = $this->berkasTerbaca($lampiran);
 
-        return \Illuminate\Support\Facades\Storage::disk($row->disk ?: 'local')->response(
-            $row->path, $row->nama_asli, [
-                'Content-Type' => $row->mime,
-                'Content-Disposition' => 'inline; filename="'.addslashes($row->nama_asli).'"',
-            ],
-        );
+        return \App\Support\Unggahan::sajikan($row->disk ?: 'local', $row->path, $row->nama_asli);
     }
 
     /** Lampiran yang berkasnya benar-benar masih ada, sesudah hak aksesnya lolos. */

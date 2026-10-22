@@ -368,6 +368,21 @@ class ImporSaldoAwal
             $halangan[] = "Ada {$tambahan} tagihan yang diterbitkan di luar impor ini.";
         }
 
+        // Audit 22 Okt 2026: data operasional yang lahir SESUDAH impor ikut terhapus diam-diam lewat FK cascade
+        // (atau, untuk penarikan tunai, menggagalkan pembatalan dengan galat 500). Tolak dengan pesan jelas.
+        $operasional = [
+            'kunjungan_klinik' => 'kunjungan klinik', 'kartu_santri' => 'kartu RFID', 'pin_santri' => 'PIN belanja',
+            'pengajuan_keluar' => 'pengajuan pengunduran diri', 'kehadiran_ujian' => 'catatan kehadiran ujian',
+            'peserta_tarik_tunai' => 'peserta penarikan tunai', 'pengajuan_tarik_tunai' => 'pengajuan penarikan tunai',
+            'transaksi_dompet_toko' => 'transaksi belanja Wafi Mart',
+        ];
+        foreach ($operasional as $tabel => $label) {
+            if (\Illuminate\Support\Facades\Schema::hasTable($tabel) && \Illuminate\Support\Facades\Schema::hasColumn($tabel, 'id_santri')
+                && ($n = DB::table($tabel)->whereIn('id_santri', $idSantri)->count()) > 0) {
+                $halangan[] = "Sudah ada {$n} {$label}.";
+            }
+        }
+
         return $halangan;
     }
 
@@ -414,9 +429,13 @@ class ImporSaldoAwal
             TabunganSantri::whereIn('id_santri', $idSantri)->delete();
             Santri::whereIn('id', $idSantri)->delete();
 
-            // Wali dari batch ini yang kini tak menaungi santri mana pun. Yang
-            // masih punya anak (mis. kakaknya dari angkatan lain) dibiarkan.
-            Wali::where('id_batch', $batch->id)
+            // Wali dari batch ini — ATAU dari batch yang SUDAH dibatalkan lebih dulu — yang kini tak menaungi
+            // santri mana pun. Yang masih punya anak (mis. kakaknya dari angkatan lain) dibiarkan.
+            // Batch lain ikut karena kakak-adik bisa terpencar di dua batch: saat batch 1 dibatalkan walinya
+            // masih punya anak di batch 2, dan saat batch 2 dibatalkan walinya tercatat lahir di batch 1 —
+            // dulu tak terhapus oleh pembatalan mana pun (22 Okt 2026: 56 wali yatim di produksi).
+            $batchBatal = ImporBatch::whereNotNull('dibatalkan_pada')->pluck('id')->push($batch->id);
+            Wali::whereIn('id_batch', $batchBatal)
                 ->whereNotExists(fn ($q) => $q->selectRaw(1)->from('santri')->whereColumn('santri.id_wali', 'wali.id'))
                 ->delete();
 
@@ -486,6 +505,13 @@ class ImporSaldoAwal
                 }
 
                 $pertama[$nilai] = $i;
+            }
+        }
+
+        // Aturan lintas baris khusus pemeta (mis. kunci wali = nama + telepon di impor santri lama).
+        if (method_exists($pemeta, 'masalahLintasBaris')) {
+            foreach ($pemeta->masalahLintasBaris($rows) as $i => $alasan) {
+                $masalah[$i] ??= $alasan;
             }
         }
 

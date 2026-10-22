@@ -57,6 +57,11 @@ class PencairanTokoController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
+        $galat = array_filter($hasil, fn ($h) => isset($h['galat']));
+        if ($galat) {
+            return back()->with('error', implode(' · ', array_map(fn ($h) => "{$h['tanggal']}: {$h['galat']}", $galat)));
+        }
+
         return back()->with('status', $hasil ? count($hasil).' tanggal dijurnal.' : 'Tidak ada transaksi yang menunggu dijurnal.');
     }
 

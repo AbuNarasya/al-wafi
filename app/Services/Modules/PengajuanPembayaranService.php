@@ -649,6 +649,12 @@ class PengajuanPembayaranService
     /** Verifikasi keuangan (pembayaran: setAkunHutang + posting; uang_muka: tandai siap; penyelesaian: posting settlement). */
     public function verifikasi(int $id, ?string $kodeCoaHutang, int $idPengguna, ?string $catatan = null, ?string $kodeRekening = null): PengajuanPembayaran
     {
+        // Satu transaksi + kunci instance: dua klik "Verifikasi" serentak dulu sama-sama memposting (audit 22 Okt 2026).
+        return DB::transaction(fn () => $this->verifikasiDalamKunci($id, $kodeCoaHutang, $idPengguna, $catatan, $kodeRekening));
+    }
+
+    private function verifikasiDalamKunci(int $id, ?string $kodeCoaHutang, int $idPengguna, ?string $catatan, ?string $kodeRekening): PengajuanPembayaran
+    {
         $user = User::find($idPengguna);
         if (! $user) {
             throw new AppException(400, 'Pengguna tidak ditemukan.');
@@ -657,7 +663,7 @@ class PengajuanPembayaranService
             throw new AppException(403, 'Hanya tim keuangan yang boleh memverifikasi pengajuan.');
         }
 
-        $inst = \App\Models\ApprovalInstance::where('jenis_dokumen', self::SUMBER)->where('id_dokumen', (string) $id)->first();
+        $inst = \App\Models\ApprovalInstance::where('jenis_dokumen', self::SUMBER)->where('id_dokumen', (string) $id)->lockForUpdate()->first();
         if (! $inst) {
             throw new AppException(404, 'Pengajuan ini tidak punya rantai persetujuan.');
         }
@@ -743,7 +749,7 @@ class PengajuanPembayaranService
      */
     public function applyPayment(int $id, string $nominal): void
     {
-        $rec = PengajuanPembayaran::find($id);
+        $rec = PengajuanPembayaran::whereKey($id)->lockForUpdate()->first();
         if (! $rec) {
             throw new AppException(400, 'Pengajuan tidak ditemukan.');
         }
@@ -771,7 +777,7 @@ class PengajuanPembayaranService
      */
     public function applyKurangBayar(int $id, string $nominal): void
     {
-        $rec = PengajuanPembayaran::find($id);
+        $rec = PengajuanPembayaran::whereKey($id)->lockForUpdate()->first();
         if (! $rec) {
             throw new AppException(400, 'Pengajuan tidak ditemukan.');
         }
@@ -785,8 +791,8 @@ class PengajuanPembayaranService
     /** Kebalikannya: vouchernya di-void, kekurangannya berutang lagi. */
     public function reverseKurangBayar(int $id, string $nominal): void
     {
-        $rec = PengajuanPembayaran::find($id);
-        if (! $rec) {
+        $rec = PengajuanPembayaran::whereKey($id)->lockForUpdate()->first();
+        if (! $rec || $rec->status === 'void') {
             return;
         }
         $rec->update([
@@ -798,8 +804,9 @@ class PengajuanPembayaranService
     /** Dipanggil Kas Keluar saat vouchernya di-void: kembalikan sisa hutang. */
     public function reversePayment(int $id, string $nominal): void
     {
-        $rec = PengajuanPembayaran::find($id);
-        if (! $rec) {
+        $rec = PengajuanPembayaran::whereKey($id)->lockForUpdate()->first();
+        // Dokumen yang sudah VOID tak boleh hidup lagi lewat void voucher-nya.
+        if (! $rec || $rec->status === 'void') {
             return;
         }
         $sisa = Money::add($rec->sisa_hutang, $nominal);
@@ -918,7 +925,7 @@ class PengajuanPembayaranService
      */
     public function applyUangMukaPayment(int $id, array $ctx): void
     {
-        $rec = PengajuanPembayaran::with('details')->find($id);
+        $rec = PengajuanPembayaran::with('details')->lockForUpdate()->find($id);
         if (! $rec) {
             throw new AppException(400, 'Pengajuan tidak ditemukan.');
         }
@@ -952,14 +959,14 @@ class PengajuanPembayaranService
         OperationalAdvance::where('id_pengajuan_sumber', $id)->where('status', '!=', 'void')->update([
             'status' => 'void', 'void_reason' => 'Void pembayaran uang muka (Kas Keluar dibatalkan)', 'void_at' => now(),
         ]);
-        PengajuanPembayaran::where('id', $id)->update(['status' => 'diverifikasi', 'sisa_hutang' => '0']);
+        PengajuanPembayaran::where('id', $id)->where('status', '!=', 'void')->update(['status' => 'diverifikasi', 'sisa_hutang' => '0']);
     }
 
     /** Batalkan pengajuan (jalur pembayaran). */
     public function void(int $id, string $alasan, int $idPengguna): PengajuanPembayaran
     {
         return DB::transaction(function () use ($id, $alasan, $idPengguna) {
-            $rec = PengajuanPembayaran::find($id);
+            $rec = PengajuanPembayaran::whereKey($id)->lockForUpdate()->first();
             if (! $rec) {
                 throw new AppException(404, 'Pengajuan tidak ditemukan.');
             }
@@ -968,6 +975,12 @@ class PengajuanPembayaranService
             }
             if ($rec->status === 'lunas') {
                 throw new AppException(409, "Pengajuan {$rec->nomor} sudah dibayar penuh. Void dulu voucher Kas Keluar yang melunasinya.");
+            }
+            // Sudah dibayar SEBAGIAN: membalik jurnal hutang penuh sementara sebagian hutang itu sudah
+            // dilunasi Kas Keluar membuat akun hutang minus (audit 22 Okt 2026). Void voucher-nya dulu.
+            if ($rec->jenis === 'pembayaran' && $rec->status === 'diposting' && Money::lt($rec->sisa_hutang, $rec->nominal)) {
+                throw new AppException(409, "Pengajuan {$rec->nomor} sudah dibayar sebagian (sisa {$rec->sisa_hutang} dari {$rec->nominal}). "
+                    .'Void dulu voucher Kas Keluar yang membayarnya.');
             }
             $pelaku = User::find($idPengguna);
             if (! $pelaku) {

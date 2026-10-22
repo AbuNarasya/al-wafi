@@ -175,14 +175,20 @@ class PembayaranSantriService
     public function tolakKelompok(string $kelompok, string $alasan, int $idPengguna): int
     {
         $this->assertTimKeuangan($idPengguna);
-        $baris = PembayaranSantri::where('kelompok_bayar', $kelompok)->where('status', 'menunggu_verifikasi')->orderBy('id')->get();
-        if ($baris->isEmpty()) {
-            throw new AppException(404, 'Tidak ada pembayaran kelompok ini yang menunggu verifikasi.');
-        }
-        DB::transaction(fn () => PembayaranSantri::whereIn('id', $baris->pluck('id'))->update([
-            'status' => 'ditolak', 'alasan_tolak' => $alasan,
-            'diverifikasi_oleh' => $idPengguna, 'diverifikasi_pada' => Carbon::now(),
-        ]));
+        $baris = DB::transaction(function () use ($kelompok, $alasan, $idPengguna) {
+            // Dikunci dulu: anggota yang sudah terverifikasi oleh klik lain tak ikut "ditolak".
+            $baris = PembayaranSantri::where('kelompok_bayar', $kelompok)->where('status', 'menunggu_verifikasi')
+                ->orderBy('id')->lockForUpdate()->get();
+            if ($baris->isEmpty()) {
+                throw new AppException(404, 'Tidak ada pembayaran kelompok ini yang menunggu verifikasi.');
+            }
+            PembayaranSantri::whereIn('id', $baris->pluck('id'))->update([
+                'status' => 'ditolak', 'alasan_tolak' => $alasan,
+                'diverifikasi_oleh' => $idPengguna, 'diverifikasi_pada' => Carbon::now(),
+            ]);
+
+            return $baris;
+        });
 
         $pertama = $baris->first();
         \App\Services\PortalWali\KabarWali::kePencatat($pertama, [
@@ -210,59 +216,73 @@ class PembayaranSantriService
      */
     private function verifikasiSatu(int $id, int $idPengguna): array
     {
-        $pembayaran = PembayaranSantri::with(['tagihan.jenis', 'santri'])->find($id);
-        if (! $pembayaran) {
-            throw new AppException(404, 'Pembayaran tidak ditemukan.');
-        }
-        if ($pembayaran->status !== 'menunggu_verifikasi') {
-            throw new AppException(422, "Pembayaran ini sudah berstatus \"{$pembayaran->status}\".");
-        }
-        $tagihan = $pembayaran->tagihan;
-        if (! $tagihan) {
-            throw new AppException(422, 'Pembayaran ini tidak terkait tagihan mana pun.');
-        }
-        $nominal = Money::of($pembayaran->nominal);
-        $sisaBaru = Money::sub($tagihan->sisa, $nominal);
-        if (Money::isNegative($sisaBaru)) {
-            throw new AppException(422, "Nominal {$nominal} melebihi sisa tagihan {$tagihan->sisa} — kemungkinan sudah ada pembayaran lain yang diverifikasi lebih dulu.");
-        }
+        $tagihan = null;
+        $hasil = DB::transaction(function () use ($id, $idPengguna, &$tagihan) {
+            // Kunci pembayaran LALU tagihannya, dan periksa di bawah kunci: dua klik "Verifikasi"
+            // serentak dulu sama-sama lolos → dua jurnal, sisa tagihan terpotong dua kali (audit 22 Okt 2026).
+            $pembayaran = PembayaranSantri::whereKey($id)->lockForUpdate()->first();
+            if (! $pembayaran) {
+                throw new AppException(404, 'Pembayaran tidak ditemukan.');
+            }
+            if ($pembayaran->status !== 'menunggu_verifikasi') {
+                throw new AppException(422, "Pembayaran ini sudah berstatus \"{$pembayaran->status}\".");
+            }
+            $tagihan = $pembayaran->id_tagihan
+                ? TagihanSantri::with('jenis')->whereKey($pembayaran->id_tagihan)->lockForUpdate()->first()
+                : null;
+            if (! $tagihan) {
+                throw new AppException(422, 'Pembayaran ini tidak terkait tagihan mana pun.');
+            }
+            if (! $tagihan->berlaku()) {
+                throw new AppException(422, 'Tagihan pembayaran ini sudah dibatalkan atau dihapus — tolak pembayarannya.');
+            }
+            $pembayaran->load('santri');
+            $nominal = Money::of($pembayaran->nominal);
+            $sisaBaru = Money::sub($tagihan->sisa, $nominal);
+            if (Money::isNegative($sisaBaru)) {
+                throw new AppException(422, "Nominal {$nominal} melebihi sisa tagihan {$tagihan->sisa} — kemungkinan sudah ada pembayaran lain yang diverifikasi lebih dulu.");
+            }
 
-        $hasil = DB::transaction(function () use ($pembayaran, $tagihan, $nominal, $sisaBaru, $idPengguna) {
-            $jenis = $tagihan->jenis;
-            $akunKredit = $this->akunKredit($tagihan);
-
-            $entry = PostingService::postJournal([
-                'referensi' => $pembayaran->nomor, 'tanggal' => $pembayaran->tanggal, 'kode_unit' => $jenis->kode_unit,
-                'sumber_modul' => 'PembayaranSantri', 'id_sumber' => (string) $pembayaran->id, 'id_pengguna' => $idPengguna,
-                'keterangan' => "{$jenis->nama} — {$pembayaran->santri->nama} ({$pembayaran->santri->no_pendaftaran})",
-                'lines' => [
-                    ['kode_coa' => $pembayaran->kode_rekening, 'debet' => $nominal, 'kredit' => '0'],
-                    ['kode_coa' => $akunKredit, 'debet' => '0', 'kredit' => $nominal],
-                ],
-            ]);
-
-            $tagihan->update(['sisa' => $sisaBaru, 'status' => Money::isZero($sisaBaru) ? 'lunas' : 'sebagian']);
-            $this->majukanTahapBilaRegistrasiLunas($tagihan->refresh(), $pembayaran->santri);
-
-            $pembayaran->update([
-                'status' => 'terverifikasi', 'diverifikasi_oleh' => $idPengguna,
-                'diverifikasi_pada' => Carbon::now(), 'journal_entry_id' => $entry->id,
-            ]);
-
-            // Kabar & push ke keluarga (kategori "tagihan") — sesudah transaksi tersimpan, tak pernah menggagalkannya.
-            DB::afterCommit(function () use ($pembayaran, $tagihan) {
-                try {
-                    \App\Services\PortalWali\KabarKeluarga::pembayaranDiverifikasi($pembayaran, $tagihan);
-                } catch (\Throwable $e) {
-                    report($e);
-                }
-            });
-            $this->tutupVaBasiSesudahnya($tagihan->id);
-
-            return $pembayaran;
+            return $this->bukukanVerifikasi($pembayaran, $tagihan, $nominal, $sisaBaru, $idPengguna);
         });
 
         return [$hasil, $tagihan];
+    }
+
+    private function bukukanVerifikasi(PembayaranSantri $pembayaran, TagihanSantri $tagihan, string $nominal, string $sisaBaru, int $idPengguna): PembayaranSantri
+    {
+        $jenis = $tagihan->jenis;
+        $akunKredit = $this->akunKredit($tagihan);
+
+        $entry = PostingService::postJournal([
+            'referensi' => $pembayaran->nomor, 'tanggal' => $pembayaran->tanggal, 'kode_unit' => $jenis->kode_unit,
+            'sumber_modul' => 'PembayaranSantri', 'id_sumber' => (string) $pembayaran->id, 'id_pengguna' => $idPengguna,
+            'keterangan' => "{$jenis->nama} — {$pembayaran->santri->nama} ({$pembayaran->santri->no_pendaftaran})",
+            'lines' => [
+                ['kode_coa' => $pembayaran->kode_rekening, 'debet' => $nominal, 'kredit' => '0'],
+                ['kode_coa' => $akunKredit, 'debet' => '0', 'kredit' => $nominal],
+            ],
+        ]);
+
+        $tagihan->update(['sisa' => $sisaBaru, 'status' => Money::isZero($sisaBaru) ? 'lunas' : 'sebagian']);
+        $this->majukanTahapBilaRegistrasiLunas($tagihan->refresh(), $pembayaran->santri);
+
+        $pembayaran->update([
+            'status' => 'terverifikasi', 'diverifikasi_oleh' => $idPengguna,
+            'diverifikasi_pada' => Carbon::now(), 'journal_entry_id' => $entry->id,
+        ]);
+
+        // Kabar & push ke keluarga (kategori "tagihan") — sesudah transaksi tersimpan, tak pernah menggagalkannya.
+        DB::afterCommit(function () use ($pembayaran, $tagihan) {
+            try {
+                \App\Services\PortalWali\KabarKeluarga::pembayaranDiverifikasi($pembayaran, $tagihan);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        });
+        $this->tutupVaBasiSesudahnya($tagihan->id);
+
+        return $pembayaran;
     }
 
     /**
@@ -447,20 +467,25 @@ class PembayaranSantriService
     public function tolak(int $id, string $alasan, int $idPengguna): PembayaranSantri
     {
         $this->assertTimKeuangan($idPengguna);
-        $pembayaran = PembayaranSantri::find($id);
-        if (! $pembayaran) {
-            throw new AppException(404, 'Pembayaran tidak ditemukan.');
-        }
-        if ($pembayaran->kelompok_bayar) {
-            throw new AppException(422, 'Pembayaran ini bagian dari transfer berkelompok. Gunakan "Tolak kelompok".');
-        }
-        if ($pembayaran->status !== 'menunggu_verifikasi') {
-            throw new AppException(422, "Pembayaran ini sudah berstatus \"{$pembayaran->status}\".");
-        }
-        $pembayaran->update([
-            'status' => 'ditolak', 'alasan_tolak' => $alasan,
-            'diverifikasi_oleh' => $idPengguna, 'diverifikasi_pada' => Carbon::now(),
-        ]);
+        // Di bawah kunci: tolak & verifikasi serentak atas baris yang sama tak boleh dua-duanya lolos.
+        $pembayaran = DB::transaction(function () use ($id, $alasan, $idPengguna) {
+            $pembayaran = PembayaranSantri::whereKey($id)->lockForUpdate()->first();
+            if (! $pembayaran) {
+                throw new AppException(404, 'Pembayaran tidak ditemukan.');
+            }
+            if ($pembayaran->kelompok_bayar) {
+                throw new AppException(422, 'Pembayaran ini bagian dari transfer berkelompok. Gunakan "Tolak kelompok".');
+            }
+            if ($pembayaran->status !== 'menunggu_verifikasi') {
+                throw new AppException(422, "Pembayaran ini sudah berstatus \"{$pembayaran->status}\".");
+            }
+            $pembayaran->update([
+                'status' => 'ditolak', 'alasan_tolak' => $alasan,
+                'diverifikasi_oleh' => $idPengguna, 'diverifikasi_pada' => Carbon::now(),
+            ]);
+
+            return $pembayaran;
+        });
 
         // Ke PENCATATNYA — staf atau wali yang mengirim dari portal.
         \App\Services\PortalWali\KabarWali::kePencatat($pembayaran, [

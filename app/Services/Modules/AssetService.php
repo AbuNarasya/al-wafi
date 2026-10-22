@@ -44,7 +44,9 @@ class AssetService
         }
         $rate = Money::div('2', (string) $a->umur_manfaat, 6);
 
-        return Money::mul($this->bookValue($a), $rate);
+        // Dikalikan pada skala 6 lalu dibulatkan ke sen. Dulu Money::mul memotong tarifnya ke 2 desimal
+        // (2/60 = 0,0333… jadi 0,03 — beban 10% terlalu kecil; umur > 200 bulan malah 0) — audit 22 Okt 2026.
+        return Money::of(bcadd(bcmul($this->bookValue($a), $rate, 6), '0.005', 2));
     }
 
     /**
@@ -66,10 +68,26 @@ class AssetService
 
         $now = Carbon::now();
         $periode = $now->format('Ym');
+
+        return DB::transaction(function () use ($input, $idPengguna, $beban, $akumulasi, $now, $periode) {
+            // Sekali per periode: klik ganda / dua tab dulu menjurnal & menambah akumulasi dua kali.
+            DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('depresiasi-bulanan')]);
+            $sudah = JournalEntry::where('sumber_modul', 'Depresiasi')->where('referensi', 'like', "DEPR-{$periode}-%")
+                ->where('status', '!=', 'void')->value('referensi');
+            if ($sudah) {
+                throw new AppException(409, "Depresiasi periode {$periode} sudah dijurnal ({$sudah}). Tiap periode hanya sekali.");
+            }
+
+            return $this->jurnalDepresiasi($input, $idPengguna, $beban, $akumulasi, $now, $periode);
+        });
+    }
+
+    private function jurnalDepresiasi(array $input, ?int $idPengguna, CoaDetail $beban, CoaDetail $akumulasi, Carbon $now, string $periode): array
+    {
         $lines = [];
         $updates = [];
 
-        foreach (Asset::where('status', 'aktif')->get() as $a) {
+        foreach (Asset::where('status', 'aktif')->lockForUpdate()->get() as $a) {
             $d = $this->monthlyDepreciation($a);
             $maxAllowed = Money::sub($this->bookValue($a), $a->nilai_residu);
             if (Money::gt($d, $maxAllowed)) {

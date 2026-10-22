@@ -42,7 +42,17 @@ class KoreksiTagihanService
      */
     public function koreksi(int $idTagihan, string $nominalBaru, string $alasan, int $idPengguna): array
     {
-        $tagihan = TagihanSantri::with(['jenis', 'santri'])->find($idTagihan);
+        if (trim($alasan) === '') {
+            throw new AppException(422, 'Alasan koreksi wajib diisi.');
+        }
+
+        // Seluruhnya di bawah kunci tagihan: pembayaran yang masuk di tengah koreksi tak boleh terlewat.
+        return DB::transaction(fn () => $this->koreksiDalamKunci($idTagihan, $nominalBaru, $alasan, $idPengguna));
+    }
+
+    private function koreksiDalamKunci(int $idTagihan, string $nominalBaru, string $alasan, int $idPengguna): array
+    {
+        $tagihan = TagihanSantri::with(['jenis', 'santri'])->lockForUpdate()->find($idTagihan);
         if (! $tagihan) {
             throw new AppException(404, 'Tagihan tidak ditemukan.');
         }
@@ -80,8 +90,13 @@ class KoreksiTagihanService
             throw new AppException(422, "Jenis biaya \"{$jenis?->nama}\" belum lengkap akun piutang/pendapatannya, sehingga akrualnya tak bisa disesuaikan. Lengkapi dulu di master Jenis Biaya.");
         }
 
-        $terbayar = PembayaranSantri::where('id_tagihan', $tagihan->id)->where('status', 'terverifikasi')
-            ->get(['nominal'])->reduce(fn ($t, $p) => Money::add($t, $p->nominal), '0');
+        // Terbayar = nominal − sisa, BUKAN jumlah baris pembayaran_santri: pelunasan dari saldo prabayar SPP
+        // mengurangi sisa tanpa membuat baris pembayaran, sehingga dulu tak terhitung dan koreksi menagih
+        // ulang uang yang sudah diterima (audit 22 Okt 2026).
+        $terbayar = Money::sub($lama, $tagihan->sisa);
+        if (Money::isNegative($terbayar)) {
+            $terbayar = '0';
+        }
 
         $sisaBaru = Money::sub($baru, $terbayar);
         $kelebihan = Money::lt($sisaBaru, '0') ? Money::sub('0', $sisaBaru) : '0';
@@ -200,8 +215,7 @@ class KoreksiTagihanService
         }
 
         $dompet = DompetWali::firstOrCreate(['id_wali' => $idWali], ['saldo' => '0']);
-        $saldoBaru = Money::add($dompet->saldo, $kelebihan);
-        $dompet->update(['saldo' => $saldoBaru]);
+        $saldoBaru = \App\Support\SaldoAtomik::tambah($dompet, $kelebihan);
 
         $base = DocNumber::docBase('DMP', now()->toDateString());
         $last = MutasiDompet::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor');

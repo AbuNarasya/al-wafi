@@ -175,4 +175,52 @@ class BukaTutupBukuTahunanTest extends TestCase
         $this->assertSame('6000000.00', (new ReportsService)->labaRugi('2025-01-01', '2025-12-31')['laba_rugi_bersih']);
         $this->assertFalse(ActivityLog::where('aksi', 'buka_bulan')->exists(), 'Desember yang sudah terbuka tak perlu "dibuka" lagi.');
     }
+
+    /** Audit 22 Okt 2026: pembalik ber-referensi sama dulu terbaca "sudah ditutup" — tahun yang pernah dibuka tak bisa ditutup lagi. */
+    public function test_tahun_yang_dibuka_bisa_ditutup_dan_dibuka_lagi(): void
+    {
+        $svc = new PeriodCloseService;
+        $svc->tutupTahun(2025, self::LABA_DITAHAN, $this->admin->id_pengguna);
+        $svc->bukaTahun(2025, $this->admin->id_pengguna, lewatPersetujuan: true);
+
+        $hasil = $svc->tutupTahun(2025, self::LABA_DITAHAN, $this->admin->id_pengguna);
+        $this->assertSame('6000000.00', $hasil['laba_rugi']);
+        $neraca = (new ReportsService)->neraca('2025-12-31');
+        $this->assertSame('0.00', $neraca['ekuitas']['laba_berjalan']);
+        $this->assertTrue($neraca['balanced']);
+
+        // Dibuka lagi: yang dibalik penutup KEDUA, bukan pembalik pembukaan pertama.
+        $svc->bukaTahun(2025, $this->admin->id_pengguna, lewatPersetujuan: true);
+        $this->assertSame(0, JournalEntry::where('sumber_modul', 'TutupBuku')->whereNull('reversal_of')->where('status', 'aktif')->count());
+        $this->assertSame('6000000.00', (new ReportsService)->labaRugi('2025-01-01', '2025-12-31')['laba_rugi_bersih']);
+        $this->assertTrue((new ReportsService)->neraca('2025-12-31')['balanced']);
+    }
+
+    /** Audit 22 Okt 2026: bulan yang masih punya uang masuk belum terverifikasi tak boleh ditutup. */
+    public function test_tutup_bulan_ditolak_bila_ada_top_up_menunggu_verifikasi(): void
+    {
+        $w = \App\Models\Wali::create(['kontak_utama' => 'ayah', 'nama_ayah' => 'A', 'telepon_ayah' => '081200000001', 'nama' => 'A', 'telepon' => '081200000001', 'status' => 'aktif']);
+        $d = \App\Models\DompetWali::create(['id_wali' => $w->id, 'saldo' => '0']);
+        \App\Models\MutasiDompet::create(['nomor' => 'DMP-UJI-1', 'pemilik' => 'wali', 'id_dompet' => $d->id, 'jenis' => 'topup',
+            'nominal' => '50000', 'saldo_setelah' => '0', 'tanggal' => '2025-11-20', 'status' => 'menunggu_verifikasi', 'dicatat_oleh' => $this->admin->id_pengguna]);
+
+        try {
+            (new PeriodCloseService)->tutupBulan(2025, 11, $this->admin->id_pengguna, $this->admin->nama);
+            $this->fail('seharusnya ditolak');
+        } catch (\App\Exceptions\AppException $e) {
+            $this->assertStringContainsString('1 top-up dompet menunggu verifikasi', $e->getMessage());
+        }
+        // Bulan SEBELUM top-up itu tetap boleh ditutup.
+        (new PeriodCloseService)->tutupBulan(2025, 10, $this->admin->id_pengguna, $this->admin->nama);
+        $this->assertSame('closed', AccountingPeriod::where('tahun', 2025)->where('bulan', 10)->value('status'));
+    }
+
+    /** Audit 22 Okt 2026: aset neto AWAL laporan tengah tahun wajib memuat surplus bulan-bulan sebelumnya yang belum ditutup. */
+    public function test_aset_neto_awal_tengah_tahun_memuat_surplus_sebelumnya(): void
+    {
+        $lap = (new ReportsService)->perubahanAsetNeto('2025-07-01', '2025-12-31');
+        $this->assertSame('10000000.00', $lap['awal']['jumlah'], 'pendapatan Juni sudah jadi aset neto per 1 Juli');
+        $this->assertSame('6000000.00', $lap['akhir']['jumlah'], 'sama dengan ekuitas di neraca akhir tahun');
+        $this->assertSame((new ReportsService)->neraca('2025-12-31')['total_ekuitas'], $lap['akhir']['jumlah']);
+    }
 }

@@ -727,6 +727,27 @@ class ReportsService
             $awal[$sifat($a)] = Money::add($awal[$sifat($a)], $saldo);
         }
 
+        // 1b. Surplus/defisit sebelum periode yang BELUM ditutup buku (mis. laporan Maret–Juni: laba
+        //     Januari–Februari). Dulu tak terhitung, sehingga aset neto awal laporan tengah tahun
+        //     lebih kecil/besar dari neraca (audit 22 Okt 2026). Tahun yang sudah ditutup bernilai nol
+        //     di sini karena jurnal TutupBuku-nya ikut di $sampaiAwal.
+        foreach ($ctx['accounts'] as $a) {
+            $akar = $akarOf($a);
+            if ($akar !== '4' && $akar !== '5') {
+                continue;
+            }
+            $nilai = $this->normal($ctx, $a, $sampaiAwal[$a->kode_coa] ?? '0');
+            $awal[$akar === '4' ? $sifat($a) : 'tanpa'] = $akar === '4'
+                ? Money::add($awal[$sifat($a)], $nilai)
+                : Money::sub($awal['tanpa'], $nilai);
+        }
+        $awalTahun = max(Carbon::parse($from)->startOfYear()->toDateString(), $this->fiscalYearStart($from));
+        if ($awalTahun <= $sebelum) {
+            $lepasLalu = $this->pelepasanPembatasan($awalTahun, $sebelum);
+            $awal['tanpa'] = Money::add($awal['tanpa'], $lepasLalu);
+            $awal['dengan'] = Money::sub($awal['dengan'], $lepasLalu);
+        }
+
         // 2. Pendapatan periode, per sifat pembatasan akunnya.
         $pendapatan = ['tanpa' => '0', 'dengan' => '0'];
         $beban = '0';

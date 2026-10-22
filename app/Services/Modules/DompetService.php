@@ -151,6 +151,11 @@ class DompetService
         $nominal = Money::of($mutasi->nominal);
 
         $mutasi = DB::transaction(function () use ($mutasi, $nominal, $idPengguna) {
+            // Periksa ulang di bawah kunci: dua klik "Verifikasi" serentak dulu menambah saldo dua kali.
+            $mutasi = MutasiDompet::whereKey($mutasi->id)->lockForUpdate()->first();
+            if ($mutasi->status !== 'menunggu_verifikasi') {
+                throw new AppException(422, "Top-up ini sudah berstatus \"{$mutasi->status}\".");
+            }
             $saldo = $this->tambahSaldo($mutasi->pemilik, $mutasi->id_dompet, $nominal);
             $entry = PostingService::postJournal([
                 'referensi' => $mutasi->nomor, 'tanggal' => $mutasi->tanggal, 'sumber_modul' => self::SUMBER,
@@ -204,7 +209,15 @@ class DompetService
         if ($mutasi->status !== 'menunggu_verifikasi') {
             throw new AppException(422, "Top-up ini sudah berstatus \"{$mutasi->status}\".");
         }
-        $mutasi->update(['status' => 'ditolak', 'alasan_tolak' => $alasan, 'diverifikasi_oleh' => $idPengguna, 'diverifikasi_pada' => Carbon::now()]);
+        $mutasi = DB::transaction(function () use ($id, $alasan, $idPengguna) {
+            $mutasi = MutasiDompet::whereKey($id)->lockForUpdate()->first();
+            if ($mutasi->status !== 'menunggu_verifikasi') {
+                throw new AppException(422, "Top-up ini sudah berstatus \"{$mutasi->status}\".");
+            }
+            $mutasi->update(['status' => 'ditolak', 'alasan_tolak' => $alasan, 'diverifikasi_oleh' => $idPengguna, 'diverifikasi_pada' => Carbon::now()]);
+
+            return $mutasi;
+        });
         // Ke PENCATATNYA — staf atau wali yang mengirim dari portal.
         \App\Services\PortalWali\KabarWali::kePencatat($mutasi, [
             'judul' => 'Top-up dompet ditolak keuangan',
@@ -239,6 +252,11 @@ class DompetService
         }
 
         return DB::transaction(function () use ($data, $nominal, $asal, $tujuan, $pencatat) {
+            if ($data['dari'] === 'santri') {
+                // Cadangan tarik tunai diperiksa ulang atas saldo yang dikunci, bukan bacaan sebelum transaksi.
+                $segar = DompetSantri::whereKey($asal->id)->lockForUpdate()->first();
+                PenarikanTunaiService::pastikanTersedia($segar->id_santri, $segar->saldo, $nominal);
+            }
             $saldoAsal = $this->kurangiSaldo($data['dari'], $asal->id, $nominal);
             $saldoTujuan = $this->tambahSaldo($data['ke'], $tujuan->id, $nominal);
             $nomorKeluar = $this->nomorMutasi($data['tanggal']);
@@ -441,6 +459,10 @@ class DompetService
         }
 
         return DB::transaction(function () use ($data, $pemilik, $nominal, $rekening, $model, $idPengguna) {
+            if ($pemilik === 'santri') {
+                $segar = DompetSantri::whereKey($model->getKey())->lockForUpdate()->first();
+                PenarikanTunaiService::pastikanTersedia($segar->id_santri, $segar->saldo, $nominal, 'Saldo Dompet Santri tidak cukup');
+            }
             $nomor = $this->nomorMutasi($data['tanggal']);
             $saldo = $this->kurangiSaldo($pemilik, $model->getKey(), $nominal);
             $penerima = trim((string) ($data['penerima'] ?? ''));
@@ -506,10 +528,11 @@ class DompetService
             'santri' => DompetSantri::find($id),
             default => TabunganSantri::find($id),
         };
-        $model->saldo = $tambah ? Money::add($model->saldo, $nominal) : Money::sub($model->saldo, $nominal);
-        $model->save();
 
-        return $model->saldo;
+        // Atomik di database: dua mutasi serentak tak saling menimpa (audit 22 Okt 2026).
+        return $tambah
+            ? \App\Support\SaldoAtomik::tambah($model, $nominal)
+            : \App\Support\SaldoAtomik::kurangi($model, $nominal, 'Saldo '.DompetPolicy::labelDompet($pemilik));
     }
 
     private function nomorMutasi(string $tanggal): string

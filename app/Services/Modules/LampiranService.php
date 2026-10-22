@@ -71,7 +71,7 @@ class LampiranService
                 'nama_asli' => $berkas->getClientOriginalName(),
                 'path' => $path,
                 'disk' => $disk,
-                'mime' => $berkas->getClientMimeType(),
+                'mime' => \App\Support\Unggahan::mime($berkas),
                 'ukuran' => $berkas->getSize(),
                 'hash_sha256' => $hash,
                 'keterangan' => $keterangan ?: null,

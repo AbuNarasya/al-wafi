@@ -61,7 +61,15 @@ class UjianSeleksi
     /** Tautan bertanda tangan yang dikodekan ke QR kartu. */
     public static function urlHadir(Santri $s): string
     {
-        return URL::signedRoute('ujian.hadir', ['santri' => $s->id]);
+        // Selalu beralamat ERP staf (APP_URL), bukan alamat permintaan saat ini: kartu yang dicetak wali
+        // dari parents.al-wafi.sch.id dulu ber-QR ke domain portal → 404 saat dipindai panitia (audit 22 Okt 2026).
+        // Tanda tangannya mencakup host, jadi harus dibuat dengan root yang sama dengan tempat ia dipindai.
+        URL::forceRootUrl(rtrim((string) config('app.url'), '/'));
+        try {
+            return URL::signedRoute('ujian.hadir', ['santri' => $s->id]);
+        } finally {
+            URL::forceRootUrl(null);
+        }
     }
 
     /** @return array{0:KehadiranUjian, 1:bool} kehadiran + apakah baru tercatat sekarang */

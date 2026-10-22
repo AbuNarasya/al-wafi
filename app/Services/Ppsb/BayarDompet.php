@@ -26,6 +26,14 @@ final class BayarDompet
      */
     public static function bayarTagihanDariDompet(TagihanSantri $tagihan, array $opts): PembayaranSantri
     {
+        // Kunci & baca ulang tagihannya: dua pembayaran serentak atas tagihan yang sama
+        // (portal + loket, atau auto-debet) tak boleh sama-sama lolos memakai sisa lama.
+        $segar = TagihanSantri::whereKey($tagihan->id)->lockForUpdate()->first();
+        if (! $segar || ! $segar->berlaku()) {
+            throw new AppException(422, 'Tagihan ini sudah dibatalkan atau dihapus.');
+        }
+        $tagihan->forceFill(['sisa' => $segar->sisa, 'status' => $segar->status])->syncOriginal();
+
         $nominal = Money::of($opts['nominal']);
         $sisaBaru = Money::sub($tagihan->sisa, $nominal);
         if (Money::isNegative($sisaBaru)) {
@@ -78,7 +86,7 @@ final class BayarDompet
         ]);
 
         $dompet = DompetWali::find($opts['id_dompet']);
-        $dompet->update(['saldo' => Money::sub($dompet->saldo, $nominal)]);
+        \App\Support\SaldoAtomik::kurangi($dompet, $nominal, 'Saldo Dompet Wali');
 
         $baseMutasi = DocNumber::docBase('DMP', $opts['tanggal']);
         $lastMutasi = MutasiDompet::where('nomor', 'like', $baseMutasi.'%')->orderByDesc('nomor')->value('nomor');

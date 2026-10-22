@@ -28,10 +28,13 @@ class KlienDompetToko
     /** `$rincian` = daftar barang untuk portal wali ([[App\Services\Modules\RincianBelanja]]). */
     public function potong(string $nomor, string $uid, string $nominal, ?string $pin, ?string $kodeToko, ?string $namaToko, ?array $rincian = null): array
     {
+        // Batas waktu lebih pendek: panggilan ini terjadi DI DALAM transaksi simpan struk yang memegang kunci nomor
+        // struk — selama menunggu, kasir lain ikut tertahan (audit 22 Okt 2026). Waktu habis = "tak pasti", dan
+        // niat bayarnya diselesaikan lewat "Cek lagi" / rekonsiliasi malam, bukan dianggap gagal.
         return $this->kirim('POST', '/api/dompet-toko/v1/potong', [
             'nomor' => $nomor, 'uid' => $uid, 'nominal' => $nominal, 'pin' => $pin,
             'kode_toko' => $kodeToko, 'nama_toko' => $namaToko, 'rincian' => $rincian,
-        ]);
+        ], batasDetik: 5);
     }
 
     public function kembalikan(string $nomor, string $nomorAsal, string $nominal, ?string $keterangan = null, ?array $rincian = null): array
@@ -69,7 +72,7 @@ class KlienDompetToko
         return $this->kirim('GET', '/api/dompet-toko/v1/transaksi', ['tanggal' => $tanggal])['transaksi'] ?? [];
     }
 
-    private function kirim(string $method, string $path, array $isi): array
+    private function kirim(string $method, string $path, array $isi, int $batasDetik = 8): array
     {
         $url = rtrim((string) config('penghubung.url'), '/');
         $rahasia = (string) config('penghubung.rahasia');
@@ -79,7 +82,7 @@ class KlienDompetToko
         $waktu = (string) time();
         $badan = $method === 'GET' ? TandaTanganToko::kueri($isi) : json_encode($isi);
         $tanda = TandaTanganToko::tanda($rahasia, $method, $path, $waktu, $badan);
-        $req = Http::timeout(8)->connectTimeout(4)->acceptJson()
+        $req = Http::timeout($batasDetik)->connectTimeout(min(4, $batasDetik))->acceptJson()
             ->withHeaders(['X-Penghubung-Waktu' => $waktu, 'X-Penghubung-Tanda' => $tanda]);
 
         try {

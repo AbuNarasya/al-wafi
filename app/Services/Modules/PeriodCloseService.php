@@ -85,6 +85,16 @@ class PeriodCloseService
         if ($shift = \App\Models\ShiftKasir::where('status', 'buka')->whereDate('dibuka_pada', '<=', $akhir)->value('nomor')) {
             throw new AppException(409, "Masih ada shift kasir terbuka ({$shift}) yang dijurnal di periode ini — tutup dulu shift-nya.");
         }
+        // Uang yang sudah diterima di bulan ini tapi belum masuk buku besar — menutup bulannya membuat
+        // verifikasi/jurnalnya kelak ditolak (audit 22 Okt 2026). Selesaikan dulu.
+        $tertunda = array_filter([
+            'pembayaran santri menunggu verifikasi' => \App\Models\PembayaranSantri::where('status', 'menunggu_verifikasi')->whereDate('tanggal', '<=', $akhir)->count(),
+            'top-up dompet menunggu verifikasi' => \App\Models\MutasiDompet::where('status', 'menunggu_verifikasi')->whereDate('tanggal', '<=', $akhir)->count(),
+            'transaksi kartu Wafi Mart belum dijurnal' => \App\Models\TransaksiDompetToko::whereNull('dijurnal_pada')->where('status', 'berhasil')->whereDate('tanggal', '<=', $akhir)->count(),
+        ]);
+        if ($tertunda) {
+            throw new AppException(409, 'Belum bisa ditutup — masih ada '.implode(', ', array_map(fn ($n, $k) => "{$n} {$k}", $tertunda, array_keys($tertunda))).'.');
+        }
         $data = ['status' => 'closed', 'closed_by' => $idPengguna, 'nama_closed_by' => $nama, 'closed_at' => now(), 'keterangan' => $keterangan];
         if ($existing) {
             $existing->update($data);
@@ -145,11 +155,19 @@ class PeriodCloseService
     /** Tutup buku tahunan: nol-kan Pendapatan(4)/Beban(5), net → Laba Ditahan. */
     public function tutupTahun(int $tahun, string $kodeCoaLabaDitahan, ?int $idPengguna): array
     {
+        return DB::transaction(fn () => $this->tutupTahunDalamKunci($tahun, $kodeCoaLabaDitahan, $idPengguna));
+    }
+
+    private function tutupTahunDalamKunci(int $tahun, string $kodeCoaLabaDitahan, ?int $idPengguna): array
+    {
         $ld = CoaDetail::find($kodeCoaLabaDitahan);
         if (! $ld) {
             throw new AppException(400, 'Akun Laba Ditahan tidak ditemukan.');
         }
-        $already = JournalEntry::where('sumber_modul', self::SUMBER)
+        // Pembalik buka tahun memakai referensi yang SAMA & berstatus aktif — dulu ia terbaca sebagai
+        // "sudah ditutup", sehingga tahun yang pernah dibuka tak bisa ditutup lagi (audit 22 Okt 2026).
+        DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('tutup-tahun')]);
+        $already = JournalEntry::where('sumber_modul', self::SUMBER)->whereNull('reversal_of')
             ->where('referensi', $this->refTahun($tahun))->where('status', 'aktif')->first();
         if ($already) {
             throw new AppException(409, 'Tahun ini sudah ditutup buku. Buka dulu untuk menutup ulang.');
@@ -215,7 +233,8 @@ class PeriodCloseService
     public function bukaTahun(int $tahun, ?int $idPengguna, bool $lewatPersetujuan = false): array
     {
         $this->pastikanLewatPersetujuan($lewatPersetujuan);
-        $entry = JournalEntry::where('sumber_modul', self::SUMBER)
+        // Hanya jurnal PENUTUP-nya, bukan pembalik dari pembukaan sebelumnya (keduanya ber-referensi sama).
+        $entry = JournalEntry::where('sumber_modul', self::SUMBER)->whereNull('reversal_of')
             ->where('referensi', $this->refTahun($tahun))->where('status', 'aktif')->first();
         if (! $entry) {
             throw new AppException(409, 'Tahun ini belum ditutup buku.');

@@ -47,6 +47,11 @@ Schedule::command('santri:terapkan-jadwal')->dailyAt('00:30');
 // sebelum hari ini — D Titipan Uang Saku / K Hutang ke Wafi Mart. Aman diulang; kosong = tak berbuat apa-apa.
 Artisan::command('dompet:jurnal-belanja-toko', function (App\Services\Modules\JurnalDompetToko $j) {
     foreach ($j->jalankan() as $h) {
+        if (isset($h['galat'])) {
+            $this->error("{$h['tanggal']}: {$h['galat']}");
+
+            continue;
+        }
         $this->info("{$h['tanggal']}: {$h['transaksi']} transaksi, bersih Rp {$h['bersih']}".($h['jurnal'] ? " → jurnal #{$h['jurnal']}" : ' (nol, tanpa jurnal)'));
     }
 })->purpose('Jurnal ringkas belanja kartu santri di Wafi Mart (penghubung)');

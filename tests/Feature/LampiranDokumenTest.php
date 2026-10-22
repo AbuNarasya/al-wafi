@@ -231,7 +231,8 @@ class LampiranDokumenTest extends TestCase
     /** Berkas disajikan inline untuk pratinjau, dengan nama aslinya. */
     public function test_berkas_disajikan_inline(): void
     {
-        $this->buatPengajuan(['lampiran' => [UploadedFile::fake()->create('invoice.pdf', 30, 'application/pdf')]]);
+        // Isi PDF sungguhan: sejak audit 22 Okt 2026 tipe tampilan dideteksi dari ISI berkas (berkas kosong → diunduh).
+        $this->buatPengajuan(['lampiran' => [UploadedFile::fake()->createWithContent('invoice.pdf', "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n")]]);
         $row = LampiranDokumen::firstOrFail();
 
         $this->actingAs($this->staff)->get(route('lampiran.berkas', $row->id))

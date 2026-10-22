@@ -21,7 +21,7 @@ final class ReversalService
     public static function reverseJournalEntry(int $entryId, array $opts = []): JournalEntry
     {
         return DB::transaction(function () use ($entryId, $opts) {
-            $entry = JournalEntry::with('lines')->find($entryId);
+            $entry = JournalEntry::with('lines')->lockForUpdate()->find($entryId);
             if (! $entry) {
                 throw new AppException(404, 'Jurnal tidak ditemukan.');
             }
