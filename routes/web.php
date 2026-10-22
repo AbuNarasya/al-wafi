@@ -148,6 +148,8 @@ Route::prefix('wali')->name('portal.')->controller(PortalWaliController::class)-
     Route::get('/kode', 'formKode')->name('kode');
     Route::post('/kode', 'periksaKode')->middleware('throttle:20,1');
     Route::post('/keluar', 'keluar')->name('keluar');
+    // Bahasa portal (Indonesia / English / العربية) — boleh sebelum masuk; sesudah masuk ikut tersimpan per orang.
+    Route::post('/bahasa', 'gantiBahasa')->name('bahasa')->middleware('throttle:30,1');
 
     Route::middleware('portal.wali:pendaftar')->group(function () {
         Route::get('/daftar', 'formDaftar')->name('daftar');

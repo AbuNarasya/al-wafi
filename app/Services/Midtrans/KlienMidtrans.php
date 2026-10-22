@@ -74,11 +74,11 @@ class KlienMidtrans
             $res = $this->http()->post(self::urlSnap(), $payload);
         } catch (ConnectionException $e) {
             Log::warning('Midtrans Snap tak terjangkau', ['galat' => $e->getMessage()]);
-            throw new AppException(502, 'Layanan pembayaran online sedang tidak bisa dihubungi. Coba lagi sebentar lagi.');
+            throw new AppException(502, __('Layanan pembayaran online sedang tidak bisa dihubungi. Coba lagi sebentar lagi.'));
         }
         if (! $res->successful() || ! $res->json('token')) {
             Log::warning('Midtrans Snap menolak', ['status' => $res->status(), 'isi' => $res->json()]);
-            throw new AppException(502, 'Pembayaran online belum bisa dibuat. Coba lagi sebentar lagi, atau pakai transfer bank.');
+            throw new AppException(502, __('Pembayaran online belum bisa dibuat. Coba lagi sebentar lagi, atau pakai transfer bank.'));
         }
 
         return ['token' => (string) $res->json('token'), 'redirect_url' => (string) $res->json('redirect_url')];
@@ -95,10 +95,10 @@ class KlienMidtrans
         try {
             $res = $this->http()->get(self::urlApi(rawurlencode($orderId).'/status'));
         } catch (ConnectionException $e) {
-            throw new AppException(502, 'Status pembayaran belum bisa diperiksa. Coba lagi sebentar lagi.');
+            throw new AppException(502, __('Status pembayaran belum bisa diperiksa. Coba lagi sebentar lagi.'));
         }
         if ($res->serverError()) {
-            throw new AppException(502, 'Status pembayaran belum bisa diperiksa. Coba lagi sebentar lagi.');
+            throw new AppException(502, __('Status pembayaran belum bisa diperiksa. Coba lagi sebentar lagi.'));
         }
 
         return (array) $res->json();

@@ -57,9 +57,9 @@ class PortalBerkasController extends Controller
             'keterangan' => ['nullable', 'string', 'max:255'],
             'berkas' => Unggahan::aturan(),
         ], [
-            'berkas.required' => 'Pilih foto atau PDF berkasnya.',
-            'berkas.max' => 'Berkas terlalu besar (maksimal '.Unggahan::maksLabel().').',
-            'berkas.mimes' => 'Berkas harus foto (JPG/PNG/WEBP) atau PDF.',
+            'berkas.required' => __('Pilih foto atau PDF berkasnya.'),
+            'berkas.max' => __('Berkas terlalu besar (maksimal :ukuran).', ['ukuran' => Unggahan::maksLabel()]),
+            'berkas.mimes' => __('Berkas harus foto (JPG/PNG/WEBP) atau PDF.'),
         ]);
         $data['id_santri'] = $santri->id;
         $peran = (string) SesiWali::peran($request);
@@ -72,7 +72,7 @@ class PortalBerkasController extends Controller
         $label = DokumenPolicy::LABEL_DOKUMEN[$data['jenis']];
         $this->kabariStaf($santri, $label, $peran);
 
-        return redirect()->route('portal.berkas', $santri->id)->with('status', "{$label} terkirim. Pesantren akan memeriksanya.");
+        return redirect()->route('portal.berkas', $santri->id)->with('status', __(':berkas terkirim. Pesantren akan memeriksanya.', ['berkas' => __($label)]));
     }
 
     public function hapus(int $dokumen): RedirectResponse
@@ -84,7 +84,7 @@ class PortalBerkasController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('portal.berkas', $idSantri)->with('status', 'Berkas dihapus.');
+        return redirect()->route('portal.berkas', $idSantri)->with('status', __('Berkas dihapus.'));
     }
 
     /** Pratinjau berkas — hanya milik anak keluarga yang sedang masuk. */

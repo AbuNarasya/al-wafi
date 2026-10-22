@@ -32,7 +32,7 @@ class PortalTarikTunaiController extends Controller
 
         return $this->jalankan($request, fn () => $this->service->ajukan(SesiWali::wali(), (string) SesiWali::peran($request),
             (int) $data['id_sesi'], (int) $data['id_santri'], (string) $data['nominal'], $data['pin'] ?? null),
-            fn ($p) => "Pengajuan {$p->nomor} terkirim. Uang saku sebesar itu kini dicadangkan sampai diputus bagian kesantrian.");
+            fn ($p) => __('Pengajuan :nomor terkirim. Uang saku sebesar itu kini dicadangkan sampai diputus bagian kesantrian.', ['nomor' => $p->nomor]));
     }
 
     public function ubah(Request $request, int $id): RedirectResponse
@@ -41,13 +41,13 @@ class PortalTarikTunaiController extends Controller
 
         return $this->jalankan($request, fn () => $this->service->ubahPengajuan(SesiWali::wali(), (string) SesiWali::peran($request),
             $id, (string) $data['nominal'], $data['pin'] ?? null),
-            fn ($p) => "Pengajuan {$p->nomor} diubah — menunggu persetujuan ulang.");
+            fn ($p) => __('Pengajuan :nomor diubah — menunggu persetujuan ulang.', ['nomor' => $p->nomor]));
     }
 
     public function batal(Request $request, int $id): RedirectResponse
     {
         return $this->jalankan($request, fn () => $this->service->batalPengajuan(SesiWali::wali(), $id),
-            fn ($p) => "Pengajuan {$p->nomor} dibatalkan — cadangan uang saku dilepas.");
+            fn ($p) => __('Pengajuan :nomor dibatalkan — cadangan uang saku dilepas.', ['nomor' => $p->nomor]));
     }
 
     private function jalankan(Request $request, \Closure $aksi, \Closure $pesan): RedirectResponse

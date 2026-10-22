@@ -21,7 +21,7 @@ class PortalPushController extends Controller
     public function langganan(Request $request): JsonResponse
     {
         if (! $this->push->aktif()) {
-            return response()->json(['ok' => false, 'pesan' => 'Notifikasi belum disiapkan di server ini.'], 503);
+            return response()->json(['ok' => false, 'pesan' => __('Notifikasi belum disiapkan di server ini.')], 503);
         }
         $data = $request->validate([
             'endpoint' => ['required', 'string', 'max:500'], 'keys' => ['required', 'array'],
@@ -49,6 +49,6 @@ class PortalPushController extends Controller
         $data = $request->validate(['kategori' => ['nullable', 'array'], 'kategori.*' => ['string', 'max:20']]);
         $this->service->simpanKategori(SesiWali::wali()->id, (string) SesiWali::peran($request), $data['kategori'] ?? []);
 
-        return redirect()->route('portal.akun')->with('status', 'Pilihan notifikasi disimpan.');
+        return redirect()->route('portal.akun')->with('status', __('Pilihan notifikasi disimpan.'));
     }
 }

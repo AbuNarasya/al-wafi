@@ -1,6 +1,6 @@
 @extends('layouts.portal')
 
-@section('title', 'Tagihan')
+@section('title', __('Tagihan'))
 @section('kembali', $anak->count() > 1 ? route('portal.tagihan') : route('portal.beranda'))
 
 @php
@@ -13,35 +13,35 @@
         return \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $p.'-01')->locale('id')->translatedFormat('F Y');
     };
     $warna = ['belum' => 'bg-red-50 text-red-700', 'sebagian' => 'bg-blue-50 text-brand', 'lunas' => 'bg-emerald-50 text-emerald-700'];
-    $label = ['belum' => 'Belum', 'sebagian' => 'Sebagian', 'lunas' => 'Lunas'];
+    $label = ['belum' => __('Belum'), 'sebagian' => __('Sebagian'), 'lunas' => __('Lunas')];
 @endphp
 
 @section('content')
     <div class="mb-4 flex items-center gap-3">
         <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#b8956a] text-white shadow-sm"><x-portal.ikon nama="tagihan" /></span>
         <div class="min-w-0">
-            <h1 class="truncate text-xl font-bold text-slate-900">Tagihan</h1>
-            <p class="truncate text-sm text-slate-500">{{ $dipilih?->nama ?? 'Belum ada anak' }}</p>
+            <h1 class="truncate text-xl font-bold text-slate-900">{{ __('Tagihan') }}</h1>
+            <p class="truncate text-sm text-slate-500">{{ $dipilih?->nama ?? __('Belum ada anak') }}</p>
         </div>
     </div>
 
     @if ($anak->isEmpty())
-        <div class="rounded-3xl bg-white p-6 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">Belum ada anak yang terdaftar.</div>
+        <div class="rounded-3xl bg-white p-6 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">{{ __('Belum ada anak yang terdaftar.') }}</div>
     @else
         @if ($anak->count() > 1)
             {{-- Rincian SATU anak; ringkasan seluruh keluarga ada satu langkah sebelumnya. --}}
             <a href="{{ route('portal.tagihan') }}" class="mb-4 flex items-center gap-1 text-sm font-semibold text-brand">
-                <x-portal.ikon nama="kembali" kelas="h-4 w-4" /> Semua anak
+                <x-portal.ikon nama="kembali" kelas="h-4 w-4" /> {{ __('Semua anak') }}
             </a>
         @endif
 
         <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-            <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Sisa tagihan {{ $dipilih->nama }}</p>
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">{{ __('Sisa tagihan :nama', ['nama' => $dipilih->nama]) }}</p>
             <p class="mt-1 text-3xl font-bold tabular-nums text-slate-900">{{ $rp($ringkasan['sisa']) }}</p>
             <p class="mt-1 text-sm text-slate-500">
-                dari {{ $rp($ringkasan['nominal']) }}
+                {{ __('dari :jumlah', ['jumlah' => $rp($ringkasan['nominal'])]) }}
                 @if ((float) $ringkasan['menunggu'] > 0)
-                    &middot; <span class="font-medium text-amber-700">{{ $rp($ringkasan['menunggu']) }} menunggu verifikasi</span>
+                    &middot; <span class="font-medium text-amber-700">{{ __(':jumlah menunggu verifikasi', ['jumlah' => $rp($ringkasan['menunggu'])]) }}</span>
                 @endif
             </p>
         </div>
@@ -49,8 +49,8 @@
         @include('portal._va-menunggu', ['daftar' => $va])
 
         <div class="mt-4 grid grid-cols-2 gap-1 rounded-2xl bg-slate-200 p-1 text-center text-sm">
-            <a href="{{ route('portal.tagihan', ['anak' => $dipilih->id]) }}" @class(['rounded-xl py-2', 'bg-white font-semibold text-slate-900 shadow-sm' => $tab === 'tagihan', 'text-slate-600' => $tab !== 'tagihan'])>Tagihan</a>
-            <a href="{{ route('portal.tagihan', ['anak' => $dipilih->id, 'tab' => 'riwayat']) }}" @class(['rounded-xl py-2', 'bg-white font-semibold text-slate-900 shadow-sm' => $tab === 'riwayat', 'text-slate-600' => $tab !== 'riwayat'])>Riwayat bayar</a>
+            <a href="{{ route('portal.tagihan', ['anak' => $dipilih->id]) }}" @class(['rounded-xl py-2', 'bg-white font-semibold text-slate-900 shadow-sm' => $tab === 'tagihan', 'text-slate-600' => $tab !== 'tagihan'])>{{ __('Tagihan') }}</a>
+            <a href="{{ route('portal.tagihan', ['anak' => $dipilih->id, 'tab' => 'riwayat']) }}" @class(['rounded-xl py-2', 'bg-white font-semibold text-slate-900 shadow-sm' => $tab === 'riwayat', 'text-slate-600' => $tab !== 'riwayat'])>{{ __('Riwayat bayar') }}</a>
         </div>
 
         @if ($tab === 'tagihan')
@@ -63,14 +63,14 @@
             @endphp
             <div class="mt-4 space-y-2" x-data="{ pilih: [] }">
                 @if ($bisaDipilih)
-                    <p class="px-1 text-xs text-slate-500">Centang beberapa tagihan untuk dibayar sekaligus.</p>
+                    <p class="px-1 text-xs text-slate-500">{{ __('Centang beberapa tagihan untuk dibayar sekaligus.') }}</p>
                 @endif
                 @forelse ($belumLunas as $t)
                     @php $p = $periode($t['periode']); @endphp
                     <div class="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200" :class="pilih.includes({{ $t['id'] }}) && 'ring-2 ring-brand'">
                         <div class="flex items-start justify-between gap-2">
                             @if ($bisaDipilih && $t['bisa_bayar'])
-                                <input type="checkbox" value="{{ $t['id'] }}" x-model.number="pilih" aria-label="Pilih {{ $t['nama'] }}"
+                                <input type="checkbox" value="{{ $t['id'] }}" x-model.number="pilih" aria-label="{{ __('Pilih :nama', ['nama' => $t['nama']]) }}"
                                        class="mt-1 h-5 w-5 shrink-0 rounded border-slate-300 text-brand focus:ring-brand">
                             @endif
                             <p class="min-w-0 flex-1 font-semibold text-slate-900">
@@ -87,18 +87,18 @@
                         <div class="mt-1 flex items-end justify-between gap-2">
                             <div class="text-sm text-slate-500">
                                 @if ($t['jatuh_tempo'] && $t['status'] !== 'lunas')
-                                    <span class="block">Jatuh tempo {{ $t['jatuh_tempo']->format('d/m/Y') }}</span>
+                                    <span class="block">{{ __('Jatuh tempo :tanggal', ['tanggal' => $t['jatuh_tempo']->format('d/m/Y')]) }}</span>
                                 @endif
                                 @if ($t['status'] === 'sebagian')
-                                    <span class="block">Terbayar {{ $rp($t['terbayar']) }} dari {{ $rp($t['nominal']) }}</span>
+                                    <span class="block">{{ __('Terbayar :terbayar dari :nominal', ['terbayar' => $rp($t['terbayar']), 'nominal' => $rp($t['nominal'])]) }}</span>
                                 @elseif ($t['status'] === 'lunas')
                                     <span class="block">{{ $rp($t['nominal']) }}</span>
                                 @endif
                                 @if ((float) $t['menunggu'] > 0)
-                                    <span class="block font-medium text-amber-700">{{ $rp($t['menunggu']) }} menunggu verifikasi</span>
+                                    <span class="block font-medium text-amber-700">{{ __(':jumlah menunggu verifikasi', ['jumlah' => $rp($t['menunggu'])]) }}</span>
                                 @endif
                                 @if ((float) $t['di_va'] > 0)
-                                    <span class="block font-medium text-amber-700">{{ $rp($t['di_va']) }} menunggu dibayar lewat VA</span>
+                                    <span class="block font-medium text-amber-700">{{ __(':jumlah menunggu dibayar lewat VA', ['jumlah' => $rp($t['di_va'])]) }}</span>
                                 @endif
                             </div>
                             @if ($t['status'] !== 'lunas')
@@ -107,17 +107,17 @@
                         </div>
                         @if ($t['bisa_bayar'])
                             <a href="{{ route('portal.bayar', $t['id']) }}" class="mt-3 block rounded-2xl bg-brand py-2.5 text-center text-sm font-semibold text-white">
-                                {{ match ($t['alur']) { 'dompet' => 'Bayar dari Dompet', 'keduanya' => \App\Services\Midtrans\PembayaranMidtrans::siap() ? 'Bayar (dompet / VA / transfer)' : 'Bayar (dompet / transfer)', default => 'Bayar lewat transfer' } }}
+                                {{ match ($t['alur']) { 'dompet' => __('Bayar dari Dompet'), 'keduanya' => \App\Services\Midtrans\PembayaranMidtrans::siap() ? __('Bayar (dompet / VA / transfer)') : __('Bayar (dompet / transfer)'), default => __('Bayar lewat transfer') } }}
                             </a>
                         @endif
                     </div>
                 @empty
                     <div class="rounded-3xl bg-white p-6 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">
                         @if (collect($tagihan)->isEmpty())
-                            Belum ada tagihan.
+                            {{ __('Belum ada tagihan.') }}
                         @else
-                            <span class="block font-semibold text-emerald-700">Alhamdulillah, semua tagihan sudah lunas.</span>
-                            <a href="{{ route('portal.tagihan', ['anak' => $dipilih->id, 'tab' => 'riwayat']) }}" class="mt-2 inline-block font-semibold text-brand">Lihat riwayat bayar &rarr;</a>
+                            <span class="block font-semibold text-emerald-700">{{ __('Alhamdulillah, semua tagihan sudah lunas.') }}</span>
+                            <a href="{{ route('portal.tagihan', ['anak' => $dipilih->id, 'tab' => 'riwayat']) }}" class="mt-2 inline-block font-semibold text-brand">{{ __('Lihat riwayat bayar') }} <span class="inline-block rtl:-scale-x-100">&rarr;</span></a>
                         @endif
                     </div>
                 @endforelse
@@ -127,8 +127,8 @@
                     <div x-show="pilih.length > 0" x-cloak class="fixed inset-x-0 bottom-16 z-40 px-4" style="margin-bottom: env(safe-area-inset-bottom)">
                         <a :href="@js(route('portal.bayar_banyak.form')) + '?' + pilih.map(id => 't[]=' + id).join('&')"
                            class="mx-auto flex max-w-lg items-center justify-between gap-3 rounded-2xl bg-brand px-4 py-3 text-white shadow-xl">
-                            <span class="text-sm"><b x-text="pilih.length"></b> tagihan dipilih</span>
-                            <span class="text-sm font-bold">Bayar sekaligus &rarr;</span>
+                            <span class="text-sm" x-text="@js(__(':jumlah tagihan dipilih')).replace(':jumlah', pilih.length)"></span>
+                            <span class="text-sm font-bold">{{ __('Bayar sekaligus') }} <span class="inline-block rtl:-scale-x-100">&rarr;</span></span>
                         </a>
                     </div>
                 @endif
@@ -144,15 +144,15 @@
                             @endif
                             <p class="text-xs text-slate-500">{{ $r['tanggal']->format('d/m/Y') }} &middot; {{ $r['sumber'] }}</p>
                             @if ($r['status'] === 'menunggu_verifikasi')
-                                <p class="text-xs font-medium text-amber-700">Menunggu verifikasi</p>
+                                <p class="text-xs font-medium text-amber-700">{{ __('Menunggu verifikasi') }}</p>
                             @else
-                                <a href="{{ route('portal.receipt', $r['id']) }}" class="mt-1 inline-block text-xs font-semibold text-brand">Unduh receipt (PDF)</a>
+                                <a href="{{ route('portal.receipt', $r['id']) }}" class="mt-1 inline-block text-xs font-semibold text-brand">{{ __('Unduh receipt (PDF)') }}</a>
                             @endif
                         </div>
                         <p class="shrink-0 text-sm font-bold tabular-nums text-slate-900">{{ $rp($r['nominal']) }}</p>
                     </div>
                 @empty
-                    <p class="p-6 text-center text-sm text-slate-500">Belum ada pembayaran.</p>
+                    <p class="p-6 text-center text-sm text-slate-500">{{ __('Belum ada pembayaran.') }}</p>
                 @endforelse
             </div>
         @endif

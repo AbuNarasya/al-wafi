@@ -31,10 +31,10 @@ class PushWaliService
         $p256dh = (string) ($data['keys']['p256dh'] ?? '');
         $auth = (string) ($data['keys']['auth'] ?? '');
         if ($endpoint === '' || $p256dh === '' || $auth === '') {
-            throw new AppException(422, 'Data langganan dari peramban tidak lengkap.');
+            throw new AppException(422, __('Data langganan dari peramban tidak lengkap.'));
         }
         if (mb_strlen($endpoint) > 500) {
-            throw new AppException(422, 'Alamat langganan terlalu panjang untuk disimpan.');
+            throw new AppException(422, __('Alamat langganan terlalu panjang untuk disimpan.'));
         }
 
         // Dikunci pada endpoint: perangkat yang sama mendaftar ulang (atau berpindah tangan) MEMPERBARUI barisnya.

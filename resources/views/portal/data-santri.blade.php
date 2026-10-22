@@ -1,6 +1,6 @@
 @extends('layouts.portal')
 
-@section('title', 'Perbaharui Data Santri')
+@section('title', __('Perbaharui Data Santri'))
 @section('kembali', route('portal.data', ['tab' => 'santri']))
 
 @php
@@ -19,28 +19,28 @@
 @endphp
 
 @section('content')
-    <p class="mb-3 text-sm text-slate-500">Perubahan langsung tersimpan dan bagian kesantrian diberi tahu. Isian bertanda <span class="text-red-500">*</span> wajib diisi.</p>
+    <p class="mb-3 text-sm text-slate-500">{!! __('Perubahan langsung tersimpan dan bagian kesantrian diberi tahu. Isian bertanda :bintang wajib diisi.', ['bintang' => '<span class="text-red-500">*</span>']) !!}</p>
     <x-peringatan-kk portal class="mb-4" />
 
     <form method="POST" action="{{ route('portal.data.santri', $santri->id) }}" class="space-y-5"
-          data-confirm="Simpan perubahan data {{ $santri->nama }}?">
+          data-confirm="{{ __('Simpan perubahan data :nama?', ['nama' => $santri->nama]) }}">
         @csrf
         @method('PUT')
 
         <section class="space-y-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-            <h2 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span>Identitas</h2>
+            <h2 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span>{{ __('Identitas') }}</h2>
             {{-- Nama dikunci: hanya admin pesantren yang boleh mengubahnya (keputusan user 14 Okt 2026). --}}
             <div>
-                <p class="{{ $kelasLabel }}">Nama lengkap</p>
+                <p class="{{ $kelasLabel }}">{{ __('Nama lengkap') }}</p>
                 <div class="rounded-2xl bg-slate-50 px-4 py-3 text-base font-semibold text-slate-900">{{ $santri->nama }}</div>
-                <p class="mt-1 text-xs text-slate-500">Nama hanya bisa diubah oleh admin pesantren. Bila keliru, hubungi bagian kesantrian dengan membawa Kartu Keluarga.</p>
+                <p class="mt-1 text-xs text-slate-500">{{ __('Nama hanya bisa diubah oleh admin pesantren. Bila keliru, hubungi bagian kesantrian dengan membawa Kartu Keluarga.') }}</p>
             </div>
             <div>
-                <label class="{{ $kelasLabel }}">Jenis kelamin <span class="text-red-500">*</span></label>
+                <label class="{{ $kelasLabel }}">{{ __('Jenis kelamin') }} <span class="text-red-500">*</span></label>
                 <div class="grid grid-cols-2 gap-2">
                     @foreach (\App\Services\PortalWali\UbahDataWali::JENIS_KELAMIN as $kode => $teks)
                         <label class="flex cursor-pointer items-center justify-center rounded-2xl border border-slate-300 bg-white py-2.5 text-sm has-[:checked]:border-brand has-[:checked]:bg-blue-50 has-[:checked]:text-brand">
-                            <input type="radio" name="jenis_kelamin" value="{{ $kode }}" required @checked(old('jenis_kelamin', $santri->jenis_kelamin) === $kode) class="sr-only">{{ $teks }}
+                            <input type="radio" name="jenis_kelamin" value="{{ $kode }}" required @checked(old('jenis_kelamin', $santri->jenis_kelamin) === $kode) class="sr-only">{{ __($teks) }}
                         </label>
                     @endforeach
                 </div>
@@ -48,31 +48,31 @@
             </div>
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                    <label for="tempat_lahir" class="{{ $kelasLabel }}">Tempat lahir</label>
+                    <label for="tempat_lahir" class="{{ $kelasLabel }}">{{ __('Tempat lahir') }}</label>
                     <input id="tempat_lahir" name="tempat_lahir" value="{{ old('tempat_lahir', $santri->tempat_lahir) }}" maxlength="255" class="{{ $kelasInput }}">
                     @error('tempat_lahir')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div>
-                    <label for="tanggal_lahir" class="{{ $kelasLabel }}">Tanggal lahir</label>
+                    <label for="tanggal_lahir" class="{{ $kelasLabel }}">{{ __('Tanggal lahir') }}</label>
                     <input id="tanggal_lahir" type="date" name="tanggal_lahir" max="{{ now()->subDay()->format('Y-m-d') }}"
                            value="{{ old('tanggal_lahir', $santri->tanggal_lahir?->format('Y-m-d')) }}" class="{{ $kelasInput }}">
                     @error('tanggal_lahir')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
             </div>
             <div>
-                <label for="nisn" class="{{ $kelasLabel }}">NISN</label>
+                <label for="nisn" class="{{ $kelasLabel }}">{{ __('NISN') }}</label>
                 <input id="nisn" name="nisn" inputmode="numeric" data-bukan-rupiah value="{{ old('nisn', $santri->nisn) }}" maxlength="20" class="{{ $kelasInput }}">
-                <p class="mt-1 text-xs text-slate-500">Nomor Induk Siswa Nasional, 10 angka — tertera di rapor / kartu NISN.</p>
+                <p class="mt-1 text-xs text-slate-500">{{ __('Nomor Induk Siswa Nasional, 10 angka — tertera di rapor / kartu NISN.') }}</p>
                 @error('nisn')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
             </div>
         </section>
 
         @foreach ($isian as $judul => $kolom)
             <section class="space-y-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                <h2 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span>{{ $judul }}</h2>
+                <h2 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span>{{ __($judul) }}</h2>
                 @foreach ($kolom as $nama => [$label, $jenis])
                     <div>
-                        <label for="{{ $nama }}" class="{{ $kelasLabel }}">{{ $label }}</label>
+                        <label for="{{ $nama }}" class="{{ $kelasLabel }}">{{ __($label) }}</label>
                         @if ($jenis === 'textarea')
                             <textarea id="{{ $nama }}" name="{{ $nama }}" rows="2" maxlength="1000" class="{{ $kelasInput }}">{{ old($nama, $santri->{$nama}) }}</textarea>
                         @else
@@ -85,7 +85,7 @@
             </section>
         @endforeach
 
-        <button class="w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white">Simpan perubahan</button>
-        <a href="{{ route('portal.data', ['tab' => 'santri']) }}" class="block text-center text-sm font-semibold text-slate-500">Batal</a>
+        <button class="w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white">{{ __('Simpan perubahan') }}</button>
+        <a href="{{ route('portal.data', ['tab' => 'santri']) }}" class="block text-center text-sm font-semibold text-slate-500">{{ __('Batal') }}</a>
     </form>
 @endsection

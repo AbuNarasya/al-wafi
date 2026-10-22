@@ -61,8 +61,10 @@ class PenarikanTunaiService
         $cadangan = self::cadangan($idSantri, $kecuali);
         $tersedia = Money::sub($saldo, $cadangan);
         if (Money::lt($tersedia, $nominal)) {
-            throw new AppException(422, $awalan.' (tersedia '.self::rp(Money::isNegative($tersedia) ? '0' : $tersedia)
-                .(Money::gtZero($cadangan) ? ', '.self::rp($cadangan).' dicadangkan untuk penarikan tunai kegiatan' : '').').');
+            $isi = ['awalan' => __($awalan), 'tersedia' => self::rp(Money::isNegative($tersedia) ? '0' : $tersedia), 'cadangan' => self::rp($cadangan)];
+            throw new AppException(422, Money::gtZero($cadangan)
+                ? __(':awalan (tersedia :tersedia, :cadangan dicadangkan untuk penarikan tunai kegiatan).', $isi)
+                : __(':awalan (tersedia :tersedia).', $isi));
         }
     }
 
@@ -163,16 +165,23 @@ class PenarikanTunaiService
         $lama = ['pengajuan' => $sesi->batas_pengajuan, 'distribusi' => $sesi->tanggal_distribusi];
         $sesi->update(array_intersect_key($baru, $d));
 
-        $kabar = [];
+        $isian = ['sesi' => $sesi->nama];
         if (isset($d['batas_pengajuan']) && ! $lama['pengajuan']->eq($sesi->batas_pengajuan)) {
-            $kabar[] = 'batas pengajuan kini sampai akhir '.$sesi->batas_pengajuan->translatedFormat('j M Y');
+            $isian['batas'] = $sesi->batas_pengajuan->translatedFormat('j M Y');
         }
         if (isset($d['tanggal_distribusi']) && ! $lama['distribusi']->eq($sesi->tanggal_distribusi)) {
-            $kabar[] = 'uang diserahkan '.$sesi->tanggal_distribusi->translatedFormat('j F Y');
+            $isian['tanggal'] = $sesi->tanggal_distribusi->translatedFormat('j F Y');
         }
+        // Satu kalimat utuh per kemungkinan — tak merangkai potongan terjemahan (portal tiga bahasa).
+        $kabar = match (true) {
+            isset($isian['batas'], $isian['tanggal']) => \App\Support\Teks::k(':sesi: batas pengajuan kini sampai akhir :batas; uang diserahkan :tanggal.', $isian),
+            isset($isian['batas']) => \App\Support\Teks::k(':sesi: batas pengajuan kini sampai akhir :batas.', $isian),
+            isset($isian['tanggal']) => \App\Support\Teks::k(':sesi: uang diserahkan :tanggal.', $isian),
+            default => null,
+        };
         if ($kabar) {
             foreach ($sesi->pengajuan()->with('santri:id,nama')->whereIn('status', ['diajukan', 'disetujui'])->get() as $p) {
-                $this->kabari($p, 'Jadwal uang saku kegiatan berubah', "{$sesi->nama}: ".implode('; ', $kabar).'.');
+                $this->kabari($p, \App\Support\Teks::k('Jadwal uang saku kegiatan berubah'), $kabar);
             }
         }
 
@@ -222,7 +231,10 @@ class PenarikanTunaiService
             return $hidup;
         });
         foreach ($kena as $p) {
-            $this->kabari($p, 'Penarikan tunai kegiatan dibatalkan', "{$sesi->nama}: sesi dibatalkan pesantren ({$alasan}). Uang saku {$p->santri->nama} kembali bisa dipakai.");
+            $this->kabari($p, \App\Support\Teks::k('Penarikan tunai kegiatan dibatalkan'),
+                \App\Support\Teks::k(':sesi: sesi dibatalkan pesantren (:alasan). Uang saku :nama kembali bisa dipakai.', [
+                    'sesi' => $sesi->nama, 'alasan' => $alasan, 'nama' => $p->santri->nama,
+                ]));
         }
 
         return $sesi;
@@ -246,12 +258,12 @@ class PenarikanTunaiService
     {
         $sesi = $this->sesiTerbukaUntukWali($idSesi);
         $santri = Santri::where('id', $idSantri)->where('id_wali', $wali->id)->where('status', 'aktif')->first()
-            ?? throw new AppException(422, 'Anak tidak ditemukan atau belum berstatus santri aktif.');
+            ?? throw new AppException(422, __('Anak tidak ditemukan atau belum berstatus santri aktif.'));
         if (! $sesi->santri()->where('santri.id', $santri->id)->exists()) {
-            throw new AppException(422, "{$santri->nama} bukan peserta kegiatan ini.");
+            throw new AppException(422, __(':nama bukan peserta kegiatan ini.', ['nama' => $santri->nama]));
         }
         if ($sesi->pengajuan()->where('id_santri', $santri->id)->whereIn('status', ['diajukan', 'disetujui', 'diserahkan'])->exists()) {
-            throw new AppException(422, "Sudah ada pengajuan untuk {$santri->nama} — ubah pengajuan itu saja.");
+            throw new AppException(422, __('Sudah ada pengajuan untuk :nama — ubah pengajuan itu saja.', ['nama' => $santri->nama]));
         }
         $nominal = $this->assertNominal($sesi, $nominal);
         $this->assertDompet($santri, $nominal);
@@ -259,7 +271,7 @@ class PenarikanTunaiService
 
         $p = DB::transaction(function () use ($wali, $peran, $sesi, $santri, $nominal) {
             $dompet = DompetSantri::where('id_santri', $santri->id)->lockForUpdate()->first();
-            self::pastikanTersedia($santri->id, $dompet->saldo, $nominal, "Uang saku {$santri->nama} tidak cukup");
+            self::pastikanTersedia($santri->id, $dompet->saldo, $nominal, __('Uang saku :nama tidak cukup', ['nama' => $santri->nama]));
             $base = DocNumber::docBase('TTK', now());
 
             return PengajuanTarikTunai::create([
@@ -307,9 +319,9 @@ class PenarikanTunaiService
             $dompet = DompetSantri::where('id_santri', $p->id_santri)->lockForUpdate()->first();
             $p->refresh();
             if (! in_array($p->status, ['diajukan', 'disetujui'], true)) {
-                throw new AppException(422, 'Pengajuan ini sudah tidak bisa diubah.');
+                throw new AppException(422, __('Pengajuan ini sudah tidak bisa diubah.'));
             }
-            self::pastikanTersedia($p->id_santri, $dompet->saldo, $nominal, "Uang saku {$p->santri->nama} tidak cukup", $p->id);
+            self::pastikanTersedia($p->id_santri, $dompet->saldo, $nominal, __('Uang saku :nama tidak cukup', ['nama' => $p->santri->nama]), $p->id);
             $p->update(['nominal' => $nominal, 'nominal_disetujui' => null, 'status' => 'diajukan', 'peran' => $peran,
                 'diputus_oleh' => null, 'diputus_pada' => null, 'alasan_tolak' => null]);
 
@@ -321,7 +333,7 @@ class PenarikanTunaiService
     {
         $p = $this->pengajuanMilik($wali, $id);
         if ($p->sesi->status !== 'berjalan' || $p->sesi->tahap() !== 'pengajuan') {
-            throw new AppException(422, 'Batas pengajuan sudah lewat — pengajuan tak bisa dibatalkan dari portal lagi.');
+            throw new AppException(422, __('Batas pengajuan sudah lewat — pengajuan tak bisa dibatalkan dari portal lagi.'));
         }
         $p->update(['status' => 'dibatalkan']);
 
@@ -344,10 +356,13 @@ class PenarikanTunaiService
             return $p;
         });
 
-        $lebihKecil = Money::lt($p->nominal_disetujui, $p->nominal) ? ' (diajukan '.self::rp($p->nominal).')' : '';
-        $this->kabari($p, 'Penarikan tunai kegiatan disetujui',
-            "{$p->sesi->nama}: ".self::rp($p->nominal_disetujui)."{$lebihKecil} untuk {$p->santri->nama}, diserahkan "
-            .$p->sesi->tanggal_distribusi->translatedFormat('j F Y').'.');
+        $isian = [
+            'sesi' => $p->sesi->nama, 'nominal' => self::rp($p->nominal_disetujui), 'diajukan' => self::rp($p->nominal),
+            'nama' => $p->santri->nama, 'tanggal' => $p->sesi->tanggal_distribusi->translatedFormat('j F Y'),
+        ];
+        $this->kabari($p, \App\Support\Teks::k('Penarikan tunai kegiatan disetujui'), Money::lt($p->nominal_disetujui, $p->nominal)
+            ? \App\Support\Teks::k(':sesi: :nominal (diajukan :diajukan) untuk :nama, diserahkan :tanggal.', $isian)
+            : \App\Support\Teks::k(':sesi: :nominal untuk :nama, diserahkan :tanggal.', $isian));
 
         return $p;
     }
@@ -360,7 +375,8 @@ class PenarikanTunaiService
 
             return $p;
         });
-        $this->kabari($p, 'Penarikan tunai kegiatan ditolak', "{$p->sesi->nama} — {$p->santri->nama}: {$alasan}");
+        $this->kabari($p, \App\Support\Teks::k('Penarikan tunai kegiatan ditolak'),
+            \App\Support\Teks::k(':sesi — :nama: :alasan', ['sesi' => $p->sesi->nama, 'nama' => $p->santri->nama, 'alasan' => $alasan]));
 
         return $p;
     }
@@ -512,8 +528,10 @@ class PenarikanTunaiService
             return [$sesi, $takDiambil];
         });
         foreach ($takDiambil as $p) {
-            $this->kabari($p, 'Uang saku kegiatan tidak diambil', "{$sesi->nama}: ".self::rp($p->nominal_disetujui)
-                ." untuk {$p->santri->nama} tidak diambil. Uang saku kembali bisa dipakai seperti biasa.");
+            $this->kabari($p, \App\Support\Teks::k('Uang saku kegiatan tidak diambil'),
+                \App\Support\Teks::k(':sesi: :nominal untuk :nama tidak diambil. Uang saku kembali bisa dipakai seperti biasa.', [
+                    'sesi' => $sesi->nama, 'nominal' => self::rp($p->nominal_disetujui), 'nama' => $p->santri->nama,
+                ]));
         }
 
         return $sesi;
@@ -556,7 +574,9 @@ class PenarikanTunaiService
 
             return $p;
         });
-        $this->kabari($p, 'Uang saku kegiatan sudah diterima', "{$p->sesi->nama}: ".self::rp($p->nominal_disetujui)." diterima {$p->santri->nama}.");
+        $this->kabari($p, \App\Support\Teks::k('Uang saku kegiatan sudah diterima'), \App\Support\Teks::k(':sesi: :nominal diterima :nama.', [
+            'sesi' => $p->sesi->nama, 'nominal' => self::rp($p->nominal_disetujui), 'nama' => $p->santri->nama,
+        ]));
 
         return $p;
     }
@@ -624,7 +644,7 @@ class PenarikanTunaiService
     {
         $n = Money::of($nominal);
         if (! Money::gtZero($n) || ! preg_match('/^\d+\.00$/', $n) || ((int) $n) % self::KELIPATAN !== 0) {
-            throw new AppException(422, "{$nama} harus kelipatan Rp 50.000.");
+            throw new AppException(422, __(':nama harus kelipatan Rp 50.000.', ['nama' => __($nama)]));
         }
 
         return $n;
@@ -634,7 +654,7 @@ class PenarikanTunaiService
     {
         $n = $this->assertKelipatan($nominal);
         if (Money::gt($n, $sesi->maks_per_santri)) {
-            throw new AppException(422, 'Melebihi batas kegiatan ini, '.self::rp($sesi->maks_per_santri).' per santri.');
+            throw new AppException(422, __('Melebihi batas kegiatan ini, :nominal per santri.', ['nominal' => self::rp($sesi->maks_per_santri)]));
         }
 
         return $n;
@@ -645,14 +665,16 @@ class PenarikanTunaiService
     {
         $dompet = DompetSantri::where('id_santri', $santri->id)->first();
         if (! $dompet) {
-            throw new AppException(422, "{$santri->nama} belum punya uang saku.");
+            throw new AppException(422, __(':nama belum punya uang saku.', ['nama' => $santri->nama]));
         }
         if ($dompet->kunci_tarik) {
-            throw new AppException(422, "Uang saku {$santri->nama} sedang dikunci dari penarikan oleh pesantren. Hubungi bagian kesantrian.");
+            throw new AppException(422, __('Uang saku :nama sedang dikunci dari penarikan oleh pesantren. Hubungi bagian kesantrian.', ['nama' => $santri->nama]));
         }
         $tersedia = Money::sub($dompet->saldo, self::cadangan($santri->id, $kecuali));
         if (Money::lt($tersedia, $nominal)) {
-            throw new AppException(422, "Uang saku {$santri->nama} tidak cukup (tersedia ".self::rp(Money::isNegative($tersedia) ? '0' : $tersedia).').');
+            throw new AppException(422, __('Uang saku :nama tidak cukup (tersedia :nominal).', [
+                'nama' => $santri->nama, 'nominal' => self::rp(Money::isNegative($tersedia) ? '0' : $tersedia),
+            ]));
         }
     }
 
@@ -670,10 +692,10 @@ class PenarikanTunaiService
     {
         $sesi = SesiTarikTunai::find($idSesi);
         if (! $sesi || ! $sesi->dibuka || $sesi->status !== 'berjalan') {
-            throw new AppException(422, 'Penarikan tunai kegiatan ini tidak dibuka.');
+            throw new AppException(422, __('Penarikan tunai kegiatan ini tidak dibuka.'));
         }
         if ($sesi->tahap() !== 'pengajuan') {
-            throw new AppException(422, 'Batas pengajuan kegiatan ini sudah lewat (akhir '.$sesi->batas_pengajuan->format('d/m/Y').').');
+            throw new AppException(422, __('Batas pengajuan kegiatan ini sudah lewat (akhir :tanggal).', ['tanggal' => $sesi->batas_pengajuan->format('d/m/Y')]));
         }
 
         return $sesi;
@@ -683,7 +705,7 @@ class PenarikanTunaiService
     {
         $p = PengajuanTarikTunai::with(['sesi', 'santri'])->where('id', $id)->where('id_wali', $wali->id)->first();
         if (! $p || ! in_array($p->status, ['diajukan', 'disetujui'], true)) {
-            throw new AppException(422, 'Pengajuan tidak ditemukan atau sudah tidak bisa diubah.');
+            throw new AppException(422, __('Pengajuan tidak ditemukan atau sudah tidak bisa diubah.'));
         }
 
         return $p;
@@ -702,7 +724,7 @@ class PenarikanTunaiService
         return $p;
     }
 
-    private function kabari(PengajuanTarikTunai $p, string $judul, string $pesan): void
+    private function kabari(PengajuanTarikTunai $p, string|\App\Support\Teks $judul, string|\App\Support\Teks $pesan): void
     {
         KabarWali::kePencatat((object) ['dicatat_oleh' => null, 'dicatat_oleh_wali' => $p->id_wali, 'dicatat_oleh_peran' => $p->peran], [
             'judul' => $judul, 'pesan' => $pesan, 'jenis' => 'tarik_tunai', 'id_santri' => $p->id_santri,

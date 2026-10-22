@@ -7,6 +7,7 @@ use App\Models\MutasiDompet;
 use App\Models\PembayaranSantri;
 use App\Models\TagihanSantri;
 use App\Support\Money;
+use App\Support\Teks;
 
 /**
  * KABAR MILIK KELUARGA untuk portal & push wali (keputusan user 21 Okt 2026) — dikirim ke setiap orang di keluarga
@@ -38,8 +39,10 @@ class KabarKeluarga
         $rp = fn ($v) => 'Rp '.number_format(abs((float) $v), 0, ',', '.');
 
         KabarWali::keKeluarga($santri->wali, [
-            'judul' => "{$santri->nama}: {$label} ".($nominal < 0 ? '−' : '+').$rp($nominal),
-            'pesan' => trim(($m->keterangan ? $m->keterangan.' · ' : '').'Sisa uang saku '.$rp($m->saldo_setelah)),
+            'judul' => Teks::k(':nama: :label :nominal', ['nama' => $santri->nama, 'label' => Teks::k($label), 'nominal' => ($nominal < 0 ? '−' : '+').$rp($nominal)]),
+            'pesan' => $m->keterangan
+                ? Teks::k(':keterangan · Sisa uang saku :saldo', ['keterangan' => ltrim($m->keterangan), 'saldo' => $rp($m->saldo_setelah)])
+                : Teks::k('Sisa uang saku :saldo', ['saldo' => $rp($m->saldo_setelah)]),
             'jenis' => 'mutasi_dompet', 'ref_jenis' => 'MutasiDompet', 'ref_id' => (string) $m->id, 'id_santri' => $santri->id,
         ]);
     }
@@ -50,9 +53,14 @@ class KabarKeluarga
         $t->loadMissing('jenis');
         $sisa = Money::of($t->sisa);
         KabarWali::keKeluarga($p->santri?->wali, [
-            'judul' => 'Pembayaran diterima — '.($p->santri?->nama ?? 'santri'),
-            'pesan' => ($t->jenis?->nama ?? 'Tagihan').' Rp '.number_format((float) $p->nominal, 0, ',', '.').' sudah diverifikasi keuangan. '
-                .(Money::isZero($sisa) ? 'Tagihan ini LUNAS.' : 'Sisa tagihan Rp '.number_format((float) $sisa, 0, ',', '.').'.'),
+            'judul' => Teks::k('Pembayaran diterima — :nama', ['nama' => $p->santri?->nama ?? Teks::k('santri')]),
+            'pesan' => Teks::k(':tagihan :nominal sudah diverifikasi keuangan. :sisa', [
+                'tagihan' => $t->jenis?->nama ?? Teks::k('Tagihan'),
+                'nominal' => 'Rp '.number_format((float) $p->nominal, 0, ',', '.'),
+                'sisa' => Money::isZero($sisa)
+                    ? Teks::k('Tagihan ini LUNAS.')
+                    : Teks::k('Sisa tagihan :sisa.', ['sisa' => 'Rp '.number_format((float) $sisa, 0, ',', '.')]),
+            ]),
             'jenis' => 'pembayaran_santri_diverifikasi', 'ref_jenis' => 'PembayaranSantri', 'ref_id' => (string) $p->id, 'id_santri' => $p->id_santri,
         ]);
     }
@@ -71,11 +79,20 @@ class KabarKeluarga
             $santri = $daftar->first()->santri;
             $nama = fn ($t) => trim(($t->jenis?->nama ?? 'Tagihan').($t->periode ? ' '.$t->periode : ''));
             $total = $daftar->reduce(fn ($s, $t) => Money::add($s, $t->sisa), '0');
+            $siapa = $santri?->nama ?? Teks::k('santri');
+            $satu = $daftar->first();
             KabarWali::keKeluarga($santri?->wali, [
-                'judul' => ($daftar->count() === 1 ? 'Tagihan baru' : $daftar->count().' tagihan baru').' — '.($santri?->nama ?? 'santri'),
-                'pesan' => $daftar->count() === 1
-                    ? $nama($daftar->first()).' '.$rp($daftar->first()->sisa).($daftar->first()->jatuh_tempo ? ', jatuh tempo '.\Illuminate\Support\Carbon::parse($daftar->first()->jatuh_tempo)->format('d/m/Y') : '').'.'
-                    : $daftar->map($nama)->implode(', ').' — total '.$rp($total).'.',
+                'judul' => $daftar->count() === 1
+                    ? Teks::k('Tagihan baru — :nama', ['nama' => $siapa])
+                    : Teks::k(':jumlah tagihan baru — :nama', ['jumlah' => $daftar->count(), 'nama' => $siapa]),
+                'pesan' => match (true) {
+                    $daftar->count() > 1 => Teks::k(':daftar — total :total.', ['daftar' => $daftar->map($nama)->implode(', '), 'total' => $rp($total)]),
+                    (bool) $satu->jatuh_tempo => Teks::k(':tagihan :nominal, jatuh tempo :tanggal.', [
+                        'tagihan' => $nama($satu), 'nominal' => $rp($satu->sisa),
+                        'tanggal' => \Illuminate\Support\Carbon::parse($satu->jatuh_tempo)->format('d/m/Y'),
+                    ]),
+                    default => Teks::k(':tagihan :nominal.', ['tagihan' => $nama($satu), 'nominal' => $rp($satu->sisa)]),
+                },
                 'jenis' => 'tagihan_terbit', 'ref_jenis' => 'TagihanSantri', 'ref_id' => (string) $daftar->first()->id, 'id_santri' => $santri?->id,
             ]);
         }

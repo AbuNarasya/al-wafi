@@ -29,8 +29,8 @@ class PortalKartuController extends Controller
             $this->kartu->aturBatas($s, $data['batas_harian'] ?? null);
 
             return ($data['batas_harian'] ?? null) === null
-                ? "Batas belanja {$s->nama} kembali ke batas bawaan."
-                : "Batas belanja harian {$s->nama} disimpan.";
+                ? __('Batas belanja :nama kembali ke batas bawaan.', ['nama' => $s->nama])
+                : __('Batas belanja harian :nama disimpan.', ['nama' => $s->nama]);
         });
     }
 
@@ -43,7 +43,7 @@ class PortalKartuController extends Controller
         return $this->jalankan($request, $id, function (Santri $s) use ($data, $request) {
             $this->kartu->pasangPin($s, $data['pin_anak'], $data['pin_anak_ulang'], SesiWali::wali()->id, (string) SesiWali::peran($request));
 
-            return "PIN belanja {$s->nama} tersimpan. Beri tahu anak Anda — PIN diminta bila belanja melewati batas harian.";
+            return __('PIN belanja :nama tersimpan. Beri tahu anak Anda — PIN diminta bila belanja melewati batas harian.', ['nama' => $s->nama]);
         });
     }
 
@@ -52,10 +52,10 @@ class PortalKartuController extends Controller
         $request->validate(['pin' => ['nullable', 'string']]);
 
         return $this->jalankan($request, $id, function (Santri $s) {
-            $k = $s->kartuAktif ?? throw new AppException(422, "{$s->nama} tidak punya kartu aktif.");
+            $k = $s->kartuAktif ?? throw new AppException(422, __(':nama tidak punya kartu aktif.', ['nama' => $s->nama]));
             $this->kartu->blokir($k, 'Diblokir wali (kartu hilang)', null, SesiWali::wali()->id);
 
-            return "Kartu {$s->nama} diblokir — tak bisa dipakai belanja. Kartu baru dipasang di kantor.";
+            return __('Kartu :nama diblokir — tak bisa dipakai belanja. Kartu baru dipasang di kantor.', ['nama' => $s->nama]);
         });
     }
 
@@ -67,7 +67,7 @@ class PortalKartuController extends Controller
 
         try {
             if ($s->status !== 'aktif') {
-                throw new AppException(422, 'Kartu belanja hanya untuk santri aktif.');
+                throw new AppException(422, __('Kartu belanja hanya untuk santri aktif.'));
             }
             (new PinTransaksi($wali, (string) SesiWali::peran($request)))->periksa($request->input('pin'));
             $pesan = $aksi($s);

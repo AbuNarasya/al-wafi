@@ -180,7 +180,7 @@ class KartuSantriService
     {
         $nominal = ($nominal === null || $nominal === '') ? null : Money::of($nominal);
         if ($nominal !== null && Money::isNegative($nominal)) {
-            throw new AppException(422, 'Batas harian tidak boleh negatif.');
+            throw new AppException(422, __('Batas harian tidak boleh negatif.'));
         }
         $dompet = DompetSantri::firstOrCreate(['id_santri' => $santri->id], ['saldo' => 0]);
         $dompet->update(['batas_harian' => $nominal]);

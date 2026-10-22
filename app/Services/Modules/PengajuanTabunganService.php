@@ -45,8 +45,10 @@ class PengajuanTabunganService
             return $p;
         });
 
-        $this->kabari($p, 'Penarikan tabungan disetujui',
-            "{$p->nomor}: Rp ".number_format((float) $p->nominal, 0, ',', '.')." dari tabungan {$p->santri->nama} masuk ke Dompet Wali.");
+        $this->kabari($p, \App\Support\Teks::k('Penarikan tabungan disetujui'),
+            \App\Support\Teks::k(':nomor: :nominal dari tabungan :nama masuk ke Dompet Wali.', [
+                'nomor' => $p->nomor, 'nominal' => 'Rp '.number_format((float) $p->nominal, 0, ',', '.'), 'nama' => $p->santri->nama,
+            ]));
 
         return $p;
     }
@@ -58,12 +60,12 @@ class PengajuanTabunganService
         $this->assertMenunggu($p);
         $p->update(['status' => 'ditolak', 'alasan_tolak' => $alasan, 'diputus_oleh' => $idPengguna, 'diputus_pada' => now()]);
 
-        $this->kabari($p, 'Penarikan tabungan ditolak', "{$p->nomor} ditolak: {$alasan}");
+        $this->kabari($p, \App\Support\Teks::k('Penarikan tabungan ditolak'), \App\Support\Teks::k(':nomor ditolak: :alasan', ['nomor' => $p->nomor, 'alasan' => $alasan]));
 
         return $p;
     }
 
-    private function kabari(PengajuanTarikTabungan $p, string $judul, string $pesan): void
+    private function kabari(PengajuanTarikTabungan $p, string|\App\Support\Teks $judul, string|\App\Support\Teks $pesan): void
     {
         KabarWali::kePencatat((object) ['dicatat_oleh' => null, 'dicatat_oleh_wali' => $p->id_wali, 'dicatat_oleh_peran' => $p->peran], [
             'judul' => $judul, 'pesan' => $pesan, 'jenis' => 'tarik_tabungan', 'id_santri' => $p->id_santri,

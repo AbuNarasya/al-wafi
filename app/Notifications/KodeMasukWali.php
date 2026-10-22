@@ -5,7 +5,10 @@ namespace App\Notifications;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-/** Kode OTP Portal Wali, lewat email. Tidak di-antre: kodenya hanya berguna beberapa menit. */
+/**
+ * Kode OTP Portal Wali, lewat email. Tidak di-antre: kodenya hanya berguna beberapa menit.
+ * Teksnya `__()` — dikirim dengan locale wali (MasukWali memasang ->locale() saat mengirim).
+ */
 class KodeMasukWali extends Notification
 {
     public function __construct(public readonly string $kode, public readonly int $menit) {}
@@ -19,12 +22,12 @@ class KodeMasukWali extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject("Kode masuk Portal Wali: {$this->kode}")
-            ->greeting('Assalamu\'alaikum,')
-            ->line('Kode masuk Portal Wali Al Wafi Anda:')
+            ->subject(__('Kode masuk Portal Wali: :kode', ['kode' => $this->kode]))
+            ->greeting(__("Assalamu'alaikum,"))
+            ->line(__('Kode masuk Portal Wali Al Wafi Anda:'))
             ->line("**{$this->kode}**")
-            ->line("Berlaku {$this->menit} menit. Jangan berikan kode ini kepada siapa pun, termasuk yang mengaku petugas.")
-            ->line('Bila Anda tidak meminta kode ini, abaikan email ini.')
+            ->line(__('Berlaku :menit menit. Jangan berikan kode ini kepada siapa pun, termasuk yang mengaku petugas.', ['menit' => $this->menit]))
+            ->line(__('Bila Anda tidak meminta kode ini, abaikan email ini.'))
             ->salutation('Al Wafi Islamic Boarding School');
     }
 }

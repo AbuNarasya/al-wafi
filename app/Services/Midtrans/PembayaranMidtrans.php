@@ -68,11 +68,11 @@ class PembayaranMidtrans
     {
         $this->assertSiap();
         if (! PembayaranPortal::keluargaBerdompet($wali->id)) {
-            throw new AppException(422, 'Dompet aktif setelah anak Anda berstatus santri aktif.');
+            throw new AppException(422, __('Dompet aktif setelah anak Anda berstatus santri aktif.'));
         }
         $nominal = $this->rupiahBulat($nominal);
         if (Money::lt($nominal, (string) self::MIN_ISI_DOMPET)) {
-            throw new AppException(422, 'Isi saldo online minimal Rp '.number_format(self::MIN_ISI_DOMPET, 0, ',', '.').'.');
+            throw new AppException(422, __('Isi saldo online minimal :nominal.', ['nominal' => 'Rp '.number_format(self::MIN_ISI_DOMPET, 0, ',', '.')]));
         }
 
         return $this->buatPesanan($wali, $pencatat, null, $nominal, 'Isi Dompet Wali');
@@ -84,11 +84,11 @@ class PembayaranMidtrans
         $this->assertSiap();
         $tagihan->loadMissing(['santri', 'jenis']);
         if (! $tagihan->santri || $tagihan->santri->id_wali !== $wali->id) {
-            throw new AppException(404, 'Tagihan tidak ditemukan.');
+            throw new AppException(404, __('Tagihan tidak ditemukan.'));
         }
         [$alur, $alasan] = PembayaranPortal::alur($tagihan);
         if (! PembayaranPortal::bisaTransfer($alur)) {
-            throw new AppException(422, $alasan ?? 'Tagihan ini dibayar dari Dompet Wali, bukan lewat pembayaran online.');
+            throw new AppException(422, $alasan ?? __('Tagihan ini dibayar dari Dompet Wali, bukan lewat pembayaran online.'));
         }
 
         // Satu tagihan, satu VA yang hidup: pesanan lama dibatalkan dulu supaya wali tak
@@ -101,10 +101,10 @@ class PembayaranMidtrans
         $nominal = $this->rupiahBulat($nominal);
         $ruang = PembayaranPortal::ruang($tagihan);
         if (Money::isZero($ruang)) {
-            throw new AppException(422, 'Tagihan ini: '.PembayaranPortal::PESAN_RUANG_HABIS);
+            throw new AppException(422, __('Tagihan ini').': '.__(PembayaranPortal::PESAN_RUANG_HABIS));
         }
         if (Money::lte($nominal, '0') || Money::gt($nominal, $ruang)) {
-            throw new AppException(422, 'Nominal melebihi sisa tagihan yang belum tercatat (Rp '.number_format((float) $ruang, 0, ',', '.').').');
+            throw new AppException(422, __('Nominal melebihi sisa tagihan yang belum tercatat (:nominal).', ['nominal' => 'Rp '.number_format((float) $ruang, 0, ',', '.')]));
         }
         PembayaranPortal::assertPenuh($tagihan, $nominal);
 
@@ -125,7 +125,7 @@ class PembayaranMidtrans
         $portal = PembayaranPortal::dari($wali, $pencatat['peran']);
         $k = $portal->keranjang($isian);
         if (! in_array('online', $k['cara'], true)) {
-            throw new AppException(422, 'Tagihan-tagihan ini tidak bisa dibayar online. Tagihan santri aktif dibayar dari Dompet Wali.');
+            throw new AppException(422, __('Tagihan-tagihan ini tidak bisa dibayar online. Tagihan santri aktif dibayar dari Dompet Wali.'));
         }
 
         // VA lama yang menyentuh salah satu tagihan ini dibatalkan dulu (satu tagihan, satu VA hidup).
@@ -321,8 +321,10 @@ class PembayaranMidtrans
             }
             if ($t->status === 'batal') {
                 KabarWali::keKeluarga($t->wali, [
-                    'judul' => 'Virtual Account dibatalkan',
-                    'pesan' => "VA {$t->order_id} (Rp ".number_format((float) $t->total, 0, ',', '.').') dibatalkan karena tagihannya sudah dibayar lewat cara lain. Mohon tidak membayar VA tersebut.',
+                    'judul' => \App\Support\Teks::k('Virtual Account dibatalkan'),
+                    'pesan' => \App\Support\Teks::k('VA :nomor (:nominal) dibatalkan karena tagihannya sudah dibayar lewat cara lain. Mohon tidak membayar VA tersebut.', [
+                        'nomor' => $t->order_id, 'nominal' => 'Rp '.number_format((float) $t->total, 0, ',', '.'),
+                    ]),
                     'jenis' => 'va_dibatalkan', 'ref_jenis' => 'TransaksiMidtrans', 'ref_id' => (string) $t->id,
                     'id_santri' => $tagihan->id_santri,
                 ]);
@@ -340,7 +342,7 @@ class PembayaranMidtrans
         $cocok = ($s['order_id'] ?? null) === $t->order_id
             || ($t->transaction_id !== null && ($s['transaction_id'] ?? null) === $t->transaction_id);
         if (! $cocok) {
-            throw new AppException(502, 'Jawaban Midtrans tidak cocok dengan pesanan.');
+            throw new AppException(502, __('Jawaban Midtrans tidak cocok dengan pesanan.'));
         }
 
         $status = (string) ($s['transaction_status'] ?? '');
@@ -474,8 +476,10 @@ class PembayaranMidtrans
             $sumber = $t->pembayaran()->first() ?? $t->mutasi()->first();
             if ($sumber) {
                 KabarWali::kePencatat($sumber, [
-                    'judul' => 'Pembayaran online diterima',
-                    'pesan' => 'Rp '.number_format((float) $t->nominal, 0, ',', '.').' sudah kami terima ('.$t->order_id.').',
+                    'judul' => \App\Support\Teks::k('Pembayaran online diterima'),
+                    'pesan' => \App\Support\Teks::k(':nominal sudah kami terima (:nomor).', [
+                        'nominal' => 'Rp '.number_format((float) $t->nominal, 0, ',', '.'), 'nomor' => $t->order_id,
+                    ]),
                     'jenis' => 'midtrans_lunas', 'ref_jenis' => 'TransaksiMidtrans', 'ref_id' => (string) $t->id,
                 ]);
             }
@@ -487,14 +491,14 @@ class PembayaranMidtrans
     private function assertSiap(): void
     {
         if (! self::siap()) {
-            throw new AppException(422, 'Pembayaran online belum tersedia. Silakan pakai transfer bank.');
+            throw new AppException(422, __('Pembayaran online belum tersedia. Silakan pakai transfer bank.'));
         }
     }
 
     private function rupiahBulat(string $nominal): string
     {
         if (! preg_match('/^\d+(\.0+)?$/', trim($nominal))) {
-            throw new AppException(422, 'Nominal harus berupa rupiah bulat.');
+            throw new AppException(422, __('Nominal harus berupa rupiah bulat.'));
         }
 
         return Money::of((int) $nominal);

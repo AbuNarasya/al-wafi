@@ -1,6 +1,6 @@
 @extends('layouts.portal')
 
-@section('title', 'Pindah saldo')
+@section('title', __('Pindah saldo'))
 @section('kembali', route('portal.dompet'))
 
 @php $rp = fn ($n) => 'Rp '.number_format((float) $n, 0, ',', '.'); @endphp
@@ -9,8 +9,8 @@
     <div class="mb-5 flex items-center gap-3">
         <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand text-white shadow-sm"><x-portal.ikon nama="dompet" /></span>
         <div class="min-w-0">
-            <h1 class="truncate text-xl font-bold text-slate-900">Pindah saldo</h1>
-            <p class="text-sm text-slate-500">Dompet Wali {{ $rp($saldoWali) }}</p>
+            <h1 class="truncate text-xl font-bold text-slate-900">{{ __('Pindah saldo') }}</h1>
+            <p class="text-sm text-slate-500">{{ __('Dompet Wali') }} {{ $rp($saldoWali) }}</p>
         </div>
     </div>
 
@@ -27,60 +27,60 @@
 
         {{-- Urutan: ARAH dulu, baru ANAK — wali memutuskan "ke mana uangnya" sebelum "anak yang mana". --}}
         <div>
-            <p class="mb-2 text-sm font-medium text-slate-700">Pindahkan</p>
+            <p class="mb-2 text-sm font-medium text-slate-700">{{ __('Pindahkan') }}</p>
             <div class="space-y-2">
                 @foreach ($arah as $kode => [$dari, $ke, $label])
                     <label class="flex cursor-pointer items-center gap-3 rounded-2xl bg-white px-4 py-3 text-sm shadow-sm ring-1 ring-slate-200 has-[:checked]:ring-2 has-[:checked]:ring-brand">
                         <input type="radio" name="arah" value="{{ $kode }}" x-model="arah" class="text-brand focus:ring-brand">
-                        <span class="font-medium text-slate-900">{{ $label }}</span>
+                        <span class="font-medium text-slate-900">{{ __($label) }}</span>
                     </label>
                 @endforeach
                 {{-- Antar anak hanya bila anak aktifnya lebih dari satu. Tanpa jurnal (lihat DompetService). --}}
                 @if ($anak->count() > 1)
                     <label class="flex cursor-pointer items-center gap-3 rounded-2xl bg-white px-4 py-3 text-sm shadow-sm ring-1 ring-slate-200 has-[:checked]:ring-2 has-[:checked]:ring-brand">
                         <input type="radio" name="arah" value="antar_anak" x-model="arah" class="text-brand focus:ring-brand">
-                        <span class="font-medium text-slate-900">Uang saku antar anak</span>
+                        <span class="font-medium text-slate-900">{{ __('Uang saku antar anak') }}</span>
                     </label>
                 @endif
             </div>
-            <p class="mt-2 text-xs text-slate-500">Tabungan tak bisa dipindah langsung &mdash; <a href="{{ route('portal.dompet.tabungan') }}" class="font-semibold text-brand">ajukan penarikan tabungan</a>.</p>
+            <p class="mt-2 text-xs text-slate-500">{{ __('Tabungan tak bisa dipindah langsung —') }} <a href="{{ route('portal.dompet.tabungan') }}" class="font-semibold text-brand">{{ __('ajukan penarikan tabungan') }}</a>.</p>
         </div>
 
         <div class="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-            <label class="mb-1 block text-sm font-medium text-slate-700" x-text="arah === 'antar_anak' ? 'Dari anak' : 'Anak'">Anak</label>
+            <label class="mb-1 block text-sm font-medium text-slate-700" x-text="arah === 'antar_anak' ? @js(__('Dari anak')) : @js(__('Anak'))">{{ __('Anak') }}</label>
             <select name="id_santri" x-model="idSantri" class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base">
                 @foreach ($anak as $a)
                     <option value="{{ $a->id }}">{{ $a->nama }}</option>
                 @endforeach
             </select>
             <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
-                <div class="rounded-2xl bg-slate-50 px-3 py-2">Uang saku<br><b class="text-sm text-slate-900" x-text="rp(a.santri)"></b></div>
-                <div class="rounded-2xl bg-slate-50 px-3 py-2">Tabungan<br><b class="text-sm text-slate-900" x-text="rp(a.tabungan)"></b></div>
+                <div class="rounded-2xl bg-slate-50 px-3 py-2">{{ __('Uang saku') }}<br><b class="text-sm text-slate-900" x-text="rp(a.santri)"></b></div>
+                <div class="rounded-2xl bg-slate-50 px-3 py-2">{{ __('Tabungan') }}<br><b class="text-sm text-slate-900" x-text="rp(a.tabungan)"></b></div>
             </div>
 
             @if ($anak->count() > 1)
                 <div x-show="arah === 'antar_anak'" x-cloak class="mt-4">
-                    <label class="mb-1 block text-sm font-medium text-slate-700">Ke anak</label>
+                    <label class="mb-1 block text-sm font-medium text-slate-700">{{ __('Ke anak') }}</label>
                     <select name="id_santri_tujuan" x-model="idTujuan" :disabled="arah !== 'antar_anak'"
                             class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base">
                         @foreach ($anak as $a)
                             <option value="{{ $a->id }}" :disabled="idSantri == {{ $a->id }}">{{ $a->nama }}</option>
                         @endforeach
                     </select>
-                    <p class="mt-1 text-xs text-slate-500">Dari uang saku ke uang saku. Tabungan tidak ikut.</p>
+                    <p class="mt-1 text-xs text-slate-500">{{ __('Dari uang saku ke uang saku. Tabungan tidak ikut.') }}</p>
                 </div>
             @endif
         </div>
 
         <div>
-            <label for="nominal" class="mb-1 block text-sm font-medium text-slate-700">Nominal</label>
+            <label for="nominal" class="mb-1 block text-sm font-medium text-slate-700">{{ __('Nominal') }}</label>
             <input id="nominal" name="nominal" type="number" min="1" step="1" required :max="saldoAsal"
                    value="{{ old('nominal') }}" class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base focus:border-brand focus:ring-brand">
-            <p class="mt-1 text-xs text-slate-500">Saldo asal: <span x-text="rp(saldoAsal)"></span></p>
+            <p class="mt-1 text-xs text-slate-500">{{ __('Saldo asal:') }} <span x-text="rp(saldoAsal)"></span></p>
         </div>
 
-        <button class="w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white">Pindahkan</button>
+        <button class="w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white">{{ __('Pindahkan') }}</button>
 
-        @include('portal._pin', ['judul' => 'Konfirmasi pemindahan saldo'])
+        @include('portal._pin', ['judul' => __('Konfirmasi pemindahan saldo')])
     </form>
 @endsection

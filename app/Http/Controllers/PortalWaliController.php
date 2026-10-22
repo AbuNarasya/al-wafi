@@ -105,7 +105,7 @@ class PortalWaliController extends Controller
     {
         $data = $request->validate([
             'email' => ['required', 'email', 'max:255'], 'sandi' => ['required', 'string', 'max:255'], 'ingat' => ['nullable', 'boolean'],
-        ], ['sandi.required' => 'Isi password Anda.']);
+        ], ['sandi.required' => __('Isi password Anda.')]);
 
         try {
             $hasil = $sandi->masuk($data['email'], $data['sandi'], $request->ip());
@@ -142,7 +142,7 @@ class PortalWaliController extends Controller
         $data = $request->validate(['kode' => ['required', 'string', 'max:10'], 'ingat' => ['nullable', 'boolean']]);
 
         if (! $this->masuk->periksa($email, 'masuk', $data['kode'])) {
-            return back()->with('error', 'Kode salah atau sudah kedaluwarsa. Periksa lagi, atau minta kode baru.');
+            return back()->with('error', __('Kode salah atau sudah kedaluwarsa. Periksa lagi, atau minta kode baru.'));
         }
 
         $keluarga = $this->masuk->cariKeluarga($email);
@@ -150,9 +150,9 @@ class PortalWaliController extends Controller
         return match ($keluarga['status']) {
             'satu' => $this->masukKeluarga($keluarga['wali'], $keluarga['peran'], $request, $request->boolean('ingat')),
             'baru' => $this->mulaiPendaftaran($email, $request),
-            'kembar' => view('portal.ditolak', ['pesan' => 'Email ini tercatat di lebih dari satu keluarga, jadi kami tak bisa '
-                .'menentukan keluarga yang mana. Silakan hubungi panitia untuk membetulkan data email Anda.']),
-            default => view('portal.ditolak', ['pesan' => 'Akun keluarga ini sedang dinonaktifkan. Silakan hubungi panitia.']),
+            'kembar' => view('portal.ditolak', ['pesan' => __('Email ini tercatat di lebih dari satu keluarga, jadi kami tak bisa '
+                .'menentukan keluarga yang mana. Silakan hubungi panitia untuk membetulkan data email Anda.')]),
+            default => view('portal.ditolak', ['pesan' => __('Akun keluarga ini sedang dinonaktifkan. Silakan hubungi panitia.')]),
         };
     }
 
@@ -175,14 +175,26 @@ class PortalWaliController extends Controller
     {
         $this->sesi->jadikanPendaftar($email, $request);
 
-        return redirect()->route('portal.daftar')->with('status', 'Email terverifikasi. Silakan isi formulir pendaftaran.');
+        return redirect()->route('portal.daftar')->with('status', __('Email terverifikasi. Silakan isi formulir pendaftaran.'));
     }
 
     public function keluar(Request $request): RedirectResponse
     {
+        $bahasa = app()->getLocale();
         $this->sesi->keluar($request);
+        // Sesi baru sesudah keluar tetap memakai bahasa orang itu — halaman masuk tak mendadak kembali ke Indonesia.
+        $request->session()->put(\App\Support\BahasaPortal::SESI, $bahasa);
 
-        return redirect()->route('portal.masuk')->with('status', 'Anda sudah keluar.');
+        return redirect()->route('portal.masuk')->with('status', __('Anda sudah keluar.'));
+    }
+
+    /** Ganti bahasa portal, lalu kembali ke halaman asal. */
+    public function gantiBahasa(Request $request): RedirectResponse
+    {
+        $bahasa = $request->validate(['bahasa' => ['required', Rule::in(array_keys(\App\Support\BahasaPortal::BAHASA))]])['bahasa'];
+        \App\Support\BahasaPortal::pilih($request, $bahasa);
+
+        return redirect()->back(fallback: route('portal.masuk'));
     }
 
     // ---- Beranda ----
@@ -203,11 +215,11 @@ class PortalWaliController extends Controller
                     'nama' => $s->nama, 'jenjang' => $s->jenjang?->nama ?? $s->kode_jenjang, 'tingkat' => $s->tingkat,
                     'kelas' => $s->kelas?->nama,
                     'tahun_ajaran' => $s->tahun_ajaran, 'nomor' => $s->no_pendaftaran,
-                    'status' => $s->status, 'label' => Tahap::labelStatus((string) $s->status),
+                    'status' => $s->status, 'label' => \App\Support\BahasaPortal::statusSantri((string) $s->status),
                     'psb' => $tahap !== false && $s->status !== 'aktif',
                     'tahap' => $tahap === false ? null : $tahap,
                     'jumlah_tahap' => count(self::TAHAP_PSB) - 1,
-                    'langkah' => self::LANGKAH[$s->status] ?? null,
+                    'langkah' => isset(self::LANGKAH[$s->status]) ? __(self::LANGKAH[$s->status]) : null,
                     'registrasi' => $s->status === 'calon' ? $s->tagihan->sum(fn ($t) => (float) $t->sisa) : null,
                     'final' => Tahap::isFinal((string) $s->status),
                     // Pengingat berkas PSB (bukan penghalang) — hanya untuk yang masih dalam proses pendaftaran.
@@ -294,13 +306,14 @@ class PortalWaliController extends Controller
             'versi_surat' => ['required', 'integer'],
             'setuju' => ['accepted'],
         ] + ($baru ? $this->aturanKeluargaBaru((string) $request->input('peran')) : []), [
-            'setuju.accepted' => 'Surat pernyataan wajib dibaca dan disetujui.',
-            'required' => ':Attribute wajib diisi.',
-            'required_if' => 'Sebutkan pekerjaannya.',
-            'email' => ':Attribute tidak sah.',
-            'regex' => ':Attribute tidak sah.',
+            'setuju.accepted' => __('Surat pernyataan wajib dibaca dan disetujui.'),
+            'required' => __(':Attribute wajib diisi.'),
+            'required_if' => __('Sebutkan pekerjaannya.'),
+            'email' => __(':Attribute tidak sah.'),
+            'regex' => __(':Attribute tidak sah.'),
         ], collect(MasukWali::PERAN)->flatMap(fn ($p) => [
-            "nama_{$p}" => "nama {$p}", "telepon_{$p}" => "nomor HP {$p}", "email_{$p}" => "email {$p}",
+            // Kunci terjemahan utuh per peran (nama ayah, nomor HP ibu, …) — lihat lang/*.json.
+            "nama_{$p}" => __("nama {$p}"), "telepon_{$p}" => __("nomor HP {$p}"), "email_{$p}" => __("email {$p}"),
         ])->all());
 
         $peran = $baru ? $data['peran'] : SesiWali::peran($request);
@@ -321,10 +334,11 @@ class PortalWaliController extends Controller
             $request->session()->put(SesiWali::WAJIB_SANDI, true);
 
             return redirect()->route('portal.sandi.buat')
-                ->with('status', "Pendaftaran {$santri->nama} diterima dengan nomor {$santri->no_pendaftaran}. Buat password untuk masuk berikutnya.");
+                ->with('status', __('Pendaftaran :nama diterima dengan nomor :nomor. Buat password untuk masuk berikutnya.',
+                    ['nama' => $santri->nama, 'nomor' => $santri->no_pendaftaran]));
         }
 
         return redirect()->route('portal.beranda')
-            ->with('status', "Pendaftaran {$santri->nama} diterima dengan nomor {$santri->no_pendaftaran}.");
+            ->with('status', __('Pendaftaran :nama diterima dengan nomor :nomor.', ['nama' => $santri->nama, 'nomor' => $santri->no_pendaftaran]));
     }
 }

@@ -1,6 +1,6 @@
 @extends('layouts.portal')
 
-@section('title', 'Menu Lengkap')
+@section('title', __('Menu Lengkap'))
 @section('kembali', route('portal.beranda'))
 
 @section('content')
@@ -24,7 +24,7 @@
             @endforeach
 
             <button type="button" @click="atur = true" class="w-full rounded-2xl bg-white py-3 text-sm font-semibold text-brand shadow-sm ring-1 ring-slate-200">
-                Atur menu utama di beranda
+                {{ __('Atur menu utama di beranda') }}
             </button>
         </div>
 
@@ -42,21 +42,21 @@
             <template x-for="k in pilih" :key="k"><input type="hidden" name="menu[]" :value="k"></template>
 
             <div class="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                <p class="text-sm font-semibold text-slate-900">Urutan di beranda <span class="font-normal text-slate-500" x-text="`(${pilih.length}/${maks})`"></span></p>
+                <p class="text-sm font-semibold text-slate-900">{{ __('Urutan di beranda') }} <span class="font-normal text-slate-500" x-text="`(${pilih.length}/${maks})`"></span></p>
                 <ol class="mt-2 space-y-1">
                     <template x-for="(k, i) in pilih" :key="k">
                         <li class="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2 text-sm">
                             <span class="w-5 text-xs text-slate-400" x-text="i + 1"></span>
                             <span class="flex-1 text-slate-800" x-text="label(k)"></span>
-                            <button type="button" @click="geser(i, -1)" class="px-2 text-slate-500" aria-label="Naik">&uarr;</button>
-                            <button type="button" @click="geser(i, 1)" class="px-2 text-slate-500" aria-label="Turun">&darr;</button>
+                            <button type="button" @click="geser(i, -1)" class="px-2 text-slate-500" aria-label="{{ __('Naik') }}">&uarr;</button>
+                            <button type="button" @click="geser(i, 1)" class="px-2 text-slate-500" aria-label="{{ __('Turun') }}">&darr;</button>
                         </li>
                     </template>
                 </ol>
             </div>
 
             <div class="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                <p class="text-sm font-semibold text-slate-900">Pilih menu (paling banyak {{ $maks }})</p>
+                <p class="text-sm font-semibold text-slate-900">{{ __('Pilih menu (paling banyak :maks)', ['maks' => $maks]) }}</p>
                 <div class="mt-2 space-y-1">
                     <template x-for="m in semua" :key="m.kunci">
                         <label class="flex items-center gap-3 rounded-2xl px-2 py-1.5 text-sm" :class="! pilih.includes(m.kunci) && pilih.length >= maks ? 'opacity-40' : ''">
@@ -66,13 +66,13 @@
                         </label>
                     </template>
                 </div>
-                <p class="mt-2 text-xs text-slate-500">Menu yang tidak dipilih tetap ada di "Menu Lengkap".</p>
+                <p class="mt-2 text-xs text-slate-500">{{ __('Menu yang tidak dipilih tetap ada di "Menu Lengkap".') }}</p>
             </div>
 
-            <button class="w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white" :disabled="pilih.length === 0">Simpan menu utama</button>
+            <button class="w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white" :disabled="pilih.length === 0">{{ __('Simpan menu utama') }}</button>
             <div class="flex justify-between text-sm">
-                <button type="button" @click="atur = false" class="font-semibold text-slate-500">Batal</button>
-                <button name="bawaan" value="1" class="font-semibold text-brand">Kembalikan bawaan</button>
+                <button type="button" @click="atur = false" class="font-semibold text-slate-500">{{ __('Batal') }}</button>
+                <button name="bawaan" value="1" class="font-semibold text-brand">{{ __('Kembalikan bawaan') }}</button>
             </div>
         </form>
     </div>

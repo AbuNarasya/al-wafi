@@ -8,25 +8,32 @@
     $wajibSandi = $masuk && (bool) request()->session()->get(\App\Services\PortalWali\SesiWali::WAJIB_SANDI);
     $diBeranda = request()->routeIs('portal.beranda', 'portal.masuk', 'portal.kode', 'portal.verifikasi.ringkasan', 'portal.sandi.buat');
     $menu = $wajibSandi ? [] : ($verifikasi ? [
-        ['portal.verifikasi.ringkasan', 'portal.verifikasi.*', 'Verifikasi', 'absensi'],
-        ['portal.data', 'portal.data*', 'Data Wali & Santri', 'data'],
+        ['portal.verifikasi.ringkasan', 'portal.verifikasi.*', __('Verifikasi'), 'absensi'],
+        ['portal.data', 'portal.data*', __('Data Wali & Santri'), 'data'],
     ] : ($masuk ? array_values(array_filter([
-        ['portal.beranda', 'portal.beranda', 'Beranda', 'beranda'],
-        ['portal.tagihan', 'portal.tagihan', 'Tagihan', 'tagihan'],
-        \App\Http\Controllers\PortalKeluargaController::punyaDompet() ? ['portal.dompet', 'portal.dompet*', 'Dompet', 'dompet'] : null,
-        ['portal.data', 'portal.data*', 'Data Wali & Santri', 'data'],
-        ['portal.akun', 'portal.akun', 'Akun', 'profil'],
+        ['portal.beranda', 'portal.beranda', __('Beranda'), 'beranda'],
+        ['portal.tagihan', 'portal.tagihan', __('Tagihan'), 'tagihan'],
+        \App\Http\Controllers\PortalKeluargaController::punyaDompet() ? ['portal.dompet', 'portal.dompet*', __('Dompet'), 'dompet'] : null,
+        ['portal.data', 'portal.data*', __('Data Wali & Santri'), 'data'],
+        ['portal.akun', 'portal.akun', __('Akun'), 'profil'],
     ])) : []));
     $belumDibaca = $masuk && ! $verifikasi && ! $wajibSandi ? \App\Http\Controllers\PortalKeluargaController::kabarBelumDibaca() : 0;
     $namaMasuk = $masuk ? (\App\Services\PortalWali\SesiWali::wali()->{'nama_'.\App\Services\PortalWali\SesiWali::peran(request())} ?: \App\Services\PortalWali\SesiWali::wali()->nama) : '';
 @endphp
 <!DOCTYPE html>
-<html lang="id" class="h-full">
+{{-- Bahasa & arah tulisan ikut pilihan wali (App\Support\BahasaPortal): Arab = kanan-ke-kiri. --}}
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Support\BahasaPortal::arah() }}" class="h-full">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Portal Wali') · Portal Wali Al Wafi</title>
+    <title>@yield('title', __('Portal Wali')) · {{ __('Portal Wali') }} Al Wafi</title>
+    {{-- Huruf Arab dari perangkat sendiri (tanpa unduhan). Nominal rupiah, nomor VA & PIN tetap ditulis
+         kiri-ke-kanan supaya tak terbaca terbalik saat ditransfer. --}}
+    <style>
+        [dir=rtl] body { font-family: "Noto Naskh Arabic", "Noto Sans Arabic", "Geeza Pro", "Segoe UI", Tahoma, sans-serif; }
+        [dir=rtl] .rp, [dir=rtl] .font-mono, [dir=rtl] input[inputmode=numeric], [dir=rtl] input[type=tel], [dir=rtl] input[type=email] { direction: ltr; unicode-bidi: isolate; }
+    </style>
 
     {{-- WAJIB ada: tanpa meta `pwa`, app.js membacanya sebagai "mati" dan MENCABUT
          pekerja layanan di perangkat yang sama (lihat komentar di komponennya).
@@ -73,7 +80,7 @@
         // jadi yang terlalu besar diberi tahu sebelum terkirim. `kirim` = langsung kirim
         // formulirnya begitu berkas siap (dipakai di halaman Berkas).
         window.unggahBukti = (maks, kirim = false) => ({
-            nama: '', keterangan: 'Foto dikecilkan otomatis sebelum dikirim.', pratinjau: null, galat: '', sibuk: false, seret: false,
+            nama: '', keterangan: @json(__('Foto dikecilkan otomatis sebelum dikirim.')), pratinjau: null, galat: '', sibuk: false, seret: false,
         // Seret & lepas dari komputer (21 Okt 2026): berkas yang dilepas di kotak unggah diperlakukan
         // sama dengan yang dipilih — masuk ke <input type=file> di dalam kotak itu, lalu lewat pilih().
         jatuhkan(e) {
@@ -81,7 +88,7 @@
             const berkas = e.dataTransfer?.files?.[0], input = e.currentTarget.querySelector('input[type=file]');
             if (! berkas || ! input || this.sibuk) return;
             if (! (berkas.type.startsWith('image/') || berkas.type === 'application/pdf')) {
-                this.galat = 'Hanya foto atau PDF.'; return;
+                this.galat = @json(__('Hanya foto atau PDF.')); return;
             }
             const dt = new DataTransfer(); dt.items.add(berkas); input.files = dt.files;
             this.pilih({ target: input });
@@ -93,7 +100,7 @@
                 this.nama = berkas.name;
                 if (! berkas.type.startsWith('image/')) {
                     this.keterangan = Math.round(berkas.size / 1024) + ' KB';
-                    if (berkas.size > maks) { this.galat = 'PDF terlalu besar (maks ' + Math.round(maks / 1024) + ' KB). Kirim fotonya saja.'; input.value = ''; this.nama = ''; return; }
+                    if (berkas.size > maks) { this.galat = @json(__('PDF terlalu besar (maks :ukuran KB). Kirim fotonya saja.')).replace(':ukuran', Math.round(maks / 1024)); input.value = ''; this.nama = ''; return; }
                 } else {
                     try {
                         const hasil = berkas.size <= maks * 0.95 ? berkas : await this.kecilkan(berkas, maks);
@@ -101,7 +108,7 @@
                         this.pratinjau = URL.createObjectURL(hasil);
                         this.keterangan = Math.round(hasil.size / 1024) + ' KB';
                     } catch (_) {
-                        this.galat = 'Foto tidak bisa diproses. Coba foto lain.'; input.value = ''; this.nama = ''; return;
+                        this.galat = @json(__('Foto tidak bisa diproses. Coba foto lain.')); input.value = ''; this.nama = ''; return;
                     }
                 }
                 if (kirim && input.form.reportValidity()) { this.sibuk = true; input.form.submit(); }
@@ -132,30 +139,32 @@
                      BUKAN history.back(): riwayat browser mengulang halaman yang sudah dilewati —
                      sesudah membayar, ia membuka lagi halaman Bayar beserta papan PIN-nya. --}}
                 <a href="@yield('kembali', $verifikasi ? route('portal.verifikasi.ringkasan') : route('portal.beranda'))"
-                   class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100" aria-label="Kembali">
+                   class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100" aria-label="{{ __('Kembali') }}">
                     <x-portal.ikon nama="kembali" />
                 </a>
-                <p class="min-w-0 flex-1 truncate text-center font-semibold text-slate-900">@yield('title', 'Portal Wali')</p>
+                <p class="min-w-0 flex-1 truncate text-center font-semibold text-slate-900">@yield('title', __('Portal Wali'))</p>
             @else
                 <a href="{{ $verifikasi ? route('portal.verifikasi.ringkasan') : ($masuk ? route('portal.beranda') : route('portal.depan')) }}" class="flex min-w-0 flex-1 items-center gap-2">
                     <x-logo class="h-9 w-9 shrink-0 rounded-xl text-sm" />
                     <span class="min-w-0 leading-tight">
                         <span class="block truncate text-sm font-semibold text-slate-900">AL Wafi Islamic Boarding School</span>
-                        <span class="block text-xs text-slate-500">Portal Wali</span>
+                        <span class="block text-xs text-slate-500">{{ __('Portal Wali') }}</span>
                     </span>
                 </a>
             @endif
+            {{-- Pemilih bahasa di setiap halaman, juga sebelum masuk (gaya pemilih bahasa Windows). --}}
+            <x-portal.pilih-bahasa class="shrink-0" />
             @if ($verifikasi || $wajibSandi)
                 <span class="w-10 shrink-0"></span>
             @elseif ($masuk)
                 <a href="{{ route('portal.kabar') }}" class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
-                   aria-label="Kabar{{ $belumDibaca ? ', '.$belumDibaca.' belum dibaca' : '' }}">
+                   aria-label="{{ $belumDibaca ? __('Kabar, :jumlah belum dibaca', ['jumlah' => $belumDibaca]) : __('Kabar') }}">
                     <x-portal.ikon nama="lonceng" />
                     @if ($belumDibaca > 0)
-                        <span class="absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">{{ $belumDibaca > 99 ? '99+' : $belumDibaca }}</span>
+                        <span class="absolute end-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">{{ $belumDibaca > 99 ? '99+' : $belumDibaca }}</span>
                     @endif
                 </a>
-                <a href="{{ route('portal.akun') }}" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white" aria-label="Akun">
+                <a href="{{ route('portal.akun') }}" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white" aria-label="{{ __('Akun') }}">
                     {{ mb_strtoupper(mb_substr($namaMasuk, 0, 1)) }}
                 </a>
             @else
@@ -174,7 +183,7 @@
 
         @yield('content')
 
-        <p class="mt-8 text-center text-xs text-slate-400">Portal Wali · AL Wafi Islamic Boarding School</p>
+        <p class="mt-8 text-center text-xs text-slate-400">{{ __('Portal Wali') }} · AL Wafi Islamic Boarding School</p>
     </main>
 
     @if ($masuk)

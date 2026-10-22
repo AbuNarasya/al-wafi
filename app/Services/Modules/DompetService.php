@@ -43,7 +43,7 @@ class DompetService
     {
         $wali = Wali::with(['dompet', 'santri' => fn ($q) => $q->whereIn('status', ['aktif', 'lolos_kesehatan', 'siap_aktivasi'])->with(['dompet', 'tabungan'])->orderBy('nama')])->find($idWali);
         if (! $wali) {
-            throw new AppException(404, 'Wali tidak ditemukan.');
+            throw new AppException(404, __('Wali tidak ditemukan.'));
         }
 
         return $wali;
@@ -57,7 +57,7 @@ class DompetService
         $this->assertRekening($data['kode_rekening']);
         $nominal = Money::of($data['nominal']);
         if (Money::lte($nominal, '0')) {
-            throw new AppException(422, 'Nominal top-up harus lebih dari nol.');
+            throw new AppException(422, __('Nominal top-up harus lebih dari nol.'));
         }
 
         $mutasi = MutasiDompet::create([
@@ -86,7 +86,7 @@ class DompetService
         $this->assertRekening($d['kode_rekening']);
         $nominal = Money::of($d['nominal']);
         if (Money::lte($nominal, '0')) {
-            throw new AppException(422, 'Nominal top-up harus lebih dari nol.');
+            throw new AppException(422, __('Nominal top-up harus lebih dari nol.'));
         }
 
         return DB::transaction(function () use ($d, $dompet, $nominal) {
@@ -116,7 +116,7 @@ class DompetService
         $this->assertRekening($data['kode_rekening']);
         $nominal = Money::of($data['nominal']);
         if (Money::lte($nominal, '0')) {
-            throw new AppException(422, 'Nominal top-up harus lebih dari nol.');
+            throw new AppException(422, __('Nominal top-up harus lebih dari nol.'));
         }
 
         $mutasi = MutasiDompet::create([
@@ -220,8 +220,8 @@ class DompetService
         });
         // Ke PENCATATNYA — staf atau wali yang mengirim dari portal.
         \App\Services\PortalWali\KabarWali::kePencatat($mutasi, [
-            'judul' => 'Top-up dompet ditolak keuangan',
-            'pesan' => "{$mutasi->nomor} ditolak: {$alasan}", 'jenis' => 'topup_dompet_ditolak',
+            'judul' => \App\Support\Teks::k('Top-up dompet ditolak keuangan'),
+            'pesan' => \App\Support\Teks::k(':nomor ditolak: :alasan', ['nomor' => $mutasi->nomor, 'alasan' => $alasan]), 'jenis' => 'topup_dompet_ditolak',
             'ref_jenis' => 'MutasiDompet', 'ref_id' => (string) $id,
         ]);
 
@@ -240,12 +240,14 @@ class DompetService
         $pencatat = \App\Services\PortalWali\Pencatat::kolom($wali ? null : $idPengguna, $wali);
         $nominal = Money::of($data['nominal']);
         if (Money::lte($nominal, '0')) {
-            throw new AppException(422, 'Nominal pemindahan harus lebih dari nol.');
+            throw new AppException(422, __('Nominal pemindahan harus lebih dari nol.'));
         }
         $asal = $this->ambilDompet($data['dari'], $data['id_santri'] ?? null, $data['id_wali'] ?? null);
         $tujuan = $this->ambilDompet($data['ke'], $data['id_santri'] ?? null, $data['id_wali'] ?? null);
         if (Money::lt($asal->saldo, $nominal)) {
-            throw new AppException(422, 'Saldo '.DompetPolicy::labelDompet($data['dari'])." tidak cukup (tersedia {$asal->saldo}).");
+            throw new AppException(422, __('Saldo :dompet tidak cukup (tersedia :saldo).', [
+                'dompet' => __(DompetPolicy::labelDompet($data['dari'])), 'saldo' => $asal->saldo,
+            ]));
         }
         if ($data['dari'] === 'santri') {
             PenarikanTunaiService::pastikanTersedia($asal->id_santri, $asal->saldo, $nominal);
@@ -302,17 +304,17 @@ class DompetService
     public function pindahAntarSantri(array $data, ?int $idPengguna, ?array $wali = null): array
     {
         if ($data['id_santri_asal'] === $data['id_santri_tujuan']) {
-            throw new AppException(422, 'Pilih anak tujuan yang berbeda.');
+            throw new AppException(422, __('Pilih anak tujuan yang berbeda.'));
         }
         $pencatat = \App\Services\PortalWali\Pencatat::kolom($wali ? null : $idPengguna, $wali);
         $nominal = Money::of($data['nominal']);
         if (Money::lte($nominal, '0')) {
-            throw new AppException(422, 'Nominal pemindahan harus lebih dari nol.');
+            throw new AppException(422, __('Nominal pemindahan harus lebih dari nol.'));
         }
         $asal = $this->ambilDompetSantri($data['id_santri_asal']);
         $tujuan = $this->ambilDompetSantri($data['id_santri_tujuan']);
         if (Santri::whereKey($data['id_santri_asal'])->value('id_wali') !== Santri::whereKey($data['id_santri_tujuan'])->value('id_wali')) {
-            throw new AppException(422, 'Uang saku hanya bisa dipindah antar anak dari keluarga yang sama.');
+            throw new AppException(422, __('Uang saku hanya bisa dipindah antar anak dari keluarga yang sama.'));
         }
 
         return DB::transaction(function () use ($data, $nominal, $asal, $tujuan, $pencatat) {
@@ -320,7 +322,7 @@ class DompetService
             DompetSantri::whereIn('id', [$asal->id, $tujuan->id])->orderBy('id')->lockForUpdate()->get();
             $asal->refresh();
             if (Money::lt($asal->saldo, $nominal)) {
-                throw new AppException(422, "Saldo uang saku tidak cukup (tersedia {$asal->saldo}).");
+                throw new AppException(422, __('Saldo uang saku tidak cukup (tersedia :saldo).', ['saldo' => $asal->saldo]));
             }
             PenarikanTunaiService::pastikanTersedia($asal->id_santri, $asal->saldo, $nominal);
             $saldoAsal = $this->kurangiSaldo('santri', $asal->id, $nominal);
@@ -355,7 +357,7 @@ class DompetService
     private function ambilDompetWali(int $idWali): DompetWali
     {
         if (! Wali::find($idWali)) {
-            throw new AppException(404, 'Wali tidak ditemukan.');
+            throw new AppException(404, __('Wali tidak ditemukan.'));
         }
 
         return DompetWali::firstOrCreate(['id_wali' => $idWali], ['saldo' => '0']);
@@ -365,10 +367,10 @@ class DompetService
     {
         $santri = Santri::find($idSantri);
         if (! $santri) {
-            throw new AppException(404, 'Santri tidak ditemukan.');
+            throw new AppException(404, __('Santri tidak ditemukan.'));
         }
         if ($santri->status !== 'aktif') {
-            throw new AppException(422, 'Dompet hanya untuk santri aktif. Selesaikan daftar ulang terlebih dahulu.');
+            throw new AppException(422, __('Dompet hanya untuk santri aktif. Selesaikan daftar ulang terlebih dahulu.'));
         }
 
         return DompetSantri::firstOrCreate(['id_santri' => $idSantri], ['saldo' => '0']);

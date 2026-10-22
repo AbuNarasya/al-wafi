@@ -81,14 +81,18 @@ class DokumenSantriController extends Controller
         }
 
         if ($data['status'] === 'perlu_diganti') {
-            $this->kabariWali($santri, "{$label} perlu diganti", "{$label} untuk {$santri->nama} perlu diunggah ulang: {$data['catatan']}");
+            $this->kabariWali($santri,
+                \App\Support\Teks::k(':berkas perlu diganti', ['berkas' => \App\Support\Teks::k($label)]),
+                \App\Support\Teks::k(':berkas untuk :nama perlu diunggah ulang: :catatan', [
+                    'berkas' => \App\Support\Teks::k($label), 'nama' => $santri->nama, 'catatan' => $data['catatan'],
+                ]));
         }
 
         return back()->with('status', $data['status'] === 'diterima' ? "{$label} ditandai diterima." : "{$label} ditandai perlu diganti — wali dikabari.");
     }
 
     /** Kabar ke setiap orang di keluarga yang bisa masuk portal (punya email). */
-    private function kabariWali(Santri $santri, string $judul, string $pesan): void
+    private function kabariWali(Santri $santri, string|\App\Support\Teks $judul, string|\App\Support\Teks $pesan): void
     {
         $wali = $santri->wali;
         if (! $wali) {
@@ -98,7 +102,8 @@ class DokumenSantriController extends Controller
             if (filled($wali->{"email_{$p}"})) {
                 \App\Models\NotifikasiWali::create([
                     'id_wali' => $wali->id, 'peran' => $p, 'id_santri' => $santri->id,
-                    'judul' => $judul, 'pesan' => $pesan, 'jenis' => 'berkas_perlu_diganti',
+                    'judul' => \App\Services\PortalWali\KabarWali::teksUntuk($wali->id, $p, $judul),
+                    'pesan' => \App\Services\PortalWali\KabarWali::teksUntuk($wali->id, $p, $pesan), 'jenis' => 'berkas_perlu_diganti',
                     'ref_jenis' => 'BerkasSantri', 'ref_id' => (string) $santri->id,
                 ]);
             }

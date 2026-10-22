@@ -30,14 +30,14 @@ final class BayarDompet
         // (portal + loket, atau auto-debet) tak boleh sama-sama lolos memakai sisa lama.
         $segar = TagihanSantri::whereKey($tagihan->id)->lockForUpdate()->first();
         if (! $segar || ! $segar->berlaku()) {
-            throw new AppException(422, 'Tagihan ini sudah dibatalkan atau dihapus.');
+            throw new AppException(422, __('Tagihan ini sudah dibatalkan atau dihapus.'));
         }
         $tagihan->forceFill(['sisa' => $segar->sisa, 'status' => $segar->status])->syncOriginal();
 
         $nominal = Money::of($opts['nominal']);
         $sisaBaru = Money::sub($tagihan->sisa, $nominal);
         if (Money::isNegative($sisaBaru)) {
-            throw new AppException(422, 'Nominal melebihi sisa tagihan.');
+            throw new AppException(422, __('Nominal melebihi sisa tagihan.'));
         }
 
         // SPP TIDAK BISA DICICIL dari Dompet Wali: pemotongan harus melunasi
@@ -49,9 +49,9 @@ final class BayarDompet
         // Ditegakkan DI SINI karena inilah satu-satunya pintu dompet: auto-debet
         // maupun tombol "bayar dari dompet" sama-sama lewat sini.
         if ($tagihan->perilaku === 'spp' && ! Money::isZero($sisaBaru)) {
-            throw new AppException(422, 'SPP tidak bisa dicicil dari Dompet Wali — pemotongan harus melunasi '
-                ."seluruh sisa tagihan (Rp {$tagihan->sisa}). Isi dulu dompetnya sampai cukup; "
-                .'begitu saldonya mencukupi, tagihan ini terpotong penuh dengan sendirinya.');
+            throw new AppException(422, __('SPP tidak bisa dicicil dari Dompet Wali — pemotongan harus melunasi seluruh sisa tagihan (Rp :sisa). Isi dulu dompetnya sampai cukup; begitu saldonya mencukupi, tagihan ini terpotong penuh dengan sendirinya.', [
+                'sisa' => $tagihan->sisa,
+            ]));
         }
         $jenis = $tagihan->jenis;
         $akunKredit = $jenis->kode_coa_pendapatan;

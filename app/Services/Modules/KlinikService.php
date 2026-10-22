@@ -8,6 +8,7 @@ use App\Models\Santri;
 use App\Models\TagihanSantri;
 use App\Services\Ledger\DocNumber;
 use App\Services\PortalWali\KabarWali;
+use App\Support\Teks;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -54,7 +55,7 @@ class KlinikService
             return $k;
         });
 
-        $this->kabari($k, "{$santri->nama} ke klinik", $this->ringkas($k));
+        $this->kabari($k, Teks::k(':nama ke klinik', ['nama' => $santri->nama]), $this->ringkasTeks($k));
 
         return $k;
     }
@@ -65,7 +66,9 @@ class KlinikService
             throw new AppException(422, 'Kunjungan ini sudah selesai.');
         }
         $k->update(['status' => 'selesai', 'selesai_pada' => now(), 'catatan_selesai' => $catatan ?: null, 'diselesaikan_oleh' => $idPengguna]);
-        $this->kabari($k, "{$k->santri->nama} selesai dirawat di klinik", 'Sudah kembali ke asrama.'.($catatan ? " Catatan: {$catatan}" : ''));
+        $this->kabari($k, Teks::k(':nama selesai dirawat di klinik', ['nama' => $k->santri->nama]), $catatan
+            ? Teks::k('Sudah kembali ke asrama. Catatan: :catatan', ['catatan' => $catatan])
+            : Teks::k('Sudah kembali ke asrama.'));
     }
 
     /** Tagihan lain-lain ke wali atas kunjungan ini (obat khusus, rujukan, dll). */
@@ -88,13 +91,29 @@ class KlinikService
 
     public function ringkas(KunjunganKlinik $k): string
     {
-        $vital = array_filter([$k->suhu ? "suhu {$k->suhu}°C" : null, $k->tensi ? "tensi {$k->tensi}" : null]);
-
-        return $k->datang_pada->timezone('Asia/Jakarta')->format('H:i')." — {$k->keluhan}".($vital ? ' ('.implode(', ', $vital).')' : '')
-            .'. Tindak lanjut: '.$k->labelTindakLanjut().($k->rujukan_ke ? " ({$k->rujukan_ke})" : '').'.';
+        return (string) $this->ringkasTeks($k);
     }
 
-    private function kabari(KunjunganKlinik $k, string $judul, string $pesan): void
+    /** Ringkasan kunjungan untuk kabar wali — diterjemahkan per penerima (portal tiga bahasa). */
+    public function ringkasTeks(KunjunganKlinik $k): Teks
+    {
+        $vital = match (true) {
+            $k->suhu && $k->tensi => Teks::k('suhu :suhu°C, tensi :tensi', ['suhu' => $k->suhu, 'tensi' => $k->tensi]),
+            (bool) $k->suhu => Teks::k('suhu :suhu°C', ['suhu' => $k->suhu]),
+            (bool) $k->tensi => Teks::k('tensi :tensi', ['tensi' => $k->tensi]),
+            default => null,
+        };
+        $tindak = $k->rujukan_ke
+            ? Teks::k(':tindak (:rujukan)', ['tindak' => Teks::k($k->labelTindakLanjut()), 'rujukan' => $k->rujukan_ke])
+            : Teks::k($k->labelTindakLanjut());
+        $isian = ['jam' => $k->datang_pada->timezone('Asia/Jakarta')->format('H:i'), 'keluhan' => $k->keluhan, 'tindak' => $tindak];
+
+        return $vital
+            ? Teks::k(':jam — :keluhan (:vital). Tindak lanjut: :tindak.', $isian + ['vital' => $vital])
+            : Teks::k(':jam — :keluhan. Tindak lanjut: :tindak.', $isian);
+    }
+
+    private function kabari(KunjunganKlinik $k, string|Teks $judul, string|Teks $pesan): void
     {
         $k->loadMissing('santri.wali');
         KabarWali::keKeluarga($k->santri?->wali, ['judul' => $judul, 'pesan' => $pesan, 'jenis' => 'klinik',

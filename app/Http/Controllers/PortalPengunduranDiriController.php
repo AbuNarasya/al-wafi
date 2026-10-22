@@ -37,12 +37,12 @@ class PortalPengunduranDiriController extends Controller
     public function ajukan(Request $request, int $id): RedirectResponse
     {
         $data = $request->validate(['alasan' => ['required', 'string', 'max:2000'], 'rencana_tanggal' => ['nullable', 'date'],
-            'surat' => Unggahan::aturan(), 'pin' => ['nullable', 'string']], ['surat.required' => 'Unggah surat pengajuan pengunduran diri.']);
+            'surat' => Unggahan::aturan(), 'pin' => ['nullable', 'string']], ['surat.required' => __('Unggah surat pengajuan pengunduran diri.')]);
 
         return $this->denganPin($request, $id, function (Santri $s) use ($data, $request) {
             $this->svc->ajukan($s, SesiWali::wali(), (string) SesiWali::peran($request), $data['alasan'], $data['rencana_tanggal'] ?? null, $request->file('surat'));
 
-            return 'Pengajuan pengunduran diri terkirim dan menunggu verifikasi wali kelas.';
+            return __('Pengajuan pengunduran diri terkirim dan menunggu verifikasi wali kelas.');
         });
     }
 
@@ -55,7 +55,7 @@ class PortalPengunduranDiriController extends Controller
             $p = PengajuanKeluar::where('id_santri', $s->id)->where('status', 'dikembalikan')->latest('id')->firstOrFail();
             $this->svc->ajukanUlang($p, $data['alasan'], $data['rencana_tanggal'] ?? null, $request->file('surat'), SesiWali::wali()->id);
 
-            return 'Pengajuan dikirim ulang ke wali kelas.';
+            return __('Pengajuan dikirim ulang ke wali kelas.');
         });
     }
 
@@ -67,7 +67,7 @@ class PortalPengunduranDiriController extends Controller
             $p = PengajuanKeluar::where('id_santri', $s->id)->whereIn('status', PengajuanKeluar::BERJALAN)->latest('id')->firstOrFail();
             $this->svc->batalkanOlehWali($p);
 
-            return 'Pengajuan pengunduran diri dibatalkan.';
+            return __('Pengajuan pengunduran diri dibatalkan.');
         });
     }
 

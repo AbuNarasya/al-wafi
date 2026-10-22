@@ -55,7 +55,7 @@ class PembayaranPortal
     {
         $t = TagihanSantri::with(['santri', 'jenis'])->find($id);
         if (! $t || ! $t->santri || $t->santri->id_wali !== $this->wali->id) {
-            throw new AppException(404, 'Tagihan tidak ditemukan.');
+            throw new AppException(404, __('Tagihan tidak ditemukan.'));
         }
 
         return $t;
@@ -72,7 +72,7 @@ class PembayaranPortal
     public static function alur(TagihanSantri $t): array
     {
         if (! $t->berlaku() || $t->status === 'lunas' || Money::lte($t->sisa, '0')) {
-            return [null, 'Tagihan ini sudah lunas atau tidak berlaku lagi.'];
+            return [null, __('Tagihan ini sudah lunas atau tidak berlaku lagi.')];
         }
         $status = (string) $t->santri->status;
         if ($status === 'aktif') {
@@ -87,7 +87,7 @@ class PembayaranPortal
             return [self::keluargaBerdompet((int) $t->santri->id_wali) ? 'keduanya' : 'transfer', null];
         }
 
-        return [null, 'Tagihan ini tidak bisa dibayar dari portal. Silakan hubungi bagian keuangan.'];
+        return [null, __('Tagihan ini tidak bisa dibayar dari portal. Silakan hubungi bagian keuangan.')];
     }
 
     /** Keluarga yang sudah punya anak berstatus aktif — merekalah yang ber-Dompet Wali. */
@@ -98,10 +98,12 @@ class PembayaranPortal
     }
 
     /** SPP & tagihan lain-lain dilunasi sekaligus — di dompet, VA, maupun transfer. */
-    public static function assertPenuh(TagihanSantri $t, string $nominal, string $nama = 'Tagihan ini'): void
+    public static function assertPenuh(TagihanSantri $t, string $nominal, ?string $nama = null): void
     {
         if (in_array($t->perilaku, self::PENUH, true) && ! Money::eq($nominal, $t->sisa)) {
-            throw new AppException(422, "{$nama} harus dilunasi sekaligus (Rp ".number_format((float) $t->sisa, 0, ',', '.').'), tidak bisa dicicil.');
+            throw new AppException(422, __(':nama harus dilunasi sekaligus (:nominal), tidak bisa dicicil.', [
+                'nama' => $nama ?? __('Tagihan ini'), 'nominal' => 'Rp '.number_format((float) $t->sisa, 0, ',', '.'),
+            ]));
         }
     }
 
@@ -197,10 +199,10 @@ class PembayaranPortal
     {
         $isian = array_filter($isian, fn ($n) => $n !== null && $n !== '');
         if ($isian === []) {
-            throw new AppException(422, 'Pilih minimal satu tagihan.');
+            throw new AppException(422, __('Pilih minimal satu tagihan.'));
         }
         if (count($isian) > self::MAKS_KERANJANG) {
-            throw new AppException(422, 'Paling banyak '.self::MAKS_KERANJANG.' tagihan sekali bayar.');
+            throw new AppException(422, __('Paling banyak :jumlah tagihan sekali bayar.', ['jumlah' => self::MAKS_KERANJANG]));
         }
 
         $daftar = collect();
@@ -216,10 +218,12 @@ class PembayaranPortal
             $n = Money::of($n);
             $ruang = self::ruang($t);
             if (Money::isZero($ruang)) {
-                throw new AppException(422, "{$nama}: ".self::PESAN_RUANG_HABIS);
+                throw new AppException(422, "{$nama}: ".__(self::PESAN_RUANG_HABIS));
             }
             if (Money::lte($n, '0') || Money::gt($n, $ruang)) {
-                throw new AppException(422, "{$nama}: nominal harus antara Rp 1 dan Rp ".number_format((float) $ruang, 0, ',', '.').'.');
+                throw new AppException(422, __(':nama: nominal harus antara Rp 1 dan :nominal.', [
+                    'nama' => $nama, 'nominal' => 'Rp '.number_format((float) $ruang, 0, ',', '.'),
+                ]));
             }
             self::assertPenuh($t, $n, $nama);
             $semuaDompet = $semuaDompet && self::bisaDompet($alur);
@@ -234,8 +238,7 @@ class PembayaranPortal
             $semuaTransfer ? 'transfer' : null,
         ]));
         if ($cara === []) {
-            throw new AppException(422, 'Tagihan santri aktif dan tagihan pendaftaran calon tidak bisa dibayar bersamaan '
-                .'kecuali dari Dompet Wali. Bayar terpisah, atau isi Dompet Wali dulu.');
+            throw new AppException(422, __('Tagihan santri aktif dan tagihan pendaftaran calon tidak bisa dibayar bersamaan kecuali dari Dompet Wali. Bayar terpisah, atau isi Dompet Wali dulu.'));
         }
 
         return ['tagihan' => $daftar, 'nominal' => $nominal, 'total' => Money::of(array_sum(array_map('floatval', $nominal))), 'cara' => $cara];
@@ -257,18 +260,21 @@ class PembayaranPortal
     {
         $k = $this->keranjang($isian);
         if (! in_array('dompet', $k['cara'], true)) {
-            throw new AppException(422, 'Tagihan-tagihan ini tidak bisa dibayar dari Dompet Wali.');
+            throw new AppException(422, __('Tagihan-tagihan ini tidak bisa dibayar dari Dompet Wali.'));
         }
         foreach ($k['tagihan'] as $t) {
             if (in_array($t->perilaku, self::PENUH, true) && ! Money::eq($k['nominal'][$t->id], $t->sisa)) {
-                throw new AppException(422, \App\Http\Controllers\PortalKeluargaController::namaTagihan($t)
-                    .' harus dilunasi sekaligus sebesar Rp '.number_format((float) $t->sisa, 0, ',', '.').'.');
+                throw new AppException(422, __(':nama harus dilunasi sekaligus sebesar :nominal.', [
+                    'nama' => \App\Http\Controllers\PortalKeluargaController::namaTagihan($t),
+                    'nominal' => 'Rp '.number_format((float) $t->sisa, 0, ',', '.'),
+                ]));
             }
         }
         $saldo = DompetWali::where('id_wali', $this->wali->id)->value('saldo') ?? '0';
         if (Money::lt($saldo, $k['total'])) {
-            throw new AppException(422, 'Saldo Dompet Wali tidak cukup untuk total Rp '.number_format((float) $k['total'], 0, ',', '.')
-                .'. Isi dompet terlebih dahulu.');
+            throw new AppException(422, __('Saldo Dompet Wali tidak cukup untuk total :nominal. Isi dompet terlebih dahulu.', [
+                'nominal' => 'Rp '.number_format((float) $k['total'], 0, ',', '.'),
+            ]));
         }
         // PIN SESUDAH semua pemeriksaan murah & DI LUAR transaksi (lihat bayarDariDompet).
         $this->pin()->periksa($pin);
@@ -282,7 +288,7 @@ class PembayaranPortal
                 $t = TagihanSantri::with(['santri', 'jenis'])->lockForUpdate()->find($t->id);
                 [$alur, $alasan] = self::alur($t);
                 if (! self::bisaDompet($alur)) {
-                    throw new AppException(422, $alasan ?? 'Tagihan ini tidak bisa dibayar dari dompet.');
+                    throw new AppException(422, $alasan ?? __('Tagihan ini tidak bisa dibayar dari dompet.'));
                 }
 
                 return $layanan->bayarDariDompet([
@@ -311,7 +317,7 @@ class PembayaranPortal
     {
         $k = $this->keranjang($isian);
         if (! in_array('transfer', $k['cara'], true)) {
-            throw new AppException(422, 'Tagihan-tagihan ini tidak bisa dibayar lewat transfer.');
+            throw new AppException(422, __('Tagihan-tagihan ini tidak bisa dibayar lewat transfer.'));
         }
         $this->pastikanRekeningPortal($data['kode_rekening']);
         $kelompok = self::nomorKelompok();
@@ -347,7 +353,7 @@ class PembayaranPortal
         // di dalam transaksi bersama kuncinya.
         [$alur, $alasan] = self::alur($this->tagihan($idTagihan));
         if (! self::bisaDompet($alur)) {
-            throw new AppException(422, $alasan ?? 'Tagihan ini dibayar lewat transfer, bukan dari dompet.');
+            throw new AppException(422, $alasan ?? __('Tagihan ini dibayar lewat transfer, bukan dari dompet.'));
         }
         $this->pin()->periksa($pin);
 
@@ -360,25 +366,26 @@ class PembayaranPortal
 
             [$alur, $alasan] = self::alur($t);
             if (! self::bisaDompet($alur)) {
-                throw new AppException(422, $alasan ?? 'Tagihan ini dibayar lewat transfer, bukan dari dompet.');
+                throw new AppException(422, $alasan ?? __('Tagihan ini dibayar lewat transfer, bukan dari dompet.'));
             }
             $nominal = Money::of($nominal);
             if (Money::lte($nominal, '0')) {
-                throw new AppException(422, 'Nominal harus lebih dari nol.');
+                throw new AppException(422, __('Nominal harus lebih dari nol.'));
             }
             $ruang = self::ruang($t);
             if (Money::isZero($ruang)) {
-                throw new AppException(422, self::PESAN_RUANG_HABIS);
+                throw new AppException(422, __(self::PESAN_RUANG_HABIS));
             }
             if (Money::gt($nominal, $ruang)) {
-                throw new AppException(422, 'Nominal melebihi sisa tagihan (Rp '.number_format((float) $ruang, 0, ',', '.').').');
+                throw new AppException(422, __('Nominal melebihi sisa tagihan (:nominal).', ['nominal' => 'Rp '.number_format((float) $ruang, 0, ',', '.')]));
             }
             if (in_array($t->perilaku, self::PENUH, true) && ! Money::eq($nominal, $t->sisa)) {
-                throw new AppException(422, 'Tagihan ini harus dilunasi sekaligus sebesar Rp '
-                    .number_format((float) $t->sisa, 0, ',', '.').'.');
+                throw new AppException(422, __(':nama harus dilunasi sekaligus sebesar :nominal.', [
+                    'nama' => __('Tagihan ini'), 'nominal' => 'Rp '.number_format((float) $t->sisa, 0, ',', '.'),
+                ]));
             }
             if (! $dompet || Money::lt($dompet->saldo, $nominal)) {
-                throw new AppException(422, 'Saldo Dompet Wali tidak cukup. Isi dompet terlebih dahulu.');
+                throw new AppException(422, __('Saldo Dompet Wali tidak cukup. Isi dompet terlebih dahulu.'));
             }
 
             // Lewat jalur dompet LOKET, bukan BayarDompet langsung: di sanalah gerbang
@@ -413,7 +420,7 @@ class PembayaranPortal
         $t = $this->tagihan($idTagihan);
         [$alur, $alasan] = self::alur($t);
         if (! self::bisaTransfer($alur)) {
-            throw new AppException(422, $alasan ?? 'Tagihan ini tidak bisa dibayar lewat transfer.');
+            throw new AppException(422, $alasan ?? __('Tagihan ini tidak bisa dibayar lewat transfer.'));
         }
         self::assertPenuh($t, Money::of($data['nominal']));
         $this->pastikanRekeningPortal($data['kode_rekening']);
@@ -438,12 +445,12 @@ class PembayaranPortal
     public function pindah(string $arah, int $idSantri, string $nominal, ?string $pin): void
     {
         if (! isset(self::ARAH[$arah])) {
-            throw new AppException(422, 'Arah pemindahan tidak dikenal.');
+            throw new AppException(422, __('Arah pemindahan tidak dikenal.'));
         }
         $santri = $this->anakAktif($idSantri);
         $nominal = Money::of($nominal);
         if (Money::lte($nominal, '0')) {
-            throw new AppException(422, 'Nominal harus lebih dari nol.');
+            throw new AppException(422, __('Nominal harus lebih dari nol.'));
         }
         $this->pin()->periksa($pin);
 
@@ -471,17 +478,19 @@ class PembayaranPortal
         $asal = $this->anakAktif($idAsal);
         $tujuan = $this->anakAktif($idTujuan);
         if ($asal->id === $tujuan->id) {
-            throw new AppException(422, 'Pilih anak tujuan yang berbeda.');
+            throw new AppException(422, __('Pilih anak tujuan yang berbeda.'));
         }
         $nominal = Money::of($nominal);
         if (Money::lte($nominal, '0')) {
-            throw new AppException(422, 'Nominal harus lebih dari nol.');
+            throw new AppException(422, __('Nominal harus lebih dari nol.'));
         }
         $saldo = \App\Models\DompetSantri::where('id_santri', $asal->id)->value('saldo') ?? '0';
         if (Money::lt($saldo, $nominal)) {
-            throw new AppException(422, "Uang saku {$asal->nama} tidak cukup (tersedia Rp ".number_format((float) $saldo, 0, ',', '.').').');
+            throw new AppException(422, __('Uang saku :nama tidak cukup (tersedia :nominal).', [
+                'nama' => $asal->nama, 'nominal' => 'Rp '.number_format((float) $saldo, 0, ',', '.'),
+            ]));
         }
-        \App\Services\Modules\PenarikanTunaiService::pastikanTersedia($asal->id, $saldo, $nominal, "Uang saku {$asal->nama} tidak cukup");
+        \App\Services\Modules\PenarikanTunaiService::pastikanTersedia($asal->id, $saldo, $nominal, __('Uang saku :nama tidak cukup', ['nama' => $asal->nama]));
         $this->pin()->periksa($pin);
 
         $nama = $this->wali->{'nama_'.$this->pencatat['peran']} ?: $this->wali->nama;
@@ -499,13 +508,14 @@ class PembayaranPortal
         $santri = $this->anakAktif($idSantri);
         $nominal = Money::of($nominal);
         if (Money::lte($nominal, '0')) {
-            throw new AppException(422, 'Nominal harus lebih dari nol.');
+            throw new AppException(422, __('Nominal harus lebih dari nol.'));
         }
         $saldo = \App\Models\TabunganSantri::where('id_santri', $santri->id)->value('saldo') ?? '0';
         $menunggu = (string) PengajuanTarikTabungan::where('id_santri', $santri->id)->where('status', 'menunggu')->sum('nominal');
         if (Money::gt(Money::add($menunggu, $nominal), $saldo)) {
-            throw new AppException(422, 'Melebihi saldo tabungan yang tersedia (Rp '
-                .number_format((float) Money::sub($saldo, $menunggu), 0, ',', '.').').');
+            throw new AppException(422, __('Melebihi saldo tabungan yang tersedia (:nominal).', [
+                'nominal' => 'Rp '.number_format((float) Money::sub($saldo, $menunggu), 0, ',', '.'),
+            ]));
         }
         $this->pin()->periksa($pin);
 
@@ -535,7 +545,7 @@ class PembayaranPortal
         $jumlah = PengajuanTarikTabungan::where('id', $id)->where('id_wali', $this->wali->id)
             ->where('status', 'menunggu')->update(['status' => 'batal']);
         if (! $jumlah) {
-            throw new AppException(422, 'Pengajuan tidak bisa dibatalkan (sudah diputus atau tidak ditemukan).');
+            throw new AppException(422, __('Pengajuan tidak bisa dibatalkan (sudah diputus atau tidak ditemukan).'));
         }
     }
 
@@ -543,7 +553,7 @@ class PembayaranPortal
     {
         $s = \App\Models\Santri::where('id', $idSantri)->where('id_wali', $this->wali->id)->first();
         if (! $s || $s->status !== 'aktif') {
-            throw new AppException(422, 'Dompet & tabungan hanya untuk anak berstatus santri aktif.');
+            throw new AppException(422, __('Dompet & tabungan hanya untuk anak berstatus santri aktif.'));
         }
 
         return $s;
@@ -564,7 +574,7 @@ class PembayaranPortal
     private function pastikanRekeningPortal(string $kode): void
     {
         if (! BankAccount::untukPortal()->contains('kode_coa', $kode)) {
-            throw new AppException(422, 'Rekening tujuan tidak tersedia. Muat ulang halaman.');
+            throw new AppException(422, __('Rekening tujuan tidak tersedia. Muat ulang halaman.'));
         }
     }
 }

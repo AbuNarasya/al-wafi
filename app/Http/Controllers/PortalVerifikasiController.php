@@ -59,20 +59,20 @@ class PortalVerifikasiController extends Controller
         $data = $request->validate([
             'peran' => ['required', Rule::in(MasukWali::PERAN)],
             'nis' => [$butuhNis ? 'required' : 'nullable', 'string', 'max:30'],
-        ], ['nis.required' => 'Isi NIS salah satu anak Anda.']);
+        ], ['nis.required' => __('Isi NIS salah satu anak Anda.')]);
 
         // Langkah kedua: NIS salah satu anak. Dibatasi per LINK — link yang bocor tak bisa
         // dipakai menebak NIS berulang-ulang.
         if ($butuhNis) {
             $kunci = 'verifikasi-nis:'.$v->id;
             if (RateLimiter::tooManyAttempts($kunci, 5)) {
-                return back()->withInput()->with('error', 'Terlalu banyak percobaan. Coba lagi dalam '
-                    .(int) ceil(RateLimiter::availableIn($kunci) / 60).' menit, atau hubungi bagian kesantrian.');
+                return back()->withInput()->with('error', __('Terlalu banyak percobaan. Coba lagi dalam :menit menit, atau hubungi bagian kesantrian.',
+                    ['menit' => (int) ceil(RateLimiter::availableIn($kunci) / 60)]));
             }
             if (! LinkVerifikasi::nisCocok($v->wali, (string) $data['nis'])) {
                 RateLimiter::hit($kunci, 60 * 60);
 
-                return back()->withInput()->with('error', 'NIS tidak cocok dengan anak di keluarga ini. Periksa lagi NIS di rapor atau kartu santri.');
+                return back()->withInput()->with('error', __('NIS tidak cocok dengan anak di keluarga ini. Periksa lagi NIS di rapor atau kartu santri.'));
             }
             RateLimiter::clear($kunci);
         }
@@ -88,12 +88,13 @@ class PortalVerifikasiController extends Controller
     private function halangan(?VerifikasiWali $v): ?string
     {
         return match (true) {
-            ! LinkVerifikasi::aktif() => self::TUTUP,
-            $v === null => 'Link ini tidak dikenal atau sudah diganti dengan link baru. Silakan hubungi bagian kesantrian.',
-            $v->wali?->status !== 'aktif' => 'Data keluarga ini sedang dinonaktifkan. Silakan hubungi bagian kesantrian.',
-            $v->selesai_pada !== null => 'Verifikasi data keluarga ini sudah selesai. Silakan masuk Portal Wali dengan email yang sudah diverifikasi.',
-            now()->lessThan($v->berlaku_mulai) => 'Link ini baru bisa dibuka mulai '.$v->berlaku_mulai->locale('id')->translatedFormat('j F Y').'.',
-            ! $v->bisaDipakai() => 'Masa berlaku link ini sudah habis. Silakan hubungi bagian kesantrian untuk link baru.',
+            ! LinkVerifikasi::aktif() => __(self::TUTUP),
+            $v === null => __('Link ini tidak dikenal atau sudah diganti dengan link baru. Silakan hubungi bagian kesantrian.'),
+            $v->wali?->status !== 'aktif' => __('Data keluarga ini sedang dinonaktifkan. Silakan hubungi bagian kesantrian.'),
+            $v->selesai_pada !== null => __('Verifikasi data keluarga ini sudah selesai. Silakan masuk Portal Wali dengan email yang sudah diverifikasi.'),
+            now()->lessThan($v->berlaku_mulai) => __('Link ini baru bisa dibuka mulai :tanggal.',
+                ['tanggal' => $v->berlaku_mulai->locale(app()->getLocale())->translatedFormat('j F Y')]),
+            ! $v->bisaDipakai() => __('Masa berlaku link ini sudah habis. Silakan hubungi bagian kesantrian untuk link baru.'),
             default => null,
         };
     }
@@ -102,25 +103,25 @@ class PortalVerifikasiController extends Controller
 
     public function formCari(): View
     {
-        return LinkVerifikasi::aktif() ? view('portal.verifikasi-cari') : view('portal.verifikasi-tolak', ['pesan' => self::TUTUP]);
+        return LinkVerifikasi::aktif() ? view('portal.verifikasi-cari') : view('portal.verifikasi-tolak', ['pesan' => __(self::TUTUP)]);
     }
 
     public function cari(Request $request): View|RedirectResponse
     {
         if (! LinkVerifikasi::aktif()) {
-            return view('portal.verifikasi-tolak', ['pesan' => self::TUTUP]);
+            return view('portal.verifikasi-tolak', ['pesan' => __(self::TUTUP)]);
         }
         $data = $request->validate([
             'nis' => ['required', 'string', 'max:30'],
             'tanggal_lahir' => ['required', 'date'],
             'hp' => ['required', 'string', 'regex:/^\d{4}$/'],
-        ], ['hp.regex' => 'Isi 4 angka terakhir nomor HP.']);
+        ], ['hp.regex' => __('Isi 4 angka terakhir nomor HP.')]);
 
         // Dibatasi per NIS juga, bukan hanya per IP: penebak bisa berganti jaringan.
         $kunci = 'verifikasi-cadangan:'.mb_strtolower(trim($data['nis']));
         if (RateLimiter::tooManyAttempts($kunci, 5)) {
-            return back()->withInput()->with('error', 'Terlalu banyak percobaan. Coba lagi dalam '
-                .(int) ceil(RateLimiter::availableIn($kunci) / 60).' menit, atau hubungi bagian kesantrian.');
+            return back()->withInput()->with('error', __('Terlalu banyak percobaan. Coba lagi dalam :menit menit, atau hubungi bagian kesantrian.',
+                ['menit' => (int) ceil(RateLimiter::availableIn($kunci) / 60)]));
         }
         try {
             $v = $this->link->cariCadangan($data['nis'], $data['tanggal_lahir'], $data['hp']);
@@ -173,10 +174,10 @@ class PortalVerifikasiController extends Controller
         $wali = SesiWali::wali();
         $email = self::emailPeran($wali, (string) SesiWali::peran($request));
         if ($email === '') {
-            return back()->with('error', 'Email belum diisi. Isi email Anda lebih dulu.');
+            return back()->with('error', __('Email belum diisi. Isi email Anda lebih dulu.'));
         }
         if (PendaftaranPortal::emailTerdaftar($email, $wali->id)) {
-            return back()->with('error', 'Email ini juga tercatat di keluarga lain, jadi tak bisa dipakai. Ganti dengan email lain.');
+            return back()->with('error', __('Email ini juga tercatat di keluarga lain, jadi tak bisa dipakai. Ganti dengan email lain.'));
         }
         try {
             $kodeUji = $masuk->mintaKode($email, 'verifikasi', $request->ip());
@@ -206,12 +207,12 @@ class PortalVerifikasiController extends Controller
         }
         $data = $request->validate(['kode' => ['required', 'string', 'max:10']]);
         if (! $masuk->periksa($email, 'verifikasi', $data['kode'])) {
-            return back()->with('error', 'Kode salah atau sudah kedaluwarsa. Periksa lagi, atau minta kode baru.');
+            return back()->with('error', __('Kode salah atau sudah kedaluwarsa. Periksa lagi, atau minta kode baru.'));
         }
         $request->session()->forget(self::MENUNGGU);
         $request->session()->put(SesiWali::VERIFIKASI_EMAIL, $email);
 
-        return redirect()->route('portal.verifikasi.ringkasan')->with('status', 'Email terbukti aktif.');
+        return redirect()->route('portal.verifikasi.ringkasan')->with('status', __('Email terbukti aktif.'));
     }
 
     public function selesai(Request $request, SesiWali $sesi): RedirectResponse
@@ -221,15 +222,15 @@ class PortalVerifikasiController extends Controller
         $email = self::emailPeran($wali, $peran);
         // Email WAJIB (keputusan user): tanpa email terbukti, verifikasi belum selesai.
         if ($email === '' || $request->session()->get(SesiWali::VERIFIKASI_EMAIL) !== $email) {
-            return back()->with('error', 'Buktikan dulu email Anda dengan kode sebelum menyelesaikan verifikasi.');
+            return back()->with('error', __('Buktikan dulu email Anda dengan kode sebelum menyelesaikan verifikasi.'));
         }
         $perluSandi = ! \App\Services\PortalWali\KataSandiWali::punya($wali, $peran);
         $data = $request->validate([
             'setuju' => ['accepted'],
             'sandi' => [$perluSandi ? 'required' : 'nullable', 'string', 'max:255'],
             'sandi_ulang' => [$perluSandi ? 'required' : 'nullable', 'string'],
-        ], ['setuju.accepted' => 'Centang pernyataan bahwa data sudah benar.', 'sandi.required' => 'Buat password untuk masuk Portal Wali.',
-            'sandi_ulang.required' => 'Ulangi password.']);
+        ], ['setuju.accepted' => __('Centang pernyataan bahwa data sudah benar.'), 'sandi.required' => __('Buat password untuk masuk Portal Wali.'),
+            'sandi_ulang.required' => __('Ulangi password.')]);
 
         $link = $this->linkAktif($request);
         try {
@@ -265,7 +266,10 @@ class PortalVerifikasiController extends Controller
                 ->whereNotIn('status', Tahap::STATUS_FINAL)->orderBy('nama')->get()
                 ->map(fn (Santri $s) => ['nama' => $s->nama, 'jenjang' => $s->jenjang?->nama ?? $s->kode_jenjang, 'nis' => $s->nis])->all(),
         ];
+        $bahasa = app()->getLocale();
         $sesi->keluar($request);
+        // Halaman penutup tetap dalam bahasa pilihan wali (sesi baru sesudah keluar).
+        $request->session()->put(\App\Support\BahasaPortal::SESI, $bahasa);
 
         return redirect()->route('portal.verifikasi.terima_kasih')->with('ringkasan_verifikasi', $ringkasan);
     }

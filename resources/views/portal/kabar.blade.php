@@ -1,6 +1,6 @@
 @extends('layouts.portal')
 
-@section('title', 'Kabar')
+@section('title', __('Kabar'))
 
 @section('content')
     <div class="divide-y divide-slate-100 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
@@ -10,13 +10,13 @@
                 <div class="min-w-0">
                     <p class="text-sm font-semibold text-slate-900">{{ $k->judul }}</p>
                     <p class="text-sm text-slate-600">{{ $k->pesan }}</p>
-                    <p class="mt-0.5 text-xs text-slate-400">{{ $k->created_at?->locale('id')->diffForHumans() }}</p>
+                    <p class="mt-0.5 text-xs text-slate-400">{{ $k->created_at?->locale(app()->getLocale())->diffForHumans() }}</p>
                 </div>
             </div>
         @empty
             <div class="p-8 text-center">
                 <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><x-portal.ikon nama="lonceng" /></span>
-                <p class="mt-2 text-sm text-slate-500">Belum ada kabar.</p>
+                <p class="mt-2 text-sm text-slate-500">{{ __('Belum ada kabar.') }}</p>
             </div>
         @endforelse
     </div>

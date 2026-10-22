@@ -15,6 +15,7 @@ use App\Services\PortalWali\KabarWali;
 use App\Support\Akses;
 use App\Support\Audit\Jejak;
 use App\Support\Money;
+use App\Support\Teks;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -46,16 +47,16 @@ class PengunduranDiriService
     public function ajukan(Santri $santri, Wali $wali, string $peran, string $alasan, ?string $rencana, UploadedFile $surat): PengajuanKeluar
     {
         if ((int) $santri->id_wali !== (int) $wali->id) {
-            throw new AppException(404, 'Santri tidak ditemukan.');
+            throw new AppException(404, __('Santri tidak ditemukan.'));
         }
         if ($santri->status !== 'aktif') {
-            throw new AppException(422, 'Pengunduran diri lewat portal hanya untuk santri aktif.');
+            throw new AppException(422, __('Pengunduran diri lewat portal hanya untuk santri aktif.'));
         }
         if (PengajuanKeluar::where('id_santri', $santri->id)->whereIn('status', PengajuanKeluar::BERJALAN)->exists()) {
-            throw new AppException(422, 'Sudah ada pengajuan pengunduran diri yang sedang berjalan untuk anak ini.');
+            throw new AppException(422, __('Sudah ada pengajuan pengunduran diri yang sedang berjalan untuk anak ini.'));
         }
         if (trim($alasan) === '') {
-            throw new AppException(422, 'Alasan wajib diisi.');
+            throw new AppException(422, __('Alasan wajib diisi.'));
         }
 
         $p = DB::transaction(function () use ($santri, $wali, $peran, $alasan, $rencana, $surat) {
@@ -109,7 +110,8 @@ class PengunduranDiriService
         });
         Jejak::catat('pengunduran_diri_diajukan_staf', ['modul' => 'pengunduran-diri', 'ref_jenis' => 'PengajuanKeluar', 'ref_id' => $p->id,
             'id_pengguna' => $u->id_pengguna, 'detail' => ['nomor' => $p->nomor, 'id_santri' => $santri->id]]);
-        $this->kabariWali($p, 'Pengajuan pengunduran diri dicatat sekolah', "Pengajuan {$p->nomor} dicatat staf atas nama Anda dan diteruskan ke wali kelas.");
+        $this->kabariWali($p, Teks::k('Pengajuan pengunduran diri dicatat sekolah'),
+            Teks::k('Pengajuan :nomor dicatat staf atas nama Anda dan diteruskan ke wali kelas.', ['nomor' => $p->nomor]));
         $this->kabariStaf($p, $this->penerimaWaliKelas($p), 'Pengajuan pengunduran diri perlu diverifikasi');
 
         return $p;
@@ -133,7 +135,7 @@ class PengunduranDiriService
     public function batalkanOlehWali(PengajuanKeluar $p): void
     {
         $this->assertStatus($p, ['menunggu_wali_kelas', 'dikembalikan', 'menunggu_kepala_sekolah'],
-            'Pengajuan yang sudah disetujui kepala sekolah tidak bisa dibatalkan dari portal — hubungi sekolah.');
+            __('Pengajuan yang sudah disetujui kepala sekolah tidak bisa dibatalkan dari portal — hubungi sekolah.'));
         $p->update(['status' => 'dibatalkan']);
     }
 
@@ -162,10 +164,10 @@ class PengunduranDiriService
             'wali_kelas_oleh' => $u->id_pengguna, 'wali_kelas_pada' => now(), 'wali_kelas_catatan' => $catatan ?: null]);
 
         if ($lanjut) {
-            $this->kabariWali($p, 'Pengajuan pengunduran diri diverifikasi wali kelas', 'Pengajuan diteruskan ke kepala sekolah.');
+            $this->kabariWali($p, Teks::k('Pengajuan pengunduran diri diverifikasi wali kelas'), Teks::k('Pengajuan diteruskan ke kepala sekolah.'));
             $this->kabariStaf($p, $this->penerimaKepalaSekolah($p), 'Pengajuan pengunduran diri menunggu persetujuan');
         } else {
-            $this->kabariWali($p, 'Pengajuan pengunduran diri dikembalikan', "Catatan wali kelas: {$catatan}");
+            $this->kabariWali($p, Teks::k('Pengajuan pengunduran diri dikembalikan'), Teks::k('Catatan wali kelas: :catatan', ['catatan' => $catatan]));
         }
     }
 
@@ -190,12 +192,12 @@ class PengunduranDiriService
             'kepala_sekolah_oleh' => $u->id_pengguna, 'kepala_sekolah_pada' => now(), 'kepala_sekolah_catatan' => $catatan ?: null]);
 
         if ($setuju) {
-            $this->kabariWali($p, 'Pengunduran diri disetujui kepala sekolah', 'Sedang diproses clearance (keuangan, kesantrian, administrasi sekolah).');
+            $this->kabariWali($p, Teks::k('Pengunduran diri disetujui kepala sekolah'), Teks::k('Sedang diproses clearance (keuangan, kesantrian, administrasi sekolah).'));
             foreach (self::MODUL_CLEARANCE as $modul) {
                 $this->kabariStaf($p, $this->pemegangHak($modul), 'Clearance pengunduran diri santri');
             }
         } else {
-            $this->kabariWali($p, 'Pengunduran diri tidak disetujui', "Catatan kepala sekolah: {$catatan}");
+            $this->kabariWali($p, Teks::k('Pengunduran diri tidak disetujui'), Teks::k('Catatan kepala sekolah: :catatan', ['catatan' => $catatan]));
         }
     }
 
@@ -250,7 +252,7 @@ class PengunduranDiriService
         });
 
         if ($p->status === 'siap_dikeluarkan') {
-            $this->kabariWali($p, 'Clearance pengunduran diri selesai', 'Santri akan dikeluarkan pada proses akhir bulan.');
+            $this->kabariWali($p, Teks::k('Clearance pengunduran diri selesai'), Teks::k('Santri akan dikeluarkan pada proses akhir bulan.'));
             $this->kabariStaf($p, $this->pemegangHak('clearance-admin'), 'Santri siap dikeluarkan (akhir bulan)');
         }
     }
@@ -284,7 +286,7 @@ class PengunduranDiriService
         });
         Jejak::catat('santri_keluar_pengajuan', ['modul' => 'pengunduran-diri', 'ref_jenis' => 'PengajuanKeluar', 'ref_id' => $p->id,
             'id_pengguna' => $u->id_pengguna, 'detail' => ['nomor' => $p->nomor, 'id_santri' => $p->id_santri]]);
-        $this->kabariWali($p, 'Santri resmi dikeluarkan', 'Proses pengunduran diri selesai. Surat mutasi / SK dapat diunduh di portal.');
+        $this->kabariWali($p, Teks::k('Santri resmi dikeluarkan'), Teks::k('Proses pengunduran diri selesai. Surat mutasi / SK dapat diunduh di portal.'));
     }
 
     public function tandaiDapodik(PengajuanKeluar $p, User $u): void
@@ -298,7 +300,7 @@ class PengunduranDiriService
     private function assertStatus(PengajuanKeluar $p, array $boleh, ?string $pesan = null): void
     {
         if (! in_array($p->status, $boleh, true)) {
-            throw new AppException(422, $pesan ?? "Pengajuan ini berstatus \"{$p->labelStatus()}\" — tindakan ini tidak berlaku.");
+            throw new AppException(422, $pesan ?? __('Pengajuan ini berstatus ":status" — tindakan ini tidak berlaku.', ['status' => __($p->labelStatus())]));
         }
     }
 
@@ -353,10 +355,11 @@ class PengunduranDiriService
         ], $penerima));
     }
 
-    private function kabariWali(PengajuanKeluar $p, string $judul, string $pesan): void
+    private function kabariWali(PengajuanKeluar $p, string|Teks $judul, string|Teks $pesan): void
     {
         $p->loadMissing(['wali', 'santri:id,nama']);
-        KabarWali::keKeluarga($p->wali, ['judul' => $judul, 'pesan' => "{$p->santri?->nama} ({$p->nomor}). {$pesan}",
+        KabarWali::keKeluarga($p->wali, ['judul' => $judul,
+            'pesan' => Teks::k(':nama (:nomor). :pesan', ['nama' => $p->santri?->nama, 'nomor' => $p->nomor, 'pesan' => $pesan]),
             'jenis' => 'pengunduran_diri', 'ref_jenis' => 'PengajuanKeluar', 'ref_id' => (string) $p->id, 'id_santri' => $p->id_santri]);
     }
 }

@@ -54,13 +54,13 @@ class PinTransaksi
     public static function assertSah(string $pin, ?string $ulang = null): void
     {
         if (! preg_match('/^\d{'.self::PANJANG.'}$/', $pin)) {
-            throw new AppException(422, 'PIN harus '.self::PANJANG.' angka.');
+            throw new AppException(422, __('PIN harus :jumlah angka.', ['jumlah' => self::PANJANG]));
         }
         if (in_array($pin, self::LEMAH, true)) {
-            throw new AppException(422, 'PIN terlalu mudah ditebak. Pilih kombinasi lain.');
+            throw new AppException(422, __('PIN terlalu mudah ditebak. Pilih kombinasi lain.'));
         }
         if ($ulang !== null && $pin !== $ulang) {
-            throw new AppException(422, 'Ulangan PIN tidak sama.');
+            throw new AppException(422, __('Ulangan PIN tidak sama.'));
         }
     }
 
@@ -92,12 +92,12 @@ class PinTransaksi
         $hasil = DB::transaction(function () use ($pin) {
             $b = PinWali::where('id_wali', $this->wali->id)->where('peran', $this->peran)->lockForUpdate()->first();
             if (! $b) {
-                return [428, 'Buat PIN transaksi terlebih dahulu.'];
+                return [428, __('Buat PIN transaksi terlebih dahulu.')];
             }
             if ($b->terkunci_sampai?->isFuture()) {
                 $menit = (int) ceil(now()->diffInMinutes($b->terkunci_sampai, true));
 
-                return [423, "PIN terkunci karena salah berulang kali. Coba lagi dalam {$menit} menit, atau setel ulang lewat Lupa PIN."];
+                return [423, __('PIN terkunci karena salah berulang kali. Coba lagi dalam :menit menit, atau setel ulang lewat Lupa PIN.', ['menit' => $menit])];
             }
             if ($pin !== null && Hash::check($pin, $b->pin_hash)) {
                 if ($b->gagal > 0 || $b->terkunci_sampai) {
@@ -113,16 +113,17 @@ class PinTransaksi
             $b->update(['gagal' => $gagal, 'terkunci_sampai' => $kunci ? now()->addMinutes(self::MENIT_KUNCI) : null]);
             if ($kunci) {
                 KabarWali::kePencatat((object) ['dicatat_oleh' => null, 'dicatat_oleh_wali' => $this->wali->id, 'dicatat_oleh_peran' => $this->peran], [
-                    'judul' => 'PIN transaksi terkunci',
-                    'pesan' => 'PIN dompet Anda salah '.self::MAKS_GAGAL.' kali dan dikunci '.self::MENIT_KUNCI.' menit. '
-                        .'Bila bukan Anda yang mencoba, segera ubah PIN dan hubungi panitia.',
+                    'judul' => \App\Support\Teks::k('PIN transaksi terkunci'),
+                    'pesan' => \App\Support\Teks::k('PIN dompet Anda salah :kali kali dan dikunci :menit menit. Bila bukan Anda yang mencoba, segera ubah PIN dan hubungi panitia.', [
+                        'kali' => self::MAKS_GAGAL, 'menit' => self::MENIT_KUNCI,
+                    ]),
                     'jenis' => 'pin_terkunci',
                 ]);
 
-                return [423, 'PIN salah '.self::MAKS_GAGAL.' kali. PIN dikunci '.self::MENIT_KUNCI.' menit.'];
+                return [423, __('PIN salah :kali kali. PIN dikunci :menit menit.', ['kali' => self::MAKS_GAGAL, 'menit' => self::MENIT_KUNCI])];
             }
 
-            return [422, 'PIN salah. Sisa percobaan: '.(self::MAKS_GAGAL - $gagal).'.'];
+            return [422, __('PIN salah. Sisa percobaan: :sisa.', ['sisa' => self::MAKS_GAGAL - $gagal])];
         });
 
         if ($hasil !== null) {

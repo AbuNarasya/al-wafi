@@ -28,4 +28,5 @@
     ];
 @endphp
 @php $penuh = in_array($nama, ['klinik'], true); @endphp
-<svg {{ $attributes->merge(['class' => $kelas]) }} fill="{{ $penuh ? 'currentColor' : 'none' }}" stroke="{{ $penuh ? 'none' : 'currentColor' }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ $jalur[$nama] ?? 'M12 21a9 9 0 100-18 9 9 0 000 18z' }}"/></svg>
+{{-- Ikon berarah dicerminkan saat bahasa kanan-ke-kiri (Arab): "kembali" menunjuk ke kanan. --}}
+<svg {{ $attributes->merge(['class' => $kelas.(in_array($nama, ['kembali', 'kanan', 'keluar'], true) ? ' rtl:-scale-x-100' : '')]) }} fill="{{ $penuh ? 'currentColor' : 'none' }}" stroke="{{ $penuh ? 'none' : 'currentColor' }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ $jalur[$nama] ?? 'M12 21a9 9 0 100-18 9 9 0 000 18z' }}"/></svg>

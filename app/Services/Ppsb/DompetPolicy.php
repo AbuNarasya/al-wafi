@@ -48,7 +48,7 @@ final class DompetPolicy
     public static function assertArahSah(string $dari, string $ke, bool $disetujui = false): void
     {
         if ($dari === $ke) {
-            throw new AppException(422, 'Asal dan tujuan pemindahan tidak boleh sama.');
+            throw new AppException(422, __('Asal dan tujuan pemindahan tidak boleh sama.'));
         }
         $daftar = $disetujui ? [...self::ARAH_SAH, ...self::ARAH_DENGAN_PERSETUJUAN] : self::ARAH_SAH;
         $sah = false;
@@ -60,10 +60,11 @@ final class DompetPolicy
         }
         if (! $sah) {
             if ($dari === 'tabungan') {
-                throw new AppException(422, 'Tabungan Santri tidak bisa dipindah langsung. Wali mengajukan penarikan dari Portal Wali, '
-                    .'lalu keuangan menyetujuinya; atau keuangan mencairkannya lewat Tarik / Kembalikan Titipan.');
+                throw new AppException(422, __('Tabungan Santri tidak bisa dipindah langsung. Wali mengajukan penarikan dari Portal Wali, lalu keuangan menyetujuinya; atau keuangan mencairkannya lewat Tarik / Kembalikan Titipan.'));
             }
-            throw new AppException(422, 'Pemindahan dari '.self::labelDompet($dari).' ke '.self::labelDompet($ke).' tidak diizinkan.');
+            throw new AppException(422, __('Pemindahan dari :asal ke :tujuan tidak diizinkan.', [
+                'asal' => __(self::labelDompet($dari)), 'tujuan' => __(self::labelDompet($ke)),
+            ]));
         }
     }
 }

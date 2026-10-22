@@ -228,7 +228,7 @@ class LinkVerifikasi
     public function selesai(VerifikasiWali $v, string $peran, string $email): void
     {
         if (! $v->bisaDipakai()) {
-            throw new AppException(422, 'Link verifikasi ini sudah tidak berlaku.');
+            throw new AppException(422, __('Link verifikasi ini sudah tidak berlaku.'));
         }
         $v->update(['selesai_pada' => now(), 'selesai_peran' => $peran, 'selesai_email' => MasukWali::normalEmail($email)]);
     }
@@ -241,8 +241,8 @@ class LinkVerifikasi
      */
     public function cariCadangan(string $nis, string $tanggalLahir, string $empatAngka): VerifikasiWali
     {
-        $tolak = new AppException(422, 'Data tidak cocok, atau keluarga ini belum dikirimi link verifikasi. '
-            .'Periksa lagi isiannya, atau hubungi bagian kesantrian.');
+        $tolak = new AppException(422, __('Data tidak cocok, atau keluarga ini belum dikirimi link verifikasi. '
+            .'Periksa lagi isiannya, atau hubungi bagian kesantrian.'));
 
         $empatAngka = preg_replace('/\D/', '', $empatAngka);
         $santri = Santri::where('nis', trim($nis))->whereDate('tanggal_lahir', $tanggalLahir)->first();

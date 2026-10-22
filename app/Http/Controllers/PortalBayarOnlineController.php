@@ -34,7 +34,7 @@ class PortalBayarOnlineController extends Controller
     public function isiDompet(Request $request): RedirectResponse
     {
         $data = $request->validate(['nominal' => ['required', 'integer', 'min:'.PembayaranMidtrans::MIN_ISI_DOMPET]], [
-            'nominal.min' => 'Isi saldo online minimal Rp '.number_format(PembayaranMidtrans::MIN_ISI_DOMPET, 0, ',', '.').'.',
+            'nominal.min' => __('Isi saldo online minimal :nominal.', ['nominal' => 'Rp '.number_format(PembayaranMidtrans::MIN_ISI_DOMPET, 0, ',', '.')]),
         ]);
 
         try {
@@ -51,7 +51,7 @@ class PortalBayarOnlineController extends Controller
         $data = $request->validate(['nominal' => ['required', 'integer', 'min:1']]);
         $tagihan = TagihanSantri::with(['santri', 'jenis'])->find($id);
         if (! $tagihan) {
-            return redirect()->route('portal.tagihan')->with('error', 'Tagihan tidak ditemukan.');
+            return redirect()->route('portal.tagihan')->with('error', __('Tagihan tidak ditemukan.'));
         }
 
         try {
@@ -116,7 +116,7 @@ class PortalBayarOnlineController extends Controller
 
         if ($t->status === 'lunas' || ! $request->boolean('ganti')) {
             return redirect()->route('portal.online.lihat', $t->order_id)->with('status',
-                $t->status === 'lunas' ? 'Pembayaran ini ternyata sudah lunas.' : 'Pesanan pembayaran dibatalkan.');
+                $t->status === 'lunas' ? __('Pembayaran ini ternyata sudah lunas.') : __('Pesanan pembayaran dibatalkan.'));
         }
 
         $isi = $t->jenis === 'bayar_kelompok' ? $t->rincian()->pluck('id_tagihan')->all() : array_filter([$t->id_tagihan]);
@@ -128,7 +128,7 @@ class PortalBayarOnlineController extends Controller
             default => route('portal.tagihan'),
         };
 
-        return redirect($ke)->with('status', 'Pesanan Virtual Account dibatalkan. Silakan pilih cara bayar lain.');
+        return redirect($ke)->with('status', __('Pesanan Virtual Account dibatalkan. Silakan pilih cara bayar lain.'));
     }
 
     private function milikSaya(string $orderId): TransaksiMidtrans

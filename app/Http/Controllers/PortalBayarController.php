@@ -47,14 +47,14 @@ class PortalBayarController extends Controller
         try {
             $t = $this->portal($request)->tagihan($id);
         } catch (AppException) {
-            return redirect()->route('portal.tagihan')->with('error', 'Tagihan tidak ditemukan.');
+            return redirect()->route('portal.tagihan')->with('error', __('Tagihan tidak ditemukan.'));
         }
         [$alur, $alasan] = PembayaranPortal::alur($t);
         if ($alur === null) {
             // Yang paling sering sampai ke sini: tombol kembali sesudah membayar. Itu
             // bukan galat — sampaikan sebagai kabar biasa.
             return redirect()->route('portal.tagihan', ['anak' => $t->id_santri])
-                ->with($t->status === 'lunas' ? 'status' : 'error', $t->status === 'lunas' ? 'Tagihan ini sudah lunas.' : $alasan);
+                ->with($t->status === 'lunas' ? 'status' : 'error', $t->status === 'lunas' ? __('Tagihan ini sudah lunas.') : $alasan);
         }
 
         return view('portal.bayar', [
@@ -83,7 +83,7 @@ class PortalBayarController extends Controller
         }
 
         return redirect()->route('portal.tagihan', ['anak' => $p->id_santri])
-            ->with('status', 'Pembayaran Rp '.number_format((float) $p->nominal, 0, ',', '.').' dari Dompet Wali berhasil.');
+            ->with('status', __('Pembayaran :nominal dari Dompet Wali berhasil.', ['nominal' => 'Rp '.number_format((float) $p->nominal, 0, ',', '.')]));
     }
 
     public function transfer(Request $request, int $id): RedirectResponse
@@ -100,7 +100,7 @@ class PortalBayarController extends Controller
         }
 
         return redirect()->route('portal.tagihan', ['anak' => $p->id_santri])
-            ->with('status', 'Bukti transfer terkirim. Keuangan akan memeriksanya; statusnya berubah setelah diverifikasi.');
+            ->with('status', __('Bukti transfer terkirim. Keuangan akan memeriksanya; statusnya berubah setelah diverifikasi.'));
     }
 
     // ---- Isi dompet ----
@@ -108,7 +108,7 @@ class PortalBayarController extends Controller
     public function formIsi(): View|RedirectResponse
     {
         if (! PortalKeluargaController::punyaDompet()) {
-            return redirect()->route('portal.beranda')->with('error', 'Dompet aktif setelah anak Anda berstatus santri aktif.');
+            return redirect()->route('portal.beranda')->with('error', __('Dompet aktif setelah anak Anda berstatus santri aktif.'));
         }
 
         return view('portal.isi-dompet', [
@@ -136,7 +136,7 @@ class PortalBayarController extends Controller
         }
 
         return redirect()->route('portal.dompet')
-            ->with('status', 'Bukti transfer terkirim. Saldo bertambah setelah keuangan memverifikasinya.');
+            ->with('status', __('Bukti transfer terkirim. Saldo bertambah setelah keuangan memverifikasinya.'));
     }
 
     // ---- Auto-debet ----
@@ -151,8 +151,8 @@ class PortalBayarController extends Controller
         }
 
         return redirect()->route('portal.dompet')->with('status', $aktif
-            ? 'Auto-debet aktif. Tagihan santri aktif dibayar otomatis dari Dompet Wali bila saldonya cukup.'
-            : 'Auto-debet dimatikan. Tagihan dibayar manual dari halaman Tagihan.');
+            ? __('Auto-debet aktif. Tagihan santri aktif dibayar otomatis dari Dompet Wali bila saldonya cukup.')
+            : __('Auto-debet dimatikan. Tagihan dibayar manual dari halaman Tagihan.'));
     }
 
     private function validasiTransfer(Request $request): array
@@ -163,9 +163,9 @@ class PortalBayarController extends Controller
             'tanggal' => ['required', 'date', 'before_or_equal:today'],
             'bukti' => Unggahan::aturan(),
         ], [
-            'bukti.required' => 'Unggah foto atau PDF bukti transfer.',
-            'bukti.max' => 'Berkas bukti terlalu besar (maksimal '.Unggahan::maksLabel().').',
-            'tanggal.before_or_equal' => 'Tanggal transfer tidak boleh di masa depan.',
+            'bukti.required' => __('Unggah foto atau PDF bukti transfer.'),
+            'bukti.max' => __('Berkas bukti terlalu besar (maksimal :ukuran).', ['ukuran' => Unggahan::maksLabel()]),
+            'tanggal.before_or_equal' => __('Tanggal transfer tidak boleh di masa depan.'),
         ]);
     }
 }

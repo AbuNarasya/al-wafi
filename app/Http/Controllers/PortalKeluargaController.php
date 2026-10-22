@@ -61,7 +61,23 @@ class PortalKeluargaController extends Controller
 
     private static function labelMutasi(MutasiDompet $m): string
     {
-        return $m->jenis === 'jajan' && (float) $m->nominal > 0 ? 'Pengembalian belanja' : (self::LABEL_MUTASI[$m->jenis] ?? $m->jenis);
+        return $m->jenis === 'jajan' && (float) $m->nominal > 0 ? __('Pengembalian belanja') : __(self::LABEL_MUTASI[$m->jenis] ?? $m->jenis);
+    }
+
+    /**
+     * Label status santri dalam bahasa portal. "Keluar" (status) berbenturan dengan tombol "Keluar" (log out)
+     * sebagai kunci terjemahan, jadi status dicari dulu lewat kunci berkonteks "Status santri: …"; tak ada →
+     * kunci biasa (di locale `id` hasilnya tetap label Indonesia apa adanya).
+     */
+    private static function labelStatusSantri(string $status): string
+    {
+        return \App\Support\BahasaPortal::statusSantri($status);
+    }
+
+    /** Label sumber pembayaran dalam bahasa portal. */
+    private static function labelSumber(?string $sumber): string
+    {
+        return __(self::LABEL_SUMBER[$sumber] ?? 'Transfer / tunai');
     }
 
     private const LABEL_SUMBER = ['dompet_wali' => 'Dompet Wali', 'xendit' => 'Pembayaran online', 'midtrans' => 'Virtual Account (online)', 'manual' => 'Transfer / tunai'];
@@ -145,7 +161,7 @@ class PortalKeluargaController extends Controller
             return view('portal.tagihan-keluarga', [
                 'anak' => $anak->map(fn (Santri $s) => [
                     'id' => $s->id, 'nama' => $s->nama, 'jenjang' => $s->jenjang?->nama ?? $s->kode_jenjang,
-                    'tingkat' => $s->tingkat, 'status' => \App\Services\Ppsb\Tahap::labelStatus((string) $s->status),
+                    'tingkat' => $s->tingkat, 'status' => self::labelStatusSantri((string) $s->status),
                     'sisa' => ($belum[$s->id] ?? collect())->sum(fn ($t) => (float) $t->sisa),
                     'lembar' => ($belum[$s->id] ?? collect())->count(),
                 ]),
@@ -197,9 +213,9 @@ class PortalKeluargaController extends Controller
         $data['riwayat'] = $bayar->map(fn (PembayaranSantri $p) => [
             'id' => $p->id,
             'tanggal' => $p->tanggal, 'nominal' => Money::of($p->nominal), 'status' => $p->status,
-            'tagihan' => $p->tagihan ? self::namaTagihan($p->tagihan) : 'Pembayaran',
+            'tagihan' => $p->tagihan ? self::namaTagihan($p->tagihan) : __('Pembayaran'),
             'keterangan' => $p->tagihan ? self::keteranganTagihan($p->tagihan) : null,
-            'sumber' => self::LABEL_SUMBER[$p->sumber] ?? 'Transfer / tunai',
+            'sumber' => self::labelSumber($p->sumber),
         ]);
 
         return view('portal.tagihan', $data);
@@ -235,9 +251,9 @@ class PortalKeluargaController extends Controller
             ]),
             'bayar' => $bayar->map(fn (PembayaranSantri $p) => [
                 'id' => $p->id, 'anak' => $nama[$p->id_santri] ?? '', 'tanggal' => $p->tanggal, 'nominal' => (float) $p->nominal,
-                'tagihan' => $p->tagihan ? self::namaTagihan($p->tagihan) : 'Pembayaran',
+                'tagihan' => $p->tagihan ? self::namaTagihan($p->tagihan) : __('Pembayaran'),
                 'keterangan' => $p->tagihan ? self::keteranganTagihan($p->tagihan) : null,
-                'sumber' => self::LABEL_SUMBER[$p->sumber] ?? 'Transfer / tunai', 'menunggu' => $p->status === 'menunggu_verifikasi',
+                'sumber' => self::labelSumber($p->sumber), 'menunggu' => $p->status === 'menunggu_verifikasi',
             ]),
         ]);
     }
@@ -268,7 +284,7 @@ class PortalKeluargaController extends Controller
         $anak = Santri::with(['dompet', 'tabungan'])->where('id_wali', SesiWali::wali()->id)
             ->whereIn('status', self::STATUS_DOMPET)->orderBy('nama')->get();
         if ($anak->isEmpty()) {
-            return redirect()->route('portal.beranda')->with('error', 'Dompet aktif setelah anak Anda berstatus santri aktif.');
+            return redirect()->route('portal.beranda')->with('error', __('Dompet aktif setelah anak Anda berstatus santri aktif.'));
         }
         // Saringan HANYA memilih di antara anak keluarga ini.
         $dipilih = $anak->firstWhere('id', (int) $request->query('anak'));
@@ -297,7 +313,7 @@ class PortalKeluargaController extends Controller
             'saldoTabungan' => $sasaran->sum(fn ($s) => (float) ($s->tabungan?->saldo ?? 0)),
             'mutasi' => $mutasi->map(fn (MutasiDompet $m) => [
                 'tanggal' => $m->tanggal, 'anak' => $namaPer[$m->pemilik.':'.$m->id_dompet] ?? '',
-                'dompet' => $m->pemilik === 'tabungan' ? 'Tabungan' : 'Uang saku',
+                'dompet' => $m->pemilik === 'tabungan' ? __('Tabungan') : __('Uang saku'),
                 'label' => self::labelMutasi($m), 'keterangan' => $m->keterangan,
                 'nominal' => abs((float) $m->nominal),
                 'keluar' => self::keluar($m),
@@ -318,7 +334,7 @@ class PortalKeluargaController extends Controller
         $tersedia = \App\Services\PortalWali\MenuPortal::tersedia($wali);
 
         return view('portal.menu', [
-            'grup' => collect(\App\Services\PortalWali\MenuPortal::GRUP)->map(fn ($label, $kode) => ['label' => $label,
+            'grup' => collect(\App\Services\PortalWali\MenuPortal::grup())->map(fn ($label, $kode) => ['label' => $label,
                 'menu' => array_filter($tersedia, fn ($m) => $m[4] === $kode)])->filter(fn ($g) => $g['menu'] !== []),
             'tersedia' => $tersedia,
             'pilihan' => \App\Services\PortalWali\MenuPortal::pilihan($wali, $peran),
@@ -332,7 +348,7 @@ class PortalKeluargaController extends Controller
         if ($request->boolean('bawaan')) {
             \App\Services\PortalWali\MenuPortal::kembalikanBawaan($wali, $peran);
 
-            return redirect()->route('portal.beranda')->with('status', 'Menu utama dikembalikan ke susunan bawaan.');
+            return redirect()->route('portal.beranda')->with('status', __('Menu utama dikembalikan ke susunan bawaan.'));
         }
         $data = $request->validate(['menu' => ['nullable', 'array'], 'menu.*' => ['string', 'max:40']]);
         try {
@@ -341,7 +357,7 @@ class PortalKeluargaController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('portal.beranda')->with('status', 'Menu utama disimpan.');
+        return redirect()->route('portal.beranda')->with('status', __('Menu utama disimpan.'));
     }
 
     /** Riwayat klinik seluruh anak (bisa disaring per anak) — dulu 5 terakhir di halaman anak. */
@@ -362,7 +378,7 @@ class PortalKeluargaController extends Controller
     public function kartuUjian(int $id): View
     {
         $s = Santri::where('id_wali', SesiWali::wali()->id)->findOrFail($id);
-        abort_unless(\App\Services\Ppsb\UjianSeleksi::bolehKartu($s), 403, 'Kartu peserta tersedia sesudah biaya registrasi lunas.');
+        abort_unless(\App\Services\Ppsb\UjianSeleksi::bolehKartu($s), 403, __('Kartu peserta tersedia sesudah biaya registrasi lunas.'));
 
         return view('ujian.kartu', ['k' => \App\Services\Ppsb\UjianSeleksi::dataKartu($s), 'kembali' => route('portal.anak', $s->id)]);
     }
@@ -399,7 +415,7 @@ class PortalKeluargaController extends Controller
             })->when($dompetAnak === [], fn ($q) => $q->whereRaw('false'))
                 ->where('status', '!=', 'ditolak')->orderByDesc('tanggal')->orderByDesc('id')->limit(10)->get()
                 ->map(fn (MutasiDompet $m) => [
-                    'tanggal' => $m->tanggal, 'dompet' => $m->pemilik === 'tabungan' ? 'Tabungan' : 'Uang saku',
+                    'tanggal' => $m->tanggal, 'dompet' => $m->pemilik === 'tabungan' ? __('Tabungan') : __('Uang saku'),
                     'label' => self::labelMutasi($m), 'keterangan' => $m->keterangan,
                     'nominal' => abs((float) $m->nominal), 'keluar' => self::keluar($m),
                     'rinci' => $m->jenis === 'jajan' ? route('portal.dompet.rincian', $m->id) : null,
@@ -416,7 +432,7 @@ class PortalKeluargaController extends Controller
                 'diganti' => $registrasi->where('status', 'perlu_diganti')->count(),
             ],
             'santri' => $s, 'aktif' => $aktif, 'tahapPsb' => $tahapPsb === false ? null : $tahapPsb,
-            'label' => \App\Services\Ppsb\Tahap::labelStatus((string) $s->status),
+            'label' => self::labelStatusSantri((string) $s->status),
             'sisa' => $belum->sum(fn ($t) => (float) $t->sisa),
             'belum' => $belum->take(5)->map(fn (TagihanSantri $t) => [
                 'id' => $t->id, 'nama' => self::namaTagihan($t), 'keterangan' => self::keteranganTagihan($t),
@@ -447,7 +463,7 @@ class PortalKeluargaController extends Controller
     {
         if (! self::punyaDompet()) {
             return redirect()->route('portal.beranda')
-                ->with('error', 'Dompet aktif setelah anak Anda berstatus santri aktif.');
+                ->with('error', __('Dompet aktif setelah anak Anda berstatus santri aktif.'));
         }
 
         $wali = $dompet->ringkasanWali(SesiWali::wali()->id);
@@ -462,7 +478,7 @@ class PortalKeluargaController extends Controller
             'anak' => $wali->santri->whereIn('status', self::STATUS_DOMPET)->values(),
             'sesiTarik' => (new \App\Services\Modules\PenarikanTunaiService)->sesiUntukWali($wali),
             'mutasi' => $mutasi->map(fn (MutasiDompet $m) => [
-                'tanggal' => $m->tanggal, 'label' => self::LABEL_MUTASI[$m->jenis] ?? $m->jenis,
+                'tanggal' => $m->tanggal, 'label' => __(self::LABEL_MUTASI[$m->jenis] ?? $m->jenis),
                 'keterangan' => $m->keterangan, 'nominal' => Money::of($m->nominal),
                 'keluar' => in_array($m->jenis, self::KELUAR, true), 'menunggu' => $m->status === 'menunggu_verifikasi',
             ]),
@@ -504,10 +520,10 @@ class PortalKeluargaController extends Controller
 
         return view('portal.akun', [
             'pushKunci' => app(\App\Services\Modules\PushService::class)->kunciPublik(),
-            'kategori' => NotifikasiWali::KATEGORI,
+            'kategori' => array_map(fn ($label) => __($label), NotifikasiWali::KATEGORI),
             'kategoriNyala' => app(\App\Services\PortalWali\PushWaliService::class)->kategoriNyala($wali->id, $peran),
             'nama' => $wali->{"nama_{$peran}"} ?: $wali->nama,
-            'peran' => \App\Models\Wali::PERAN[$peran] ?? $peran,
+            'peran' => __(\App\Models\Wali::PERAN[$peran] ?? $peran),
             'email' => MasukWali::samarkanEmail((string) $wali->{"email_{$peran}"}),
             'telepon' => $wali->{"telepon_{$peran}"} ?: $wali->telepon,
             'perangkat' => PerangkatWali::where('id_wali', $wali->id)->where('peran', $peran)
@@ -527,6 +543,6 @@ class PortalKeluargaController extends Controller
             ->update(['dicabut_pada' => now()]);
 
         return redirect()->route('portal.akun')->with($jumlah ? 'status' : 'error',
-            $jumlah ? 'Perangkat dicabut. Perangkat itu harus memasukkan kode lagi untuk masuk.' : 'Perangkat tidak ditemukan.');
+            $jumlah ? __('Perangkat dicabut. Perangkat itu harus memasukkan kode lagi untuk masuk.') : __('Perangkat tidak ditemukan.'));
     }
 }

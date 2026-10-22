@@ -45,7 +45,18 @@ final class MenuPortal
     {
         $berdompet = \App\Services\PortalWali\PembayaranPortal::keluargaBerdompet((int) $wali->id);
 
-        return array_filter(self::KATALOG, fn ($m) => $m[5] !== 'dompet' || $berdompet);
+        // Label diterjemahkan di sini (bahasa portal wali) — semua layar pemakai menerima nama menu siap tampil.
+        return array_map(function ($m) {
+            $m[1] = __($m[1]);
+
+            return $m;
+        }, array_filter(self::KATALOG, fn ($m) => $m[5] !== 'dompet' || $berdompet));
+    }
+
+    /** @return array<string,string> kode grup => nama grup dalam bahasa portal */
+    public static function grup(): array
+    {
+        return array_map(fn ($label) => __($label), self::GRUP);
     }
 
     /** @return list<string> kunci menu yang dipilih (atau bawaan), berurutan, hanya yang tersedia, paling banyak MAKS. */
@@ -75,15 +86,15 @@ final class MenuPortal
     {
         $kunci = array_values(array_unique(array_map('strval', $kunci)));
         if ($kunci === []) {
-            throw new AppException(422, 'Pilih minimal satu menu.');
+            throw new AppException(422, __('Pilih minimal satu menu.'));
         }
         if (count($kunci) > self::MAKS) {
-            throw new AppException(422, 'Menu utama paling banyak '.self::MAKS.' ikon. Menu lainnya tetap ada di "Menu Lengkap".');
+            throw new AppException(422, __('Menu utama paling banyak :maks ikon. Menu lainnya tetap ada di "Menu Lengkap".', ['maks' => self::MAKS]));
         }
         $tersedia = self::tersedia($wali);
         foreach ($kunci as $k) {
             if (! isset($tersedia[$k])) {
-                throw new AppException(422, 'Menu tidak dikenal.');
+                throw new AppException(422, __('Menu tidak dikenal.'));
             }
         }
         DB::table('preferensi_menu_wali')->updateOrInsert(['id_wali' => $wali->id, 'peran' => $peran],

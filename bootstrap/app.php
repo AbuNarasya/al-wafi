@@ -26,7 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
 
         // Rute yang tak berlaku di instans ini (Portal Wali di Wafi Mart, dst.) → 404.
-        $middleware->web(append: [\App\Http\Middleware\SaklarInstans::class]);
+        $middleware->web(append: [\App\Http\Middleware\SaklarInstans::class, \App\Http\Middleware\BahasaPortal::class]);
 
         // Domain portal wali sendiri (config/portal.php): di sana hanya /wali/…; /wali/… di domain staf dialihkan.
         // Paling depan — pengalihan tak perlu membuka sesi.

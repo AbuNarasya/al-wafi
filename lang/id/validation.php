@@ -1,0 +1,95 @@
+<?php
+
+/*
+ * Pesan validasi bahasa Indonesia (22 Okt 2026, bersama portal wali tiga bahasa). Sebelum ada berkas ini,
+ * locale `id` jatuh ke cadangan `en` — galat isian tampil berbahasa Inggris, di portal maupun layar staf.
+ * Aturan yang tak tercantum di sini tetap memakai pesan bawaan berbahasa Inggris.
+ */
+return [
+    'accepted' => ':Attribute harus disetujui.',
+    'after' => ':Attribute harus tanggal sesudah :date.',
+    'after_or_equal' => ':Attribute harus tanggal :date atau sesudahnya.',
+    'alpha_num' => ':Attribute hanya boleh berisi huruf dan angka.',
+    'array' => ':Attribute harus berupa daftar.',
+    'before' => ':Attribute harus tanggal sebelum :date.',
+    'before_or_equal' => ':Attribute harus tanggal :date atau sebelumnya.',
+    'between' => [
+        'numeric' => ':Attribute harus antara :min dan :max.',
+        'file' => ':Attribute harus berukuran antara :min dan :max kilobita.',
+        'string' => ':Attribute harus antara :min dan :max karakter.',
+        'array' => ':Attribute harus berisi antara :min dan :max butir.',
+    ],
+    'boolean' => ':Attribute harus bernilai ya atau tidak.',
+    'confirmed' => 'Konfirmasi :attribute tidak cocok.',
+    'date' => ':Attribute bukan tanggal yang sah.',
+    'different' => ':Attribute dan :other harus berbeda.',
+    'digits' => ':Attribute harus :digits angka.',
+    'digits_between' => ':Attribute harus antara :min dan :max angka.',
+    'distinct' => ':Attribute berisi nilai kembar.',
+    'email' => ':Attribute harus alamat email yang sah.',
+    'exists' => ':Attribute yang dipilih tidak sah.',
+    'file' => ':Attribute harus berupa berkas.',
+    'gt' => [
+        'numeric' => ':Attribute harus lebih besar dari :value.',
+        'file' => ':Attribute harus lebih besar dari :value kilobita.',
+        'string' => ':Attribute harus lebih dari :value karakter.',
+        'array' => ':Attribute harus berisi lebih dari :value butir.',
+    ],
+    'gte' => [
+        'numeric' => ':Attribute harus :value atau lebih.',
+        'file' => ':Attribute harus :value kilobita atau lebih.',
+        'string' => ':Attribute harus :value karakter atau lebih.',
+        'array' => ':Attribute harus berisi :value butir atau lebih.',
+    ],
+    'image' => ':Attribute harus berupa gambar.',
+    'in' => ':Attribute yang dipilih tidak sah.',
+    'integer' => ':Attribute harus bilangan bulat.',
+    'lt' => [
+        'numeric' => ':Attribute harus kurang dari :value.',
+        'file' => ':Attribute harus kurang dari :value kilobita.',
+        'string' => ':Attribute harus kurang dari :value karakter.',
+        'array' => ':Attribute harus berisi kurang dari :value butir.',
+    ],
+    'lte' => [
+        'numeric' => ':Attribute harus :value atau kurang.',
+        'file' => ':Attribute harus :value kilobita atau kurang.',
+        'string' => ':Attribute harus :value karakter atau kurang.',
+        'array' => ':Attribute tidak boleh berisi lebih dari :value butir.',
+    ],
+    'max' => [
+        'numeric' => ':Attribute tidak boleh lebih dari :max.',
+        'file' => ':Attribute tidak boleh lebih dari :max kilobita.',
+        'string' => ':Attribute tidak boleh lebih dari :max karakter.',
+        'array' => ':Attribute tidak boleh berisi lebih dari :max butir.',
+    ],
+    'mimes' => ':Attribute harus berkas berjenis: :values.',
+    'mimetypes' => ':Attribute harus berkas berjenis: :values.',
+    'min' => [
+        'numeric' => ':Attribute minimal :min.',
+        'file' => ':Attribute minimal :min kilobita.',
+        'string' => ':Attribute minimal :min karakter.',
+        'array' => ':Attribute minimal berisi :min butir.',
+    ],
+    'numeric' => ':Attribute harus berupa angka.',
+    'present' => ':Attribute wajib ada.',
+    'regex' => 'Format :attribute tidak sah.',
+    'required' => ':Attribute wajib diisi.',
+    'required_if' => ':Attribute wajib diisi bila :other bernilai :value.',
+    'required_with' => ':Attribute wajib diisi bila :values ada.',
+    'same' => ':Attribute dan :other harus sama.',
+    'size' => [
+        'numeric' => ':Attribute harus :size.',
+        'file' => ':Attribute harus berukuran :size kilobita.',
+        'string' => ':Attribute harus :size karakter.',
+        'array' => ':Attribute harus berisi :size butir.',
+    ],
+    'string' => ':Attribute harus berupa teks.',
+    'unique' => ':Attribute sudah dipakai.',
+    'uploaded' => ':Attribute gagal diunggah.',
+
+    'attributes' => [
+        'sandi' => 'password', 'sandi_ulang' => 'ulangan password', 'kode' => 'kode', 'pin' => 'PIN',
+        'nominal' => 'nominal', 'alasan' => 'alasan', 'surat' => 'surat', 'berkas' => 'berkas', 'bukti' => 'bukti transfer',
+        'telepon' => 'telepon', 'tanggal' => 'tanggal', 'nama' => 'nama',
+    ],
+];

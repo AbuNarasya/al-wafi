@@ -41,9 +41,9 @@ final class SaldoAtomik
         if (! $baris) {
             $tersedia = DB::table($tabel)->where($kunci, $model->getKey())->value('saldo');
             if ($tersedia === null) {
-                throw new AppException(404, "{$label} tidak ditemukan.");
+                throw new AppException(404, __(':label tidak ditemukan.', ['label' => __($label)]));
             }
-            throw new AppException(422, "{$label} tidak cukup (tersedia ".Money::of($tersedia).').');
+            throw new AppException(422, __(':label tidak cukup (tersedia :saldo).', ['label' => __($label), 'saldo' => Money::of($tersedia)]));
         }
         $model->forceFill(['saldo' => $baris->saldo])->syncOriginalAttribute('saldo');
 

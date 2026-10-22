@@ -68,10 +68,9 @@ class PembayaranSantriService
             return;
         }
 
-        throw new AppException(422, sprintf(
-            'Tagihan lain-lain harus dilunasi sekaligus, tidak bisa dicicil. Yang harus dibayar %s, bukan %s.',
-            Money::of($ruang),
-            Money::of($nominal),
+        throw new AppException(422, __(
+            'Tagihan lain-lain harus dilunasi sekaligus, tidak bisa dicicil. Yang harus dibayar :harus, bukan :nominal.',
+            ['harus' => Money::of($ruang), 'nominal' => Money::of($nominal)],
         ));
     }
 
@@ -84,28 +83,28 @@ class PembayaranSantriService
     {
         $tagihan = TagihanSantri::with(['jenis', 'santri'])->find($data['id_tagihan']);
         if (! $tagihan) {
-            throw new AppException(404, 'Tagihan tidak ditemukan.');
+            throw new AppException(404, __('Tagihan tidak ditemukan.'));
         }
         $this->assertLingkup($tagihan->jenis->tipe, $lingkup);
         if ($tagihan->id_santri !== $data['id_santri']) {
             throw new AppException(400, 'Tagihan itu bukan milik santri yang dipilih.');
         }
         if ($tagihan->status === 'lunas') {
-            throw new AppException(422, 'Tagihan ini sudah lunas.');
+            throw new AppException(422, __('Tagihan ini sudah lunas.'));
         }
         if (! $tagihan->berlaku()) {
             throw new AppException(422, $tagihan->status === 'dihapus'
-                ? 'Tagihan ini sudah dihapus lewat koreksi nominal, jadi tak ada yang perlu dibayar.'
-                : 'Tagihan ini sudah dibatalkan.');
+                ? __('Tagihan ini sudah dihapus lewat koreksi nominal, jadi tak ada yang perlu dibayar.')
+                : __('Tagihan ini sudah dibatalkan.'));
         }
 
         $nominal = Money::of($data['nominal']);
         if (Money::lte($nominal, '0')) {
-            throw new AppException(422, 'Nominal pembayaran harus lebih dari nol.');
+            throw new AppException(422, __('Nominal pembayaran harus lebih dari nol.'));
         }
         $ruang = $this->ruangTagihan($tagihan->id, $tagihan->sisa);
         if (Money::gt($nominal, $ruang)) {
-            throw new AppException(422, "Nominal melebihi sisa tagihan yang belum tercatat ({$ruang}).");
+            throw new AppException(422, __('Nominal melebihi sisa tagihan yang belum tercatat (:nominal).', ['nominal' => $ruang]));
         }
         $this->assertLunasSekaligus($tagihan, $nominal, $ruang);
         $this->assertRekeningAda($data['kode_rekening']);
@@ -192,8 +191,10 @@ class PembayaranSantriService
 
         $pertama = $baris->first();
         \App\Services\PortalWali\KabarWali::kePencatat($pertama, [
-            'judul' => 'Pembayaran ditolak keuangan', 'id_santri' => $pertama->id_santri,
-            'pesan' => "{$pertama->nomor} s/d {$baris->last()->nomor} ({$baris->count()} tagihan) ditolak: {$alasan}",
+            'judul' => \App\Support\Teks::k('Pembayaran ditolak keuangan'), 'id_santri' => $pertama->id_santri,
+            'pesan' => \App\Support\Teks::k(':awal s/d :akhir (:jumlah tagihan) ditolak: :alasan', [
+                'awal' => $pertama->nomor, 'akhir' => $baris->last()->nomor, 'jumlah' => $baris->count(), 'alasan' => $alasan,
+            ]),
             'jenis' => 'pembayaran_santri_ditolak', 'ref_jenis' => 'PembayaranSantri', 'ref_id' => (string) $pertama->id,
         ]);
 
@@ -386,32 +387,32 @@ class PembayaranSantriService
     {
         $tagihan = TagihanSantri::with(['jenis', 'santri'])->find($data['id_tagihan']);
         if (! $tagihan) {
-            throw new AppException(404, 'Tagihan tidak ditemukan.');
+            throw new AppException(404, __('Tagihan tidak ditemukan.'));
         }
         if ($tagihan->status === 'lunas') {
-            throw new AppException(422, 'Tagihan ini sudah lunas.');
+            throw new AppException(422, __('Tagihan ini sudah lunas.'));
         }
         if (! $tagihan->berlaku()) {
             throw new AppException(422, $tagihan->status === 'dihapus'
-                ? 'Tagihan ini sudah dihapus lewat koreksi nominal, jadi tak ada yang perlu dibayar.'
-                : 'Tagihan ini sudah dibatalkan.');
+                ? __('Tagihan ini sudah dihapus lewat koreksi nominal, jadi tak ada yang perlu dibayar.')
+                : __('Tagihan ini sudah dibatalkan.'));
         }
 
         $dompet = DompetWali::where('id_wali', $tagihan->santri->id_wali)->first();
         if (! $dompet) {
-            throw new AppException(422, 'Keluarga ini belum punya Dompet Wali. Lakukan top-up lebih dulu di menu Dompet & Tabungan.');
+            throw new AppException(422, __('Keluarga ini belum punya Dompet Wali. Lakukan top-up lebih dulu di menu Dompet & Tabungan.'));
         }
         $nominal = Money::of($data['nominal']);
         if (Money::lte($nominal, '0')) {
-            throw new AppException(422, 'Nominal pembayaran harus lebih dari nol.');
+            throw new AppException(422, __('Nominal pembayaran harus lebih dari nol.'));
         }
         $ruang = $this->ruangTagihan($tagihan->id, $tagihan->sisa);
         if (Money::gt($nominal, $ruang)) {
-            throw new AppException(422, "Nominal melebihi sisa tagihan yang belum tercatat ({$ruang}).");
+            throw new AppException(422, __('Nominal melebihi sisa tagihan yang belum tercatat (:nominal).', ['nominal' => $ruang]));
         }
         $this->assertLunasSekaligus($tagihan, $nominal, $ruang);
         if (Money::lt($dompet->saldo, $nominal)) {
-            throw new AppException(422, "Saldo Dompet Wali tidak cukup (tersedia {$dompet->saldo}).");
+            throw new AppException(422, __('Saldo Dompet Wali tidak cukup (tersedia :saldo).', ['saldo' => $dompet->saldo]));
         }
 
         $hasil = DB::transaction(function () use ($tagihan, $dompet, $nominal, $data, $idPengguna, $wali) {
@@ -489,8 +490,8 @@ class PembayaranSantriService
 
         // Ke PENCATATNYA — staf atau wali yang mengirim dari portal.
         \App\Services\PortalWali\KabarWali::kePencatat($pembayaran, [
-            'judul' => 'Pembayaran santri ditolak keuangan', 'id_santri' => $pembayaran->id_santri,
-            'pesan' => "{$pembayaran->nomor} ditolak: {$alasan}", 'jenis' => 'pembayaran_santri_ditolak',
+            'judul' => \App\Support\Teks::k('Pembayaran santri ditolak keuangan'), 'id_santri' => $pembayaran->id_santri,
+            'pesan' => \App\Support\Teks::k(':nomor ditolak: :alasan', ['nomor' => $pembayaran->nomor, 'alasan' => $alasan]), 'jenis' => 'pembayaran_santri_ditolak',
             'ref_jenis' => 'PembayaranSantri', 'ref_id' => (string) $id,
         ]);
 

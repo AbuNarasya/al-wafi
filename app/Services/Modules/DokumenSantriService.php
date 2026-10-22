@@ -50,22 +50,22 @@ class DokumenSantriService
     {
         $santri = Santri::find($data['id_santri']);
         if (! $santri) {
-            throw new AppException(404, 'Santri tidak ditemukan.');
+            throw new AppException(404, __('Santri tidak ditemukan.'));
         }
         if (Tahap::isFinal($santri->status)) {
-            throw new AppException(422, "Proses santri ini sudah berakhir dengan status \"{$santri->status}\"; berkas tidak bisa ditambahkan lagi.");
+            throw new AppException(422, __('Proses santri ini sudah berakhir dengan status ":status"; berkas tidak bisa ditambahkan lagi.', ['status' => $santri->status]));
         }
         $izin = DokumenPolicy::bolehUnggah($data['jenis'], $santri->status);
         if (! $izin['boleh']) {
             throw new AppException(422, $izin['alasan']);
         }
         if ($data['jenis'] === 'lainnya' && empty($data['keterangan'])) {
-            throw new AppException(422, 'Jenis "Dokumen Lainnya" wajib disertai keterangan isinya.');
+            throw new AppException(422, __('Jenis "Dokumen Lainnya" wajib disertai keterangan isinya.'));
         }
         $putusan = StatusBerkasSantri::where('id_santri', $santri->id)->where('jenis', $data['jenis'])->first();
         if ($wali !== null && $putusan?->status === 'diterima') {
-            throw new AppException(422, '"'.DokumenPolicy::LABEL_DOKUMEN[$data['jenis']].'" sudah diterima pesantren. '
-                .'Bila perlu diganti, hubungi bagian PSB.');
+            throw new AppException(422, __('":berkas" sudah diterima pesantren. Bila perlu diganti, hubungi bagian PSB.',
+                ['berkas' => __(DokumenPolicy::LABEL_DOKUMEN[$data['jenis']])]));
         }
 
         $hash = hash_file('sha256', $berkas->getRealPath());
@@ -168,10 +168,10 @@ class DokumenSantriService
     {
         $row = DokumenSantri::with('santri:id,id_wali,status')->find($id);
         if (! $row || (int) $row->santri?->id_wali !== $idWali || (int) $row->diunggah_wali !== $idWali) {
-            throw new AppException(404, 'Berkas tidak ditemukan.');
+            throw new AppException(404, __('Berkas tidak ditemukan.'));
         }
         if (StatusBerkasSantri::where('id_santri', $row->id_santri)->where('jenis', $row->jenis)->value('status') === 'diterima') {
-            throw new AppException(422, 'Berkas ini sudah diterima pesantren dan tak bisa dihapus lagi.');
+            throw new AppException(422, __('Berkas ini sudah diterima pesantren dan tak bisa dihapus lagi.'));
         }
         $this->hapus($id);
     }

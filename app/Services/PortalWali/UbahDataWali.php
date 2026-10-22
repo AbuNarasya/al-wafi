@@ -13,6 +13,7 @@ use App\Services\Modules\NotificationService;
 use App\Services\Modules\WaliService;
 use App\Services\Ppsb\Tahap;
 use App\Support\Audit\Jejak;
+use App\Support\Teks;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -103,11 +104,11 @@ class UbahDataWali
     public function ubahSantri(Santri $santri, array $data): array
     {
         if ((int) $santri->id_wali !== (int) $this->wali->id) {
-            throw new AppException(404, 'Santri tidak ditemukan.');
+            throw new AppException(404, __('Santri tidak ditemukan.'));
         }
         if (! self::bolehUbahSantri($santri)) {
-            throw new AppException(422, 'Data santri berstatus '.Tahap::labelStatus((string) $santri->status)
-                .' tidak bisa diubah lewat portal. Hubungi bagian kesantrian.');
+            throw new AppException(422, __('Data santri berstatus :status tidak bisa diubah lewat portal. Hubungi bagian kesantrian.',
+                ['status' => \App\Support\BahasaPortal::statusSantri((string) $santri->status)]));
         }
 
         $baru = [];
@@ -131,7 +132,7 @@ class UbahDataWali
         }
         $santri->save();
 
-        $this->umumkan('Santri', $santri->id, $perubahan, "data santri {$santri->nama}", $santri->id);
+        $this->umumkan('Santri', $santri->id, $perubahan, Teks::k('data santri :nama', ['nama' => $santri->nama]), $santri->id);
 
         return $perubahan;
     }
@@ -175,8 +176,8 @@ class UbahDataWali
         foreach (MasukWali::PERAN as $p) {
             $telepon = $berubah["telepon_{$p}"] ?? null;
             if ($telepon !== null && PendaftaranPortal::teleponTerdaftar($telepon, $this->wali->id)) {
-                throw new AppException(409, 'Nomor HP '.Wali::PERAN[$p].' sudah terdaftar di data keluarga santri lain. '
-                    .'Pakai nomor lain, atau hubungi bagian kesantrian.');
+                throw new AppException(409, __('Nomor HP :peran sudah terdaftar di data keluarga santri lain. Pakai nomor lain, atau hubungi bagian kesantrian.',
+                    ['peran' => __(Wali::PERAN[$p])]));
             }
         }
 
@@ -193,7 +194,7 @@ class UbahDataWali
         (new WaliService)->update($this->wali->id, $berubah);
         $this->wali->refresh();
 
-        $this->umumkan('Wali', $this->wali->id, $perubahan, 'data keluarga');
+        $this->umumkan('Wali', $this->wali->id, $perubahan, Teks::k('data keluarga'));
 
         return $perubahan;
     }
@@ -211,22 +212,22 @@ class UbahDataWali
     public function periksaEmailBaru(string $sasaran, string $email): string
     {
         if (! in_array($sasaran, MasukWali::PERAN, true)) {
-            throw new AppException(404, 'Peran tidak dikenal.');
+            throw new AppException(404, __('Peran tidak dikenal.'));
         }
-        $label = Wali::PERAN[$sasaran];
+        $label = __(Wali::PERAN[$sasaran]);
         $email = MasukWali::normalEmail($email);
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new AppException(422, 'Alamat email tidak sah.');
+            throw new AppException(422, __('Alamat email tidak sah.'));
         }
         if (! filled($this->wali->{"nama_{$sasaran}"})) {
-            throw new AppException(422, "Isi dulu nama {$label} di Data Wali sebelum mengisi emailnya.");
+            throw new AppException(422, __('Isi dulu nama :peran di Data Wali sebelum mengisi emailnya.', ['peran' => $label]));
         }
         if ($email === MasukWali::normalEmail((string) $this->wali->{"email_{$sasaran}"})) {
-            throw new AppException(422, "Email itu sudah tercatat sebagai email {$label}.");
+            throw new AppException(422, __('Email itu sudah tercatat sebagai email :peran.', ['peran' => $label]));
         }
         // Email yang tercatat di dua keluarga ditolak masuk ("kembar") — jadi dicegah di sini.
         if (PendaftaranPortal::emailTerdaftar($email, $this->wali->id)) {
-            throw new AppException(409, 'Email ini sudah terdaftar di data keluarga santri lain. Pakai email lain, atau hubungi bagian kesantrian.');
+            throw new AppException(409, __('Email ini sudah terdaftar di data keluarga santri lain. Pakai email lain, atau hubungi bagian kesantrian.'));
         }
 
         return $email;
@@ -253,7 +254,7 @@ class UbahDataWali
             ));
         }
 
-        $this->umumkan('Wali', $this->wali->id, [self::labelKeluarga("email_{$sasaran}") => ['lama' => $lama, 'baru' => $email]], 'email keluarga');
+        $this->umumkan('Wali', $this->wali->id, [self::labelKeluarga("email_{$sasaran}") => ['lama' => $lama, 'baru' => $email]], Teks::k('email keluarga'));
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -267,6 +268,47 @@ class UbahDataWali
         return trim($nama.' ('.(Wali::PERAN[$this->peran] ?? $this->peran).')');
     }
 
+    /** namaPengubah() untuk kabar wali: perannya ("Ayah") ikut bahasa penerima. */
+    private function namaPengubahTeks(): Teks
+    {
+        return Teks::k(':nama (:peran)', [
+            'nama' => ltrim((string) ($this->wali->{"nama_{$this->peran}"} ?: $this->wali->nama)),
+            'peran' => Teks::k(Wali::PERAN[$this->peran] ?? $this->peran),
+        ]);
+    }
+
+    /**
+     * Label kolom pada rincian (kunci $perubahan, mis. "No. HP Ibu") → Teks yang bisa diterjemahkan. Label yang tak
+     * dikenal tampil apa adanya.
+     */
+    private static function labelTeks(string $label): string|Teks
+    {
+        static $peta = null;
+        if ($peta === null) {
+            $peta = [];
+            foreach (self::KOLOM_SANTRI + self::KOLOM_KELUARGA as $l) {
+                $peta[$l] = Teks::k($l);
+            }
+            foreach (Wali::PERAN as $p => $namaPeran) {
+                foreach (self::KOLOM_PERAN + ['email' => 'Email'] as $jenis => $l) {
+                    $peta[self::labelKeluarga("{$jenis}_{$p}")] = Teks::k(':kolom :peran', ['kolom' => Teks::k($l), 'peran' => Teks::k($namaPeran)]);
+                }
+            }
+        }
+
+        return $peta[$label] ?? $label;
+    }
+
+    /** Nilai rincian: label tetap (Laki-laki, rentang pendapatan) ikut diterjemahkan; isian wali apa adanya. */
+    private static function nilaiTeks(?string $nilai): string|Teks
+    {
+        if ($nilai === null) {
+            return '—';
+        }
+
+        return in_array($nilai, self::JENIS_KELAMIN, true) || in_array($nilai, Wali::PENDAPATAN, true) ? Teks::k($nilai) : $nilai;
+    }
+
     /**
      * Jejak audit + kabar staf + kabar anggota keluarga lainnya. Kegagalan di sini
      * TIDAK membatalkan perubahannya (sudah tersimpan): data yang benar lebih penting
@@ -274,7 +316,7 @@ class UbahDataWali
      *
      * @param  array<string,array{lama:?string,baru:?string}>  $perubahan
      */
-    private function umumkan(string $refJenis, int $refId, array $perubahan, string $apa, ?int $idSantri = null): void
+    private function umumkan(string $refJenis, int $refId, array $perubahan, Teks $apa, ?int $idSantri = null): void
     {
         $rincian = collect($perubahan)
             ->map(fn ($n, $label) => "{$label}: ".($n['lama'] ?? '—').' → '.($n['baru'] ?? '—'))
@@ -303,14 +345,23 @@ class UbahDataWali
         }
 
         // Anggota keluarga lain yang bisa masuk portal ikut tahu — terutama bila
-        // emailnya sendiri yang diganti.
+        // emailnya sendiri yang diganti. Disusun dalam bahasa portal masing-masing (portal tiga bahasa).
         try {
             foreach (MasukWali::PERAN as $p) {
                 if ($p !== $this->peran && filled($this->wali->{"email_{$p}"})) {
+                    $bahasa = KabarWali::bahasa($this->wali->id, $p);
+                    $rincianBahasa = collect($perubahan)
+                        ->map(fn ($n, $label) => Teks::k(':label: :lama → :baru', [
+                            'label' => self::labelTeks($label), 'lama' => self::nilaiTeks($n['lama'] ?? null), 'baru' => self::nilaiTeks($n['baru'] ?? null),
+                        ])->dalam($bahasa))
+                        ->implode('; ');
                     NotifikasiWali::create([
                         'id_wali' => $this->wali->id, 'peran' => $p, 'id_santri' => $idSantri,
-                        'judul' => ucfirst($apa).' diubah',
-                        'pesan' => mb_strimwidth("{$this->namaPengubah()} mengubah {$apa}. {$rincian}", 0, 1000, '…'),
+                        // ":Apa" = isian berhuruf awal kapital (seperti ucfirst dulu).
+                        'judul' => Teks::k(':Apa diubah', ['apa' => $apa])->dalam($bahasa),
+                        'pesan' => mb_strimwidth(Teks::k(':pengubah mengubah :apa. :rincian', [
+                            'pengubah' => $this->namaPengubahTeks(), 'apa' => $apa, 'rincian' => $rincianBahasa,
+                        ])->dalam($bahasa), 0, 1000, '…'),
                         'jenis' => self::JENIS_NOTIF, 'ref_jenis' => $refJenis, 'ref_id' => (string) $refId,
                     ]);
                 }

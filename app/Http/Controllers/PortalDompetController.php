@@ -41,7 +41,7 @@ class PortalDompetController extends Controller
         if ($e->status === 428) {
             $asal = parse_url(url()->previous(), PHP_URL_PATH).(($q = parse_url(url()->previous(), PHP_URL_QUERY)) ? "?{$q}" : '');
 
-            return redirect()->route('portal.pin', ['kembali' => $asal])->with('status', 'Buat PIN transaksi dulu untuk mengamankan dompet Anda.');
+            return redirect()->route('portal.pin', ['kembali' => $asal])->with('status', __('Buat PIN transaksi dulu untuk mengamankan dompet Anda.'));
         }
 
         return back()->withInput($request->except('pin'))->with('error', $e->getMessage());
@@ -105,7 +105,7 @@ class PortalDompetController extends Controller
         }
         $data = $request->validate(['kode' => ['required', 'string', 'max:10']]);
         if (! $this->masuk()->periksa($this->emailSaya($request), 'pin', $data['kode'])) {
-            return back()->with('error', 'Kode salah atau sudah kedaluwarsa.');
+            return back()->with('error', __('Kode salah atau sudah kedaluwarsa.'));
         }
 
         $this->portal($request)->pin()->simpan(Crypt::decryptString($terenkripsi));
@@ -115,7 +115,7 @@ class PortalDompetController extends Controller
         $kembali = $request->session()->pull(self::PIN_KEMBALI);
 
         return ($kembali ? redirect($kembali) : redirect()->route('portal.beranda'))
-            ->with('status', 'PIN transaksi berhasil disimpan. Gunakan PIN ini setiap membayar atau memindah saldo.');
+            ->with('status', __('PIN transaksi berhasil disimpan. Gunakan PIN ini setiap membayar atau memindah saldo.'));
     }
 
     /** Ganti PIN: cukup PIN lama, tanpa kode email. */
@@ -131,7 +131,7 @@ class PortalDompetController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('portal.beranda')->with('status', 'PIN transaksi berhasil diganti.');
+        return redirect()->route('portal.beranda')->with('status', __('PIN transaksi berhasil diganti.'));
     }
 
     // ---- Pindah saldo ----
@@ -140,7 +140,7 @@ class PortalDompetController extends Controller
     {
         $anak = Santri::with(['dompet', 'tabungan'])->where('id_wali', SesiWali::wali()->id)->where('status', 'aktif')->orderBy('nama')->get();
         if ($anak->isEmpty()) {
-            return redirect()->route('portal.beranda')->with('error', 'Pindah saldo tersedia setelah anak Anda berstatus santri aktif.');
+            return redirect()->route('portal.beranda')->with('error', __('Pindah saldo tersedia setelah anak Anda berstatus santri aktif.'));
         }
 
         return view('portal.pindah', [
@@ -167,8 +167,9 @@ class PortalDompetController extends Controller
             return self::tanganiGalat($e, $request);
         }
 
-        return redirect()->route('portal.dompet')->with('status', 'Saldo dipindahkan: '
-            .($data['arah'] === 'antar_anak' ? 'uang saku antar anak' : PembayaranPortal::ARAH[$data['arah']][2]).'.');
+        return redirect()->route('portal.dompet')->with('status', __('Saldo dipindahkan: :arah.', [
+            'arah' => $data['arah'] === 'antar_anak' ? __('uang saku antar anak') : __(PembayaranPortal::ARAH[$data['arah']][2]),
+        ]));
     }
 
     // ---- Tarik tabungan ----
@@ -177,7 +178,7 @@ class PortalDompetController extends Controller
     {
         $anak = Santri::with('tabungan')->where('id_wali', SesiWali::wali()->id)->where('status', 'aktif')->orderBy('nama')->get();
         if ($anak->isEmpty()) {
-            return redirect()->route('portal.beranda')->with('error', 'Tersedia setelah anak Anda berstatus santri aktif.');
+            return redirect()->route('portal.beranda')->with('error', __('Tersedia setelah anak Anda berstatus santri aktif.'));
         }
 
         return view('portal.tarik-tabungan', [
@@ -199,7 +200,7 @@ class PortalDompetController extends Controller
             return self::tanganiGalat($e, $request);
         }
 
-        return redirect()->route('portal.dompet.tabungan')->with('status', "Pengajuan {$p->nomor} terkirim. Keuangan akan memutuskannya; Anda menerima kabar di portal.");
+        return redirect()->route('portal.dompet.tabungan')->with('status', __('Pengajuan :nomor terkirim. Keuangan akan memutuskannya; Anda menerima kabar di portal.', ['nomor' => $p->nomor]));
     }
 
     public function batalTabungan(Request $request, int $id): RedirectResponse
@@ -210,7 +211,7 @@ class PortalDompetController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('portal.dompet.tabungan')->with('status', 'Pengajuan dibatalkan.');
+        return redirect()->route('portal.dompet.tabungan')->with('status', __('Pengajuan dibatalkan.'));
     }
 
     private function masuk(): MasukWali

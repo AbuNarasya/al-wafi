@@ -1,6 +1,6 @@
 @extends('layouts.portal')
 
-@section('title', 'Berkas Pendaftaran')
+@section('title', __('Berkas Pendaftaran'))
 @section('kembali', route('portal.anak', $santri->id))
 
 @php
@@ -17,38 +17,38 @@
 @section('content')
     <div class="mb-4">
         <h1 class="text-xl font-bold text-slate-900">{{ $santri->nama }}</h1>
-        <p class="text-sm text-slate-500">Unggah foto atau PDF berkas pendaftaran (maks {{ \App\Support\Unggahan::maksLabel() }} per berkas — foto dikecilkan otomatis).
-            Berkas juga boleh diserahkan langsung ke panitia.</p>
+        <p class="text-sm text-slate-500">{{ __('Unggah foto atau PDF berkas pendaftaran (maks :ukuran per berkas — foto dikecilkan otomatis).', ['ukuran' => \App\Support\Unggahan::maksLabel()]) }}
+            {{ __('Berkas juga boleh diserahkan langsung ke panitia.') }}</p>
     </div>
 
     {{-- Pengingat, bukan penghalang: proses PSB tetap berjalan walau berkas belum lengkap. --}}
     @if ($kurang > 0)
         <div class="mb-4 rounded-3xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
-            <b>{{ $kurang }} dari {{ $registrasi->count() }} berkas registrasi</b> belum diterima pesantren. Mohon dilengkapi.
+            {!! __('<b>:kurang dari :total berkas registrasi</b> belum diterima pesantren. Mohon dilengkapi.', ['kurang' => e($kurang), 'total' => e($registrasi->count())]) !!}
         </div>
     @elseif ($registrasi->isNotEmpty())
-        <div class="mb-4 rounded-3xl bg-emerald-50 p-4 text-sm text-emerald-800 ring-1 ring-emerald-200">Berkas registrasi sudah lengkap diterima. Jazakumullah khairan.</div>
+        <div class="mb-4 rounded-3xl bg-emerald-50 p-4 text-sm text-emerald-800 ring-1 ring-emerald-200">{{ __('Berkas registrasi sudah lengkap diterima. Jazakumullah khairan.') }}</div>
     @endif
 
     @foreach (['registrasi', 'pindahan', 'pasca_lulus'] as $kelompok)
         @php $isi = $perKelompok[$kelompok] ?? collect(); @endphp
         @continue ($isi->isEmpty())
         <section class="mb-5">
-            <h2 class="mb-1 flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span>{{ \App\Services\Ppsb\DokumenPolicy::LABEL_KELOMPOK[$kelompok] }}</h2>
+            <h2 class="mb-1 flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span>{{ __(\App\Services\Ppsb\DokumenPolicy::LABEL_KELOMPOK[$kelompok]) }}</h2>
             @if ($kelompok === 'pindahan')
-                <p class="mb-2 text-xs text-slate-500">Hanya untuk santri pindahan dari sekolah lain.</p>
+                <p class="mb-2 text-xs text-slate-500">{{ __('Hanya untuk santri pindahan dari sekolah lain.') }}</p>
             @endif
             <div class="divide-y divide-slate-100 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
                 @foreach ($isi as $b)
                     <div class="p-4">
                         <div class="flex items-start justify-between gap-2">
-                            <p class="font-semibold text-slate-900">{{ $b['label'] }}</p>
-                            <span class="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $warna[$b['status']] }}">{{ \App\Services\Modules\DokumenSantriService::STATUS[$b['status']] }}</span>
+                            <p class="font-semibold text-slate-900">{{ __($b['label']) }}</p>
+                            <span class="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $warna[$b['status']] }}">{{ __(\App\Services\Modules\DokumenSantriService::STATUS[$b['status']]) }}</span>
                         </div>
                         @if ($b['status'] === 'perlu_diganti' && $b['catatan'])
-                            <p class="mt-1 text-sm text-red-700">Catatan panitia: {{ $b['catatan'] }}</p>
+                            <p class="mt-1 text-sm text-red-700">{{ __('Catatan panitia: :catatan', ['catatan' => $b['catatan']]) }}</p>
                         @elseif ($b['status'] === 'diterima' && $b['berkas']->isEmpty())
-                            <p class="mt-1 text-xs text-slate-500">Diterima pesantren (diserahkan langsung).</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ __('Diterima pesantren (diserahkan langsung).') }}</p>
                         @endif
 
                         @foreach ($b['berkas'] as $d)
@@ -56,9 +56,9 @@
                                 <a href="{{ route('portal.berkas.lihat', $d->id) }}" target="_blank" rel="noopener" class="min-w-0 flex-1 truncate text-brand underline">{{ $d->nama_asli }}</a>
                                 <span class="shrink-0 text-xs text-slate-400">{{ $d->created_at?->format('d/m/Y') }}</span>
                                 @if ($bolehUnggah && $b['status'] !== 'diterima' && $d->diunggah_wali)
-                                    <form method="POST" action="{{ route('portal.berkas.hapus', $d->id) }}" data-confirm="Hapus berkas {{ $d->nama_asli }}?">
+                                    <form method="POST" action="{{ route('portal.berkas.hapus', $d->id) }}" data-confirm="{{ __('Hapus berkas :nama?', ['nama' => $d->nama_asli]) }}">
                                         @csrf @method('DELETE')
-                                        <button class="shrink-0 text-xs font-semibold text-red-700">Hapus</button>
+                                        <button class="shrink-0 text-xs font-semibold text-red-700">{{ __('Hapus') }}</button>
                                     </form>
                                 @endif
                             </div>
@@ -71,14 +71,14 @@
                                 @csrf
                                 <input type="hidden" name="jenis" value="{{ $b['jenis'] }}">
                                 @if ($b['jenis'] === 'lainnya')
-                                    <input name="keterangan" required maxlength="255" placeholder="Berkas apa ini?" class="mb-2 w-full rounded-2xl border border-slate-300 px-4 py-2.5 text-sm">
+                                    <input name="keterangan" required maxlength="255" placeholder="{{ __('Berkas apa ini?') }}" class="mb-2 w-full rounded-2xl border border-slate-300 px-4 py-2.5 text-sm">
                                 @endif
                                 <label class="flex cursor-pointer flex-wrap items-center justify-center gap-x-2 rounded-2xl border-2 border-dashed border-slate-300 py-2.5 text-sm font-semibold text-brand"
                                        :class="{ 'opacity-60': sibuk, 'border-brand bg-blue-50': seret }"
                                        @dragover.prevent="seret = true" @dragleave.prevent="seret = false" @drop.prevent="jatuhkan($event)">
                                     <x-portal.ikon nama="unggah" kelas="h-5 w-5" />
-                                    <span x-text="sibuk ? 'Mengirim…' : (seret ? 'Lepaskan berkas di sini' : @js($b['berkas']->isEmpty() ? 'Unggah berkas' : 'Unggah berkas pengganti'))"></span>
-                                    <span x-show="! sibuk && ! seret" class="hidden text-xs font-normal text-slate-500 sm:inline">atau seret berkas ke sini</span>
+                                    <span x-text="sibuk ? @js(__('Mengirim…')) : (seret ? @js(__('Lepaskan berkas di sini')) : @js($b['berkas']->isEmpty() ? __('Unggah berkas') : __('Unggah berkas pengganti')))"></span>
+                                    <span x-show="! sibuk && ! seret" class="hidden text-xs font-normal text-slate-500 sm:inline">{{ __('atau seret berkas ke sini') }}</span>
                                     <input type="file" name="berkas" accept="image/*,application/pdf" class="sr-only" @change="pilih($event)">
                                 </label>
                                 <p x-show="galat" x-text="galat" x-cloak class="mt-1 text-xs text-red-700"></p>
@@ -91,6 +91,6 @@
     @endforeach
 
     @unless ($bolehUnggah)
-        <p class="px-2 text-center text-xs text-slate-500">Proses pendaftaran ini sudah berakhir — berkas tidak bisa ditambah lagi.</p>
+        <p class="px-2 text-center text-xs text-slate-500">{{ __('Proses pendaftaran ini sudah berakhir — berkas tidak bisa ditambah lagi.') }}</p>
     @endunless
 @endsection

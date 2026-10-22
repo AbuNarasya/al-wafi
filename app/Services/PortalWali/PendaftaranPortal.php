@@ -136,12 +136,12 @@ class PendaftaranPortal
 
             if ($telepon !== null && self::teleponTerdaftar($telepon)) {
                 throw new AppException(409, $p === $peran
-                    ? 'Nomor HP ini sudah terdaftar di data keluarga santri. Masuklah dengan email yang tercatat di '
-                        .'keluarga Anda, atau hubungi panitia PSB untuk memperbarui email Anda.'
-                    : "Nomor HP {$label} sudah terdaftar di data keluarga santri lain. Kosongkan isiannya, atau hubungi panitia PSB.");
+                    ? __('Nomor HP ini sudah terdaftar di data keluarga santri. Masuklah dengan email yang tercatat di '
+                        .'keluarga Anda, atau hubungi panitia PSB untuk memperbarui email Anda.')
+                    : __('Nomor HP :peran sudah terdaftar di data keluarga santri lain. Kosongkan isiannya, atau hubungi panitia PSB.', ['peran' => __($label)]));
             }
             if ($p !== $peran && $email !== null && self::emailTerdaftar($email)) {
-                throw new AppException(409, "Email {$label} sudah terdaftar di data keluarga santri lain. Kosongkan isiannya, atau hubungi panitia PSB.");
+                throw new AppException(409, __('Email :peran sudah terdaftar di data keluarga santri lain. Kosongkan isiannya, atau hubungi panitia PSB.', ['peran' => __($label)]));
             }
 
             $pekerjaan = $data["pekerjaan_{$p}"] ?? null;
@@ -181,23 +181,23 @@ class PendaftaranPortal
         if (! $surat || (int) ($data['versi_surat'] ?? 0) !== $surat->versi) {
             // Versi yang dibaca wali harus versi yang disimpan: bila panitia
             // mengaktifkan versi baru saat formulir terbuka, wali membaca ulang.
-            throw new AppException(409, 'Surat pernyataan baru saja diperbarui panitia. Muat ulang halaman dan baca kembali sebelum mendaftar.');
+            throw new AppException(409, __('Surat pernyataan baru saja diperbarui panitia. Muat ulang halaman dan baca kembali sebelum mendaftar.'));
         }
 
         $gelombang = collect($pilihan['gelombang'])->first(fn ($g) => $g['tahun_ajaran'] === ($data['tahun_ajaran'] ?? null)
             && $g['kode'] === ($data['gelombang'] ?? null));
         if (! $gelombang) {
-            throw new AppException(422, 'Gelombang pendaftaran yang dipilih sudah ditutup. Muat ulang halaman.');
+            throw new AppException(422, __('Gelombang pendaftaran yang dipilih sudah ditutup. Muat ulang halaman.'));
         }
         if (! array_key_exists($data['jalur'] ?? '', $pilihan['jalur'])) {
-            throw new AppException(422, 'Jalur pendaftaran ini tidak tersedia di portal.');
+            throw new AppException(422, __('Jalur pendaftaran ini tidak tersedia di portal.'));
         }
         $jenjang = collect($pilihan['jenjang'])->firstWhere('kode', $data['kode_jenjang'] ?? null);
         if (! $jenjang || ! in_array((int) ($data['tingkat'] ?? 0), $jenjang['tingkat'], true)) {
-            throw new AppException(422, 'Jenjang atau kelas tidak tersedia.');
+            throw new AppException(422, __('Jenjang atau kelas tidak tersedia.'));
         }
         if (in_array($data['jalur'], $jenjang['jalur_nonaktif'][$data['tahun_ajaran']] ?? [], true)) {
-            throw new AppException(422, "Jalur {$pilihan['jalur'][$data['jalur']]} tidak dibuka untuk {$jenjang['nama']}.");
+            throw new AppException(422, __('Jalur :jalur tidak dibuka untuk :jenjang.', ['jalur' => $pilihan['jalur'][$data['jalur']], 'jenjang' => $jenjang['nama']]));
         }
 
         $isianSantri = [
@@ -243,7 +243,7 @@ class PendaftaranPortal
             // Pesan service ditulis untuk panitia (mis. "isi selnya di Setting Awal → Tarif").
             // Wali tak bisa berbuat apa-apa atasnya — dicatat untuk panitia, wali diberi pesan umum.
             Log::warning('Pendaftaran portal ditolak service', ['pesan' => $e->getMessage(), 'email' => $penanda['email']]);
-            throw new AppException(422, 'Pendaftaran untuk pilihan ini belum bisa diproses. Silakan hubungi panitia PSB.');
+            throw new AppException(422, __('Pendaftaran untuk pilihan ini belum bisa diproses. Silakan hubungi panitia PSB.'));
         }
     }
 }

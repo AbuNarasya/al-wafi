@@ -31,7 +31,7 @@ class PortalBayarBanyakController extends Controller
     private function isian(Request $request): array
     {
         $data = $request->validate(['nominal' => ['required', 'array', 'min:1', 'max:'.PembayaranPortal::MAKS_KERANJANG],
-            'nominal.*' => ['required', 'integer', 'min:1']], ['nominal.required' => 'Pilih minimal satu tagihan.']);
+            'nominal.*' => ['required', 'integer', 'min:1']], ['nominal.required' => __('Pilih minimal satu tagihan.')]);
 
         return collect($data['nominal'])->mapWithKeys(fn ($n, $id) => [(int) $id => (string) $n])->all();
     }
@@ -67,8 +67,10 @@ class PortalBayarBanyakController extends Controller
             return PortalDompetController::tanganiGalat($e, $request);
         }
 
-        return redirect()->route('portal.tagihan')->with('status', $hasil->count().' tagihan dibayar dari Dompet Wali, total Rp '
-            .number_format((float) $hasil->sum(fn ($p) => (float) $p->nominal), 0, ',', '.').'.');
+        return redirect()->route('portal.tagihan')->with('status', __(':jumlah tagihan dibayar dari Dompet Wali, total :nominal.', [
+            'jumlah' => $hasil->count(),
+            'nominal' => 'Rp '.number_format((float) $hasil->sum(fn ($p) => (float) $p->nominal), 0, ',', '.'),
+        ]));
     }
 
     public function transfer(Request $request): RedirectResponse
@@ -79,9 +81,9 @@ class PortalBayarBanyakController extends Controller
             'tanggal' => ['required', 'date', 'before_or_equal:today'],
             'bukti' => Unggahan::aturan(),
         ], [
-            'bukti.required' => 'Unggah foto atau PDF bukti transfer.',
-            'bukti.max' => 'Berkas bukti terlalu besar (maksimal '.Unggahan::maksLabel().').',
-            'tanggal.before_or_equal' => 'Tanggal transfer tidak boleh di masa depan.',
+            'bukti.required' => __('Unggah foto atau PDF bukti transfer.'),
+            'bukti.max' => __('Berkas bukti terlalu besar (maksimal :ukuran).', ['ukuran' => Unggahan::maksLabel()]),
+            'tanggal.before_or_equal' => __('Tanggal transfer tidak boleh di masa depan.'),
         ]);
         $data['bukti_path'] = $request->file('bukti')->store('pembayaran-bukti', 'local');
 
@@ -93,8 +95,9 @@ class PortalBayarBanyakController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('portal.tagihan')->with('status', 'Bukti transfer untuk '.$baris->count()
-            .' tagihan terkirim. Keuangan akan memeriksanya; statusnya berubah setelah diverifikasi.');
+        return redirect()->route('portal.tagihan')->with('status', __('Bukti transfer untuk :jumlah tagihan terkirim. Keuangan akan memeriksanya; statusnya berubah setelah diverifikasi.', [
+            'jumlah' => $baris->count(),
+        ]));
     }
 
     public function online(Request $request, PembayaranMidtrans $midtrans): RedirectResponse

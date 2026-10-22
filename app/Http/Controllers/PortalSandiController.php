@@ -40,7 +40,7 @@ class PortalSandiController extends Controller
             return redirect()->route('portal.beranda');
         }
         $data = $request->validate(['sandi' => ['required', 'string', 'max:255'], 'sandi_ulang' => ['required', 'string']],
-            ['sandi.required' => 'Isi password baru.', 'sandi_ulang.required' => 'Ulangi password baru.']);
+            ['sandi.required' => __('Isi password baru.'), 'sandi_ulang.required' => __('Ulangi password baru.')]);
         $wali = SesiWali::wali();
         $peran = (string) SesiWali::peran($request);
         // Hanya MENGGANTI password lama (lupa password) yang mengeluarkan perangkat lain —
@@ -58,7 +58,7 @@ class PortalSandiController extends Controller
         $request->session()->forget(SesiWali::WAJIB_SANDI);
         $request->session()->put(SesiWali::PUNYA_SANDI, true);
 
-        return redirect()->route('portal.beranda')->with('status', 'Password tersimpan. Mulai sekarang masuk dengan email dan password ini.');
+        return redirect()->route('portal.beranda')->with('status', __('Password tersimpan. Mulai sekarang masuk dengan email dan password ini.'));
     }
 
     public function formGanti(): View
@@ -70,12 +70,12 @@ class PortalSandiController extends Controller
     {
         $data = $request->validate([
             'sandi_lama' => ['required', 'string'], 'sandi' => ['required', 'string', 'max:255'], 'sandi_ulang' => ['required', 'string'],
-        ], ['sandi_lama.required' => 'Isi password lama.', 'sandi.required' => 'Isi password baru.', 'sandi_ulang.required' => 'Ulangi password baru.']);
+        ], ['sandi_lama.required' => __('Isi password lama.'), 'sandi.required' => __('Isi password baru.'), 'sandi_ulang.required' => __('Ulangi password baru.')]);
         $wali = SesiWali::wali();
         $peran = (string) SesiWali::peran($request);
 
         if (! $this->sandi->cocok($wali, $peran, $data['sandi_lama'])) {
-            return back()->with('error', 'Password lama salah. Lupa? Keluar, lalu pakai "Lupa password" di halaman masuk.');
+            return back()->with('error', __('Password lama salah. Lupa? Keluar, lalu pakai "Lupa password" di halaman masuk.'));
         }
         try {
             $this->sandi->simpan($wali, $peran, $data['sandi'], $data['sandi_ulang']);
@@ -84,6 +84,6 @@ class PortalSandiController extends Controller
         }
         $this->perangkat->cabutLainnya($wali->id, $peran, $request);
 
-        return redirect()->route('portal.akun')->with('status', 'Password diganti. Perangkat lain Anda harus masuk ulang.');
+        return redirect()->route('portal.akun')->with('status', __('Password diganti. Perangkat lain Anda harus masuk ulang.'));
     }
 }

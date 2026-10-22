@@ -63,18 +63,18 @@ class MasukWali
     {
         $email = self::normalEmail($email);
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new AppException(422, 'Alamat email tidak sah.');
+            throw new AppException(422, __('Alamat email tidak sah.'));
         }
 
         $terakhir = OtpWali::where('email', $email)->where('tujuan', $tujuan)->latest('id')->value('created_at');
         if ($terakhir && now()->diffInSeconds($terakhir, true) < self::JEDA_DETIK) {
-            throw new AppException(429, 'Kode baru saja dikirim. Tunggu satu menit sebelum meminta lagi.');
+            throw new AppException(429, __('Kode baru saja dikirim. Tunggu satu menit sebelum meminta lagi.'));
         }
         foreach (['email' => [$email, self::BATAS_EMAIL], 'ip' => [$ip ?? '-', self::BATAS_IP]] as $jenis => [$nilai, [$maks, $detik]]) {
             $kunci = "portal-otp:{$jenis}:{$nilai}";
             if (RateLimiter::tooManyAttempts($kunci, $maks)) {
                 $menit = (int) ceil(RateLimiter::availableIn($kunci) / 60);
-                throw new AppException(429, "Terlalu banyak permintaan kode. Coba lagi dalam {$menit} menit.");
+                throw new AppException(429, __('Terlalu banyak permintaan kode. Coba lagi dalam :menit menit.', ['menit' => $menit]));
             }
             RateLimiter::hit($kunci, $detik);
         }
@@ -90,7 +90,8 @@ class MasukWali
             ]);
         });
 
-        Notification::route('mail', $email)->notify(new KodeMasukWali($kode, self::MENIT));
+        // Bahasa email = bahasa portal wali saat meminta kode (tetap benar bila kelak di-antre).
+        Notification::route('mail', $email)->notify((new KodeMasukWali($kode, self::MENIT))->locale(app()->getLocale()));
 
         return self::modeUji() ? $kode : null;
     }

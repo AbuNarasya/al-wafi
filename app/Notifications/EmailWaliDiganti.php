@@ -27,11 +27,14 @@ class EmailWaliDiganti extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Email Portal Wali Anda telah diganti')
-            ->greeting('Assalamu\'alaikum,')
-            ->line("Email {$this->peran} di Portal Wali Al Wafi baru saja diganti oleh {$this->oleh} menjadi {$this->emailBaru}.")
-            ->line('Mulai sekarang, alamat ini tidak bisa lagi dipakai untuk masuk Portal Wali.')
-            ->line('Bila Anda tidak mengenali perubahan ini, segera hubungi panitia / bagian kesantrian pesantren.')
+            // Teks `__()`: tak di-antre, jadi terkirim dalam locale permintaan portal (bahasa wali yang mengganti).
+            ->subject(__('Email Portal Wali Anda telah diganti'))
+            ->greeting(__("Assalamu'alaikum,"))
+            ->line(__('Email :peran di Portal Wali Al Wafi baru saja diganti oleh :oleh menjadi :email.', [
+                'peran' => mb_strtolower(__(ucfirst($this->peran))), 'oleh' => $this->oleh, 'email' => $this->emailBaru,
+            ]))
+            ->line(__('Mulai sekarang, alamat ini tidak bisa lagi dipakai untuk masuk Portal Wali.'))
+            ->line(__('Bila Anda tidak mengenali perubahan ini, segera hubungi panitia / bagian kesantrian pesantren.'))
             ->salutation('Al Wafi Islamic Boarding School');
     }
 }
