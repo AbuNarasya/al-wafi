@@ -795,6 +795,7 @@ Route::middleware('auth')->group(function () {
         ->middleware('hakakses:pengunduran-diri,lihat')->group(function () {
             Route::get('/', 'index')->name('index');
             Route::post('/keluarkan', 'keluarkan')->name('keluarkan')->middleware('hakakses:clearance-admin,ubah');
+            Route::post('/ajukan/{santri}', 'ajukan')->name('ajukan')->middleware('hakakses:pengunduran-diri,buat')->whereNumber('santri');
             Route::get('/dokumen/{dokumen}', 'dokumen')->name('dokumen')->whereNumber('dokumen');
             Route::get('/{pengajuan}', 'show')->name('show')->whereNumber('pengajuan');
             Route::post('/{pengajuan}/verifikasi', 'verifikasi')->name('verifikasi')->whereNumber('pengajuan');

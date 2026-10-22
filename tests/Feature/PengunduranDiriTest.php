@@ -25,6 +25,7 @@ use Tests\TestCase;
 class PengunduranDiriTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\MembuatTarif;
 
     private const PIN = '482915';
 
@@ -125,6 +126,34 @@ class PengunduranDiriTest extends TestCase
         $mutasi = $p->dokumen()->where('jenis', 'surat_mutasi')->sole();
         $this->sebagaiIbu()->get(route('portal.mundur', $this->ahmad->id))->assertSee('Selesai')->assertSee('Surat mutasi');
         $this->sebagaiIbu()->get(route('portal.mundur.dokumen', $mutasi->id))->assertOk();
+    }
+
+    /** 22 Okt 2026: staf mengajukan atas nama wali dari halaman santri; tagihan PPSB ikut "tetap tertagih". */
+    public function test_staf_mengajukan_atas_nama_wali_dan_seluruh_tagihan_tetap_tertagih(): void
+    {
+        \App\Models\BusinessUnit::create(['kode_unit' => 'ZZU', 'nama_unit' => 'Unit']);
+        \App\Models\CoaGroup::create(['kode_grup' => 'ZZPD', 'nama_grup' => 'Uji']);
+        \App\Models\CoaDetail::create(['kode_coa' => '4.ZZPD.UP', 'nama_coa' => 'Pend UP', 'kode_grup' => 'ZZPD', 'jenis_saldo' => 'kredit']);
+        $this->buatBiaya(['kode' => 'UPZ', 'nama' => 'Uang Pangkal', 'tipe' => 'uang_pangkal', 'kode_jenjang' => 'J002', 'kode_coa_pendapatan' => '4.ZZPD.UP', 'kode_unit' => 'ZZU']);
+        \App\Models\TagihanSantri::create(['id_santri' => $this->ahmad->id, 'kode_jenis' => 'UPZ', 'perilaku' => 'uang_pangkal', 'kode_jenjang' => 'J002',
+            'tahun_ajaran' => '2026/2027', 'nominal' => 3000000, 'sisa' => 3000000, 'status' => 'belum_bayar', 'jatuh_tempo' => now()->toDateString()]);
+
+        $this->actingAs($this->u['lain'])->post(route('pengunduran_diri.ajukan', $this->ahmad->id), ['alasan' => 'Pindah', 'surat' => $this->surat()])
+            ->assertForbidden(); // tanpa hak "buat"
+        HakAksesModul::where('id_pengguna', $this->u['tu']->id_pengguna)->where('kode_modul', 'pengunduran-diri')->update(['buat' => true]);
+        HakAksesModul::create(['id_pengguna' => $this->u['tu']->id_pengguna, 'kode_modul' => 'santri', 'lihat' => true, 'buat' => false, 'ubah' => false, 'hapus' => false, 'menu' => true]);
+        Akses::lupakan();
+        $this->actingAs($this->u['tu'])->get(route('santri.show', $this->ahmad->id))->assertSee('Ajukan Pengunduran Diri');
+        $this->actingAs($this->u['tu'])->post(route('pengunduran_diri.ajukan', $this->ahmad->id), ['alasan' => 'Pindah kota', 'surat' => $this->surat()])
+            ->assertSessionHas('status');
+
+        $p = PengajuanKeluar::sole();
+        $this->assertSame(['menunggu_wali_kelas', 'staf', $this->wali->id], [$p->status, $p->diajukan_peran, (int) $p->id_wali]);
+        $this->assertTrue(NotifikasiWali::where('jenis', 'pengunduran_diri')->exists(), 'wali dikabari');
+
+        $keu = app(\App\Services\Modules\PengunduranDiriService::class)->keuangan($this->ahmad);
+        $this->assertSame(['3000000.00', []], [$keu['tetap_total'], $keu['dibatalkan']]);
+        $this->assertFalse($keu['bersih']);
     }
 
     /**

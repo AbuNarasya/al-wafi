@@ -52,6 +52,20 @@ class PengunduranDiriController extends Controller
         ]);
     }
 
+    /** Diajukan staf atas nama wali, dari halaman santri (santri aktif tak lagi bisa dikeluarkan langsung). */
+    public function ajukan(Request $request, int $santri): RedirectResponse
+    {
+        $d = $request->validate(['alasan' => ['required', 'string', 'max:2000'], 'rencana_tanggal' => ['nullable', 'date'], 'surat' => Unggahan::aturan()]);
+        $s = \App\Models\Santri::findOrFail($santri);
+        try {
+            $p = $this->svc->ajukanOlehStaf($s, $request->user(), $d['alasan'], $d['rencana_tanggal'] ?? null, $request->file('surat'));
+        } catch (AppException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('pengunduran_diri.show', $p->id)->with('status', "Pengajuan {$p->nomor} dikirim ke wali kelas.");
+    }
+
     public function verifikasi(Request $request, PengajuanKeluar $pengajuan): RedirectResponse
     {
         $d = $request->validate(['keputusan' => ['required', Rule::in(['lanjut', 'kembalikan'])], 'catatan' => ['nullable', 'string', 'max:2000']]);

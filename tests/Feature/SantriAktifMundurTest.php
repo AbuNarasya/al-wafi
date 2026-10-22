@@ -25,7 +25,7 @@ use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-/** Pengunduran diri SANTRI AKTIF: sisa uang pangkal dihapuskan + akrual dibalik sebesar sisa. */
+/** Pengunduran diri SANTRI AKTIF (keputusan user 22 Okt 2026): seluruh tagihan tetap ditagih; kelas, kartu, jadwal & lanjutan dibereskan. */
 class SantriAktifMundurTest extends TestCase
 {
     use \Tests\Concerns\MengaktifkanSantri;
@@ -110,12 +110,9 @@ class SantriAktifMundurTest extends TestCase
         return $rows->reduce(fn ($t, $l) => Money::add($t, Money::sub($l->debet, $l->kredit)), '0');
     }
 
-    public function test_mundur_menghapus_sisa_dan_membalik_akrual_sebesar_sisa(): void
+    public function test_semua_tagihan_tetap_ditagih_tanpa_jurnal_pembalik(): void
     {
         $santri = $this->santriAktif();
-        $this->assertSame(20000000.0, (float) $this->saldo(self::PIUT_UP), 'akrual daftar ulang membentuk piutang 20jt');
-
-        // Bayar 5 juta SETELAH daftar ulang → piutang tinggal 15 juta.
         $this->bayarUp($santri, '5000000');
         $this->assertSame(15000000.0, (float) $this->saldo(self::PIUT_UP));
 
@@ -123,41 +120,36 @@ class SantriAktifMundurTest extends TestCase
 
         $this->assertSame('keluar', $santri->refresh()->status);
         $tagihan = $this->tagihanUp($santri);
-        $this->assertSame('batal', $tagihan->status);
-        $this->assertSame(0.0, (float) $tagihan->sisa);
-
-        // Piutang nol, dan pendapatan tinggal sebesar yang benar-benar diterima (5 juta).
-        $this->assertSame(0.0, (float) $this->saldo(self::PIUT_UP), 'piutang habis, tidak minus');
-        $this->assertSame(-5000000.0, (float) $this->saldo(self::PEND_UP), 'pendapatan tersisa 5jt (kredit)');
-
-        $pembalik = JournalEntry::where('keterangan', 'like', 'Pembatalan sisa uang pangkal%')->first();
-        $this->assertNotNull($pembalik);
+        $this->assertSame(['sebagian', 15000000.0], [$tagihan->status, (float) $tagihan->sisa], 'sisa uang pangkal tetap ditagih');
+        $this->assertSame(15000000.0, (float) $this->saldo(self::PIUT_UP), 'piutang utuh');
+        $this->assertNull(JournalEntry::where('keterangan', 'like', 'Pembatalan sisa%')->first());
         $this->assertDatabaseHas('activity_log', ['aksi' => 'santri_aktif_mengundurkan_diri']);
+
+        // Wali tetap bisa melunasinya dari portal.
+        [$alur] = \App\Services\PortalWali\PembayaranPortal::alur($tagihan->load('santri'));
+        $this->assertNotNull($alur);
     }
 
-    public function test_tanpa_pembayaran_setelah_akrual_pembalik_sama_dengan_akrual_penuh(): void
+    public function test_keluar_melepas_kelas_kartu_jadwal_dan_lanjutan(): void
     {
         $santri = $this->santriAktif();
+        $kelas = \App\Models\Kelas::create(['kode_jenjang' => $santri->kode_jenjang, 'tingkat' => 1, 'nama' => '7A', 'peruntukan' => 'L']);
+        $santri->update(['id_kelas' => $kelas->id]);
+        $kartu = \App\Models\KartuSantri::create(['uid' => 'AABBCCDD', 'id_santri' => $santri->id, 'status' => 'aktif']);
+        $jadwal = \App\Models\JadwalPerubahanSantri::create(['id_santri' => $santri->id, 'tahun_ajaran' => self::TA, 'keputusan' => 'naik', 'status' => 'siap']);
+        TahunAjaran::create(['kode' => '2027/2028', 'status' => 'nonaktif']);
+        $lanjutan = \App\Models\Pendaftaran::create(['id_santri' => $santri->id, 'jenis' => 'lanjutan', 'status' => 'calon', 'nomor' => 'LJ-UJI-1', 'tanggal' => now()->toDateString(),
+            'tahun_ajaran' => '2027/2028', 'kode_jenjang' => $santri->kode_jenjang]);
 
         (new SantriService)->mengundurkanDiri($santri->id, 'pindah', $this->admin);
 
-        $this->assertSame(0.0, (float) $this->saldo(self::PIUT_UP));
-        $this->assertSame(0.0, (float) $this->saldo(self::PEND_UP), 'pendapatan uang pangkal kembali nol');
+        $this->assertNull($santri->refresh()->id_kelas);
+        $this->assertSame(['diblokir', 'Santri keluar'], [$kartu->refresh()->status, $kartu->alasan_blokir]);
+        $this->assertSame('dibatalkan', $jadwal->refresh()->status);
+        $this->assertSame('mengundurkan_diri', $lanjutan->refresh()->status);
     }
 
-    public function test_lunas_sebelum_daftar_ulang_tidak_menerbitkan_jurnal_pembalik(): void
-    {
-        $santri = $this->santriAktif('20000000'); // lunas sebelum daftar ulang → tak ada akrual
-        $this->assertSame(0.0, (float) $this->saldo(self::PIUT_UP));
-
-        (new SantriService)->mengundurkanDiri($santri->id, 'pindah', $this->admin);
-
-        $this->assertSame('keluar', $santri->refresh()->status);
-        $this->assertNull(JournalEntry::where('keterangan', 'like', 'Pembatalan sisa uang pangkal%')->first());
-        $this->assertSame(-20000000.0, (float) $this->saldo(self::PEND_UP), 'pendapatan yang sudah diterima tidak diusik');
-    }
-
-    public function test_tolak_bila_ada_pembayaran_menunggu_verifikasi(): void
+    public function test_pembayaran_menunggu_verifikasi_tidak_menahan_keluar(): void
     {
         $santri = $this->santriAktif();
         (new PembayaranSantriService)->catat([
@@ -165,12 +157,12 @@ class SantriAktifMundurTest extends TestCase
             'tanggal' => now()->toDateString(), 'nominal' => '1000000', 'kode_rekening' => self::KAS,
         ], $this->admin, 'ppsb');
 
-        $this->expectException(AppException::class);
-        $this->expectExceptionMessageMatches('/menunggu verifikasi/i');
+        // Tak ada sisa yang dihapuskan, jadi angka yang masih bergerak tak lagi jadi masalah.
         (new SantriService)->mengundurkanDiri($santri->id, 'pindah', $this->admin);
+        $this->assertSame('keluar', $santri->refresh()->status);
     }
 
-    public function test_rencana_angsuran_aktif_dinonaktifkan(): void
+    public function test_rencana_angsuran_tetap_berjalan(): void
     {
         $santri = $this->santriAktif();
         (new AngsuranUangPangkalService)->buatRencana($santri->id, [
@@ -183,7 +175,29 @@ class SantriAktifMundurTest extends TestCase
 
         (new SantriService)->mengundurkanDiri($santri->id, 'pindah domisili', $this->admin);
 
-        $this->assertFalse(RencanaAngsuranUangPangkal::where('id_tagihan', $this->tagihanUp($santri)->id)->where('status', 'aktif')->exists());
+        $this->assertTrue(RencanaAngsuranUangPangkal::where('id_tagihan', $this->tagihanUp($santri)->id)->where('status', 'aktif')->exists(),
+            'tagihannya tetap ditagih, jadwal cicilannya tetap berlaku');
+    }
+
+    public function test_auto_debet_tetap_memotong_tagihan_santri_yang_sudah_keluar(): void
+    {
+        $santri = $this->santriAktif();
+        (new SantriService)->mengundurkanDiri($santri->id, 'pindah', $this->admin);
+        \App\Models\Wali::whereKey($santri->id_wali)->update(['auto_debet' => true]);
+        CoaDetail::create(['kode_coa' => \App\Services\Ppsb\DompetPolicy::COA_TITIPAN['wali'], 'nama_coa' => 'Titipan Wali', 'kode_grup' => self::GRP, 'jenis_saldo' => 'kredit']);
+        \App\Models\DompetWali::create(['id_wali' => $santri->id_wali, 'saldo' => '20000000']);
+
+        (new \App\Services\Modules\AutoDebetService)->jalankan($this->admin);
+
+        $this->assertSame('lunas', $this->tagihanUp($santri)->status);
+    }
+
+    public function test_tombol_langsung_di_halaman_santri_ditolak_untuk_santri_aktif(): void
+    {
+        $santri = $this->santriAktif();
+        $this->actingAs(User::find($this->admin))->post(route('santri.aksi', [$santri->id, 'undur-diri']), ['alasan' => 'pindah'])
+            ->assertSessionHas('error', fn ($m) => str_contains($m, 'alur Pengunduran Diri'));
+        $this->assertSame('aktif', $santri->refresh()->status);
     }
 
     public function test_calon_belum_aktif_tetap_memakai_alur_lama(): void

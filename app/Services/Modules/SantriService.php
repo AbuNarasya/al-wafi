@@ -863,13 +863,12 @@ class SantriService
         }
         Tahap::assertBolehMundur($santri->status);
 
-        // Santri AKTIF: sisa uang pangkal dihapuskan & akrualnya dibalik.
+        // Santri AKTIF: keluar dengan SELURUH tagihan tetap ditagih (keputusan user 22 Okt 2026).
         if ($santri->status === 'aktif') {
             // GERBANG TITIPAN. Hanya titipan yang ditahan, BUKAN tagihan —
-            // sisa uang pangkal & perlengkapan memang sudah dibalik akrualnya
-            // beberapa baris di bawah, dan menahan kepergian karena tagihan
-            // berarti menahan santri yang justru keluar karena tak sanggup
-            // membayar. Titipan tak punya jalan keluar lain; kalau ditinggalkan
+            // tagihannya tetap ditagih sesudah keluar, dan menahan kepergian
+            // karena tagihan berarti menahan santri yang justru keluar karena
+            // tak sanggup membayar. Titipan tak punya jalan keluar lain; kalau ditinggalkan
             // ia menggantung di neraca selamanya.
             (new BebasTanggunganService)->assertTitipanDikembalikan(
                 $santri->id,
@@ -997,88 +996,44 @@ class SantriService
     }
 
     /**
-     * Pengunduran diri santri AKTIF → status "keluar". Sisa uang pangkal DAN
-     * biaya perlengkapan yang belum dibayar dibatalkan, akrualnya dibalik
-     * SEBESAR SISA (bukan nominal akrual asli): pembayaran yang sudah masuk
-     * sejak daftar ulang telah mengurangi piutang lewat jurnalnya sendiri, jadi
-     * membalik nominal asli akan membuat piutang minus dan menghapus pendapatan
-     * yang benar diterima. Tagihan lain (SPP dll.) sengaja TIDAK disentuh.
+     * Pengunduran diri santri AKTIF → status "keluar" (keputusan user 22 Okt 2026).
      *
-     * Sama seperti akrualnya, pembalikan keduanya berupa dua jurnal terpisah
-     * agar masing-masing memakai unit bisnisnya sendiri.
+     * SELURUH tagihan tetap ditagih — SPP, tagihan lain, DAN sisa uang pangkal & perlengkapan. Dulu sisa
+     * PPSB dibatalkan & akrualnya dibalik; kini hanya CALON yang tagihan PPSB-nya ditutup saat mundur. Wali
+     * tetap bisa melunasinya dari portal, dan auto-debet tetap memotongnya.
+     *
+     * Yang dibereskan: santri dilepas dari rombelnya, kartu RFID aktif diblokir (tak bisa belanja / ke klinik),
+     * jadwal perubahan yang belum menyala dibatalkan, dan pendaftaran lanjutan yang masih berjalan ditutup —
+     * supaya ia tak "hidup lagi" sebagai calon di tahun berikutnya.
      */
     private function keluarkanSantriAktif(Santri $santri, string $alasan, ?int $idPengguna): Santri
     {
-        $tagihan = $this->tagihanPerilaku($santri->id, 'uang_pangkal');
-        $perlengkapan = $this->tagihanPerilaku($santri->id, 'perlengkapan');
+        return DB::transaction(function () use ($santri, $alasan, $idPengguna) {
+            $kelasLama = $santri->id_kelas;
+            $santri->update(['status' => 'keluar', 'id_kelas' => null]);
 
-        /** @var list<array{tagihan:TagihanSantri,sisa:string,balik:bool}> */
-        $garap = [];
-        $sisaTotal = '0';
-        foreach (array_filter([$tagihan, $perlengkapan]) as $t) {
-            if ($t->status === 'batal') {
-                continue;
-            }
-            $label = $t->jenis?->nama ?? 'tagihan';
-            $menunggu = PembayaranSantri::where('id_tagihan', $t->id)->where('status', 'menunggu_verifikasi')->count();
-            if ($menunggu > 0) {
-                throw new AppException(422, "Masih ada {$menunggu} pembayaran \"{$label}\" yang menunggu verifikasi keuangan. Verifikasi atau tolak dulu, agar sisa yang dihapuskan bukan angka yang masih berubah.");
+            $kartu = \App\Models\KartuSantri::where('id_santri', $santri->id)->where('status', 'aktif')->get();
+            foreach ($kartu as $k) {
+                $k->update(['status' => 'diblokir', 'alasan_blokir' => 'Santri keluar', 'diblokir_pada' => now(), 'diblokir_oleh' => $idPengguna]);
             }
 
-            $sisa = Money::of($t->sisa);
-            $balik = $t->sudah_akrual && Money::gtZero($sisa);
-            if ($balik && ! $t->jenis?->kode_coa_piutang) {
-                throw new AppException(422, "Jenis biaya \"{$label}\" belum punya akun piutang, sehingga akrualnya tidak bisa dibalik. Lengkapi dulu di master Jenis Biaya.");
+            $jadwal = JadwalPerubahanSantri::where('id_santri', $santri->id)->whereIn('status', JadwalPerubahanSantri::HIDUP)
+                ->update(['status' => 'dibatalkan', 'catatan' => "Santri keluar: {$alasan}"]);
+
+            $lanjutan = Pendaftaran::where('id_santri', $santri->id)->lanjutan()->terbuka()->get();
+            foreach ($lanjutan as $p) {
+                $p->update(['status' => 'mengundurkan_diri', 'catatan' => "Santri keluar: {$alasan}"]);
             }
-            $garap[] = ['tagihan' => $t, 'sisa' => $sisa, 'balik' => $balik];
-            if ($balik) {
-                $sisaTotal = Money::add($sisaTotal, $sisa);
-            }
-        }
-        $adaBalik = collect($garap)->contains('balik', true);
-
-        return DB::transaction(function () use ($santri, $alasan, $idPengguna, $tagihan, $perlengkapan, $garap, $sisaTotal, $adaBalik) {
-            foreach ($garap as $g) {
-                $t = $g['tagihan'];
-                if ($g['balik']) {
-                    $jenis = $t->jenis;
-                    PostingService::postJournal([
-                        'referensi' => $santri->nis ?? $santri->no_pendaftaran,
-                        'tanggal' => Carbon::now()->toDateString(),
-                        'kode_unit' => $jenis->kode_unit,
-                        'sumber_modul' => 'PembayaranSantri',
-                        'id_sumber' => (string) $t->id,
-                        'id_pengguna' => $idPengguna,
-                        'keterangan' => 'Pembatalan sisa '.$this->labelKomponen($t)." — pengunduran diri {$santri->nama}",
-                        // Kebalikan jurnal akrual daftar ulang, sebesar sisa yang masih menggantung.
-                        'lines' => [
-                            ['kode_coa' => $jenis->kode_coa_pendapatan, 'debet' => $g['sisa'], 'kredit' => '0'],
-                            ['kode_coa' => $jenis->kode_coa_piutang, 'debet' => '0', 'kredit' => $g['sisa']],
-                        ],
-                    ]);
-                }
-
-                $t->update(['sisa' => '0', 'status' => 'batal']);
-                PotonganUangPangkal::batalkanUntuk($t->id);
-
-                // Jadwal angsuran atas tagihan yang dibatalkan tak lagi berlaku.
-                RencanaAngsuranUangPangkal::where('id_tagihan', $t->id)->where('status', 'aktif')
-                    ->update(['status' => 'digantikan', 'alasan' => "Santri mengundurkan diri: {$alasan}"]);
-            }
-
-            $santri->update(['status' => 'keluar']);
-            Pendaftaran::where('id_santri', $santri->id)->update(['catatan' => "Mengundurkan diri (santri aktif): {$alasan}"]);
 
             ActivityLog::create([
                 'id_pengguna' => $idPengguna,
                 'aksi' => 'santri_aktif_mengundurkan_diri',
                 'detail' => json_encode([
                     'id_santri' => $santri->id, 'nis' => $santri->nis, 'no_pendaftaran' => $santri->no_pendaftaran,
-                    'nama' => $santri->nama, 'alasan' => $alasan,
-                    'id_tagihan_uang_pangkal' => $tagihan?->id,
-                    'id_tagihan_perlengkapan' => $perlengkapan?->id,
-                    'sisa_dihapuskan' => $adaBalik ? $sisaTotal : '0',
-                    'akrual_dibalik' => $adaBalik,
+                    'nama' => $santri->nama, 'alasan' => $alasan, 'id_kelas_lama' => $kelasLama,
+                    'kartu_diblokir' => $kartu->pluck('uid')->all(), 'jadwal_dibatalkan' => $jadwal,
+                    'pendaftaran_lanjutan_ditutup' => $lanjutan->pluck('nomor')->all(),
+                    'tagihan' => 'seluruhnya tetap ditagih',
                 ], JSON_UNESCAPED_UNICODE),
             ]);
 

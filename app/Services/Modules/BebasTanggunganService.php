@@ -74,12 +74,10 @@ class BebasTanggunganService
     /**
      * GERBANG kepergian — menahan TITIPAN yang belum dikembalikan.
      *
-     * Sengaja hanya titipan, BUKAN tagihan. Tagihan sudah punya jalan
-     * keluarnya sendiri: `SantriService::keluarkanSantriAktif()` membalik
-     * akrual uang pangkal & perlengkapan yang bersisa, dan itu perilaku yang
-     * memang dirancang begitu. Menahan kepergian karena tagihan berarti
-     * melawan rancangan yang sudah ada — dan menahan santri yang justru sedang
-     * keluar karena tak sanggup membayar.
+     * Sengaja hanya titipan, BUKAN tagihan. Tagihan TETAP DITAGIH sesudah
+     * santri keluar (keputusan user 22 Okt 2026) — wali melunasinya dari portal
+     * atau auto-debet. Menahan kepergian karena tagihan berarti menahan santri
+     * yang justru sedang keluar karena tak sanggup membayar.
      *
      * Titipan lain ceritanya: ia uang WALI yang dipegang pesantren, tak punya
      * jalan keluar mana pun sebelum modul penarikan ada, dan kalau ditinggalkan

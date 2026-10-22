@@ -79,7 +79,8 @@
             @csrf
             <p class="font-semibold text-slate-900">{{ $ulang ? 'Perbaiki & kirim ulang' : 'Ajukan pengunduran diri' }}</p>
             @unless ($ulang)
-                <p class="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">Pengajuan akan diverifikasi wali kelas, diputuskan kepala sekolah, lalu melalui clearance keuangan, kesantrian, dan administrasi sekolah. Santri dikeluarkan pada proses akhir bulan.</p>
+                <p class="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">Pengajuan akan diverifikasi wali kelas, diputuskan kepala sekolah, lalu melalui clearance keuangan, kesantrian, dan administrasi sekolah. Santri dikeluarkan pada proses akhir bulan.
+                    Seluruh tagihan yang belum lunas (SPP, sisa uang pangkal &amp; perlengkapan, dan tagihan lain) <b>tetap harus diselesaikan</b>.</p>
             @endunless
             <label class="block text-sm"><span class="mb-1 block font-medium text-slate-700">Alasan</span>
                 <textarea name="alasan" rows="4" required maxlength="2000" class="w-full rounded-2xl border border-slate-300 px-4 py-3 text-base focus:border-brand focus:ring-brand">{{ old('alasan', $ulang ? $p->alasan : '') }}</textarea>

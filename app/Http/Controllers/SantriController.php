@@ -638,19 +638,12 @@ class SantriController extends Controller
             ];
         }
 
-        // Pengunduran diri santri AKTIF: pratinjau sisa yang akan dihapuskan —
-        // uang pangkal DAN perlengkapan, karena keduanya ikut dibatalkan.
-        $keluarAktif = null;
-        if ($santri->status === 'aktif') {
-            $hidup = collect([$tagihanUangPangkal, $tagihanPerlengkapan])
-                ->filter(fn ($t) => $t && $t->status !== 'batal');
-            $keluarAktif = [
-                'sisa' => (string) $hidup->reduce(fn ($s, $t) => Money::add($s, $t->sisa), '0'),
-                'akrual' => $hidup->contains(fn ($t) => (bool) $t->sudah_akrual),
-                'menunggu' => $hidup->sum(fn ($t) => PembayaranSantri::where('id_tagihan', $t->id)
-                    ->where('status', 'menunggu_verifikasi')->count()),
-            ];
-        }
+        // Pengunduran diri santri AKTIF hanya lewat alur Pengunduran Diri (keputusan user 22 Okt 2026) —
+        // layar ini menunjukkan pengajuan yang sedang berjalan, atau formulir untuk mengajukannya atas nama wali.
+        $keluarAktif = $santri->status === 'aktif' ? [
+            'berjalan' => \App\Models\PengajuanKeluar::where('id_santri', $santri->id)
+                ->whereIn('status', \App\Models\PengajuanKeluar::BERJALAN)->latest('id')->first(),
+        ] : null;
 
         // Tunggakan awal (pintu manual saldo awal). Halangannya dihitung PER
         // TAGIHAN dari sumber yang sama dengan yang dipakai service menolak,
@@ -989,6 +982,16 @@ class SantriController extends Controller
         return Santri::findOrFail($id);
     }
 
+    private function bukanSantriAktif(int $id): int
+    {
+        if (Santri::whereKey($id)->value('status') === 'aktif') {
+            throw new AppException(422, 'Santri aktif hanya bisa keluar lewat alur Pengunduran Diri (wali kelas → kepala sekolah → clearance). '
+                .'Ajukan dari kotak "Pengunduran Diri Santri Aktif" di halaman ini.');
+        }
+
+        return $id;
+    }
+
     /** Aksi lifecycle terpusat. */
     public function aksi(Request $request, int $id, string $aksi): RedirectResponse
     {
@@ -1033,8 +1036,10 @@ class SantriController extends Controller
                 // tanggungan. Boleh, tetapi alasannya (kolom yang sama) jadi
                 // alasan tertulisnya — dan itulah yang akan dibaca saat
                 // piutangnya dipersoalkan.
+                // Santri AKTIF tak lagi bisa dikeluarkan dari sini — wajib lewat alur Pengunduran Diri
+                // (keputusan user 22 Okt 2026). Ditegakkan di controller: service-nya tetap dipakai alur itu.
                 'undur-diri' => $this->service->mengundurkanDiri(
-                    $id,
+                    $this->bukanSantriAktif($id),
                     $request->validate([
                         'alasan' => ['required', 'string', 'max:255'],
                         'abaikan_tanggungan' => ['nullable', 'boolean'],

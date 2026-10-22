@@ -79,7 +79,8 @@ class AutoDebetService
                 continue;
             }
 
-            $tagihanList = TagihanSantri::whereHas('santri', fn ($q) => $q->where('id_wali', $w->id)->where('status', 'aktif'))
+            // Santri yang sudah KELUAR ikut: seluruh tagihannya tetap ditagih (keputusan user 22 Okt 2026).
+            $tagihanList = TagihanSantri::whereHas('santri', fn ($q) => $q->where('id_wali', $w->id)->whereIn('status', ['aktif', 'keluar']))
                 ->whereIn('status', ['belum_bayar', 'sebagian'])
                 // REGISTRASI tak pernah ikut auto-debet. Biaya itu milik tahap
                 // PENDAFTARAN — disetor di meja PPSB sebagai syarat calon boleh

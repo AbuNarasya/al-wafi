@@ -1032,46 +1032,46 @@
             </div>
         @endif
 
-        {{-- Santri AKTIF: pengunduran diri (status → Keluar) --}}
-        @if ($keluarAktif && \App\Support\Akses::boleh('santri', 'ubah'))
+        {{-- Santri AKTIF: pengunduran diri HANYA lewat alurnya (wali kelas → kepala sekolah → clearance) —
+             keputusan user 22 Okt 2026. Staf bisa mengajukan atas nama wali; seluruh tagihan tetap ditagih. --}}
+        @if ($keluarAktif && \App\Support\Akses::boleh('pengunduran-diri', 'buat'))
             <div class="mt-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm" x-data="{ buka: false }">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <h3 class="text-sm font-semibold text-gray-800">Pengunduran Diri Santri Aktif</h3>
-                        <p class="text-xs text-gray-500">Status menjadi <b>Keluar</b>. Sisa kewajiban uang pangkal dihapuskan dan akrualnya dibalik.</p>
+                        <p class="text-xs text-gray-500">Lewat alur Pengunduran Diri: wali kelas → kepala sekolah → clearance → dikeluarkan.
+                            Seluruh tagihan (SPP, sisa uang pangkal &amp; perlengkapan, tagihan lain) <b>tetap ditagih</b>.</p>
                     </div>
-                    <button type="button" @click="buka = !buka"
-                            class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
-                        <span x-text="buka ? 'Tutup' : 'Mengundurkan Diri'"></span>
-                    </button>
+                    @if ($keluarAktif['berjalan'])
+                        <a href="{{ route('pengunduran_diri.show', $keluarAktif['berjalan']->id) }}"
+                           class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-brand hover:bg-gray-50">
+                            {{ $keluarAktif['berjalan']->nomor }} · {{ $keluarAktif['berjalan']->labelStatus() }} →
+                        </a>
+                    @else
+                        <button type="button" @click="buka = !buka"
+                                class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
+                            <span x-text="buka ? 'Tutup' : 'Ajukan Pengunduran Diri'"></span>
+                        </button>
+                    @endif
                 </div>
 
-                <form x-show="buka" x-cloak method="POST" action="{{ $act('undur-diri') }}" class="mt-3 space-y-2 border-t border-gray-100 pt-3"
-                      data-confirm="Keluarkan santri ini? Sisa uang pangkal dihapuskan dan jurnal akrualnya dibalik.">
-                    @csrf
-                    @if ((float) $keluarAktif['sisa'] > 0)
-                        <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                            Sisa uang pangkal <b>@rp($keluarAktif['sisa'])</b> akan dihapuskan.
-                            @if ($keluarAktif['akrual'])
-                                Jurnal pembalik terbit sebesar sisa itu (Debit Pendapatan, Kredit Piutang) — pembayaran yang sudah diterima tetap diakui.
-                            @endif
-                        </div>
-                    @else
-                        <div class="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                            Tidak ada sisa uang pangkal — tidak ada jurnal pembalik yang perlu diterbitkan.
-                        </div>
-                    @endif
-                    @if ($keluarAktif['menunggu'] > 0)
-                        <p class="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                            Ada {{ $keluarAktif['menunggu'] }} pembayaran uang pangkal menunggu verifikasi keuangan — pengunduran diri akan ditolak sampai itu diselesaikan.
-                        </p>
-                    @endif
-                    <p class="text-xs text-gray-400">Tagihan lain (SPP, tagihan kegiatan, dll.) tidak ikut dibatalkan.</p>
-                    <label class="block text-xs text-gray-600">Alasan <span class="text-red-500">*</span>
-                        <input type="text" name="alasan" required placeholder="mis. pindah domisili" value="{{ old('alasan') }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
-                    </label>
-                    <button class="rounded-lg bg-gray-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-gray-800">Konfirmasi Pengunduran Diri</button>
-                </form>
+                @unless ($keluarAktif['berjalan'])
+                    <form x-show="buka" x-cloak method="POST" action="{{ route('pengunduran_diri.ajukan', $santri->id) }}" enctype="multipart/form-data"
+                          class="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                        @csrf
+                        <p class="text-xs text-gray-500">Diajukan atas nama wali (mis. wali datang ke sekolah). Pengajuan langsung masuk ke wali kelas, dan wali dikabari lewat portal.</p>
+                        <label class="block text-xs text-gray-600">Alasan <span class="text-red-500">*</span>
+                            <input type="text" name="alasan" required maxlength="2000" placeholder="mis. pindah domisili" value="{{ old('alasan') }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                        </label>
+                        <label class="block text-xs text-gray-600">Rencana tanggal keluar
+                            <input type="date" name="rencana_tanggal" value="{{ old('rencana_tanggal') }}" class="mt-0.5 rounded border-gray-300 text-sm">
+                        </label>
+                        <label class="block text-xs text-gray-600">Surat pengajuan dari wali <span class="text-red-500">*</span>
+                            <input type="file" name="surat" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="mt-0.5 block w-full text-sm">
+                        </label>
+                        <button class="rounded-lg bg-gray-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-gray-800">Kirim ke Wali Kelas</button>
+                    </form>
+                @endunless
             </div>
         @endif
     </div>

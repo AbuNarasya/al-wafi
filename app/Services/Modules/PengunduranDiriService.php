@@ -28,10 +28,12 @@ use Illuminate\Support\Facades\Storage;
  *
  *  • Wali kelas = `kelas.id_wali_kelas` santri itu; kepala sekolah = `jenjang.id_kepala_sekolah`.
  *    Admin selalu boleh (cadangan bila belum ditetapkan).
- *  • Clearance keuangan baru boleh ✓ bila tagihan NON-PPSB bersisa & titipan nol — selain itu catatan
- *    "disepakati / dibebaskan" WAJIB. Tagihan PPSB (uang pangkal, perlengkapan) dibatalkan otomatis saat
- *    santri dikeluarkan; SPP & tagihan lain tetap tertagih (keputusan user).
- *  • Pengeluaran memakai SantriService::mengundurkanDiri (pembalikan akrual yang sudah teruji).
+ *  • SATU-SATUNYA jalan keluar santri aktif (22 Okt 2026): tombol langsung di halaman santri ditutup; staf
+ *    boleh mengajukan atas nama wali (ajukanOlehStaf).
+ *  • SELURUH tagihan tetap ditagih saat santri aktif keluar — termasuk sisa uang pangkal & perlengkapan
+ *    (keputusan user 22 Okt 2026; dulu sisa PPSB dibatalkan). Clearance keuangan baru boleh ✓ bila tak ada
+ *    tagihan bersisa & titipan nol — selain itu catatan "disepakati / dibebaskan" WAJIB.
+ *  • Pengeluaran memakai SantriService::mengundurkanDiri (lepas kelas, nonaktifkan kartu, tutup jadwal).
  */
 class PengunduranDiriService
 {
@@ -67,6 +69,47 @@ class PengunduranDiriService
 
             return $p;
         });
+        $this->kabariStaf($p, $this->penerimaWaliKelas($p), 'Pengajuan pengunduran diri perlu diverifikasi');
+
+        return $p;
+    }
+
+    /**
+     * Diajukan STAF atas nama wali (wali datang ke sekolah membawa surat). Alurnya sama persis dengan dari
+     * portal — langsung ke wali kelas — dan walinya dikabari supaya tahu ada pengajuan atas anaknya.
+     */
+    public function ajukanOlehStaf(Santri $santri, User $u, string $alasan, ?string $rencana, UploadedFile $surat): PengajuanKeluar
+    {
+        if (! Akses::bolehUntuk($u, 'pengunduran-diri', 'buat')) {
+            throw new AppException(403, 'Anda tidak berhak mengajukan pengunduran diri.');
+        }
+        if ($santri->status !== 'aktif') {
+            throw new AppException(422, 'Alur pengunduran diri hanya untuk santri aktif.');
+        }
+        if (! $santri->id_wali) {
+            throw new AppException(422, 'Santri ini belum punya wali — lengkapi data walinya dulu.');
+        }
+        if (PengajuanKeluar::where('id_santri', $santri->id)->whereIn('status', PengajuanKeluar::BERJALAN)->exists()) {
+            throw new AppException(422, 'Sudah ada pengajuan pengunduran diri yang sedang berjalan untuk santri ini.');
+        }
+        if (trim($alasan) === '') {
+            throw new AppException(422, 'Alasan wajib diisi.');
+        }
+
+        $p = DB::transaction(function () use ($santri, $u, $alasan, $rencana, $surat) {
+            $base = DocNumber::docBase('PKD', now());
+            $p = PengajuanKeluar::create([
+                'nomor' => DocNumber::nextDocNumber($base, PengajuanKeluar::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor')),
+                'id_santri' => $santri->id, 'id_wali' => $santri->id_wali, 'diajukan_peran' => 'staf',
+                'alasan' => trim($alasan), 'rencana_tanggal' => $rencana ?: null, 'status' => 'menunggu_wali_kelas',
+            ]);
+            $this->simpanBerkas($p, 'surat_pengajuan', $surat, $u->id_pengguna, null);
+
+            return $p;
+        });
+        Jejak::catat('pengunduran_diri_diajukan_staf', ['modul' => 'pengunduran-diri', 'ref_jenis' => 'PengajuanKeluar', 'ref_id' => $p->id,
+            'id_pengguna' => $u->id_pengguna, 'detail' => ['nomor' => $p->nomor, 'id_santri' => $santri->id]]);
+        $this->kabariWali($p, 'Pengajuan pengunduran diri dicatat sekolah', "Pengajuan {$p->nomor} dicatat staf atas nama Anda dan diteruskan ke wali kelas.");
         $this->kabariStaf($p, $this->penerimaWaliKelas($p), 'Pengajuan pengunduran diri perlu diverifikasi');
 
         return $p;
@@ -159,8 +202,9 @@ class PengunduranDiriService
     // ---- Clearance ----
 
     /**
-     * Keadaan keuangan santri untuk clearance: tagihan yang TETAP tertagih (non-PPSB), sisa PPSB yang akan
-     * dibatalkan saat keluar, dan titipan (dompet + tabungan) yang harus dikembalikan.
+     * Keadaan keuangan santri untuk clearance: tagihan yang TETAP tertagih — SELURUHNYA, termasuk sisa PPSB
+     * (keputusan user 22 Okt 2026) — dan titipan (dompet + tabungan) yang harus dikembalikan. `dibatalkan`
+     * dipertahankan (selalu kosong) supaya layar lama tetap terbaca.
      *
      * @return array{tetap:list<array>, tetap_total:string, dibatalkan:list<array>, dibatalkan_total:string, titipan:array, bersih:bool}
      */
@@ -169,7 +213,7 @@ class PengunduranDiriService
         $tagihan = TagihanSantri::with('jenis:kode,nama')->where('id_santri', $s->id)
             ->whereNotIn('status', ['lunas', 'batal', 'dihapus'])->where('sisa', '>', 0)->orderBy('jatuh_tempo')->get();
         $baris = fn ($t) => ['nama' => \App\Http\Controllers\PortalKeluargaController::namaTagihan($t), 'sisa' => Money::of($t->sisa)];
-        [$ppsb, $tetap] = $tagihan->partition(fn ($t) => in_array($t->perilaku, self::PERILAKU_PPSB, true));
+        [$ppsb, $tetap] = [collect(), $tagihan];
         $titipan = (new BebasTanggunganService)->periksa($s->id)['titipan'];
         $tetapTotal = Money::of($tetap->sum(fn ($t) => (float) $t->sisa));
 

@@ -78,6 +78,11 @@ class PembayaranPortal
         if ($status === 'aktif') {
             return ['keduanya', null];
         }
+        // Santri yang sudah KELUAR: seluruh tagihannya tetap ditagih (keputusan user 22 Okt 2026), jadi tetap
+        // bisa dilunasi dari portal — dari Dompet Wali bila keluarganya masih ber-dompet, selain itu transfer/VA.
+        if ($status === 'keluar') {
+            return [self::keluargaBerdompet((int) $t->santri->id_wali) ? 'keduanya' : 'transfer', null];
+        }
         if (! Tahap::isFinal($status) && in_array($t->perilaku, self::PSB, true)) {
             return [self::keluargaBerdompet((int) $t->santri->id_wali) ? 'keduanya' : 'transfer', null];
         }

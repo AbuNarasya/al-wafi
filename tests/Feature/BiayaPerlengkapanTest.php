@@ -219,7 +219,8 @@ class BiayaPerlengkapanTest extends TestCase
         $this->assertSame(2000000.0, (float) $pl->lines->firstWhere('kode_coa', self::PEND_PL)->kredit);
     }
 
-    public function test_mengundurkan_diri_membalik_sisa_keduanya(): void
+    /** Keputusan user 22 Okt 2026: santri AKTIF keluar → sisa uang pangkal & perlengkapan TETAP ditagih. */
+    public function test_mengundurkan_diri_santri_aktif_keduanya_tetap_ditagih(): void
     {
         $this->masterPerlengkapan();
         $santri = $this->buatSantriDiterima();
@@ -233,12 +234,11 @@ class BiayaPerlengkapanTest extends TestCase
 
         $this->assertSame('keluar', $santri->refresh()->status);
         foreach (['uang_pangkal', 'perlengkapan'] as $k) {
-            $this->assertSame('batal', $hasil[$k]->refresh()->status);
-            $this->assertSame(0.0, (float) $hasil[$k]->sisa);
+            $this->assertSame('belum_bayar', $hasil[$k]->refresh()->status);
         }
-        // Piutang keduanya kembali nol.
-        $this->assertSame(0.0, $this->saldo(self::PIUT_UP));
-        $this->assertSame(0.0, $this->saldo(self::PIUT_PL));
+        // Piutang keduanya utuh — tak ada jurnal pembalik.
+        $this->assertSame(5000000.0, $this->saldo(self::PIUT_UP));
+        $this->assertSame(2000000.0, $this->saldo(self::PIUT_PL));
     }
 
     public function test_dua_jadwal_termin_berdiri_sendiri(): void

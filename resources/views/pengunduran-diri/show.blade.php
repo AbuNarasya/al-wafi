@@ -92,10 +92,9 @@
 
                         @if ($pihak === 'keuangan')
                             <div class="mt-2 rounded-lg bg-gray-50 p-2 text-xs">
-                                <p class="font-semibold">Tetap tertagih (SPP & tagihan lain): {{ $rp($keuangan['tetap_total']) }}</p>
+                                <p class="font-semibold">Tetap tertagih (seluruh tagihan, termasuk sisa PPSB): {{ $rp($keuangan['tetap_total']) }}</p>
                                 @foreach ($keuangan['tetap'] as $t)<p class="pl-2">· {{ $t['nama'] }} — {{ $rp($t['sisa']) }}</p>@endforeach
                                 <p class="mt-1 font-semibold">Titipan (dompet + tabungan): {{ $rp($keuangan['titipan']['total']) }}</p>
-                                <p class="mt-1 text-gray-500">Sisa tagihan PPSB yang dibatalkan saat keluar: {{ $rp($keuangan['dibatalkan_total']) }}</p>
                             </div>
                         @endif
                         @if ($pihak === 'admin' && $bolehClearance['admin'] && in_array($p->status, ['clearance', 'siap_dikeluarkan', 'selesai'], true))
