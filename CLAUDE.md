@@ -24,16 +24,19 @@ C:/php/php.exe artisan view:cache               # wajib setelah menyunting Blade
 npm run build                                   # wajib setelah menyunting app.js / app.css
 serve.bat                                       # jalankan server dev (port 8123)
 bash deploy/ke-dev.sh                           # kirim commit HEAD ke dev.erp (lihat di bawah)
-bash deploy/ke-vps.sh wafimart                  # perbarui instans Wafi Mart di VPS (sesudah ke-dev.sh)
+bash deploy/ke-vps.sh wafimart_dev              # Wafi Mart DEV di VPS (wafimart.erp.al-wafi.sch.id), sesudah ke-dev.sh
 bash deploy/ke-vps.sh erp main                  # ERP PRODUKSI — hanya saat user bilang "rilis"
+bash deploy/ke-vps.sh wafimart main             # Wafi Mart PRODUKSI — hanya saat user bilang "rilis"
 ```
 
-**"Rilis" dari user = majukan `main` ke HEAD (maju lurus) LALU `bash deploy/ke-vps.sh erp main`.** Sejak 20 Okt 2026
-erp.al-wafi.sch.id (produksi) berjalan di VPS mengikuti cabang `main` dan TIDAK ikut "commit".
+**"Rilis" dari user = cadangkan DB erp produksi, majukan `main` ke HEAD (maju lurus) LALU `bash deploy/ke-vps.sh erp main`
+DAN `bash deploy/ke-vps.sh wafimart main`.** Sejak 20 Okt 2026 erp.al-wafi.sch.id (produksi) berjalan di VPS mengikuti
+cabang `main` dan TIDAK ikut "commit"; Wafi Mart produksi (wafimart.al-wafi.sch.id) ikut `main` sejak 22 Okt 2026.
 
-**"Commit" dari user = commit LALU `bash deploy/ke-dev.sh` LALU `bash deploy/ke-vps.sh wafimart`**
-(keputusan 14 Okt 2026; langkah VPS ditambahkan 20 Okt 2026). VPS = `ssh vps-alwafi` (deploy@31.97.108.145,
-akun Hostinger pemilik al-wafi.sch.id); instans Wafi Mart (`INSTANS=wafimart`) ikut cabang `dev-coba`. ke-dev.sh: skripnya
+**"Commit" dari user = commit LALU `bash deploy/ke-dev.sh` LALU `bash deploy/ke-vps.sh wafimart_dev`**
+(keputusan 14 Okt 2026; Wafi Mart dev terpisah sejak 22 Okt 2026). VPS = `ssh vps-alwafi` (deploy@31.97.108.145,
+akun Hostinger pemilik al-wafi.sch.id). Penghubung RFID: Wafi Mart DEV (`/var/www/wafimart_dev`, cabang `dev-coba`,
+salinan DB produksi 22 Okt) → dev.erp; Wafi Mart PRODUKSI (`/var/www/wafimart`) → erp produksi. ke-dev.sh: skripnya
 membangun aset, mem-push cabang kerja + menimpa paksa cabang `dev-coba`, mengirim `public/build`,
 lalu di server menyamakan kode ke `dev-coba` + migrate + cache. dev.erp = tempat coba-coba;
 **`main` disisihkan untuk rilis ERP sungguhan** — jangan dimajukan tanpa diminta. Push gagal
