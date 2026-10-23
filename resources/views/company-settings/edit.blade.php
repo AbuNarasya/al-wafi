@@ -77,6 +77,9 @@
                 </p>
             </div>
 
+            {{-- Hanya selama toko masih menumpang di ERP ini: sesudah Wafi Mart berdiri di instans sendiri
+                 (WAFIMART_TERPISAH), grup menu WAFI MART disembunyikan dan isian ini tak dipakai lagi. --}}
+            @unless (\App\Support\Instans::tokoTerpisah())
             <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <x-field name="kode_unit_wafimart" label="Unit Bisnis Wafi Mart"
                          :value="$s->kode_unit_wafimart"
@@ -87,6 +90,7 @@
                     penampung neraca — baru terpisah saat Wafi Mart berdiri di instans sendiri.
                 </p>
             </div>
+            @endunless
             @endif
 
             <x-field name="keterangan" label="Keterangan" :value="$s->keterangan" textarea />

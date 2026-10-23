@@ -82,6 +82,22 @@ class MenuWafiMartTest extends TestCase
         $this->assertSame('WAFI MART', $this->grupTerbuka('/shift-kasir'));            // hanya ada di WAFI MART
     }
 
+    /** 24 Okt 2026: sesudah Wafi Mart terpisah, isian unitnya di Pengaturan Perusahaan ERP tak relevan lagi. */
+    public function test_isian_unit_wafi_mart_hilang_sesudah_toko_terpisah_tanpa_menghapus_nilainya(): void
+    {
+        $this->actingAs($this->admin)->get(route('company_settings.edit'))->assertOk()->assertSee('Unit Bisnis Wafi Mart');
+
+        CompanySettings::updateOrCreate(['id' => 1], ['nama_perusahaan' => 'X', 'jenis_perusahaan' => 'Yayasan', 'mata_uang' => 'IDR',
+            'periode_awal_pembukuan' => '2026-01-01', 'bulan_awal_anggaran' => 1, 'kode_unit_wafimart' => 'UWM']);
+        config(['instans.wafimart_terpisah' => true]);
+        $this->actingAs($this->admin)->get(route('company_settings.edit'))->assertOk()
+            ->assertDontSee('Unit Bisnis Wafi Mart')->assertSee('Batas belanja kartu harian');
+
+        $this->actingAs($this->admin)->put(route('company_settings.update'), ['nama_perusahaan' => 'X', 'jenis_perusahaan' => 'Yayasan',
+            'mata_uang' => 'IDR', 'periode_awal_pembukuan' => '2026-01-01', 'bulan_awal_anggaran' => 1])->assertRedirect();
+        $this->assertSame('UWM', CompanySettings::find(1)->kode_unit_wafimart, 'isian yang tak tampil tak ikut terhapus');
+    }
+
     public function test_laporan_tersaring_unit_wafi_mart(): void
     {
         $this->actingAs($this->admin);
