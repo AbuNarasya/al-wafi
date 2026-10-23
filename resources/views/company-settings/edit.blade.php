@@ -95,5 +95,66 @@
                 <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Simpan</button>
             </div>
         </form>
+
+        {{-- Biaya Virtual Account Midtrans (24 Okt 2026) — lihat App\Services\Midtrans\TarifVa. --}}
+        @if ($biayaVa)
+            <div class="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h2 class="text-base font-semibold text-gray-900">Biaya Virtual Account (Midtrans)</h2>
+                <p class="mt-1 text-sm text-gray-500">
+                    Biaya layanan VA yang dipungut dari wali. Harus <b>sama</b> dengan tarif yang dipotong Midtrans (termasuk PPN),
+                    supaya Rekening Midtrans di buku besar tetap cocok dengan saldo Midtrans. VA yang sudah terbit tidak berubah.
+                </p>
+
+                <div class="mt-4 rounded-lg bg-gray-50 px-4 py-3 text-sm">
+                    Berlaku sekarang: <b>@rp($biayaVa['berlaku'])</b> per VA
+                    @if ($biayaVa['riwayat']->isEmpty())
+                        <span class="text-gray-500">— masih dari pengaturan server, belum pernah diubah di sini.</span>
+                    @endif
+                </div>
+
+                @foreach ($biayaVa['terjadwal'] as $j)
+                    <div class="mt-2 flex items-center justify-between gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
+                        <span>Terjadwal: <b>@rp($j->biaya)</b> mulai {{ \Illuminate\Support\Carbon::parse($j->berlaku_mulai)->translatedFormat('j F Y') }}</span>
+                        <form method="POST" action="{{ route('company_settings.biaya_va.batal', $j->id) }}" data-confirm="Batalkan tarif terjadwal ini?">
+                            @csrf @method('DELETE')
+                            <button class="text-xs font-semibold text-amber-800 underline">Batalkan</button>
+                        </form>
+                    </div>
+                @endforeach
+
+                <form method="POST" action="{{ route('company_settings.biaya_va') }}" class="mt-4 grid gap-4 sm:grid-cols-2">
+                    @csrf
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Biaya VA baru (termasuk PPN)</label>
+                        <x-input-rupiah name="biaya_va" :value="old('biaya_va')" required placeholder="mis. 4440" />
+                    </div>
+                    <x-field name="berlaku_mulai" label="Berlaku mulai" type="date" :value="old('berlaku_mulai', now()->toDateString())" required />
+                    <div class="sm:col-span-2">
+                        <x-field name="catatan_va" label="Catatan (mis. dasar perubahan dari Midtrans)" :value="old('catatan_va')" />
+                    </div>
+                    <div class="flex justify-end sm:col-span-2">
+                        <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Simpan biaya VA</button>
+                    </div>
+                </form>
+
+                @if ($biayaVa['riwayat']->isNotEmpty())
+                    <table class="mt-6 w-full text-sm">
+                        <thead class="text-left text-xs uppercase tracking-wide text-gray-500">
+                            <tr><th class="py-2">Berlaku mulai</th><th class="py-2 text-right">Biaya</th><th class="py-2">Dicatat</th><th class="py-2">Catatan</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach ($biayaVa['riwayat'] as $r)
+                                <tr>
+                                    <td class="py-2">{{ \Illuminate\Support\Carbon::parse($r->berlaku_mulai)->translatedFormat('j M Y H:i') }}</td>
+                                    <td class="py-2 text-right tabular-nums">@rp($r->biaya)</td>
+                                    <td class="py-2 text-gray-600">{{ $r->nama_pencatat ?? '—' }}</td>
+                                    <td class="py-2 text-gray-600">{{ $r->catatan ?? '—' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
+            </div>
+        @endif
     </div>
 @endsection

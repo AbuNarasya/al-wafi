@@ -332,6 +332,8 @@ Route::middleware('auth')->group(function () {
     Route::prefix('company-settings')->name('company_settings.')->group(function () {
         Route::get('/', [CompanySettingsController::class, 'edit'])->name('edit')->middleware('hakakses:company-settings,lihat');
         Route::put('/', [CompanySettingsController::class, 'update'])->name('update')->middleware('hakakses:company-settings,ubah');
+        Route::post('/biaya-va', [CompanySettingsController::class, 'simpanBiayaVa'])->name('biaya_va')->middleware('hakakses:company-settings,ubah');
+        Route::delete('/biaya-va/{id}', [CompanySettingsController::class, 'batalBiayaVa'])->name('biaya_va.batal')->middleware('hakakses:company-settings,ubah')->whereNumber('id');
     });
 
     // Master Jenjang — sumber tunggal daftar jenjang lintas modul.

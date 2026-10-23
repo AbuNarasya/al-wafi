@@ -26,6 +26,12 @@ class CompanySettingsController extends Controller
             's' => $s,
             'opsiUnit' => BusinessUnit::orderBy('kode_unit')->pluck('nama_unit', 'kode_unit')->all(),
             // Akun liabilitas saja (kelompok 2) — penampung barang diterima belum ditagih.
+            // Biaya VA Midtrans (24 Okt 2026) — hanya instans yang punya portal wali.
+            'biayaVa' => \App\Support\Instans::portalWali() ? [
+                'berlaku' => \App\Services\Midtrans\TarifVa::berlaku(),
+                'terjadwal' => \App\Services\Midtrans\TarifVa::terjadwal(),
+                'riwayat' => \App\Services\Midtrans\TarifVa::riwayat(),
+            ] : null,
             'opsiGrni' => CoaDetail::where('status', 'aktif')->where('kode_coa', 'like', '2%')->orderBy('kode_coa')->get()
                 ->mapWithKeys(fn ($c) => [$c->kode_coa => "{$c->kode_coa} — {$c->nama_coa}"])->all(),
         ]);
@@ -72,5 +78,35 @@ class CompanySettingsController extends Controller
         PostingService::lupakanKonteksNeraca();
 
         return redirect()->route('company_settings.edit')->with('status', 'Pengaturan perusahaan berhasil disimpan.');
+    }
+
+    /** Tarif biaya Virtual Account Midtrans — lihat App\Services\Midtrans\TarifVa. */
+    public function simpanBiayaVa(Request $request): RedirectResponse
+    {
+        $d = $request->validate([
+            'biaya_va' => ['required', 'numeric', 'min:0', 'max:100000'],
+            'berlaku_mulai' => ['required', 'date', 'after_or_equal:today'],
+            'catatan_va' => ['nullable', 'string', 'max:500'],
+        ], ['berlaku_mulai.after_or_equal' => 'Tanggal mulai berlaku tidak boleh lampau.']);
+        try {
+            \App\Services\Midtrans\TarifVa::simpan($d['biaya_va'], $d['berlaku_mulai'], $d['catatan_va'] ?? null, $request->user()->id_pengguna);
+        } catch (\App\Exceptions\AppException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('company_settings.edit')->with('status', \Illuminate\Support\Carbon::parse($d['berlaku_mulai'])->isToday()
+            ? 'Biaya VA baru berlaku mulai sekarang untuk VA yang terbit sesudah ini.'
+            : 'Biaya VA baru dijadwalkan.');
+    }
+
+    public function batalBiayaVa(Request $request, int $id): RedirectResponse
+    {
+        try {
+            \App\Services\Midtrans\TarifVa::batalkan($id, $request->user()->id_pengguna);
+        } catch (\App\Exceptions\AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('status', 'Tarif terjadwal dibatalkan.');
     }
 }

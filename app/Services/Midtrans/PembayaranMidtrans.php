@@ -45,9 +45,10 @@ class PembayaranMidtrans
 
     public function __construct(private readonly KlienMidtrans $klien = new KlienMidtrans) {}
 
+    /** Biaya VA yang berlaku saat ini — diatur di Pengaturan Perusahaan (TarifVa); belum diatur = angka `.env`. */
     public static function biaya(): string
     {
-        return Money::of((int) config('services.midtrans.biaya_va'));
+        return TarifVa::berlaku();
     }
 
     /** Kunci terpasang + rekening & akun biaya ada. Bila tidak, tombol bayar online tak ditampilkan. */
