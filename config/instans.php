@@ -51,7 +51,7 @@ return [
             'manifest' => '/manifest-wafimart.json',
             // Portal wali, Midtrans, & santri hanya ada di ERP Al Wafi (penerbit dompet santri).
             'portal_wali' => false,
-            'grup_mati' => ['DATA SISWA/SANTRI', 'PPSB', 'KEPENDIDIKAN', 'TAGIHAN LAIN-LAIN', 'LAUNDRY'],
+            'grup_mati' => ['DATA SISWA/SANTRI', 'PPSB', 'KEPENDIDIKAN', 'TAGIHAN LAIN-LAIN', 'LAUNDRY', 'KLINIK'],
             'modul_mati' => [
                 'dashboard-ppsb', 'dashboard-kesantrian',
                 'jenjang', 'tipe-biaya', 'jenis-biaya', 'tarif', 'reminder-tagihan',

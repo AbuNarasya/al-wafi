@@ -212,16 +212,9 @@ final class ModulRegistry
         // KODE MODULNYA TETAP `tagihan-lain`: ia tersimpan di `hak_akses_modul`,
         // jadi menggantinya akan memutus hak yang sudah diberikan ke pengguna.
         ['kode' => 'tagihan-lain', 'nama' => 'Tagihan Lain-lain (laundry, ekskul, kegiatan)', 'grup' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi'],
-        // Hak petugas laundry. SENGAJA TERPISAH dari `tagihan-lain`: ia mencatat
-        // timbangan tiap hari, dan tak pernah butuh wewenang menerbitkan tagihan
-        // ke siapa pun. Penerbitan periodenya tetap menuntut hak `tagihan-lain`,
-        // jadi satu layar melayani dua wewenang yang berbeda.
-        ['kode' => 'setoran-laundry', 'nama' => 'Setoran Pemakaian (timbangan laundry harian)', 'grup' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi'],
-        // DUA matriks besaran, dua modul. Keduanya menetapkan uang, tapi atas
-        // dasar yang berbeda — per jenjang bagi kegiatan berpeserta, per satuan
-        // bagi layanan bersatuan — dan biasanya diurus orang yang berbeda pula.
+        // Matriks besaran kegiatan berpeserta (per jenjang). Setoran Laundry & Matriks Tarif
+        // Layanan (`setoran-laundry`, `tarif-pemakaian`) dihapus 2 Nov 2026 — laundry kini grup LAUNDRY.
         ['kode' => 'tarif-kepesertaan', 'nama' => 'Matriks Tarif Kegiatan (per jenjang)', 'grup' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Setting Tagihan Lain Lain'],
-        ['kode' => 'tarif-pemakaian', 'nama' => 'Matriks Tarif Layanan (per satuan & kuota)', 'grup' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Setting Tagihan Lain Lain'],
         // TANPA MENU: dijalankan dari halaman santri, bukan layar tersendiri.
         // Wewenangnya sengaja terpisah dari modul tagihan mana pun — ia mengubah
         // PIUTANG YANG SUDAH DIBUKUKAN, jadi tak boleh ikut hak `ubah` biasa.

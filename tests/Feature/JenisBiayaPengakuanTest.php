@@ -83,9 +83,15 @@ class JenisBiayaPengakuanTest extends TestCase
         $this->assertSame('akrual', JenisBiaya::find('UJI-1')?->pengakuan);
     }
 
-    public function test_perilaku_lain_wajib_menyatakan_cara_tagihnya(): void
+    public function test_perilaku_lain_cara_tagih_kosong_berarti_langsung(): void
     {
-        $this->kirim(['cara_tagih' => ''])->assertSessionHasErrors('cara_tagih');
+        // Sejak Setoran Laundry dihapus (2 Nov 2026): kosong = ditagih langsung
+        // (manual / modul lain seperti Laundry); `pemakaian` tak lagi diterima.
+        $this->kirim(['cara_tagih' => ''])->assertSessionHasNoErrors();
+        $this->assertNull(JenisBiaya::find('UJI-1')?->cara_tagih);
+
+        JenisBiaya::find('UJI-1')?->delete();
+        $this->kirim(['cara_tagih' => 'pemakaian'])->assertSessionHasErrors('cara_tagih');
     }
 
     public function test_perilaku_selain_lain_tidak_dituntut_cara_tagih(): void
@@ -101,9 +107,9 @@ class JenisBiayaPengakuanTest extends TestCase
     public function test_perilaku_selain_lain_tidak_menyimpan_cara_tagih(): void
     {
         // Isian yang disembunyikan di layar TETAP terkirim peramban. Sisa nilai
-        // "pemakaian" tak boleh menempel pada baris SPP — ia tak dipakai siapa
+        // "kepesertaan" tak boleh menempel pada baris SPP — ia tak dipakai siapa
         // pun, tapi terbaca sebagai kesengajaan oleh pembaca berikutnya.
-        $this->kirim(['tipe' => 'spp', 'cara_tagih' => 'pemakaian',
+        $this->kirim(['tipe' => 'spp', 'cara_tagih' => 'kepesertaan',
             'pengakuan' => 'akrual', 'kode_coa_piutang' => self::PIUTANG])
             ->assertSessionHasNoErrors();
 
@@ -134,12 +140,11 @@ class JenisBiayaPengakuanTest extends TestCase
         $item = array_values(array_filter(Navigation::ITEMS, fn ($m) => ($m['group'] ?? null) === $grup));
         $this->assertNotSame([], $item);
 
-        // Dua matriks besaran memakai MODUL BERBEDA: keduanya menetapkan uang,
-        // tapi atas dasar yang berbeda dan biasanya diurus orang yang berbeda.
+        // Setoran Laundry & Matriks Tarif Layanan dihapus 2 Nov 2026 (laundry = grup LAUNDRY).
         $modul = array_column($item, 'modul');
         $this->assertContains('tarif-kepesertaan', $modul);
-        $this->assertContains('tarif-pemakaian', $modul);
-        $this->assertContains('setoran-laundry', $modul);
+        $this->assertNotContains('tarif-pemakaian', $modul);
+        $this->assertNotContains('setoran-laundry', $modul);
     }
 
     // ---- Akun Pendapatan Diterima di Muka (prabayar SPP) ----

@@ -20,6 +20,29 @@
         @endif
     </div>
 
+    {{-- Saklar terbit otomatis (permintaan user 2 Nov 2026). --}}
+    <div @class(['mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm',
+        'border-emerald-200 bg-emerald-50' => $pengaturan->terbit_otomatis, 'border-gray-200 bg-gray-50' => ! $pengaturan->terbit_otomatis])>
+        <p>
+            Terbit otomatis:
+            @if ($pengaturan->terbit_otomatis)
+                <b class="text-emerald-700">NYALA</b> — draf kelebihan diterbitkan sendiri tiap tanggal {{ $pengaturan->hari_terbit }}.
+            @else
+                <b class="text-gray-700">MATI</b> — tagihan hanya terbit bila ditekan "Terbitkan sekarang".
+            @endif
+        </p>
+        @if (\App\Support\Akses::boleh('laundry-master', 'ubah'))
+            <form method="POST" action="{{ route('laundry.tagihan.otomatis') }}"
+                  data-confirm="{{ $pengaturan->terbit_otomatis ? 'Matikan terbit otomatis? Tagihan kelebihan harus diterbitkan manual.' : 'Nyalakan terbit otomatis? Draf akan terbit sendiri tiap tanggal '.$pengaturan->hari_terbit.'.' }}">
+                @csrf
+                <input type="hidden" name="aktif" value="{{ $pengaturan->terbit_otomatis ? 0 : 1 }}">
+                <button @class(['rounded-lg px-3 py-1.5 text-sm font-semibold',
+                    'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50' => $pengaturan->terbit_otomatis,
+                    'bg-emerald-600 text-white hover:bg-emerald-700' => ! $pengaturan->terbit_otomatis])>{{ $pengaturan->terbit_otomatis ? 'Matikan' : 'Nyalakan' }}</button>
+            </form>
+        @endif
+    </div>
+
     @if ($pengaturan->tarif_per_kg === null)
         <p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Tarif kelebihan per kg belum diatur — tagihan tak bisa disusun. Atur di <a href="{{ route('laundry.pengaturan') }}" class="underline">Pengaturan Laundry</a>.</p>
     @endif

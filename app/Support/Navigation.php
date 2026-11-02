@@ -290,11 +290,7 @@ final class Navigation
         // jenjang yang selnya sudah terisi, jadi urutan menunya mengikuti urutan
         // kerjanya.
         ['url' => '/kesantrian/tagihan-lain/tarif', 'label' => 'Matriks Tarif Kegiatan', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Setting Tagihan Lain Lain', 'modul' => 'tarif-kepesertaan'],
-        ['url' => '/kesantrian/setoran-pemakaian/tarif', 'label' => 'Matriks Tarif Layanan', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Setting Tagihan Lain Lain', 'modul' => 'tarif-pemakaian'],
         ['url' => '/kesantrian/tagihan-lain/peserta', 'label' => 'Peserta Kegiatan', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Setting Tagihan Lain Lain', 'modul' => 'tagihan-lain'],
-        // Setoran mendahului daftar tagihan: ia yang dibuka tiap hari, sedangkan
-        // daftar tagihan dilihat sesekali.
-        ['url' => '/kesantrian/setoran-pemakaian', 'label' => 'Setoran Laundry', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi', 'modul' => 'setoran-laundry'],
         ['url' => '/kesantrian/tagihan-lain', 'label' => 'Daftar & Terbitkan', 'group' => 'TAGIHAN LAIN-LAIN', 'sub' => 'Transaksi', 'modul' => 'tagihan-lain'],
 
         // ---- Klinik (grup sendiri, permintaan user 21 Okt 2026). Catat kunjungan = santri TAP KARTU RFID. ----

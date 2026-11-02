@@ -168,4 +168,18 @@ class TagihanLaundryTest extends TestCase
         $this->assertSame('18.00', (new TagihanLaundryService)->kuota('J003'), 'override SMA dikosongkan → ikut bawaan');
         $this->actingAs($this->keu)->get(route('laundry.terima', ['santri' => $this->smp->id]))->assertSee('Kuota Oktober');
     }
+
+    public function test_saklar_terbit_otomatis_dari_layar_tagihan(): void
+    {
+        $svc = new TagihanLaundryService;
+        $this->assertTrue((bool) $svc->pengaturan()->terbit_otomatis);
+        $this->actingAs($this->keu)->get(route('laundry.tagihan'))->assertOk()->assertSee('NYALA')->assertSee('Matikan');
+
+        $this->actingAs($this->keu)->post(route('laundry.tagihan.otomatis'), ['aktif' => 0])->assertSessionHas('status');
+        $this->assertFalse((bool) $svc->pengaturan()->terbit_otomatis);
+        $this->actingAs($this->keu)->get(route('laundry.tagihan'))->assertSee('MATI')->assertSee('Nyalakan');
+
+        $this->actingAs($this->keu)->post(route('laundry.tagihan.otomatis'), ['aktif' => 1]);
+        $this->assertTrue((bool) $svc->pengaturan()->terbit_otomatis);
+    }
 }

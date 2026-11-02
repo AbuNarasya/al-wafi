@@ -94,16 +94,11 @@
                 <label class="mb-1 block text-xs font-medium text-gray-600">Sumber peserta <span class="text-red-500">*</span></label>
                 <select name="sumber" x-model="sumber" class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm">
                     <option value="peserta">Daftar peserta (ekskul, kegiatan)</option>
-                    <option value="pemakaian">Pemakaian (laundry)</option>
                 </select>
-                <p class="mt-1 text-xs text-gray-400" x-show="sumber === 'pemakaian'" x-cloak>
-                    Nominalnya dihitung dari timbangan yang sudah masuk sampai akhir periode, dikurangi kuota gratis.
-                </p>
+                <p class="mt-1 text-xs text-gray-400">Tagihan laundry diterbitkan dari menu LAUNDRY → Kuota &amp; Tagihan.</p>
             </div>
             <div>
-                <label class="mb-1 block text-xs font-medium text-gray-600">
-                    Periode <span x-show="sumber === 'pemakaian'" class="text-red-500">*</span>
-                </label>
+                <label class="mb-1 block text-xs font-medium text-gray-600">Periode</label>
                 <input type="month" name="periode" value="{{ old('periode') }}"
                        class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm">
             </div>

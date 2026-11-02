@@ -266,7 +266,7 @@ class KepesertaanLainTest extends TestCase
         JenisBiaya::create([
             'kode' => 'LDR', 'nama' => 'Laundry', 'tipe' => 'lain',
             'kode_coa_pendapatan' => self::PENDAPATAN, 'kode_unit' => 'ZZKPU', 'status' => 'aktif',
-            'pengakuan' => 'kas', 'cara_tagih' => 'pemakaian',
+            'pengakuan' => 'kas', 'cara_tagih' => null,
         ]);
 
         $this->expectException(AppException::class);
@@ -311,7 +311,7 @@ class KepesertaanLainTest extends TestCase
         JenisBiaya::create([
             'kode' => 'LDR-SMA', 'nama' => 'Laundry SMA', 'tipe' => 'lain', 'kode_jenjang' => 'SMA',
             'kode_coa_pendapatan' => self::PENDAPATAN, 'kode_unit' => 'ZZKPU', 'status' => 'aktif',
-            'pengakuan' => 'kas', 'cara_tagih' => 'pemakaian',
+            'pengakuan' => 'kas', 'cara_tagih' => null,
         ]);
         $sma = $this->santri('880023', 'Putra Ramadhan', 'SMA');
         $sdtq = $this->santri('880024', 'Qasim Halim', 'SDTQ');
@@ -339,7 +339,7 @@ class KepesertaanLainTest extends TestCase
         JenisBiaya::create([
             'kode' => 'LDR2', 'nama' => 'Laundry', 'tipe' => 'lain',
             'kode_coa_pendapatan' => self::PENDAPATAN, 'kode_unit' => 'ZZKPU', 'status' => 'aktif',
-            'pengakuan' => 'kas', 'cara_tagih' => 'pemakaian',
+            'pengakuan' => 'kas', 'cara_tagih' => null,
         ]);
 
         $grid = $this->svc()->grid();

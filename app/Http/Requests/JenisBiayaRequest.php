@@ -37,17 +37,14 @@ class JenisBiayaRequest extends FormRequest
             'kode_coa_piutang' => ['nullable', 'required_if:pengakuan,akrual', 'string', 'exists:coa_detail,kode_coa'],
             'pengakuan' => ['required', Rule::in(['akrual', 'kas'])],
             // Hanya bermakna untuk perilaku `lain` — registrasi, uang pangkal,
-            // SPP & daftar ulang punya alur penagihannya sendiri.
-            'cara_tagih' => [
-                Rule::requiredIf(fn () => TipeBiaya::perilakuDari($this->input('tipe')) === 'lain'),
-                'nullable',
-                Rule::in(['pemakaian', 'kepesertaan']),
-            ],
+            // SPP & daftar ulang punya alur penagihannya sendiri. Kosong = langsung
+            // (diterbitkan manual / oleh modul lain seperti Laundry). Nilai `pemakaian`
+            // (Setoran Laundry lama) dihapus 2 Nov 2026.
+            'cara_tagih' => ['nullable', Rule::in(['kepesertaan'])],
             'kode_coa_diterima_dimuka' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
             'kode_unit' => ['required', 'string', 'exists:business_units,kode_unit'],
-            // Tarif satuan, nama satuan, & kuota TIDAK di sini — besarannya
-            // tinggal di Matriks Tarif Layanan, sama seperti tarif biasa yang
-            // tinggal di menu Tarif. Master ini identitas akuntansi saja.
+            // Besaran TIDAK di sini — tarif biasa tinggal di menu Tarif, tarif kegiatan
+            // di Matriks Tarif Kegiatan. Master ini identitas akuntansi saja.
             'berulang' => ['nullable', 'boolean'],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
         ];

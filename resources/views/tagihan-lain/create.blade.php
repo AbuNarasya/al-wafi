@@ -58,9 +58,6 @@
 
                 <div class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
                     <b>{{ $jenis->kode }} — {{ $jenis->nama }}</b>
-                    @if ($jenis->cara_tagih === 'pemakaian')
-                        <span class="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">layanan bersatuan</span>
-                    @endif
                 </div>
 
                 <div class="grid gap-4 sm:grid-cols-2">

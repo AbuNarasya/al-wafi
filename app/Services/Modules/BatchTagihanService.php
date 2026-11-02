@@ -8,7 +8,6 @@ use App\Models\BatchTagihan;
 use App\Models\BatchTagihanBaris;
 use App\Models\JenisBiaya;
 use App\Models\Santri;
-use App\Models\SetoranPemakaian;
 use App\Models\TagihanSantri;
 use App\Support\Money;
 use App\Support\UbahMassal;
@@ -40,7 +39,7 @@ use Illuminate\Support\Facades\DB;
 class BatchTagihanService
 {
     /** Sumber peserta untuk modul `tagihan_lain`. */
-    public const SUMBER_LAIN = ['manual', 'peserta', 'pemakaian'];
+    public const SUMBER_LAIN = ['manual', 'peserta'];
 
     /** Jenis notifikasi hasil rilis terjadwal. */
     public const JENIS_NOTIF = 'batch_tagihan_dirilis';
@@ -179,15 +178,12 @@ class BatchTagihanService
     }
 
     /**
-     * Tagihan lain-lain. Tiga sumber peserta yang berbeda watak:
-     *  • manual    — santri dipilih satu per satu, satu nominal untuk semua;
-     *  • peserta   — keluarga B (ekskul), nominal dari matriks tarif jenjang;
-     *  • pemakaian — keluarga A (laundry), nominal dari timbangan yang sudah masuk.
+     * Tagihan lain-lain. Dua sumber peserta yang berbeda watak:
+     *  • manual  — santri dipilih satu per satu, satu nominal untuk semua;
+     *  • peserta — keluarga B (ekskul), nominal dari matriks tarif jenjang.
      *
-     * Untuk `pemakaian`, id setorannya ikut dijepret. Itu WAJIB: kalau saat
-     * rilis kita menyapu ulang "semua setoran yang belum bertanda", timbangan
-     * yang baru masuk setelah otorisasi akan ikut ditandai lunas padahal
-     * nominalnya tak menghitungnya — kilogramnya hilang tanpa jejak.
+     * Sumber `pemakaian` (Setoran Laundry lama) dihapus 2 Nov 2026 — laundry kini
+     * modul tersendiri (TagihanLaundryService) yang menerbitkan tagihannya sendiri.
      */
     private function barisTagihanLain(array $p): array
     {
@@ -218,69 +214,17 @@ class BatchTagihanService
             ], $ids);
         }
 
-        if ($sumber === 'peserta') {
-            ['nominal' => $peta, 'gugur' => $gugur] = (new KepesertaanLainService)->nominalPeserta($kode);
-            if ($peta === []) {
-                throw new AppException(422, 'Tidak ada peserta yang bisa ditagih.'
-                    .($gugur === [] ? ' Daftar pesertanya masih kosong.' : ' '.implode('; ', $gugur).'.'));
-            }
-
-            return array_map(fn ($id) => [
-                'id_santri' => (int) $id, 'kode_jenis' => $kode, 'periode' => $periode,
-                'nominal' => $peta[$id], 'keputusan' => BatchTagihanBaris::TERBIT, 'alasan' => null,
-            ], array_keys($peta));
+        // peserta
+        ['nominal' => $peta, 'gugur' => $gugur] = (new KepesertaanLainService)->nominalPeserta($kode);
+        if ($peta === []) {
+            throw new AppException(422, 'Tidak ada peserta yang bisa ditagih.'
+                .($gugur === [] ? ' Daftar pesertanya masih kosong.' : ' '.implode('; ', $gugur).'.'));
         }
 
-        // pemakaian
-        if (! $periode) {
-            throw new AppException(422, 'Periode wajib diisi untuk tagihan berbasis pemakaian.');
-        }
-        $pemakaian = new PemakaianLainService;
-        $jenis = $pemakaian->jenis($kode);
-        $sampai = Carbon::parse($periode.'-01')->endOfMonth()->toDateString();
-
-        // Id setoran yang dijepret, untuk SELURUH santri dalam satu kueri —
-        // syaratnya sama persis dengan rekap(), jadi yang dijepret adalah yang
-        // dihitung nominalnya. Dulu satu kueri per santri.
-        $setoranPerSantri = SetoranPemakaian::belumTertagih()
-            ->where('kode_jenis', $jenis->kode)
-            ->whereDate('tanggal', '<=', $sampai)
-            ->orderBy('id')
-            ->get(['id', 'id_santri'])
-            ->groupBy('id_santri')
-            ->map(fn ($g) => $g->pluck('id')->all());
-
-        $baris = [];
-        foreach ($pemakaian->rekap($jenis->kode, $sampai) as $r) {
-            $s = $r['santri'];
-            if (! $s) {
-                continue;
-            }
-            // Di bawah kuota ⇒ TIDAK ada tagihan sama sekali, bukan tagihan nol.
-            // Setorannya sengaja dibiarkan tak bertanda supaya ikut periode depan.
-            if (! Money::gtZero($r['nominal'])) {
-                $baris[] = [
-                    'id_santri' => $s->id, 'kode_jenis' => $kode, 'periode' => $periode,
-                    'keputusan' => BatchTagihanBaris::BEBAS,
-                    'alasan' => "Pemakaian {$r['kuantitas']} masih di dalam kuota gratis — tak ada yang ditagih.",
-                ];
-
-                continue;
-            }
-            $baris[] = [
-                'id_santri' => $s->id, 'kode_jenis' => $kode, 'periode' => $periode,
-                'nominal' => $r['nominal'], 'keputusan' => BatchTagihanBaris::TERBIT, 'alasan' => null,
-                'snapshot' => [
-                    'kuantitas' => $r['kuantitas'], 'kena_tagih' => $r['kena_tagih'],
-                    'setoran' => $setoranPerSantri->get($s->id, []),
-                ],
-            ];
-        }
-        if ($baris === []) {
-            throw new AppException(422, 'Belum ada setoran yang bisa ditagih untuk periode itu.');
-        }
-
-        return $baris;
+        return array_map(fn ($id) => [
+            'id_santri' => (int) $id, 'kode_jenis' => $kode, 'periode' => $periode,
+            'nominal' => $peta[$id], 'keputusan' => BatchTagihanBaris::TERBIT, 'alasan' => null,
+        ], array_keys($peta));
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -423,10 +367,6 @@ class BatchTagihanService
         $peta = $this->petaTagihan($batch, $target->keys()->all());
         $terbit = $target->filter(fn ($b) => isset($peta[$b->id_santri]));
         $gugurTambahan = $target->reject(fn ($b) => isset($peta[$b->id_santri]));
-
-        if ($batch->modul === 'tagihan_lain' && ($batch->parameter['sumber'] ?? null) === 'pemakaian') {
-            $this->tandaiSetoran($terbit, $peta);
-        }
 
         // Satu kueri, bukan satu per baris: batch SPP seluruh santri = 649 baris,
         // dan rilis cadangan bisa berjalan di dalam halaman yang sedang dibuka.
@@ -634,27 +574,6 @@ class BatchTagihanService
                 ->where('periode', $p['periode'] ?? null)
                 ->orderBy('id')->pluck('id', 'id_santri')->all(),
         };
-    }
-
-    /**
-     * Tandai setoran yang IKUT DIJEPRET saja — bukan menyapu ulang semua yang
-     * belum bertanda. Timbangan yang masuk setelah otorisasi harus tetap
-     * telanjang supaya terbawa ke periode berikutnya.
-     *
-     * @param  array<int,int>  $peta
-     */
-    private function tandaiSetoran($baris, array $peta): void
-    {
-        // [id setoran => id tagihan] untuk seluruh batch, lalu SATU kueri.
-        $tanda = [];
-        foreach ($baris as $b) {
-            foreach ($b->snapshot['setoran'] ?? [] as $idSetoran) {
-                $tanda[(int) $idSetoran] = $peta[$b->id_santri];
-            }
-        }
-        if ($tanda !== []) {
-            UbahMassal::perBaris('setoran_pemakaian', 'id', 'id_tagihan', $tanda, syarat: 't.id_tagihan IS NULL');
-        }
     }
 
     /** Tutup batch: tandai baris yang gugur, simpan ringkasannya, kembalikan hasil. */

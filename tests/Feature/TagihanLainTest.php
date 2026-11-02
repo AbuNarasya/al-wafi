@@ -70,7 +70,7 @@ class TagihanLainTest extends TestCase
             'kode' => 'LDR', 'nama' => 'Laundry', 'tipe' => 'lain',
             'kode_coa_pendapatan' => self::PENDAPATAN, 'kode_coa_piutang' => self::PIUTANG,
             'kode_unit' => 'ZZTLU', 'status' => 'aktif',
-            'pengakuan' => 'akrual', 'cara_tagih' => 'pemakaian',
+            'pengakuan' => 'akrual', 'cara_tagih' => null,
         ]);
     }
 

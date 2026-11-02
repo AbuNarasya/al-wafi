@@ -81,7 +81,6 @@ use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\SaldoDompetController;
 use App\Http\Controllers\SantriController;
 use App\Http\Controllers\SantriManualController;
-use App\Http\Controllers\SetoranPemakaianController;
 use App\Http\Controllers\SimpleMasterController;
 use App\Http\Controllers\SppController;
 use App\Http\Controllers\PortalBayarController;
@@ -841,6 +840,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/tagihan/{tagihan}/batal-kecuali', 'batalKecuali')->name('tagihan.batal_kecuali')->middleware('hakakses:laundry-tagihan,ubah')->whereNumber('tagihan');
         Route::get('/pengaturan', 'pengaturan')->name('pengaturan')->middleware('hakakses:laundry-master,lihat');
         Route::put('/pengaturan', 'simpanPengaturan')->name('pengaturan.simpan')->middleware('hakakses:laundry-master,ubah');
+        // Saklar terbit otomatis langsung dari layar Kuota & Tagihan (permintaan user 2 Nov 2026).
+        Route::post('/tagihan/otomatis', 'saklarOtomatis')->name('tagihan.otomatis')->middleware('hakakses:laundry-master,ubah');
     });
 
     // Klinik — catatan kunjungan santri (21 Okt 2026).
@@ -1309,19 +1310,6 @@ Route::middleware('auth')->group(function () {
         Route::put('/peserta/{id}/status', 'statusPeserta')->name('peserta.status')->middleware('hakakses:tagihan-lain,ubah')->whereNumber('id');
 
         Route::post('/peserta/terbitkan', 'terbitkan')->name('peserta.terbitkan')->middleware('hakakses:tagihan-lain,buat');
-    });
-
-    // Keluarga A — setoran pemakaian (laundry). Haknya TERPISAH: petugas laundry
-    // mencatat timbangan, bukan menerbitkan uang. Penerbitan periodenya tetap
-    // menuntut hak `tagihan-lain`.
-    Route::prefix('kesantrian/setoran-pemakaian')->name('setoran_pemakaian.')->controller(SetoranPemakaianController::class)->group(function () {
-        Route::get('/tarif', 'tarif')->name('tarif')->middleware('hakakses:tarif-pemakaian,lihat');
-        Route::put('/tarif', 'simpanTarif')->name('tarif.simpan')->middleware('hakakses:tarif-pemakaian,ubah');
-
-        Route::get('/', 'index')->name('index')->middleware('hakakses:setoran-laundry,lihat');
-        Route::post('/', 'catat')->name('catat')->middleware('hakakses:setoran-laundry,buat');
-        Route::delete('/{id}', 'hapus')->name('hapus')->middleware('hakakses:setoran-laundry,buat')->whereNumber('id');
-        Route::post('/terbitkan', 'terbitkan')->name('terbitkan')->middleware('hakakses:tagihan-lain,buat');
     });
 
     // Saldo Dompet — daftar saldo seluruh wali & santri, BACA SAJA. Menumpang

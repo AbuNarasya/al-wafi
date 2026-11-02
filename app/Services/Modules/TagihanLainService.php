@@ -56,23 +56,9 @@ class TagihanLainService
     }
 
     /**
-     * Penerbitan dari PEMAKAIAN (keluarga A — laundry).
-     *
-     * Nominal per santri sudah dihitung PemakaianLainService dari kuantitas ×
-     * tarif satuan dikurangi kuota; yang tersisa di sini hanyalah menuliskannya
-     * jadi tagihan dan jurnal, sama seperti dua jalur lainnya.
-     *
-     * @param  array<int,string>  $nominalPerSantri
-     */
-    public function terbitkanUntukPemakaian(JenisBiaya $jenis, array $nominalPerSantri, array $data, int $idPengguna): array
-    {
-        return $this->terbitkanSnapshot($jenis, $nominalPerSantri, $data, $idPengguna);
-    }
-
-    /**
      * Penerbitan dari nominal yang SUDAH DITETAPKAN di tempat lain.
      *
-     * Dipakai jalur pemakaian (nominalnya hasil hitungan kuantitas) dan Batch
+     * Dipakai Tagihan Laundry (nominalnya hasil hitungan kelebihan kuota) dan Batch
      * Tagihan (nominalnya dikunci sejak draft diotorisasi). Namanya sengaja
      * netral: keduanya sama-sama "ini angkanya, tinggal tuliskan", dan
      * membedakannya jadi dua method hanya melahirkan dua salinan yang harus

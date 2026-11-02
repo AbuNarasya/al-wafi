@@ -105,17 +105,16 @@
                 {{-- `<select>` biasa, BUKAN <x-field :options>: yang terakhir
                      merender <x-search-select> yang hanya meneruskan `class`,
                      sehingga `x-model` tak pernah sampai ke isiannya dan blok
-                     satuan di bawah tak bisa mengikuti pilihannya. Dua pilihan
+                     keterangan di bawah tak bisa mengikuti pilihannya. Dua pilihan
                      pun tak butuh dropdown pencari. --}}
-                <label class="mb-1 block text-sm font-medium text-gray-700">Cara Menagih <span class="text-red-500">*</span></label>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Cara Menagih</label>
                 <select name="cara_tagih" x-model="caraTagih"
                         class="w-full rounded-lg border border-gray-400 px-3 py-2 text-sm focus:border-brand focus:ring-1 focus:ring-brand">
-                    <option value="">— pilih —</option>
+                    <option value="">Langsung — diterbitkan manual atau oleh modul lain (mis. Laundry)</option>
                     <option value="kepesertaan">Menurut kepesertaan — hanya santri yang ikut, tarif per jenjang</option>
-                    <option value="pemakaian">Menurut pemakaian — tarif per satuan dikali kuantitas</option>
                 </select>
                 <p class="mt-1 text-xs text-gray-400">
-                    Kepesertaan untuk ekskul, kegiatan khusus, program umroh. Pemakaian untuk layanan bersatuan seperti laundry per kilogram.
+                    Kepesertaan untuk ekskul, kegiatan khusus, program umroh.
                     @error('cara_tagih')<span class="text-red-600">{{ $message }}</span>@enderror
                 </p>
 
@@ -125,10 +124,6 @@
                 <p x-show="caraTagih === 'kepesertaan'" x-cloak class="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
                     Besarannya diatur di <b>Matriks Tarif Kegiatan</b>, per jenjang — bukan di sini.
                     Sel yang dikosongkan di sana berarti jenjang itu tidak ikut kegiatannya.
-                </p>
-                <p x-show="caraTagih === 'pemakaian'" x-cloak class="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                    Tarif per satuan, nama satuan, dan kuota gratisnya diatur di <b>Matriks Tarif Layanan</b> — bukan di sini.
-                    Selama belum diisi, Setoran Laundry menolak mencatat pemakaiannya.
                 </p>
             </div>
 

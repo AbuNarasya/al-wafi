@@ -103,7 +103,6 @@ class TagihanLainController extends Controller
     {
         return match (true) {
             $jenis->cara_tagih === 'kepesertaan' => 'Hanya peserta terdaftar kegiatan ini. Tambah/hentikan peserta di menu Peserta Kegiatan.',
-            $jenis->cara_tagih === 'pemakaian' => 'Nominal layanan bersatuan biasanya diterbitkan dari menu Setoran Laundry, bukan diketik di sini.',
             (bool) $jenis->kode_jenjang => 'Hanya santri aktif jenjang jenis biaya ini.',
             default => 'Seluruh santri aktif — jenis biaya ini tidak terikat jenjang.',
         };

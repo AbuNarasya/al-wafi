@@ -86,7 +86,7 @@ class TagihanLainLunasSekaligusTest extends TestCase
                 'kode' => $kode, 'nama' => $nama, 'tipe' => $tipe,
                 'kode_coa_pendapatan' => self::PENDAPATAN, 'kode_coa_piutang' => self::PIUTANG,
                 'kode_unit' => 'ZZLSU', 'status' => 'aktif', 'pengakuan' => 'akrual',
-                'cara_tagih' => $tipe === 'lain' ? 'pemakaian' : null,
+                'cara_tagih' => null,
             ]);
         }
 

@@ -125,6 +125,21 @@ class LaundryTagihanController extends Controller
         return back()->with('status', 'Pengaturan laundry disimpan.');
     }
 
+    /** Nyalakan / matikan terbit otomatis tanpa membuka seluruh Pengaturan Laundry. */
+    public function saklarOtomatis(Request $request): RedirectResponse
+    {
+        $nyala = $request->validate(['aktif' => ['required', 'boolean']])['aktif'];
+        $nyala = filter_var($nyala, FILTER_VALIDATE_BOOLEAN);
+        $lama = (bool) $this->svc->pengaturan()->terbit_otomatis;
+        DB::table('pengaturan_laundry')->where('id', 1)->update([
+            'terbit_otomatis' => $nyala, 'diubah_oleh' => $request->user()->id_pengguna, 'updated_at' => now(),
+        ]);
+        Jejak::catat('ubah_pengaturan_laundry', ['modul' => 'laundry-master', 'id_pengguna' => $request->user()->id_pengguna,
+            'detail' => ['lama' => ['terbit_otomatis' => $lama], 'baru' => ['terbit_otomatis' => $nyala]]]);
+
+        return back()->with('status', $nyala ? 'Terbit otomatis DINYALAKAN.' : 'Terbit otomatis DIMATIKAN — tagihan diterbitkan manual.');
+    }
+
     /** Bulan berjalan: siapa yang sudah melewati / mendekati kuota — angka perkiraan, belum ditagih. */
     private function perkiraan(string $periode)
     {
