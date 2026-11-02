@@ -105,7 +105,26 @@
                             @else<span class="text-emerald-700">{{ __('Sudah diambil') }} {{ $tgl($l->diserahkan_pada) }}</span>@endif
                         </span>
                     </summary>
-                    <ul class="mt-2 space-y-0.5 text-xs text-slate-600">
+                    {{-- Perjalanan cucian: tiap langkah dengan waktunya (permintaan user 2 Nov 2026). --}}
+                    <ol class="mt-3 space-y-2 border-s-2 border-slate-200 ps-4 text-xs">
+                        @foreach (\App\Models\Laundry::LANGKAH_PORTAL as $s => $label)
+                            @continue(! $l->{"{$s}_pada"})
+                            <li class="relative">
+                                <span class="absolute -start-[1.4rem] top-0.5 h-2.5 w-2.5 rounded-full bg-cyan-600 ring-2 ring-white"></span>
+                                <span class="font-semibold text-slate-800">{{ __($label) }}</span>
+                                <span class="block text-slate-500">{{ $l->{"{$s}_pada"}->timezone('Asia/Jakarta')->locale(app()->getLocale())->translatedFormat('j M Y, H:i') }}</span>
+                            </li>
+                        @endforeach
+                        @if ($l->status === 'dibatalkan' && $l->dibatalkan_pada)
+                            <li class="relative">
+                                <span class="absolute -start-[1.4rem] top-0.5 h-2.5 w-2.5 rounded-full bg-slate-400 ring-2 ring-white"></span>
+                                <span class="font-semibold text-slate-800">{{ __('Dibatalkan') }}</span>
+                                <span class="block text-slate-500">{{ $l->dibatalkan_pada->timezone('Asia/Jakarta')->locale(app()->getLocale())->translatedFormat('j M Y, H:i') }}</span>
+                            </li>
+                        @endif
+                    </ol>
+                    <p class="mt-3 text-xs font-semibold text-slate-700">{{ __('Daftar pakaian') }}</p>
+                    <ul class="mt-1 space-y-0.5 text-xs text-slate-600">
                         @foreach ($l->item as $it)
                             <li>{{ $it->nama_pakaian }} × {{ $it->jumlah }}@if ($it->kurang() > 0) <span class="font-semibold text-red-700">({{ __('kurang :n', ['n' => $it->kurang()]) }})</span>@endif</li>
                         @endforeach

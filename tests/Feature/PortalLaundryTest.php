@@ -103,4 +103,16 @@ class PortalLaundryTest extends TestCase
         // Menu tersedia di katalog portal.
         $this->get(route('portal.menu'))->assertOk()->assertSee(route('portal.laundry'), false);
     }
+
+    public function test_riwayat_memperlihatkan_perjalanan_tiap_langkah(): void
+    {
+        $a = $this->setor($this->ahmad, '5');
+        $this->svc->majukan([$a->id], 'diterima', $this->petugas);
+        $this->svc->majukan([$a->id], 'diproses', $this->petugas);
+        $this->svc->serahkan($this->ahmad, [$a->id], [$a->item()->first()->id => 4], null, 'kartu', $this->petugas);
+
+        $this->masuk();
+        $this->get(route('portal.laundry'))->assertOk()
+            ->assertSeeInOrder(['Riwayat', 'Cucian diterima', 'Sedang dicuci', 'Siap diambil', 'Sudah diambil', 'Daftar pakaian', 'Gamis']);
+    }
 }
