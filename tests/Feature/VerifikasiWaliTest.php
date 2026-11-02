@@ -65,16 +65,6 @@ class VerifikasiWaliTest extends TestCase
             ->assertRedirect(route('portal.verifikasi.ringkasan'));
     }
 
-    private function kodeTerkirimKe(string $email): string
-    {
-        $kode = '';
-        Notification::assertSentOnDemand(KodeMasukWali::class, function (KodeMasukWali $n, array $s, AnonymousNotifiable $t) use ($email, &$kode) {
-            return $t->routes['mail'] === $email && ($kode = $n->kode) !== '';
-        });
-
-        return $kode;
-    }
-
     // ---- Staf ----
 
     public function test_buat_massal_hanya_keluarga_yang_perlu_dan_belum_punya_link(): void
@@ -94,6 +84,13 @@ class VerifikasiWaliTest extends TestCase
         $this->assertSame(1, VerifikasiWali::count());
 
         $this->actingAs($this->admin)->get(route('wali.verifikasi'))->assertOk()->assertSee('Ibu Aminah')->assertDontSee('Lulus');
+    }
+
+    public function test_daftar_wali_menampilkan_anak_bertaut_ke_detail_santri(): void
+    {
+        $this->actingAs($this->admin)->get(route('wali.index'))->assertOk()
+            ->assertSee('AHMAD')->assertSee('NIS 2425001')
+            ->assertSee('href="'.route('santri.show', $this->ahmad->id).'"', false);
     }
 
     public function test_kirim_wa_menandai_terkirim_dan_membuka_wa_me(): void
@@ -127,11 +124,25 @@ class VerifikasiWaliTest extends TestCase
         $this->get(route('portal.verifikasi.buka', LinkVerifikasi::kode($v)))->assertSee('Masa berlaku link ini sudah habis');
     }
 
+    /** Isian langkah ① apa adanya + $ubah. */
+    private function isianKeluarga(array $ubah = []): array
+    {
+        $isi = ['nik' => '', 'alamat' => (string) $this->wali->fresh()->alamat];
+        foreach (['ayah', 'ibu', 'wali'] as $p) {
+            $isi += ["nama_{$p}" => (string) $this->wali->{"nama_{$p}"}, "telepon_{$p}" => (string) $this->wali->{"telepon_{$p}"},
+                "email_{$p}" => (string) $this->wali->{"email_{$p}"}, "pekerjaan_{$p}" => '', "pekerjaan_lain_{$p}" => '', "pendapatan_{$p}" => ''];
+        }
+
+        return $ubah + $isi;
+    }
+
     public function test_mode_verifikasi_menutup_dompet_dan_pembayaran(): void
     {
         $this->masukLewatLink($this->link());
 
-        $this->get(route('portal.verifikasi.ringkasan'))->assertOk()->assertSee('AHMAD')->assertSee('aminah@contoh.id');
+        $this->get(route('portal.verifikasi.ringkasan'))->assertRedirect(route('portal.verifikasi.wali'));
+        $this->get(route('portal.verifikasi.wali'))->assertOk()->assertSee('Ibu Aminah')->assertSee('aminah@contoh.id')
+            ->assertSee('Data Wali')->assertSee('Data Santri')->assertSee('Sedang diisi');
         $this->get(route('portal.data'))->assertOk();
         foreach (['portal.beranda', 'portal.dompet', 'portal.tagihan', 'portal.akun', 'portal.pin'] as $rute) {
             $this->get(route($rute))->assertRedirect(route('portal.verifikasi.ringkasan'));
@@ -148,53 +159,82 @@ class VerifikasiWaliTest extends TestCase
         $this->assertGuest('wali');
     }
 
-    public function test_alur_lengkap_buktikan_email_lalu_selesai_menjadi_akun_portal(): void
+    public function test_alur_bertahap_tanpa_kode_tanpa_password(): void
     {
         $v = $this->link();
         $this->masukLewatLink($v);
 
-        // Email WAJIB terbukti sebelum selesai.
-        $this->post(route('portal.verifikasi.selesai'), ['setuju' => '1'])->assertSessionHas('error');
-        $this->assertNull($v->fresh()->selesai_pada);
+        // Langkah tak bisa dilompati.
+        $this->get(route('portal.verifikasi.santri'))->assertRedirect(route('portal.verifikasi.wali'));
+        $this->get(route('portal.verifikasi.konfirmasi'))->assertRedirect(route('portal.verifikasi.ringkasan'));
+        $this->post(route('portal.verifikasi.selesai'), ['setuju' => '1'])->assertRedirect(route('portal.verifikasi.ringkasan'));
 
-        $this->post(route('portal.verifikasi.email'))->assertRedirect(route('portal.verifikasi.kode'));
-        $kode = $this->kodeTerkirimKe('aminah@contoh.id');
-        $this->post(route('portal.verifikasi.kode'), ['kode' => $kode])->assertRedirect(route('portal.verifikasi.ringkasan'));
+        // ① Email ayah & ibu diisi sekaligus, TANPA kode (keputusan user 2 Nov 2026).
+        $this->put(route('portal.verifikasi.wali'), $this->isianKeluarga(['alamat' => 'Jl. Baru 9', 'email_ayah' => 'Hasan@Contoh.id']))
+            ->assertRedirect(route('portal.verifikasi.santri'));
+        $this->assertSame('hasan@contoh.id', $this->wali->fresh()->email_ayah);
+        $this->assertSame('Jl. Baru 9', $this->wali->fresh()->alamat);
+        Notification::assertSentOnDemandTimes(KodeMasukWali::class, 0);
 
-        // Password sekalian dibuat di langkah Selesai (keputusan user 14 Okt 2026).
-        $this->post(route('portal.verifikasi.selesai'), ['setuju' => '1', 'sandi' => 'pendek', 'sandi_ulang' => 'pendek'])
-            ->assertSessionHas('error');
-        $this->post(route('portal.verifikasi.selesai'), ['setuju' => '1', 'sandi' => 'rahasia123', 'sandi_ulang' => 'rahasia123'])
-            ->assertRedirect(route('portal.verifikasi.terima_kasih'));
-        $this->assertTrue(\App\Services\PortalWali\KataSandiWali::punya($this->wali, 'ibu'));
+        // ② Data santri.
+        $this->get(route('portal.verifikasi.santri'))->assertOk()->assertSee('AHMAD');
+        $this->put(route('portal.verifikasi.santri'), ['santri' => [$this->ahmad->id => ['jenis_kelamin' => 'L', 'tempat_lahir' => 'Bogor']]])
+            ->assertRedirect(route('portal.verifikasi.konfirmasi'));
+        $this->assertSame('Bogor', $this->ahmad->fresh()->tempat_lahir);
+
+        // ③ Ringkasan + centang — tanpa isian password.
+        $this->get(route('portal.verifikasi.konfirmasi'))->assertOk()->assertSee('hasan@contoh.id')->assertSee('Sudah diisi')
+            ->assertDontSee('name="sandi"', false);
+        $this->post(route('portal.verifikasi.selesai'), [])->assertSessionHasErrors('setuju');
+        $this->post(route('portal.verifikasi.selesai'), ['setuju' => '1'])->assertRedirect(route('portal.verifikasi.terima_kasih'));
+        $this->assertFalse(\App\Services\PortalWali\KataSandiWali::punya($this->wali, 'ibu'), 'password dibuat saat masuk pertama kali');
         $v->refresh();
         $this->assertNotNull($v->selesai_pada);
         $this->assertSame('ibu', $v->selesai_peran);
         $this->assertSame('aminah@contoh.id', $v->selesai_email);
 
-        // Halaman penutup, bukan aplikasi: ringkasan + tombol Tutup, sesinya berakhir.
+        // Halaman penutup: ringkasan + petunjuk masuk pertama kali, sesinya berakhir.
         $this->get(route('portal.verifikasi.terima_kasih'))->assertOk()
             ->assertSee('Syukron, pembaharuan data telah selesai')->assertSee('AHMAD')
-            ->assertSee('Ibu Aminah')->assertSee('aminah@contoh.id')->assertSee('081234567890')->assertSee('Tutup');
+            ->assertSee('Ibu Aminah')->assertSee('aminah@contoh.id')->assertSee('081234567890')
+            ->assertSee('Cara masuk Portal Wali pertama kali')->assertSee('Tutup');
         $this->assertGuest('wali');
         $this->get(route('portal.beranda'))->assertRedirect(route('portal.masuk'));
         $this->get(route('portal.verifikasi.buka', LinkVerifikasi::kode($v)))->assertSee('sudah selesai');
+        Notification::assertSentOnDemandTimes(KodeMasukWali::class, 0);
     }
 
-    public function test_peran_tanpa_email_wajib_mengisi_email_baru(): void
+    public function test_email_sendiri_wajib_diisi(): void
     {
         $this->masukLewatLink($this->link(), 'ayah');
-        $this->get(route('portal.verifikasi.ringkasan'))->assertSee('Belum ada email tercatat');
-        $this->post(route('portal.verifikasi.email'))->assertSessionHas('error');
+        $this->get(route('portal.verifikasi.wali'))->assertOk()->assertSee('name="email_ayah"', false);
 
-        // Mengisi email lewat Data Wali & Santri = terbukti (kode dikirim ke alamat baru).
-        $this->post(route('portal.data.email', 'ayah'), ['email' => 'hasan@contoh.id'])->assertRedirect(route('portal.data.email.kode'));
-        $kode = $this->kodeTerkirimKe('hasan@contoh.id');
-        $this->post(route('portal.data.email.kode'), ['kode' => $kode])->assertRedirect(route('portal.verifikasi.ringkasan'));
-
-        $this->post(route('portal.verifikasi.selesai'), ['setuju' => '1', 'sandi' => 'rahasia123', 'sandi_ulang' => 'rahasia123'])
-            ->assertRedirect(route('portal.verifikasi.terima_kasih'));
+        $this->put(route('portal.verifikasi.wali'), $this->isianKeluarga())->assertSessionHasErrors('email_ayah');
+        $this->put(route('portal.verifikasi.wali'), $this->isianKeluarga(['email_ayah' => 'bukan-email']))->assertSessionHasErrors('email_ayah');
+        $this->put(route('portal.verifikasi.wali'), $this->isianKeluarga(['email_ayah' => 'hasan@contoh.id']))
+            ->assertRedirect(route('portal.verifikasi.santri'));
         $this->assertSame('hasan@contoh.id', $this->wali->fresh()->email_ayah);
+    }
+
+    public function test_email_yang_sudah_dipakai_masuk_tak_bisa_diganti_dari_verifikasi(): void
+    {
+        // Ibu sudah punya password → ayah (pemegang link) tak boleh mengganti emailnya.
+        (new \App\Services\PortalWali\KataSandiWali)->simpan($this->wali, 'ibu', 'rahasia123', 'rahasia123');
+        $this->masukLewatLink($this->link(), 'ayah');
+
+        $this->get(route('portal.verifikasi.wali'))->assertOk()->assertDontSee('name="email_ibu"', false)->assertSee('Sudah dipakai masuk Portal Wali');
+        $this->put(route('portal.verifikasi.wali'), $this->isianKeluarga(['email_ayah' => 'hasan@contoh.id', 'email_ibu' => 'penyusup@contoh.id']))
+            ->assertRedirect(route('portal.verifikasi.santri'));
+        $this->assertSame('aminah@contoh.id', $this->wali->fresh()->email_ibu, 'isian email ibu diabaikan');
+    }
+
+    public function test_satu_email_untuk_dua_orang_ditolak(): void
+    {
+        $this->masukLewatLink($this->link(), 'ayah');
+
+        $this->put(route('portal.verifikasi.wali'), $this->isianKeluarga(['email_ayah' => 'aminah@contoh.id']))
+            ->assertSessionHas('error', fn ($e) => str_contains($e, 'lebih dari satu orang'));
+        $this->assertNull($this->wali->fresh()->email_ayah);
     }
 
     // ---- Verifikasi dua langkah (NIS) ----
@@ -253,26 +293,22 @@ class VerifikasiWaliTest extends TestCase
             ->assertSee('Salin pesan')->assertSee('Jazakumullah khairan')->assertSee('mohon tidak dibagikan');
     }
 
-    public function test_email_kembar_tak_bisa_dibuktikan(): void
+    public function test_email_keluarga_lain_ditolak(): void
     {
-        Wali::create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Lain', 'telepon_ayah' => '0833', 'email_ayah' => 'aminah@contoh.id',
+        Wali::create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Lain', 'telepon_ayah' => '0833', 'email_ayah' => 'lain@contoh.id',
             'nama' => 'Lain', 'telepon' => '0833', 'status' => 'aktif']);
         $this->masukLewatLink($this->link());
 
-        $this->get(route('portal.verifikasi.ringkasan'))->assertSee('juga tercatat di keluarga lain');
-        $this->post(route('portal.verifikasi.email'))->assertSessionHas('error');
+        $this->put(route('portal.verifikasi.wali'), $this->isianKeluarga(['email_ayah' => 'lain@contoh.id']))
+            ->assertSessionHas('error', fn ($e) => str_contains($e, 'keluarga santri lain'));
+        $this->assertNull($this->wali->fresh()->email_ayah);
         Notification::assertNothingSent();
     }
 
     public function test_mode_verifikasi_tanpa_kabar_staf_tapi_jejak_tetap(): void
     {
         $this->masukLewatLink($this->link());
-        $isi = ['nik' => '', 'alamat' => 'Jl. Baru 9'];
-        foreach (['ayah', 'ibu', 'wali'] as $p) {
-            $isi += ["nama_{$p}" => (string) $this->wali->{"nama_{$p}"}, "telepon_{$p}" => (string) $this->wali->{"telepon_{$p}"},
-                "pekerjaan_{$p}" => '', "pekerjaan_lain_{$p}" => '', "pendapatan_{$p}" => ''];
-        }
-        $this->put(route('portal.data.keluarga'), $isi)->assertSessionHas('status');
+        $this->put(route('portal.verifikasi.wali'), $this->isianKeluarga(['alamat' => 'Jl. Baru 9']))->assertRedirect(route('portal.verifikasi.santri'));
 
         $this->assertSame('Jl. Baru 9', $this->wali->fresh()->alamat);
         $this->assertSame(0, \App\Models\Notification::where('jenis', \App\Services\PortalWali\UbahDataWali::JENIS_NOTIF)->count());
@@ -324,7 +360,7 @@ class VerifikasiWaliTest extends TestCase
 
         $this->actingAs($this->admin)->get(route('wali.verifikasi'))->assertSee('pernah selesai');
         $this->masukLewatLink($baru);
-        $this->get(route('portal.verifikasi.ringkasan'))->assertOk();
+        $this->get(route('portal.verifikasi.wali'))->assertOk();
     }
 
     public function test_akhiri_mencabut_yang_belum_selesai_saja(): void

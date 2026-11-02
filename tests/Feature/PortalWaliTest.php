@@ -92,9 +92,13 @@ class PortalWaliTest extends TestCase
     }
 
     /** Sesudah masuk dengan kode PERTAMA KALI: wajib membuat password (keputusan user 14 Okt 2026). */
+    /** Buat password → dikeluarkan (keputusan user 2 Nov 2026) → masuk ulang dengan password itu. */
     private function buatSandi(string $sandi = 'rahasia123')
     {
-        return $this->post(route('portal.sandi.buat'), ['sandi' => $sandi, 'sandi_ulang' => $sandi]);
+        $this->post(route('portal.sandi.buat'), ['sandi' => $sandi, 'sandi_ulang' => $sandi])->assertRedirect(route('portal.masuk'));
+        $this->assertGuest('wali');
+
+        return $this->post(route('portal.masuk.sandi'), ['email' => session('_old_input.email'), 'sandi' => $sandi]);
     }
 
     private function keluarga(array $kolom = []): Wali

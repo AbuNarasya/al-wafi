@@ -99,12 +99,25 @@ class PortalSandiTest extends TestCase
         }
         $this->post(route('portal.sandi.buat'), ['sandi' => 'pendek', 'sandi_ulang' => 'pendek'])->assertSessionHas('error');
         $this->post(route('portal.sandi.buat'), ['sandi' => 'rahasia123', 'sandi_ulang' => 'beda12345'])->assertSessionHas('error');
-        $this->post(route('portal.sandi.buat'), ['sandi' => 'rahasia123', 'sandi_ulang' => 'rahasia123'])->assertRedirect(route('portal.beranda'));
-        $this->get(route('portal.beranda'))->assertOk();
+        // Sesudah membuat password: KELUAR, lalu masuk ulang dengan password itu (keputusan user 2 Nov 2026).
+        $this->post(route('portal.sandi.buat'), ['sandi' => 'rahasia123', 'sandi_ulang' => 'rahasia123'])
+            ->assertRedirect(route('portal.masuk'))->assertSessionHas('status');
+        $this->assertGuest('wali');
+        $this->get(route('portal.beranda'))->assertRedirect(route('portal.masuk'));
 
-        // Masuk berikutnya: password saja.
-        $this->keluar();
         $this->post(route('portal.masuk.sandi'), ['email' => 'hasan@contoh.id', 'sandi' => 'rahasia123'])->assertRedirect(route('portal.beranda'));
+        $this->get(route('portal.beranda'))->assertOk();
+    }
+
+    public function test_kode_masuk_pertama_kali_ditolak_bila_sudah_punya_password(): void
+    {
+        (new KataSandiWali)->simpan($this->wali, 'ibu', 'rahasia123', 'rahasia123');
+
+        $kode = $this->kode('hasanah@contoh.id');
+        $this->post(route('portal.kode'), ['kode' => $kode])->assertRedirect(route('portal.masuk'))
+            ->assertSessionHas('error', fn ($e) => str_contains($e, 'sudah punya password'));
+        $this->assertGuest('wali');
+        $this->get(route('portal.beranda'))->assertRedirect(route('portal.masuk'));
     }
 
     public function test_lupa_password_menyetel_ulang_dan_mencabut_perangkat_lain(): void
@@ -118,12 +131,12 @@ class PortalSandiTest extends TestCase
         $kode = $this->kode('hasan@contoh.id', lupa: true);
         // Sudah punya password, tapi lewat "Lupa password" → tetap wajib membuat yang baru.
         $this->post(route('portal.kode'), ['kode' => $kode])->assertRedirect(route('portal.sandi.buat'));
-        $this->post(route('portal.sandi.buat'), ['sandi' => 'baru12345', 'sandi_ulang' => 'baru12345'])->assertRedirect(route('portal.beranda'));
+        $this->post(route('portal.sandi.buat'), ['sandi' => 'baru12345', 'sandi_ulang' => 'baru12345'])->assertRedirect(route('portal.masuk'));
 
         $this->assertNotNull($lain->fresh()->dicabut_pada, 'perangkat lain orang ini dikeluarkan');
         $this->assertNull($ibu->fresh()->dicabut_pada, 'perangkat ibu tak tersentuh');
+        $this->assertGuest('wali');
 
-        $this->keluar();
         $this->post(route('portal.masuk.sandi'), ['email' => 'hasan@contoh.id', 'sandi' => 'lama12345'])->assertSessionHas('error');
         $this->post(route('portal.masuk.sandi'), ['email' => 'hasan@contoh.id', 'sandi' => 'baru12345'])->assertRedirect(route('portal.beranda'));
     }
@@ -149,7 +162,8 @@ class PortalSandiTest extends TestCase
 
         $this->withCookie(IngatPerangkat::COOKIE, 'TOKEN-UJI')->get(route('portal.beranda'))
             ->assertRedirect(route('portal.sandi.buat'));
-        $this->post(route('portal.sandi.buat'), ['sandi' => 'rahasia123', 'sandi_ulang' => 'rahasia123'])->assertRedirect(route('portal.beranda'));
+        $this->post(route('portal.sandi.buat'), ['sandi' => 'rahasia123', 'sandi_ulang' => 'rahasia123'])->assertRedirect(route('portal.masuk'));
+        $this->post(route('portal.masuk.sandi'), ['email' => 'hasan@contoh.id', 'sandi' => 'rahasia123'])->assertRedirect(route('portal.beranda'));
         $this->get(route('portal.beranda'))->assertOk();
     }
 }

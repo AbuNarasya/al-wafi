@@ -70,23 +70,7 @@ class PortalDataController extends Controller
     public function simpanSantri(Request $request, int $id): RedirectResponse
     {
         $santri = $this->anak($id);
-        // Nama santri TIDAK diterima dari wali — hanya admin (UbahDataWali::KOLOM_SANTRI_TERKUNCI).
-        $data = $request->validate([
-            'jenis_kelamin' => ['required', Rule::in(array_keys(UbahDataWali::JENIS_KELAMIN))],
-            'tempat_lahir' => ['nullable', 'string', 'max:255'],
-            'tanggal_lahir' => ['nullable', 'date', 'before:today'],
-            'nisn' => ['nullable', 'string', 'regex:/^[0-9]{1,20}$/'],
-            'asal_sekolah' => ['nullable', 'string', 'max:255'],
-            'alamat_sekolah_asal' => ['nullable', 'string', 'max:1000'],
-            'kepala_sekolah_asal' => ['nullable', 'string', 'max:255'],
-            'cp_kepala_sekolah_asal' => ['nullable', 'string', 'max:255'],
-            'wali_kelas_asal' => ['nullable', 'string', 'max:255'],
-            'cp_wali_kelas_asal' => ['nullable', 'string', 'max:255'],
-        ], [
-            'required' => __(':Attribute wajib diisi.'),
-            'nisn.regex' => __('NISN hanya berisi angka.'),
-            'tanggal_lahir.before' => __('Tanggal lahir harus sebelum hari ini.'),
-        ], array_map(fn (string $l) => __($l), UbahDataWali::KOLOM_SANTRI));
+        $data = $request->validate(...self::aturanSantri());
 
         try {
             $perubahan = $this->ubah($request)->ubahSantri($santri, $data);
@@ -108,7 +92,64 @@ class PortalDataController extends Controller
 
     public function simpanKeluarga(Request $request): RedirectResponse
     {
-        $wali = SesiWali::wali();
+        $data = self::validasiKeluarga($request, SesiWali::wali());
+
+        try {
+            $perubahan = $this->ubah($request)->ubahKeluarga($data);
+        } catch (AppException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('portal.data', ['tab' => 'wali'])->with('status', $perubahan === []
+            ? __('Tidak ada data yang berubah.')
+            : __('Data keluarga tersimpan (:jumlah isian diubah). Bagian kesantrian sudah diberi tahu.', ['jumlah' => count($perubahan)]));
+    }
+
+    /**
+     * Aturan isian santri — dipakai juga oleh langkah ② verifikasi data. $awalan untuk
+     * formulir banyak anak sekaligus ("santri.12.").
+     *
+     * Nama santri TIDAK diterima dari wali — hanya admin (UbahDataWali::KOLOM_SANTRI_TERKUNCI).
+     *
+     * @return array{0: array<string,mixed>, 1: array<string,string>, 2: array<string,string>}
+     */
+    public static function aturanSantri(string $awalan = ''): array
+    {
+        $aturan = [
+            'jenis_kelamin' => ['required', Rule::in(array_keys(UbahDataWali::JENIS_KELAMIN))],
+            'tempat_lahir' => ['nullable', 'string', 'max:255'],
+            'tanggal_lahir' => ['nullable', 'date', 'before:today'],
+            'nisn' => ['nullable', 'string', 'regex:/^[0-9]{1,20}$/'],
+            'asal_sekolah' => ['nullable', 'string', 'max:255'],
+            'alamat_sekolah_asal' => ['nullable', 'string', 'max:1000'],
+            'kepala_sekolah_asal' => ['nullable', 'string', 'max:255'],
+            'cp_kepala_sekolah_asal' => ['nullable', 'string', 'max:255'],
+            'wali_kelas_asal' => ['nullable', 'string', 'max:255'],
+            'cp_wali_kelas_asal' => ['nullable', 'string', 'max:255'],
+        ];
+        $label = array_map(fn (string $l) => __($l), UbahDataWali::KOLOM_SANTRI);
+
+        return [
+            collect($aturan)->mapWithKeys(fn ($a, $k) => [$awalan.$k => $a])->all(),
+            [
+                'required' => __(':Attribute wajib diisi.'),
+                $awalan.'nisn.regex' => __('NISN hanya berisi angka.'),
+                $awalan.'tanggal_lahir.before' => __('Tanggal lahir harus sebelum hari ini.'),
+            ],
+            collect($label)->mapWithKeys(fn ($l, $k) => [$awalan.$k => $l])->all(),
+        ];
+    }
+
+    /**
+     * Isian data keluarga yang sudah lolos aturan (tanpa email) — dipakai juga oleh
+     * langkah ① verifikasi data.
+     *
+     * @param  array{0?: array<string,mixed>, 1?: array<string,string>, 2?: array<string,string>}  $tambahan
+     *                                                                                                 [aturan, pesan, label] tambahan (email di langkah verifikasi)
+     * @return array<string,mixed>
+     */
+    public static function validasiKeluarga(Request $request, Wali $wali, array $tambahan = []): array
+    {
         $aturan = [
             'nik' => ['nullable', 'string', 'regex:/^[0-9]{16}$/'],
             'alamat' => ['nullable', 'string', 'max:1000'],
@@ -132,12 +173,13 @@ class PortalDataController extends Controller
                 ]));
             }
         }
-        $data = $request->validate($aturan, [
+        [$aturanTambah, $pesanTambah, $labelTambah] = $tambahan + [[], [], []];
+        $data = $request->validate($aturan + $aturanTambah, $pesanTambah + [
             'required' => __(':Attribute wajib diisi (kontak utama keluarga).'),
             'required_if' => __('Sebutkan pekerjaannya.'),
             'nik.regex' => __('NIK berisi 16 angka.'),
             'regex' => __(':Attribute tidak sah.'),
-        ], $label);
+        ], $labelTambah + $label);
 
         // "Lainnya…" menyimpan apa yang diketik wali — sama dengan form pendaftaran.
         foreach (MasukWali::PERAN as $p) {
@@ -147,15 +189,7 @@ class PortalDataController extends Controller
             unset($data["pekerjaan_lain_{$p}"]);
         }
 
-        try {
-            $perubahan = $this->ubah($request)->ubahKeluarga($data);
-        } catch (AppException $e) {
-            return back()->withInput()->with('error', $e->getMessage());
-        }
-
-        return redirect()->route('portal.data', ['tab' => 'wali'])->with('status', $perubahan === []
-            ? __('Tidak ada data yang berubah.')
-            : __('Data keluarga tersimpan (:jumlah isian diubah). Bagian kesantrian sudah diberi tahu.', ['jumlah' => count($perubahan)]));
+        return $data;
     }
 
     // ---- Ganti email (dibuktikan kode ke alamat BARU) ----
@@ -226,12 +260,10 @@ class PortalDataController extends Controller
             return redirect()->route('portal.data', ['tab' => 'wali'])->with('error', $e->getMessage());
         }
         $request->session()->forget(self::EMAIL_BARU);
-        // Mode verifikasi: email baru milik orang yang sedang masuk baru saja terbukti
-        // lewat kode ke alamat itu — langkah "buktikan email" tak perlu diulang.
-        if (SesiWali::modeVerifikasi($request) && $peran === SesiWali::peran($request)) {
-            $request->session()->put(SesiWali::VERIFIKASI_EMAIL, $email);
-
-            return redirect()->route('portal.verifikasi.ringkasan')->with('status', __('Email diganti dan terbukti aktif.'));
+        // Mode verifikasi: kembali ke langkah ① (email di sana diketik langsung, jalur ini
+        // hanya terbuka bila wali membuka menu Data lewat alamat).
+        if (SesiWali::modeVerifikasi($request)) {
+            return redirect()->route('portal.verifikasi.wali')->with('status', __('Email diganti dan terbukti aktif.'));
         }
         if ($diingat) {
             $perangkat->ingat(SesiWali::wali()->refresh(), (string) SesiWali::peran($request), $request);

@@ -34,6 +34,7 @@ final class MenuPortal
         'data' => ['portal.data', 'Data wali & santri', 'data', '#475569', 'administrasi', null],
         'pendaftaran' => ['portal.daftar', 'Pendaftaran', 'psb', '#9b7bb0', 'administrasi', null],
         'klinik' => ['portal.klinik', 'Riwayat klinik', 'klinik', '#b91c1c', 'lainnya', null],
+        'laundry' => ['portal.laundry', 'Laundry', 'laundry', '#0891b2', 'lainnya', null],
         'kabar' => ['portal.kabar', 'Kabar', 'lonceng', '#c98a5e', 'lainnya', null],
         'akun' => ['portal.akun', 'Akun', 'profil', '#64748b', 'lainnya', null],
     ];

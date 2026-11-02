@@ -41,6 +41,9 @@ class WaliService
                     $w->orWhere($col, 'ilike', "%{$q}%");
                 }
             }))
+            // Daftar anak ditampilkan per keluarga & menaut ke detail santri (permintaan user 2 Nov 2026).
+            ->with(['santri' => fn ($s) => $s->select(['id', 'id_wali', 'nama', 'nis', 'kode_jenjang', 'id_kelas', 'status'])
+                ->with(['jenjang:kode,nama', 'kelas:id,nama'])->orderBy('nama')])
             ->withCount('santri')
             ->orderBy('nama')
             ->get();

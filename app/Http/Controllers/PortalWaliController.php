@@ -159,10 +159,20 @@ class PortalWaliController extends Controller
     private function masukKeluarga(Wali $wali, string $peran, Request $request, bool $ingat): RedirectResponse
     {
         $lupa = (bool) $request->session()->pull(SesiWali::LUPA_SANDI);
+        $punya = KataSandiWali::punya($wali, $peran);
+
+        // "Masuk pertama kali" bagi yang SUDAH punya password tak membuka sesi (keputusan user
+        // 2 Nov 2026): kode email hanya untuk pertama kali & lupa password.
+        if ($punya && ! $lupa) {
+            $request->session()->forget(SesiWali::MENUNGGU);
+
+            return redirect()->route('portal.masuk')->withInput(['email' => MasukWali::normalEmail((string) $wali->{"email_{$peran}"})])
+                ->with('error', __('Anda sudah punya password. Masuk dengan email dan password, atau pakai “Lupa password?” bila lupa.'));
+        }
         $this->sesi->masuk($wali, $peran, $request, $ingat);
 
         // Kode email cukup sekali: belum punya password, atau lupa password → buat dulu.
-        if ($lupa || ! KataSandiWali::punya($wali, $peran)) {
+        if ($lupa || ! $punya) {
             $request->session()->put(SesiWali::WAJIB_SANDI, true);
 
             return redirect()->route('portal.sandi.buat');

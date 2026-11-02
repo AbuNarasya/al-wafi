@@ -257,6 +257,33 @@ class UbahDataWali
         $this->umumkan('Wali', $this->wali->id, [self::labelKeluarga("email_{$sasaran}") => ['lama' => $lama, 'baru' => $email]], Teks::k('email keluarga'));
     }
 
+    /**
+     * Langkah ① verifikasi data: email diisi TANPA kode (keputusan user 2 Nov 2026) —
+     * email terbukti nanti saat orangnya masuk pertama kali dengan kode.
+     *
+     * Pengaman: email orang yang SUDAH punya password (sudah pernah masuk) tak bisa diganti
+     * dari sini — pemegang link tak boleh mengunci pasangannya keluar dari akunnya sendiri.
+     * Orang itu menggantinya sendiri lewat menu Data Wali (kode ke alamat baru).
+     *
+     * @return bool  true bila email berubah
+     *
+     * @throws AppException
+     */
+    public function isiEmailTanpaKode(string $sasaran, string $email): bool
+    {
+        $email = MasukWali::normalEmail($email);
+        if ($email === '' || $email === MasukWali::normalEmail((string) $this->wali->{"email_{$sasaran}"})) {
+            return false;
+        }
+        if (KataSandiWali::punya($this->wali, $sasaran)) {
+            throw new AppException(422, __('Email :peran sudah dipakai masuk Portal Wali, jadi hanya bisa diganti oleh :peran sendiri lewat menu Data Wali & Santri.',
+                ['peran' => mb_strtolower(__(Wali::PERAN[$sasaran]))]));
+        }
+        $this->gantiEmail($sasaran, $email);
+
+        return true;
+    }
+
     // ══════════════════════════════════════════════════════════════════
     //  JEJAK & KABAR
     // ══════════════════════════════════════════════════════════════════

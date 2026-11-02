@@ -14,7 +14,8 @@ use Illuminate\View\View;
  * PORTAL WALI — membuat & mengganti password (KataSandiWali).
  *
  *   /wali/sandi/buat   sesudah masuk dengan kode email (pertama kali / lupa password);
- *                      middleware PortalWali menahan wali di sini sampai selesai.
+ *                      middleware PortalWali menahan wali di sini sampai selesai, lalu
+ *                      wali dikeluarkan dan masuk ulang dengan password barunya.
  *   /wali/sandi/ganti  dari menu Akun: password lama + baru.
  *
  * Password diganti / disetel ulang → perangkat lain ORANG ini dicabut: perangkat
@@ -34,7 +35,7 @@ class PortalSandiController extends Controller
         return view('portal.sandi-buat', ['ganti' => KataSandiWali::punya($wali, (string) SesiWali::peran($request))]);
     }
 
-    public function buat(Request $request): RedirectResponse
+    public function buat(Request $request, SesiWali $sesi): RedirectResponse
     {
         if (! $request->session()->get(SesiWali::WAJIB_SANDI)) {
             return redirect()->route('portal.beranda');
@@ -55,10 +56,16 @@ class PortalSandiController extends Controller
         if ($menggantiLama) {
             $this->perangkat->cabutLainnya($wali->id, $peran, $request);
         }
-        $request->session()->forget(SesiWali::WAJIB_SANDI);
-        $request->session()->put(SesiWali::PUNYA_SANDI, true);
 
-        return redirect()->route('portal.beranda')->with('status', __('Password tersimpan. Mulai sekarang masuk dengan email dan password ini.'));
+        // Sesudah membuat password, wali KELUAR lalu masuk ulang dengan password itu (keputusan
+        // user 2 Nov 2026) — sekaligus memastikan password-nya benar diingat.
+        $email = (string) $wali->{"email_{$peran}"};
+        $bahasa = app()->getLocale();
+        $sesi->keluar($request);
+        $request->session()->put(\App\Support\BahasaPortal::SESI, $bahasa);
+
+        return redirect()->route('portal.masuk')->withInput(['email' => $email])
+            ->with('status', __('Password tersimpan. Silakan masuk dengan email dan password Anda.'));
     }
 
     public function formGanti(): View

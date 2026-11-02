@@ -3,6 +3,7 @@
 @section('title', 'Wali / Keluarga Santri')
 
 @section('content')
+    @php $bolehLihatSantri = \App\Support\Akses::boleh('santri', 'lihat'); @endphp
     <div x-data="rowFilter" x-cloak>
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <x-filter-bar placeholder="Cari nama / telepon…" />
@@ -21,7 +22,7 @@
             <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <tr><th class="px-4 py-3">Nama (Kontak Utama)</th><th class="px-4 py-3">Telepon</th><th class="px-4 py-3 text-center">Santri</th><th class="px-4 py-3">Status</th><th class="px-4 py-3 text-right">Aksi</th></tr>
                 <tr class="bg-white">
-                    <x-fcol :col="0" /><x-fcol :col="1" /><x-fcol type="blank" /><x-fcol :col="3" type="select" /><x-fcol type="blank" />
+                    <x-fcol :col="0" /><x-fcol :col="1" /><x-fcol :col="2" /><x-fcol :col="3" type="select" /><x-fcol type="blank" />
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
@@ -29,7 +30,21 @@
                     <tr data-row class="hover:bg-gray-50">
                         <td class="px-4 py-3 font-medium text-gray-900">{{ $r->nama }}<div class="text-xs text-gray-400">Kontak: {{ ucfirst($r->kontak_utama) }}</div></td>
                         <td class="px-4 py-3 text-gray-600">{{ $r->telepon }}</td>
-                        <td class="px-4 py-3 text-center">{{ $r->santri_count }}</td>
+                        <td class="px-4 py-3">
+                            @forelse ($r->santri as $s)
+                                <div class="py-0.5">
+                                    @if ($bolehLihatSantri)
+                                        <a href="{{ route('santri.show', $s->id) }}" class="font-medium text-brand hover:underline">{{ $s->nama }}</a>
+                                    @else
+                                        <span class="font-medium text-gray-800">{{ $s->nama }}</span>
+                                    @endif
+                                    @if ($s->status !== 'aktif')<span class="ml-1 rounded-full bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">{{ \App\Services\Ppsb\Tahap::labelStatus((string) $s->status) }}</span>@endif
+                                    <div class="text-xs text-gray-400">{{ $s->kelas?->nama ?? ($s->jenjang?->nama ?? $s->kode_jenjang) }}{{ $s->nis ? ' · NIS '.$s->nis : '' }}</div>
+                                </div>
+                            @empty
+                                <span class="text-gray-400">—</span>
+                            @endforelse
+                        </td>
                         <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $r->status === 'aktif' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500' }}">{{ ucfirst($r->status) }}</span></td>
                         <td class="px-4 py-3 text-right">
                             <div class="flex items-center justify-end gap-2">

@@ -221,6 +221,10 @@ Route::prefix('api/dompet-toko/v1')->middleware([\App\Http\Middleware\TandaTanga
 Route::post('/midtrans/notifikasi', \App\Http\Controllers\MidtransNotifikasiController::class)
     ->name('midtrans.notifikasi')->middleware('throttle:120,1');
 // Kartu belanja Wafi Mart per anak — di bawah /wali/anak, BUKAN /wali/data (mode verifikasi).
+// Laundry di portal wali (tahap 3, 26 Okt 2026): kuota, cucian berjalan, riwayat, tagihan kelebihan.
+Route::prefix('wali')->name('portal.')->middleware('portal.wali')->group(function () {
+    Route::get('/laundry', [\App\Http\Controllers\PortalLaundryController::class, 'index'])->name('laundry');
+});
 Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalKartuController::class)->group(function () {
     Route::post('/anak/{id}/kartu/batas', 'batas')->name('kartu.batas')->middleware('throttle:10,1')->whereNumber('id');
     Route::post('/anak/{id}/kartu/pin', 'pinAnak')->name('kartu.pin')->middleware('throttle:10,1')->whereNumber('id');
@@ -289,10 +293,13 @@ Route::prefix('wali')->name('portal.verifikasi.')->controller(\App\Http\Controll
     Route::post('/v/{kode}', 'pilihPeran')->where('kode', '[A-Za-z0-9]{32}')->middleware('throttle:10,1');
 
     Route::middleware('portal.wali')->group(function () {
+        // Bertahap (2 Nov 2026): ① Data Wali → ② Data Santri → ③ Selesai.
         Route::get('/verifikasi', 'ringkasan')->name('ringkasan');
-        Route::post('/verifikasi/email', 'kirimKode')->name('email')->middleware('throttle:5,1');
-        Route::get('/verifikasi/kode', 'formKode')->name('kode');
-        Route::post('/verifikasi/kode', 'konfirmasiKode')->middleware('throttle:10,1');
+        Route::get('/verifikasi/wali', 'formWali')->name('wali');
+        Route::put('/verifikasi/wali', 'simpanWali')->middleware('throttle:20,1');
+        Route::get('/verifikasi/santri', 'formSantri')->name('santri');
+        Route::put('/verifikasi/santri', 'simpanSantri')->middleware('throttle:20,1');
+        Route::get('/verifikasi/selesai', 'formKonfirmasi')->name('konfirmasi');
         Route::post('/verifikasi/selesai', 'selesai')->name('selesai')->middleware('throttle:10,1');
     });
 });
@@ -808,6 +815,33 @@ Route::middleware('auth')->group(function () {
             Route::post('/{pengajuan}/dokumen', 'unggah')->name('unggah')->whereNumber('pengajuan');
             Route::post('/{pengajuan}/dapodik', 'dapodik')->name('dapodik')->whereNumber('pengajuan');
         });
+
+    // Laundry — tahap 1 (26 Okt 2026): terima (tap kartu) → proses → selesai → serahkan (tap kartu + cocokkan pakaian).
+    Route::prefix('laundry')->name('laundry.')->controller(\App\Http\Controllers\LaundryController::class)->group(function () {
+        Route::get('/', 'index')->name('index')->middleware('hakakses:laundry,lihat');
+        Route::get('/terima', 'terima')->name('terima')->middleware('hakakses:laundry,buat');
+        Route::post('/terima', 'simpanTerima')->name('simpan_terima')->middleware('hakakses:laundry,buat');
+        Route::post('/majukan', 'majukan')->name('majukan')->middleware('hakakses:laundry,ubah');
+        Route::get('/serahkan', 'serahkan')->name('serahkan')->middleware('hakakses:laundry,ubah');
+        Route::post('/serahkan', 'simpanSerahkan')->name('simpan_serahkan')->middleware('hakakses:laundry,ubah');
+        Route::get('/riwayat', 'riwayat')->name('riwayat')->middleware('hakakses:laundry,lihat');
+        Route::get('/jenis-pakaian', 'jenisPakaian')->name('jenis')->middleware('hakakses:laundry-master,lihat');
+        Route::post('/jenis-pakaian', 'simpanJenis')->name('jenis.simpan')->middleware('hakakses:laundry-master,buat');
+        Route::put('/jenis-pakaian/{id}', 'ubahJenis')->name('jenis.ubah')->middleware('hakakses:laundry-master,ubah')->whereNumber('id');
+        Route::get('/{laundry}', 'show')->name('show')->middleware('hakakses:laundry,lihat')->whereNumber('laundry');
+        Route::post('/{laundry}/batal', 'batal')->name('batal')->middleware('hakakses:laundry,hapus')->whereNumber('laundry');
+        Route::post('/{laundry}/koreksi-berat', 'koreksiBerat')->name('koreksi_berat')->middleware('hakakses:laundry,ubah')->whereNumber('laundry');
+    });
+    // Laundry tahap 2: kuota bulanan, tagihan kelebihan (keuangan), pengaturan tarif & kuota.
+    Route::prefix('laundry')->name('laundry.')->controller(\App\Http\Controllers\LaundryTagihanController::class)->group(function () {
+        Route::get('/tagihan', 'index')->name('tagihan')->middleware('hakakses:laundry-tagihan,lihat');
+        Route::post('/tagihan/susun', 'susun')->name('tagihan.susun')->middleware('hakakses:laundry-tagihan,buat');
+        Route::post('/tagihan/terbitkan', 'terbitkan')->name('tagihan.terbitkan')->middleware('hakakses:laundry-tagihan,buat');
+        Route::post('/tagihan/{tagihan}/kecualikan', 'kecualikan')->name('tagihan.kecualikan')->middleware('hakakses:laundry-tagihan,ubah')->whereNumber('tagihan');
+        Route::post('/tagihan/{tagihan}/batal-kecuali', 'batalKecuali')->name('tagihan.batal_kecuali')->middleware('hakakses:laundry-tagihan,ubah')->whereNumber('tagihan');
+        Route::get('/pengaturan', 'pengaturan')->name('pengaturan')->middleware('hakakses:laundry-master,lihat');
+        Route::put('/pengaturan', 'simpanPengaturan')->name('pengaturan.simpan')->middleware('hakakses:laundry-master,ubah');
+    });
 
     // Klinik — catatan kunjungan santri (21 Okt 2026).
     Route::prefix('klinik')->name('klinik.')->controller(\App\Http\Controllers\KlinikController::class)->group(function () {

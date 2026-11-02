@@ -148,6 +148,12 @@ final class ModulRegistry
         // Klinik: lihat = daftar/riwayat/rekap, buat = mencatat kunjungan (+ menerbitkan tagihan bila juga berhak
         // Tagihan Lain-lain), ubah = menyelesaikan rawat di klinik.
         ['kode' => 'klinik', 'nama' => 'Klinik (kunjungan santri)', 'grup' => 'KLINIK'],
+        // Laundry: lihat = papan & riwayat, buat = menerima cucian, ubah = memajukan proses & menyerahkan,
+        // hapus = membatalkan kantong yang masih Diterima. Master jenis pakaian dipisah.
+        ['kode' => 'laundry', 'nama' => 'Laundry (terima, proses, serahkan)', 'grup' => 'LAUNDRY'],
+        ['kode' => 'laundry-master', 'nama' => 'Laundry — Jenis Pakaian & Pengaturan (tarif, kuota)', 'grup' => 'LAUNDRY'],
+        // Keuangan: lihat = daftar per bulan, buat = susun & terbitkan tagihan kelebihan, ubah = kecualikan santri.
+        ['kode' => 'laundry-tagihan', 'nama' => 'Laundry — Kuota & Tagihan Kelebihan', 'grup' => 'LAUNDRY'],
         // Kelas/rombel: buat/ubah/hapus = master kelas; ubah juga = menempatkan santri ke kelas.
         ['kode' => 'kelas', 'nama' => 'Kelas (rombel) & Penempatan Kelas', 'grup' => 'DATA SISWA/SANTRI'],
         // Pengunduran diri santri aktif: lihat = membuka daftar. Wali kelas & kepala sekolah ditetapkan di
@@ -276,6 +282,7 @@ final class ModulRegistry
         'PPSB',
         'KEPENDIDIKAN',
         'KLINIK',
+        'LAUNDRY',
         'TAGIHAN LAIN-LAIN',
         'SISTEM',
         'TANPA MENU',

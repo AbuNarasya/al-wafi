@@ -6,10 +6,11 @@ use App\Exceptions\AppException;
 use App\Models\Santri;
 use App\Models\VerifikasiWali;
 use App\Models\Wali;
+use App\Services\PortalWali\KataSandiWali;
 use App\Services\PortalWali\LinkVerifikasi;
 use App\Services\PortalWali\MasukWali;
-use App\Services\PortalWali\PendaftaranPortal;
 use App\Services\PortalWali\SesiWali;
+use App\Services\PortalWali\UbahDataWali;
 use App\Services\Ppsb\Tahap;
 use App\Support\Audit\Jejak;
 use Illuminate\Http\RedirectResponse;
@@ -23,16 +24,13 @@ use Illuminate\View\View;
  *
  *   /wali/v/{kode}   buka link → pilih peran → MODE VERIFIKASI (sesi terbatas)
  *   /wali/v          jalur cadangan bagi yang kehilangan link
- *   /wali/verifikasi ringkasan → buktikan email → selesai (= akun portal penuh)
+ *   /wali/verifikasi ① Data Wali → ② Data Santri → ③ Selesai (tanpa kode, tanpa password)
  *
- * Pemeriksaan & pembetulan datanya memakai layar Data Wali & Santri yang sudah
- * ada (PortalDataController) — satu aturan ubah data, satu jejak audit.
+ * Aturan isian & penyimpanannya sama dengan layar Data Wali & Santri
+ * (PortalDataController + UbahDataWali) — satu aturan ubah data, satu jejak audit.
  */
 class PortalVerifikasiController extends Controller
 {
-    /** Email yang sedang menunggu kode pembuktian. */
-    private const MENUNGGU = 'portal.verifikasi_menunggu';
-
     public function __construct(private readonly LinkVerifikasi $link) {}
 
     // ---- Membuka link ----
@@ -135,11 +133,30 @@ class PortalVerifikasiController extends Controller
         return redirect()->route('portal.verifikasi.buka', LinkVerifikasi::kode($v));
     }
 
-    // ---- Mode verifikasi ----
+    // ---- Mode verifikasi: ① Data Wali → ② Data Santri → ③ Selesai ----
+    //
+    // Bertahap (keputusan user 2 Nov 2026). Setiap "Simpan & lanjut" langsung menyimpan, jadi wali
+    // yang berhenti di tengah tak kehilangan isiannya. Email diketik TANPA kode — terbukti nanti
+    // saat orangnya masuk pertama kali (kode email → buat password → masuk ulang).
+
+    /** Langkah yang sudah disimpan untuk link yang sedang dibuka: [id link, jumlah langkah]. */
+    private const LEWAT = 'portal.verifikasi_lewat';
 
     private function linkAktif(Request $request): VerifikasiWali
     {
         return VerifikasiWali::findOrFail(SesiWali::modeVerifikasi($request));
+    }
+
+    private function lewat(Request $request): int
+    {
+        [$idLink, $n] = $request->session()->get(self::LEWAT, [null, 0]);
+
+        return $idLink === SesiWali::modeVerifikasi($request) ? (int) $n : 0;
+    }
+
+    private function tandaiLewat(Request $request, int $langkah): void
+    {
+        $request->session()->put(self::LEWAT, [SesiWali::modeVerifikasi($request), max($this->lewat($request), $langkah)]);
     }
 
     private static function emailPeran(Wali $wali, string $peran): string
@@ -147,127 +164,194 @@ class PortalVerifikasiController extends Controller
         return MasukWali::normalEmail((string) $wali->{"email_{$peran}"});
     }
 
-    public function ringkasan(Request $request): View|RedirectResponse
+    private static function anakAktif(Wali $wali): \Illuminate\Database\Eloquent\Collection
+    {
+        return Santri::with('jenjang:kode,nama')->where('id_wali', $wali->id)
+            ->whereNotIn('status', Tahap::STATUS_FINAL)->orderBy('nama')->get();
+    }
+
+    /** /wali/verifikasi — membuka langkah yang belum disimpan. */
+    public function ringkasan(Request $request): RedirectResponse
+    {
+        if (! SesiWali::modeVerifikasi($request)) {
+            return redirect()->route('portal.beranda');
+        }
+
+        return redirect()->route(match ($this->lewat($request)) {
+            0 => 'portal.verifikasi.wali',
+            1 => 'portal.verifikasi.santri',
+            default => 'portal.verifikasi.konfirmasi',
+        });
+    }
+
+    // ① Data Wali
+
+    public function formWali(Request $request): View|RedirectResponse
+    {
+        if (! SesiWali::modeVerifikasi($request)) {
+            return redirect()->route('portal.beranda');
+        }
+        $wali = SesiWali::wali();
+
+        return view('portal.verifikasi-wali', [
+            'wali' => $wali, 'peranSaya' => (string) SesiWali::peran($request), 'link' => $this->linkAktif($request),
+            'lewat' => $this->lewat($request),
+            'punyaSandi' => collect(MasukWali::PERAN)->mapWithKeys(fn ($p) => [$p => KataSandiWali::punya($wali, $p)])->all(),
+        ]);
+    }
+
+    public function simpanWali(Request $request): RedirectResponse
     {
         if (! SesiWali::modeVerifikasi($request)) {
             return redirect()->route('portal.beranda');
         }
         $wali = SesiWali::wali();
         $peran = (string) SesiWali::peran($request);
-        $email = self::emailPeran($wali, $peran);
 
-        return view('portal.verifikasi', [
-            'wali' => $wali, 'peran' => $peran, 'link' => $this->linkAktif($request),
-            'anak' => Santri::with('jenjang:kode,nama')->where('id_wali', $wali->id)
-                ->whereNotIn('status', Tahap::STATUS_FINAL)->orderBy('nama')->get(),
-            'email' => $email,
-            'emailKembar' => $email !== '' && PendaftaranPortal::emailTerdaftar($email, $wali->id),
-            'terbukti' => $email !== '' && $request->session()->get(SesiWali::VERIFIKASI_EMAIL) === $email,
-            // Belum punya password → dibuat sekalian di langkah Selesai (keputusan user 14 Okt 2026).
-            'perluSandi' => ! \App\Services\PortalWali\KataSandiWali::punya($wali, $peran),
-        ]);
-    }
+        // Email orang yang sudah punya password tak diterima dari sini (UbahDataWali::isiEmailTanpaKode).
+        $aturan = $pesan = $label = [];
+        foreach (MasukWali::PERAN as $p) {
+            if (KataSandiWali::punya($wali, $p)) {
+                continue;
+            }
+            // Email WAJIB bagi orang yang sedang verifikasi (keputusan user): dipakai masuk portal.
+            $aturan["email_{$p}"] = [$p === $peran ? 'required' : 'nullable', 'email', 'max:255'];
+            $label["email_{$p}"] = mb_strtolower(__('Email :peran', ['peran' => __(Wali::PERAN[$p] ?? $p)]));
+        }
+        $pesan = ["email_{$peran}.required" => __('Email Anda wajib diisi — dipakai untuk masuk Portal Wali.'), 'email' => __('Alamat email tidak sah.')];
+        $data = PortalDataController::validasiKeluarga($request, $wali, [$aturan, $pesan, $label]);
 
-    /** Buktikan email yang SUDAH tercatat untuk peran ini (mengganti → lewat Data Wali & Santri). */
-    public function kirimKode(Request $request, MasukWali $masuk): RedirectResponse
-    {
-        $wali = SesiWali::wali();
-        $email = self::emailPeran($wali, (string) SesiWali::peran($request));
-        if ($email === '') {
-            return back()->with('error', __('Email belum diisi. Isi email Anda lebih dulu.'));
+        $email = [];
+        foreach (MasukWali::PERAN as $p) {
+            if (array_key_exists("email_{$p}", $data)) {
+                $email[$p] = MasukWali::normalEmail((string) $data["email_{$p}"]);
+            }
+            unset($data["email_{$p}"]);
         }
-        if (PendaftaranPortal::emailTerdaftar($email, $wali->id)) {
-            return back()->with('error', __('Email ini juga tercatat di keluarga lain, jadi tak bisa dipakai. Ganti dengan email lain.'));
+        // Satu email = satu orang: masuk portal mencari keluarga & peran lewat email.
+        $terisi = array_filter($email + collect(MasukWali::PERAN)->mapWithKeys(fn ($p) => [$p => self::emailPeran($wali, $p)])->all());
+        foreach (array_count_values($terisi) as $alamat => $jumlah) {
+            if ($jumlah > 1) {
+                return back()->withInput()->with('error', __('Email :email dipakai untuk lebih dari satu orang. Setiap orang tua / wali memakai email sendiri.', ['email' => $alamat]));
+            }
         }
+
+        $ubah = new UbahDataWali($wali, $peran, tanpaKabarStaf: true);
         try {
-            $kodeUji = $masuk->mintaKode($email, 'verifikasi', $request->ip());
+            $ubah->ubahKeluarga($data);
+            foreach ($email as $p => $alamat) {
+                $ubah->isiEmailTanpaKode($p, $alamat);
+            }
         } catch (AppException $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->withInput()->with('error', $e->getMessage());
         }
-        $request->session()->put(self::MENUNGGU, $email);
+        $this->tandaiLewat($request, 1);
 
-        return redirect()->route('portal.verifikasi.kode')->with('kode_uji', $kodeUji);
+        return redirect()->route('portal.verifikasi.santri');
     }
 
-    public function formKode(Request $request): View|RedirectResponse
+    // ② Data Santri
+
+    public function formSantri(Request $request): View|RedirectResponse
     {
-        $email = $request->session()->get(self::MENUNGGU);
-        if (! $email) {
+        if (! SesiWali::modeVerifikasi($request)) {
+            return redirect()->route('portal.beranda');
+        }
+        if ($this->lewat($request) < 1) {
+            return redirect()->route('portal.verifikasi.wali');
+        }
+
+        return view('portal.verifikasi-santri', ['anak' => self::anakAktif(SesiWali::wali()), 'lewat' => $this->lewat($request)]);
+    }
+
+    public function simpanSantri(Request $request): RedirectResponse
+    {
+        if (! SesiWali::modeVerifikasi($request) || $this->lewat($request) < 1) {
+            return redirect()->route('portal.verifikasi.ringkasan');
+        }
+        $wali = SesiWali::wali();
+        $bisa = self::anakAktif($wali)->filter(fn (Santri $s) => UbahDataWali::bolehUbahSantri($s));
+
+        $aturan = $pesan = $label = [];
+        foreach ($bisa as $s) {
+            [$a, $p, $l] = PortalDataController::aturanSantri("santri.{$s->id}.");
+            $aturan += $a;
+            $pesan += $p;
+            // Galat menyebut nama anaknya — banyak anak dalam satu formulir.
+            $label += array_map(fn ($x) => $x.' ('.$s->nama.')', $l);
+        }
+        $data = $request->validate($aturan, $pesan, $label);
+
+        $ubah = new UbahDataWali($wali, (string) SesiWali::peran($request), tanpaKabarStaf: true);
+        try {
+            foreach ($bisa as $s) {
+                $ubah->ubahSantri($s, $data['santri'][$s->id] ?? []);
+            }
+        } catch (AppException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+        $this->tandaiLewat($request, 2);
+
+        return redirect()->route('portal.verifikasi.konfirmasi');
+    }
+
+    // ③ Selesai
+
+    public function formKonfirmasi(Request $request): View|RedirectResponse
+    {
+        if (! SesiWali::modeVerifikasi($request)) {
+            return redirect()->route('portal.beranda');
+        }
+        if ($this->lewat($request) < 2) {
             return redirect()->route('portal.verifikasi.ringkasan');
         }
 
-        return view('portal.verifikasi-kode', ['tujuan' => $email, 'menit' => MasukWali::MENIT]);
-    }
-
-    public function konfirmasiKode(Request $request, MasukWali $masuk): RedirectResponse
-    {
-        $email = $request->session()->get(self::MENUNGGU);
-        if (! $email) {
-            return redirect()->route('portal.verifikasi.ringkasan');
-        }
-        $data = $request->validate(['kode' => ['required', 'string', 'max:10']]);
-        if (! $masuk->periksa($email, 'verifikasi', $data['kode'])) {
-            return back()->with('error', __('Kode salah atau sudah kedaluwarsa. Periksa lagi, atau minta kode baru.'));
-        }
-        $request->session()->forget(self::MENUNGGU);
-        $request->session()->put(SesiWali::VERIFIKASI_EMAIL, $email);
-
-        return redirect()->route('portal.verifikasi.ringkasan')->with('status', __('Email terbukti aktif.'));
+        return view('portal.verifikasi-konfirmasi', ['wali' => SesiWali::wali()->refresh(), 'anak' => self::anakAktif(SesiWali::wali()),
+            'lewat' => $this->lewat($request)]);
     }
 
     public function selesai(Request $request, SesiWali $sesi): RedirectResponse
     {
-        $wali = SesiWali::wali();
+        if (! SesiWali::modeVerifikasi($request) || $this->lewat($request) < 2) {
+            return redirect()->route('portal.verifikasi.ringkasan');
+        }
+        $wali = SesiWali::wali()->refresh();
         $peran = (string) SesiWali::peran($request);
         $email = self::emailPeran($wali, $peran);
-        // Email WAJIB (keputusan user): tanpa email terbukti, verifikasi belum selesai.
-        if ($email === '' || $request->session()->get(SesiWali::VERIFIKASI_EMAIL) !== $email) {
-            return back()->with('error', __('Buktikan dulu email Anda dengan kode sebelum menyelesaikan verifikasi.'));
+        // Email WAJIB terisi (keputusan user) — dibuktikan saat masuk pertama kali, bukan di sini.
+        if ($email === '') {
+            return redirect()->route('portal.verifikasi.wali')->with('error', __('Email Anda wajib diisi — dipakai untuk masuk Portal Wali.'));
         }
-        $perluSandi = ! \App\Services\PortalWali\KataSandiWali::punya($wali, $peran);
-        $data = $request->validate([
-            'setuju' => ['accepted'],
-            'sandi' => [$perluSandi ? 'required' : 'nullable', 'string', 'max:255'],
-            'sandi_ulang' => [$perluSandi ? 'required' : 'nullable', 'string'],
-        ], ['setuju.accepted' => __('Centang pernyataan bahwa data sudah benar.'), 'sandi.required' => __('Buat password untuk masuk Portal Wali.'),
-            'sandi_ulang.required' => __('Ulangi password.')]);
+        $request->validate(['setuju' => ['accepted']], ['setuju.accepted' => __('Centang pernyataan bahwa data sudah benar.')]);
 
-        $link = $this->linkAktif($request);
         try {
-            // Password dulu (bisa ditolak: terlalu pendek / tak sama), baru tandai selesai.
-            if ($perluSandi) {
-                \App\Services\PortalWali\KataSandiWali::assertSah($data['sandi'], $data['sandi_ulang']);
-            }
-            $this->link->selesai($link, $peran, $email);
-            if ($perluSandi) {
-                (new \App\Services\PortalWali\KataSandiWali)->simpan($wali, $peran, $data['sandi'], $data['sandi_ulang']);
-            }
+            $this->link->selesai($this->linkAktif($request), $peran, $email);
         } catch (AppException $e) {
             return back()->with('error', $e->getMessage());
         }
         try {
             Jejak::catat('verifikasi_data_selesai', [
-                'modul' => \App\Services\PortalWali\UbahDataWali::MODUL_JEJAK, 'ref_jenis' => 'Wali', 'ref_id' => $wali->id,
-                'detail' => 'Verifikasi data keluarga diselesaikan oleh '.(new \App\Services\PortalWali\UbahDataWali($wali, $peran))->namaPengubah()
-                    ." lewat link verifikasi; email {$email} terbukti.",
+                'modul' => UbahDataWali::MODUL_JEJAK, 'ref_jenis' => 'Wali', 'ref_id' => $wali->id,
+                'detail' => 'Verifikasi data keluarga diselesaikan oleh '.(new UbahDataWali($wali, $peran))->namaPengubah()
+                    ." lewat link verifikasi; email {$email} (dibuktikan saat masuk pertama kali).",
             ]);
         } catch (\Throwable) {
             // jejak tak boleh menggagalkan penyelesaian
         }
         // Halaman penutup, BUKAN aplikasi (keputusan user 14 Okt 2026): sesinya diakhiri,
-        // ringkasan dibawa sebagai flash. Akunnya tetap jadi — wali bisa masuk portal kapan
-        // saja dengan email yang baru terbukti.
+        // ringkasan dibawa sebagai flash.
         $ringkasan = [
             'peran' => Wali::PERAN[$peran] ?? $peran,
             'nama' => $wali->{"nama_{$peran}"} ?: $wali->nama,
             'email' => $email,
             'telepon' => $wali->{"telepon_{$peran}"} ?: $wali->telepon,
-            'anak' => Santri::with('jenjang:kode,nama')->where('id_wali', $wali->id)
-                ->whereNotIn('status', Tahap::STATUS_FINAL)->orderBy('nama')->get()
+            'punya_sandi' => KataSandiWali::punya($wali, $peran),
+            'anak' => self::anakAktif($wali)
                 ->map(fn (Santri $s) => ['nama' => $s->nama, 'jenjang' => $s->jenjang?->nama ?? $s->kode_jenjang, 'nis' => $s->nis])->all(),
         ];
         $bahasa = app()->getLocale();
         $sesi->keluar($request);
+        $request->session()->forget(self::LEWAT);
         // Halaman penutup tetap dalam bahasa pilihan wali (sesi baru sesudah keluar).
         $request->session()->put(\App\Support\BahasaPortal::SESI, $bahasa);
 

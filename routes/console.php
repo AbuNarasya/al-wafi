@@ -119,6 +119,20 @@ Artisan::command('potongan:evaluasi', function (AngsuranUangPangkalService $serv
 })->purpose('Putuskan potongan uang pangkal yang tenggatnya lewat: terkunci, hangus, atau batal');
 Schedule::command('potongan:evaluasi')->dailyAt('00:45')->withoutOverlapping();
 
+// Laundry tahap 2 (26 Okt 2026): tanggal 1 menyusun draf kelebihan kuota bulan lalu; sejak tanggal terbit (Pengaturan
+// Laundry, bawaan 5) draf yang tersisa terbit otomatis jadi tagihan lain-lain. Aman diulang tiap hari.
+Artisan::command('laundry:tagihan', function (App\Services\Modules\TagihanLaundryService $svc) {
+    try {
+        $h = $svc->jalankanJadwal();
+    } catch (App\Exceptions\AppException $e) {
+        $this->error($e->getMessage());
+
+        return 1;
+    }
+    $this->info("{$h['periode']}: ".json_encode($h, JSON_UNESCAPED_UNICODE));
+})->purpose('Susun draf & terbitkan tagihan kelebihan kuota laundry bulan lalu');
+Schedule::command('laundry:tagihan')->dailyAt('01:15')->withoutOverlapping();
+
 // Batch tagihan yang waktu rilisnya sudah lewat. Tiap 5 menit — bukan harian:
 // petugas menetapkan waktu rilis sampai ke menitnya, dan menjanjikan "terbit
 // pukul 07:00" lalu baru menerbitkannya tengah malam adalah janji yang ingkar.

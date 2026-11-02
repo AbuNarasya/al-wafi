@@ -33,7 +33,21 @@
         </dl>
     </section>
 
-    <p class="mt-3 px-2 text-center text-xs text-slate-500">{{ __('Email di atas kini dipakai untuk masuk Portal Wali.') }}</p>
+    @if (! empty($r['punya_sandi']))
+        <p class="mt-3 px-2 text-center text-xs text-slate-500">{{ __('Masuk Portal Wali dengan email dan password Anda seperti biasa.') }}</p>
+    @else
+        {{-- Email belum dibuktikan saat verifikasi (keputusan user 2 Nov 2026) — buktinya kode masuk pertama kali. --}}
+        <section class="mt-3 rounded-3xl bg-blue-50 p-4 text-sm text-slate-700 ring-1 ring-blue-100">
+            <p class="font-semibold text-slate-900">{{ __('Cara masuk Portal Wali pertama kali') }}</p>
+            <ol class="mt-2 list-decimal space-y-1 ps-5">
+                <li>{{ __('Buka halaman Masuk, lalu pilih “:pilihan”.', ['pilihan' => __('Wali terdaftar, baru pertama kali masuk?')]) }}</li>
+                <li>{!! __('Ketik email :email — kode 6 angka dikirim ke email itu.', ['email' => '<b class="break-all">'.e($r['email']).'</b>']) !!}</li>
+                <li>{{ __('Buat password, lalu masuk dengan email dan password tersebut.') }}</li>
+            </ol>
+            <p class="mt-2 text-xs text-slate-500">{{ __('Orang tua / wali lain yang emailnya sudah diisi masuk dengan cara yang sama, memakai emailnya sendiri.') }}</p>
+        </section>
+    @endif
+    <a href="{{ route('portal.masuk') }}" class="mt-4 block w-full rounded-2xl bg-white py-3 text-center text-sm font-bold text-brand ring-1 ring-slate-300">{{ __('Ke halaman Masuk') }}</a>
 
     {{-- Tab yang dibuka dari WhatsApp sering tak boleh ditutup lewat skrip — bila
          window.close() ditolak, pesan pengganti yang muncul. --}}

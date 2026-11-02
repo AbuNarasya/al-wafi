@@ -302,6 +302,15 @@ final class Navigation
         ['url' => '/klinik/catat', 'label' => 'Catat Kunjungan (tap kartu)', 'group' => 'KLINIK', 'modul' => 'klinik'],
         ['url' => '/klinik/rekap', 'label' => 'Rekap Klinik', 'group' => 'KLINIK', 'modul' => 'klinik'],
 
+        // ---- Laundry (grup sendiri, permintaan user 26 Okt 2026). Terima & serahkan = santri TAP KARTU RFID. ----
+        ['url' => '/laundry', 'label' => 'Papan Laundry', 'group' => 'LAUNDRY', 'modul' => 'laundry'],
+        ['url' => '/laundry/terima', 'label' => 'Terima Cucian (tap kartu)', 'group' => 'LAUNDRY', 'modul' => 'laundry'],
+        ['url' => '/laundry/serahkan', 'label' => 'Serahkan Cucian (tap kartu)', 'group' => 'LAUNDRY', 'modul' => 'laundry'],
+        ['url' => '/laundry/riwayat', 'label' => 'Riwayat Laundry', 'group' => 'LAUNDRY', 'modul' => 'laundry'],
+        ['url' => '/laundry/tagihan', 'label' => 'Kuota & Tagihan', 'group' => 'LAUNDRY', 'modul' => 'laundry-tagihan'],
+        ['url' => '/laundry/jenis-pakaian', 'label' => 'Jenis Pakaian', 'group' => 'LAUNDRY', 'modul' => 'laundry-master'],
+        ['url' => '/laundry/pengaturan', 'label' => 'Pengaturan Laundry (tarif & kuota)', 'group' => 'LAUNDRY', 'modul' => 'laundry-master'],
+
         // ---- 8. Sistem ----
         ['url' => '/approvals', 'label' => 'Persetujuan Saya', 'group' => 'SISTEM'],
         // "Outstanding Approval" (/void-approvals) dibuang 2026-07-28 — tak ada
@@ -310,7 +319,7 @@ final class Navigation
 
     // DATA SISWA/SANTRI mendahului PPSB & KEPENDIDIKAN: isinya orang yang jadi
     // rujukan kedua grup itu, dan itu pula yang paling sering dibuka.
-    public const GROUP_ORDER = ['', 'SETTING AWAL', 'ANGGARAN', 'PENGAJUAN PEMBAYARAN', 'KEUANGAN', 'WAFI MART', 'DATA SISWA/SANTRI', 'PPSB', 'KEPENDIDIKAN', 'KLINIK', 'TAGIHAN LAIN-LAIN', 'SISTEM'];
+    public const GROUP_ORDER = ['', 'SETTING AWAL', 'ANGGARAN', 'PENGAJUAN PEMBAYARAN', 'KEUANGAN', 'WAFI MART', 'DATA SISWA/SANTRI', 'PPSB', 'KEPENDIDIKAN', 'KLINIK', 'LAUNDRY', 'TAGIHAN LAIN-LAIN', 'SISTEM'];
 
     public const SUB_ORDER = [
         'SETTING AWAL' => ['Setting Umum', 'Setting Biaya'],
