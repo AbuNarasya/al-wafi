@@ -48,7 +48,7 @@ class TagihanLaundryTest extends TestCase
         Carbon::setTestNow('2026-10-10 09:00:00');
         Level::create(['kode_level' => 'L1', 'nama_level' => 'Staf', 'max_transaksi' => null]);
         $this->keu = User::create(['username' => 'keu', 'nama' => 'Keuangan', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif'])->fresh();
-        foreach (['laundry', 'laundry-tagihan', 'laundry-master'] as $m) {
+        foreach (['laundry-ikhwan', 'laundry-akhwat', 'laundry-tagihan', 'laundry-master', 'laundry-dashboard'] as $m) {
             HakAksesModul::create(['id_pengguna' => $this->keu->id_pengguna, 'kode_modul' => $m, 'lihat' => true, 'buat' => true, 'ubah' => true, 'hapus' => true, 'menu' => true]);
         }
         Akses::lupakan();
@@ -167,6 +167,31 @@ class TagihanLaundryTest extends TestCase
         $this->assertSame(['8000.00', '18.00', 3], [(string) $p->tarif_per_kg, (string) $p->kuota_bawaan_kg, (int) $p->hari_terbit]);
         $this->assertSame('18.00', (new TagihanLaundryService)->kuota('J003'), 'override SMA dikosongkan → ikut bawaan');
         $this->actingAs($this->keu)->get(route('laundry.terima', ['santri' => $this->smp->id]))->assertSee('Kuota Oktober');
+    }
+
+    public function test_dashboard_12_bulan_pemakaian_penyerahan_dan_tagihan(): void
+    {
+        $a = $this->setor($this->smp, '12');
+        $this->setor($this->smp, '11.5');   // Oktober: Ahmad 23,5 kg → lebih 3,5 kg = Rp 24.500
+        $this->setor($this->sma, '14');
+        $svc = new LaundryService;
+        $svc->majukan([$a->id], 'diterima', $this->keu->id_pengguna);
+        $svc->majukan([$a->id], 'diproses', $this->keu->id_pengguna);
+        $svc->serahkan($this->smp, [$a->id], [], null, 'kartu', $this->keu->id_pengguna);
+        Carbon::setTestNow('2026-11-05 01:15:00');
+        (new TagihanLaundryService)->jalankanJadwal();   // draf tgl 1 terlewat → disusun & terbit sekaligus
+
+        $this->actingAs($this->keu)->get(route('laundry.dashboard', ['sampai' => '2026-10']))->assertOk()
+            ->assertSee('Pemakaian 12 bulan')->assertSee('<svg', false)
+            ->assertSee('37,5 kg')              // total Oktober
+            ->assertSee('3,5')                  // kg kelebihan
+            ->assertSee('Rp 24.500')            // tagihan terbit
+            ->assertSee('1,0×')                 // 1 penyerahan / 1 santri
+            ->assertSeeInOrder(['10 pemakai terbanyak', 'AHMAD', 'BUDI']);
+
+        // Bagian akhwat: santri uji semuanya ikhwan → kosong.
+        $this->actingAs($this->keu)->get(route('laundry.dashboard', ['sampai' => '2026-10', 'bagian' => 'akhwat']))->assertOk()
+            ->assertDontSee('AHMAD')->assertSee('0,0 kg');
     }
 
     public function test_saklar_terbit_otomatis_dari_layar_tagihan(): void

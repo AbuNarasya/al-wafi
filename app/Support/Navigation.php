@@ -299,10 +299,14 @@ final class Navigation
         ['url' => '/klinik/rekap', 'label' => 'Rekap Klinik', 'group' => 'KLINIK', 'modul' => 'klinik'],
 
         // ---- Laundry (grup sendiri, permintaan user 26 Okt 2026). Terima & serahkan = santri TAP KARTU RFID. ----
-        ['url' => '/laundry', 'label' => 'Papan Laundry', 'group' => 'LAUNDRY', 'modul' => 'laundry'],
-        ['url' => '/laundry/terima', 'label' => 'Terima Cucian (tap kartu)', 'group' => 'LAUNDRY', 'modul' => 'laundry'],
-        ['url' => '/laundry/serahkan', 'label' => 'Serahkan Cucian (tap kartu)', 'group' => 'LAUNDRY', 'modul' => 'laundry'],
-        ['url' => '/laundry/riwayat', 'label' => 'Riwayat Laundry', 'group' => 'LAUNDRY', 'modul' => 'laundry'],
+        // Ikhwan / akhwat dipisah (3 Nov 2026): dua papan berhak sendiri; terima/serahkan/riwayat satu menu
+        // yang isinya tersaring menurut hak petugas.
+        ['url' => '/laundry/dashboard', 'label' => 'Dashboard Laundry', 'group' => 'LAUNDRY', 'modul' => 'laundry-dashboard'],
+        ['url' => '/laundry/ikhwan', 'label' => 'Papan Laundry Ikhwan', 'group' => 'LAUNDRY', 'modul' => 'laundry-ikhwan'],
+        ['url' => '/laundry/akhwat', 'label' => 'Papan Laundry Akhwat', 'group' => 'LAUNDRY', 'modul' => 'laundry-akhwat'],
+        ['url' => '/laundry/terima', 'label' => 'Terima Cucian (tap kartu)', 'group' => 'LAUNDRY', 'modulAny' => ['laundry-ikhwan', 'laundry-akhwat']],
+        ['url' => '/laundry/serahkan', 'label' => 'Serahkan Cucian (tap kartu)', 'group' => 'LAUNDRY', 'modulAny' => ['laundry-ikhwan', 'laundry-akhwat']],
+        ['url' => '/laundry/riwayat', 'label' => 'Riwayat Laundry', 'group' => 'LAUNDRY', 'modulAny' => ['laundry-ikhwan', 'laundry-akhwat']],
         ['url' => '/laundry/tagihan', 'label' => 'Kuota & Tagihan', 'group' => 'LAUNDRY', 'modul' => 'laundry-tagihan'],
         ['url' => '/laundry/jenis-pakaian', 'label' => 'Jenis Pakaian', 'group' => 'LAUNDRY', 'modul' => 'laundry-master'],
         ['url' => '/laundry/pengaturan', 'label' => 'Pengaturan Laundry (tarif & kuota)', 'group' => 'LAUNDRY', 'modul' => 'laundry-master'],

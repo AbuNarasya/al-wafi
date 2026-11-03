@@ -38,7 +38,8 @@ class LaundryTest extends TestCase
         parent::setUp();
         Level::create(['kode_level' => 'L1', 'nama_level' => 'Staf', 'max_transaksi' => null]);
         $this->petugas = User::create(['username' => 'lnd', 'nama' => 'Petugas Laundry', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif'])->fresh();
-        HakAksesModul::create(['id_pengguna' => $this->petugas->id_pengguna, 'kode_modul' => 'laundry', 'lihat' => true, 'buat' => true, 'ubah' => true, 'hapus' => true, 'menu' => true]);
+        // Petugas laundry IKHWAN (santri uji di sini berjenis kelamin L) — 3 Nov 2026.
+        HakAksesModul::create(['id_pengguna' => $this->petugas->id_pengguna, 'kode_modul' => 'laundry-ikhwan', 'lihat' => true, 'buat' => true, 'ubah' => true, 'hapus' => true, 'menu' => true]);
         Akses::lupakan();
         Jenjang::create(['kode' => 'J002', 'nama' => 'SMP', 'urutan' => 2, 'jumlah_tingkat' => 3]);
         $w = Wali::create(['kontak_utama' => 'ibu', 'nama_ibu' => 'Ibu', 'telepon_ibu' => '0811', 'nama' => 'Ibu', 'telepon' => '0811', 'status' => 'aktif']);
@@ -121,15 +122,51 @@ class LaundryTest extends TestCase
     public function test_papan_hak_akses_dan_instans_wafi_mart(): void
     {
         $this->terima(['kartu' => 'KARTU001']);
-        $this->actingAs($this->petugas)->get(route('laundry.index'))->assertOk()->assertSee('Papan Laundry')->assertSee('AHMAD FAUZI');
+        $this->actingAs($this->petugas)->get(route('laundry.index'))->assertRedirect(route('laundry.papan', 'ikhwan'));
+        $this->actingAs($this->petugas)->get(route('laundry.papan', 'ikhwan'))->assertOk()->assertSee('Papan Laundry Ikhwan')->assertSee('AHMAD FAUZI');
         $this->actingAs($this->petugas)->get(route('laundry.riwayat'))->assertOk()->assertSee('AHMAD FAUZI');
         $this->actingAs($this->petugas)->get(route('laundry.jenis'))->assertForbidden(); // master butuh hak sendiri
+        $this->actingAs($this->petugas)->get(route('laundry.dashboard'))->assertForbidden(); // dashboard butuh hak sendiri
 
         $tamu = User::create(['username' => 'tamu', 'nama' => 'Tamu', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif']);
         $this->actingAs($tamu)->get(route('laundry.index'))->assertForbidden();
 
         config(['instans.kode' => 'wafimart']);
         Akses::lupakan();
-        $this->assertFalse(\App\Support\Instans::modulHidup('laundry'), 'Wafi Mart tak punya santri — laundry mati di sana');
+        $this->assertFalse(\App\Support\Instans::modulHidup('laundry-ikhwan'), 'Wafi Mart tak punya santri — laundry mati di sana');
+        $this->assertFalse(\App\Support\Instans::modulHidup('laundry-akhwat'));
+    }
+
+    public function test_petugas_ikhwan_tak_bisa_menyentuh_cucian_akhwat(): void
+    {
+        $w = Wali::first();
+        $siti = Santri::create(['no_pendaftaran' => 'L-P1', 'nis' => '242507009', 'id_wali' => $w->id, 'nama' => 'Siti Aisyah', 'jenis_kelamin' => 'P',
+            'kode_jenjang' => 'J002', 'tingkat' => 1, 'status' => 'aktif']);
+        KartuSantri::create(['uid' => 'KARTUP01', 'id_santri' => $siti->id, 'status' => 'aktif']);
+        $petugasAkhwat = User::create(['username' => 'lnda', 'nama' => 'Petugas Akhwat', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif'])->fresh();
+        HakAksesModul::create(['id_pengguna' => $petugasAkhwat->id_pengguna, 'kode_modul' => 'laundry-akhwat', 'lihat' => true, 'buat' => true, 'ubah' => true, 'hapus' => true, 'menu' => true]);
+        Akses::lupakan();
+
+        // Ikhwan menge-tap kartu akhwat → ditolak; namanya tak muncul di pencarian.
+        $this->actingAs($this->petugas)->get(route('laundry.terima', ['kartu' => 'KARTUP01']))->assertSee('dilayani laundry akhwat');
+        $this->actingAs($this->petugas)->get(route('laundry.terima', ['cari' => 'Siti']))->assertDontSee('SITI AISYAH');
+        $this->terima(['kartu' => 'KARTUP01'])->assertSessionHas('error');
+        $this->assertSame(0, Laundry::count());
+
+        // Petugas akhwat menerimanya; petugas ikhwan tak melihat & tak bisa memajukan / membuka.
+        Akses::lupakan();
+        $this->actingAs($petugasAkhwat)->post(route('laundry.simpan_terima'), ['kartu' => 'KARTUP01', 'berat' => '2',
+            'item' => [['id_jenis_pakaian' => $this->gamis, 'jumlah' => 2]]])->assertSessionHas('status');
+        $l = Laundry::sole();
+        $this->actingAs($petugasAkhwat)->get(route('laundry.papan', 'akhwat'))->assertOk()->assertSee('SITI AISYAH');
+        $this->actingAs($petugasAkhwat)->get(route('laundry.papan', 'ikhwan'))->assertForbidden();
+
+        Akses::lupakan();
+        $this->actingAs($this->petugas)->get(route('laundry.papan', 'akhwat'))->assertForbidden();
+        $this->actingAs($this->petugas)->get(route('laundry.papan', 'ikhwan'))->assertDontSee('SITI AISYAH');
+        $this->actingAs($this->petugas)->get(route('laundry.riwayat'))->assertDontSee('SITI AISYAH');
+        $this->actingAs($this->petugas)->get(route('laundry.show', $l->id))->assertForbidden();
+        $this->actingAs($this->petugas)->post(route('laundry.majukan'), ['dari' => 'diterima', 'id' => [$l->id]])->assertSessionHas('error');
+        $this->assertSame('diterima', $l->fresh()->status);
     }
 }

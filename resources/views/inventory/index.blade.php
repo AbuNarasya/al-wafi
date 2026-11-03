@@ -6,7 +6,7 @@
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <form method="GET" id="filterPersediaan"></form>
         <div class="flex flex-wrap items-center gap-2">
-            <x-filter-server placeholder="Cari kode / nama / barcode…" :total="$rows->count()"
+            <x-filter-server placeholder="Cari kode / nama / barcode…" :total="$rows->total()"
                              :reset="route('inventory.index')" :aktif="$q !== '' || $kategori !== ''" form="filterPersediaan" />
             @if ($kategoriOptions)
                 <select name="kategori" form="filterPersediaan" onchange="this.form.submit()" class="rounded-lg border-gray-300 text-sm">
@@ -147,4 +147,5 @@
             </tbody>
         </table>
     </div>
+    <div class="mt-4">{{ $rows->links() }}</div>
 @endsection

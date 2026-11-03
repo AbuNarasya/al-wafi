@@ -8,6 +8,11 @@
         <form method="GET" class="flex items-end gap-2 text-sm">
             <label><span class="block text-xs text-gray-500">Bulan</span>
                 <input type="month" name="periode" value="{{ $periode }}" class="rounded-lg border-gray-300 text-sm"></label>
+            <label><span class="block text-xs text-gray-500">Bagian</span>
+                <select name="bagian" class="rounded-lg border-gray-300 text-sm">
+                    <option value="">Ikhwan &amp; Akhwat</option>
+                    @foreach (\App\Support\BagianLaundry::BAGIAN as $k => $b)<option value="{{ $k }}" @selected($bagian === $k)>{{ $b['label'] }}</option>@endforeach
+                </select></label>
             <button class="rounded-lg border border-gray-300 px-3 py-2 hover:bg-gray-50">Tampilkan</button>
         </form>
         @if (! $berjalan && $boleh)

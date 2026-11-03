@@ -48,7 +48,9 @@ class InventoryController extends Controller
                     ->orWhereIn('kode_persediaan', BarcodePersediaan::where('barcode', $q)->select('kode_persediaan')),
             ))
             ->when($kategori !== '', fn ($query) => $query->where('kode_kategori', $kategori))
-            ->orderBy('kode_persediaan')->get();
+            // Berhalaman (3 Nov 2026): Wafi Mart punya ±2.800 barang, dan tiap baris membawa formulir
+            // Mutasi lengkap — semuanya sekaligus membuat halaman (dan tiap pencarian) macet.
+            ->orderBy('kode_persediaan')->paginate(50)->withQueryString();
 
         $lokasi = LokasiPersediaan::pilihan();
 
@@ -61,7 +63,7 @@ class InventoryController extends Controller
             // pesantren yang cuma punya gudang utama tak perlu melihatnya.
             'lokasiOptions' => $lokasi,
             'lokasiNama' => LokasiPersediaan::semuaNama(),
-            'stokLokasi' => count($lokasi) > 1 ? InventoryMovement::stokPerLokasi($rows->pluck('kode_persediaan')->all()) : [],
+            'stokLokasi' => count($lokasi) > 1 ? InventoryMovement::stokPerLokasi($rows->getCollection()->pluck('kode_persediaan')->all()) : [],
             // Dipakai pemilih "Bagian pemakai" pada formulir Pemakaian/Opname.
             'bagianOptions' => Bagian::orderBy('nama_bagian')->pluck('nama_bagian', 'kode_bagian')->all(),
         ]);

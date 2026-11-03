@@ -11,6 +11,13 @@
                 <option value="">Semua</option>
                 @foreach (\App\Models\Laundry::LABEL as $k => $v)<option value="{{ $k }}" @selected($status === $k)>{{ $v }}</option>@endforeach
             </select></label>
+        @if (count($bagianBoleh) > 1)
+            <label><span class="block text-xs text-gray-500">Bagian</span>
+                <select name="bagian" class="rounded-lg border-gray-300 text-sm">
+                    <option value="">Ikhwan &amp; Akhwat</option>
+                    @foreach ($bagianBoleh as $b)<option value="{{ $b }}" @selected($bagian === $b)>{{ \App\Support\BagianLaundry::BAGIAN[$b]['label'] }}</option>@endforeach
+                </select></label>
+        @endif
         <label><span class="block text-xs text-gray-500">Cari</span><input name="cari" value="{{ $cari }}" placeholder="nama / NIS / nomor" class="rounded-lg border-gray-300 text-sm"></label>
         <label class="flex items-center gap-1 pb-2"><input type="checkbox" name="kurang" value="1" @checked(request()->boolean('kurang')) class="rounded border-gray-300"> hanya yang kurang</label>
         <button class="rounded-lg border border-gray-300 px-3 py-2 hover:bg-gray-50">Tampilkan</button>

@@ -817,19 +817,22 @@ Route::middleware('auth')->group(function () {
 
     // Laundry — tahap 1 (26 Okt 2026): terima (tap kartu) → proses → selesai → serahkan (tap kartu + cocokkan pakaian).
     Route::prefix('laundry')->name('laundry.')->controller(\App\Http\Controllers\LaundryController::class)->group(function () {
-        Route::get('/', 'index')->name('index')->middleware('hakakses:laundry,lihat');
-        Route::get('/terima', 'terima')->name('terima')->middleware('hakakses:laundry,buat');
-        Route::post('/terima', 'simpanTerima')->name('simpan_terima')->middleware('hakakses:laundry,buat');
-        Route::post('/majukan', 'majukan')->name('majukan')->middleware('hakakses:laundry,ubah');
-        Route::get('/serahkan', 'serahkan')->name('serahkan')->middleware('hakakses:laundry,ubah');
-        Route::post('/serahkan', 'simpanSerahkan')->name('simpan_serahkan')->middleware('hakakses:laundry,ubah');
-        Route::get('/riwayat', 'riwayat')->name('riwayat')->middleware('hakakses:laundry,lihat');
+        // Ikhwan / akhwat (3 Nov 2026): /laundry membuka papan bagian pertama yang berhak; tiap papan diperiksa haknya di controller.
+        Route::get('/', 'index')->name('index')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,lihat');
+        Route::get('/dashboard', [\App\Http\Controllers\LaundryDashboardController::class, 'index'])->name('dashboard')->middleware('hakakses:laundry-dashboard,lihat');
+        Route::get('/{bagian}', 'papan')->name('papan')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,lihat')->whereIn('bagian', ['ikhwan', 'akhwat']);
+        Route::get('/terima', 'terima')->name('terima')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,buat');
+        Route::post('/terima', 'simpanTerima')->name('simpan_terima')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,buat');
+        Route::post('/majukan', 'majukan')->name('majukan')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,ubah');
+        Route::get('/serahkan', 'serahkan')->name('serahkan')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,ubah');
+        Route::post('/serahkan', 'simpanSerahkan')->name('simpan_serahkan')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,ubah');
+        Route::get('/riwayat', 'riwayat')->name('riwayat')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,lihat');
         Route::get('/jenis-pakaian', 'jenisPakaian')->name('jenis')->middleware('hakakses:laundry-master,lihat');
         Route::post('/jenis-pakaian', 'simpanJenis')->name('jenis.simpan')->middleware('hakakses:laundry-master,buat');
         Route::put('/jenis-pakaian/{id}', 'ubahJenis')->name('jenis.ubah')->middleware('hakakses:laundry-master,ubah')->whereNumber('id');
-        Route::get('/{laundry}', 'show')->name('show')->middleware('hakakses:laundry,lihat')->whereNumber('laundry');
-        Route::post('/{laundry}/batal', 'batal')->name('batal')->middleware('hakakses:laundry,hapus')->whereNumber('laundry');
-        Route::post('/{laundry}/koreksi-berat', 'koreksiBerat')->name('koreksi_berat')->middleware('hakakses:laundry,ubah')->whereNumber('laundry');
+        Route::get('/{laundry}', 'show')->name('show')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,lihat')->whereNumber('laundry');
+        Route::post('/{laundry}/batal', 'batal')->name('batal')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,hapus')->whereNumber('laundry');
+        Route::post('/{laundry}/koreksi-berat', 'koreksiBerat')->name('koreksi_berat')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,ubah')->whereNumber('laundry');
     });
     // Laundry tahap 2: kuota bulanan, tagihan kelebihan (keuangan), pengaturan tarif & kuota.
     Route::prefix('laundry')->name('laundry.')->controller(\App\Http\Controllers\LaundryTagihanController::class)->group(function () {

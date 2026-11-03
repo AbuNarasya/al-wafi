@@ -33,11 +33,16 @@ class LaundryTagihanController extends Controller
         $berjalan = $periode >= now()->format('Y-m');
         $p = $this->svc->pengaturan();
 
-        $baris = $berjalan ? $this->perkiraan($periode) : TagihanLaundry::with(['santri:id,nama,nis,id_kelas', 'santri.kelas:id,nama'])
+        $baris = $berjalan ? $this->perkiraan($periode) : TagihanLaundry::with(['santri:id,nama,nis,id_kelas,jenis_kelamin', 'santri.kelas:id,nama'])
             ->where('periode', $periode)->get()->sortBy(fn ($t) => $t->santri?->nama)->values();
+        // Saringan ikhwan / akhwat (3 Nov 2026) — tampilan saja; penerbitan tetap seluruh draf bulan itu.
+        $bagian = isset(\App\Support\BagianLaundry::BAGIAN[$request->query('bagian')]) ? $request->query('bagian') : null;
+        if ($bagian) {
+            $baris = $baris->filter(fn ($r) => $r->santri?->jenis_kelamin === \App\Support\BagianLaundry::BAGIAN[$bagian]['jk'])->values();
+        }
 
         return view('laundry.tagihan', [
-            'periode' => $periode, 'berjalan' => $berjalan, 'baris' => $baris, 'pengaturan' => $p,
+            'periode' => $periode, 'berjalan' => $berjalan, 'baris' => $baris, 'pengaturan' => $p, 'bagian' => $bagian,
             'bulan' => Carbon::createFromFormat('Y-m-d', "{$periode}-01")->locale('id')->translatedFormat('F Y'),
             'tanggalTerbit' => Carbon::createFromFormat('Y-m-d', "{$periode}-01")->addMonthNoOverflow()->day(min(28, (int) $p->hari_terbit)),
             'ringkas' => ['kg' => (float) Laundry::where('status', '!=', 'dibatalkan')->whereBetween('diterima_pada', TagihanLaundryService::batas($periode))->sum('berat'),
@@ -147,7 +152,7 @@ class LaundryTagihanController extends Controller
             ->selectRaw('id_santri, sum(berat) as kg')->groupBy('id_santri')->pluck('kg', 'id_santri');
         $tarif = $this->svc->pengaturan()->tarif_per_kg;
 
-        return Santri::with('kelas:id,nama')->whereIn('id', $pakai->keys())->get(['id', 'nama', 'nis', 'kode_jenjang', 'id_kelas'])
+        return Santri::with('kelas:id,nama')->whereIn('id', $pakai->keys())->get(['id', 'nama', 'nis', 'kode_jenjang', 'id_kelas', 'jenis_kelamin'])
             ->map(function ($s) use ($pakai, $tarif) {
                 $kuota = $this->svc->kuota($s->kode_jenjang);
                 $kg = Money::of($pakai[$s->id]);

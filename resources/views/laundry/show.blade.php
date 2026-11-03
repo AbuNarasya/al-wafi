@@ -61,7 +61,7 @@
 
             @if ($terkunci)
                 <p class="rounded-xl border border-gray-200 bg-white p-4 text-xs text-gray-500 shadow-sm">Kelebihan laundry bulan ini sudah ditagih — kantong terkunci (tak bisa dikoreksi / dibatalkan).</p>
-            @elseif ($l->status !== 'dibatalkan' && \App\Support\Akses::boleh('laundry', 'ubah'))
+            @elseif ($l->status !== 'dibatalkan' && \App\Support\Akses::boleh(\App\Support\BagianLaundry::BAGIAN[\App\Support\BagianLaundry::dariJk($l->santri?->jenis_kelamin) ?? 'ikhwan']['modul'], 'ubah'))
                 <form method="POST" action="{{ route('laundry.koreksi_berat', $l->id) }}" x-data="{ buka: false }" class="rounded-xl border border-gray-200 bg-white p-4 text-sm shadow-sm">
                     @csrf
                     <button type="button" x-show="! buka" @click="buka = true" class="text-sm text-brand hover:underline">Koreksi berat (salah timbang)</button>
@@ -74,7 +74,7 @@
                 </form>
             @endif
 
-            @if ($l->status === 'diterima' && ! $terkunci && \App\Support\Akses::boleh('laundry', 'hapus'))
+            @if ($l->status === 'diterima' && ! $terkunci && \App\Support\Akses::boleh(\App\Support\BagianLaundry::BAGIAN[\App\Support\BagianLaundry::dariJk($l->santri?->jenis_kelamin) ?? 'ikhwan']['modul'], 'hapus'))
                 <form method="POST" action="{{ route('laundry.batal', $l->id) }}" class="rounded-xl border border-gray-200 bg-white p-4 text-sm shadow-sm" data-confirm="Batalkan kantong {{ $l->nomor }}?">
                     @csrf
                     <p class="font-semibold text-gray-900">Batalkan (salah catat)</p>

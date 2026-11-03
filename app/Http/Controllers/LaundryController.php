@@ -8,6 +8,7 @@ use App\Models\Laundry;
 use App\Models\Santri;
 use App\Services\Modules\KartuSantriService;
 use App\Services\Modules\LaundryService;
+use App\Support\BagianLaundry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -19,27 +20,37 @@ class LaundryController extends Controller
 {
     public function __construct(private readonly LaundryService $svc) {}
 
-    /** Papan proses: Diterima · Diproses · Selesai, plus yang diserahkan hari ini. */
-    public function index(Request $request): View
+    /** /laundry → papan bagian pertama yang berhak dilihat petugas ini. */
+    public function index(): RedirectResponse
     {
+        return redirect()->route('laundry.papan', BagianLaundry::boleh('lihat')[0] ?? 'ikhwan');
+    }
+
+    /** Papan proses satu bagian (ikhwan / akhwat): Diterima · Diproses · Selesai, plus yang diserahkan hari ini. */
+    public function papan(Request $request, string $bagian): View
+    {
+        abort_unless(in_array($bagian, BagianLaundry::boleh('lihat'), true), 403, 'Anda tidak punya hak atas papan laundry '.$bagian.'.');
+        $jk = BagianLaundry::BAGIAN[$bagian]['jk'];
         $cari = trim((string) $request->query('cari', ''));
         $q = Laundry::with(['santri:id,nama,nis,kode_jenjang,id_kelas', 'santri.kelas:id,nama', 'item'])
             ->whereIn('status', ['diterima', 'diproses', 'selesai'])
+            ->whereHas('santri', fn ($s) => $s->where('jenis_kelamin', $jk))
             ->when($cari !== '', fn ($w) => $w->where(fn ($x) => $x->where('nomor', 'ilike', "%{$cari}%")
                 ->orWhereHas('santri', fn ($s) => $s->where('nama', 'ilike', "%{$cari}%")->orWhere('nis', 'ilike', "%{$cari}%"))))
             ->orderBy('diterima_pada')->get();
 
         return view('laundry.index', [
-            'cari' => $cari,
+            'cari' => $cari, 'bagian' => $bagian, 'labelBagian' => BagianLaundry::BAGIAN[$bagian]['label'],
             'kolom' => collect(['diterima', 'diproses', 'selesai'])->mapWithKeys(fn ($s) => [$s => $q->where('status', $s)->values()]),
-            'diserahkanHariIni' => Laundry::where('status', 'diserahkan')->whereDate('diserahkan_pada', today())->count(),
+            'diserahkanHariIni' => Laundry::where('status', 'diserahkan')->whereDate('diserahkan_pada', today())
+                ->whereHas('santri', fn ($s) => $s->where('jenis_kelamin', $jk))->count(),
         ]);
     }
 
     /** Penerimaan — langkah 1: tap kartu (atau cari nama/NIS bila kartu tertinggal); langkah 2: formulir. */
     public function terima(Request $request): View
     {
-        [$santri, $cara, $galat, $hasilCari] = $this->kenali($request);
+        [$santri, $cara, $galat, $hasilCari] = $this->kenali($request, 'buat');
 
         return view('laundry.terima', [
             'santri' => $santri, 'cara' => $cara, 'galat' => $galat, 'hasilCari' => $hasilCari, 'uid' => $request->query('kartu'),
@@ -57,7 +68,7 @@ class LaundryController extends Controller
             'catatan' => ['nullable', 'string', 'max:1000'],
             'item' => ['required', 'array', 'max:60'], 'item.*.id_jenis_pakaian' => ['nullable', 'integer'], 'item.*.jumlah' => ['nullable', 'integer', 'min:0', 'max:200'],
         ]);
-        [$santri, $cara, $galat] = $this->kenali($request);
+        [$santri, $cara, $galat] = $this->kenali($request, 'buat');
         if (! $santri) {
             return redirect()->route('laundry.terima')->with('error', $galat ?? 'Santri tidak dikenali — tap ulang kartunya.');
         }
@@ -74,6 +85,12 @@ class LaundryController extends Controller
     {
         $d = $request->validate(['dari' => ['required', Rule::in(array_keys(Laundry::MAJU))], 'id' => ['required', 'array', 'min:1'], 'id.*' => ['integer']],
             ['id.required' => 'Pilih minimal satu kantong.']);
+        // Kantong santri di luar bagian petugas ditolak seluruhnya — bukan dilewati diam-diam.
+        $jk = BagianLaundry::jkBoleh('ubah');
+        $asing = Laundry::whereIn('id', $d['id'])->whereHas('santri', fn ($s) => $s->where(fn ($w) => $w->whereNotIn('jenis_kelamin', $jk)->orWhereNull('jenis_kelamin')))->count();
+        if ($asing > 0) {
+            return back()->with('error', "{$asing} kantong yang dipilih di luar bagian laundry Anda.");
+        }
         try {
             $h = $this->svc->majukan($d['id'], $d['dari'], $request->user()->id_pengguna);
         } catch (AppException $e) {
@@ -87,7 +104,7 @@ class LaundryController extends Controller
     /** Penyerahan: tap kartu → kantong yang Selesai ditampilkan beserta daftar pakaiannya untuk dicocokkan. */
     public function serahkan(Request $request): View
     {
-        [$santri, $cara, $galat, $hasilCari] = $this->kenali($request);
+        [$santri, $cara, $galat, $hasilCari] = $this->kenali($request, 'ubah');
 
         return view('laundry.serahkan', ['santri' => $santri, 'cara' => $cara, 'galat' => $galat, 'hasilCari' => $hasilCari,
             'uid' => $request->query('kartu'), 'kantong' => $santri ? $this->svc->untukDiserahkan($santri) : collect()]);
@@ -97,7 +114,7 @@ class LaundryController extends Controller
     {
         $d = $request->validate(['id' => ['required', 'array', 'min:1'], 'id.*' => ['integer'], 'kembali' => ['nullable', 'array'],
             'kembali.*' => ['integer', 'min:0'], 'catatan_serah' => ['nullable', 'string', 'max:1000']], ['id.required' => 'Pilih kantong yang diserahkan.']);
-        [$santri, $cara, $galat] = $this->kenali($request);
+        [$santri, $cara, $galat] = $this->kenali($request, 'ubah');
         if (! $santri) {
             return redirect()->route('laundry.serahkan')->with('error', $galat ?? 'Santri tidak dikenali — tap ulang kartunya.');
         }
@@ -110,8 +127,19 @@ class LaundryController extends Controller
         return redirect()->route('laundry.serahkan')->with('status', "{$n} kantong diserahkan kepada {$santri->nama}.");
     }
 
+    /** Kantong santri di luar bagian petugas: 403 (detail, koreksi, batal). */
+    private function pastikanBagian(Laundry $laundry, string $aksi): void
+    {
+        try {
+            BagianLaundry::pastikan($laundry->santri, $aksi);
+        } catch (AppException $e) {
+            abort(403, $e->getMessage());
+        }
+    }
+
     public function show(Laundry $laundry): View
     {
+        $this->pastikanBagian($laundry, 'lihat');
         $laundry->load(['santri.kelas', 'santri.jenjang', 'item']);
 
         return view('laundry.show', ['l' => $laundry,
@@ -122,6 +150,7 @@ class LaundryController extends Controller
 
     public function batal(Request $request, Laundry $laundry): RedirectResponse
     {
+        $this->pastikanBagian($laundry, 'hapus');
         $d = $request->validate(['alasan' => ['required', 'string', 'max:500']]);
         try {
             $this->svc->batalkan($laundry, $d['alasan'], $request->user()->id_pengguna);
@@ -134,6 +163,7 @@ class LaundryController extends Controller
 
     public function koreksiBerat(Request $request, Laundry $laundry): RedirectResponse
     {
+        $this->pastikanBagian($laundry, 'ubah');
         $d = $request->validate(['berat' => ['required', 'numeric', 'gt:0', 'max:'.LaundryService::BERAT_MAKS], 'alasan' => ['required', 'string', 'max:500']]);
         try {
             $this->svc->koreksiBerat($laundry, (string) $d['berat'], $d['alasan'], $request->user()->id_pengguna);
@@ -150,13 +180,19 @@ class LaundryController extends Controller
         $sampai = Carbon::parse($request->query('sampai', now()->toDateString()))->endOfDay();
         $status = $request->query('status');
         $cari = trim((string) $request->query('cari', ''));
+        // Hanya bagian yang berhak dilihat; ?bagian= menyempitkan lagi bila petugas memegang keduanya.
+        $bagianBoleh = BagianLaundry::boleh('lihat');
+        $bagian = in_array($request->query('bagian'), $bagianBoleh, true) ? $request->query('bagian') : null;
+        $jk = $bagian ? [BagianLaundry::BAGIAN[$bagian]['jk']] : BagianLaundry::jkBoleh('lihat');
         $q = Laundry::with(['santri:id,nama,nis', 'item'])->whereBetween('diterima_pada', [$dari, $sampai])
+            ->whereHas('santri', fn ($s) => $s->whereIn('jenis_kelamin', $jk))
             ->when(isset(Laundry::LABEL[$status]), fn ($w) => $w->where('status', $status))
             ->when($request->boolean('kurang'), fn ($w) => $w->where('ada_kurang', true))
             ->when($cari !== '', fn ($w) => $w->where(fn ($x) => $x->where('nomor', 'ilike', "%{$cari}%")
                 ->orWhereHas('santri', fn ($s) => $s->where('nama', 'ilike', "%{$cari}%")->orWhere('nis', 'ilike', "%{$cari}%"))));
 
         return view('laundry.riwayat', ['dari' => $dari, 'sampai' => $sampai, 'status' => $status, 'cari' => $cari,
+            'bagian' => $bagian, 'bagianBoleh' => $bagianBoleh,
             'ringkas' => ['kantong' => (clone $q)->count(), 'berat' => (float) (clone $q)->sum('berat')],
             'rows' => $q->orderByDesc('diterima_pada')->paginate(50)->withQueryString()]);
     }
@@ -192,11 +228,23 @@ class LaundryController extends Controller
      * Santri dikenali dari KARTU yang ditap (`kartu`), atau — bila kartu tertinggal — dari pilihan hasil pencarian
      * (`santri`, dicatat sebagai cara "manual" supaya bisa diaudit). `cari` = daftar santri aktif yang cocok.
      *
+     * Hanya santri BAGIAN petugas (ikhwan / akhwat, untuk $aksi) yang dikenali — kartu santri bagian lain ditolak
+     * dengan pesan, dan tak muncul di hasil pencarian.
+     *
      * @return array{0:?Santri, 1:?string, 2:?string, 3:\Illuminate\Support\Collection}
      */
-    private function kenali(Request $request): array
+    private function kenali(Request $request, string $aksi): array
     {
         $hasil = collect();
+        $bagian = function (Santri $s) use ($aksi): ?string {
+            try {
+                BagianLaundry::pastikan($s, $aksi);
+
+                return null;
+            } catch (AppException $e) {
+                return $e->getMessage();
+            }
+        };
         $uid = trim((string) $request->input('kartu', ''));
         if ($uid !== '') {
             $kartu = (new KartuSantriService)->cariAktif($uid);
@@ -206,17 +254,23 @@ class LaundryController extends Controller
             if ($kartu->santri?->status !== 'aktif') {
                 return [null, null, "{$kartu->santri?->nama} bukan santri aktif.", $hasil];
             }
+            if ($tolak = $bagian($kartu->santri)) {
+                return [null, null, $tolak, $hasil];
+            }
 
             return [$kartu->santri->load(['kelas:id,nama', 'jenjang:kode,nama']), 'kartu', null, $hasil];
         }
         if ($id = (int) $request->input('santri', 0)) {
             $s = Santri::with(['kelas:id,nama', 'jenjang:kode,nama'])->where('status', 'aktif')->find($id);
+            if ($s && ($tolak = $bagian($s))) {
+                return [null, null, $tolak, $hasil];
+            }
 
             return [$s, $s ? 'manual' : null, $s ? null : 'Santri tidak ditemukan atau bukan santri aktif.', $hasil];
         }
         $cari = trim((string) $request->query('cari', ''));
         if (mb_strlen($cari) >= 3) {
-            $hasil = Santri::with('kelas:id,nama')->where('status', 'aktif')
+            $hasil = Santri::with('kelas:id,nama')->where('status', 'aktif')->whereIn('jenis_kelamin', BagianLaundry::jkBoleh($aksi))
                 ->where(fn ($w) => $w->where('nama', 'ilike', "%{$cari}%")->orWhere('nis', 'ilike', "%{$cari}%"))
                 ->orderBy('nama')->limit(15)->get(['id', 'nama', 'nis', 'id_kelas']);
         }

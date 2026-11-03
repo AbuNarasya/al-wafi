@@ -1,18 +1,27 @@
 @extends('layouts.app')
 
-@section('title', 'Papan Laundry')
+@section('title', 'Papan Laundry '.$labelBagian)
 
 @section('content')
+    @php $bagianBoleh = \App\Support\BagianLaundry::boleh('lihat'); @endphp
+    @if (count($bagianBoleh) > 1)
+        <div class="mb-3 flex gap-2 text-sm">
+            @foreach ($bagianBoleh as $b)
+                <a href="{{ route('laundry.papan', $b) }}" @class(['rounded-full px-4 py-1.5 font-semibold',
+                    'bg-brand text-white' => $b === $bagian, 'bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50' => $b !== $bagian])>{{ \App\Support\BagianLaundry::BAGIAN[$b]['label'] }}</a>
+            @endforeach
+        </div>
+    @endif
     <div class="flex flex-wrap items-center justify-between gap-3">
         <form method="GET" class="flex gap-2">
             <input name="cari" value="{{ $cari }}" placeholder="Cari nama / NIS / nomor" class="w-64 rounded-lg border-gray-300 text-sm">
             <button class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50">Cari</button>
         </form>
         <div class="flex gap-2">
-            @if (\App\Support\Akses::boleh('laundry', 'buat'))
+            @if (\App\Support\Akses::boleh(\App\Support\BagianLaundry::BAGIAN[$bagian]['modul'], 'buat'))
                 <a href="{{ route('laundry.terima') }}" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white">+ Terima cucian</a>
             @endif
-            @if (\App\Support\Akses::boleh('laundry', 'ubah'))
+            @if (\App\Support\Akses::boleh(\App\Support\BagianLaundry::BAGIAN[$bagian]['modul'], 'ubah'))
                 <a href="{{ route('laundry.serahkan') }}" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">Serahkan cucian</a>
             @endif
         </div>
@@ -22,7 +31,7 @@
 
     <div class="mt-4 grid gap-4 lg:grid-cols-3">
         @foreach ($kolom as $status => $daftar)
-            @php $bisaMaju = isset(\App\Models\Laundry::MAJU[$status]) && \App\Support\Akses::boleh('laundry', 'ubah'); @endphp
+            @php $bisaMaju = isset(\App\Models\Laundry::MAJU[$status]) && \App\Support\Akses::boleh(\App\Support\BagianLaundry::BAGIAN[$bagian]['modul'], 'ubah'); @endphp
             {{-- Tanpa dialog konfirmasi: dipakai puluhan kali sehari, dan langkahnya ringan (tak menyentuh uang). --}}
             <form method="POST" action="{{ route('laundry.majukan') }}" data-no-confirm class="flex flex-col rounded-xl border border-gray-200 bg-gray-50 shadow-sm"
                   x-data="{ pilih: [], semua: @js($daftar->pluck('id')->all()) }">

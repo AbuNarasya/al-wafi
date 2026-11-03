@@ -148,9 +148,13 @@ final class ModulRegistry
         // Klinik: lihat = daftar/riwayat/rekap, buat = mencatat kunjungan (+ menerbitkan tagihan bila juga berhak
         // Tagihan Lain-lain), ubah = menyelesaikan rawat di klinik.
         ['kode' => 'klinik', 'nama' => 'Klinik (kunjungan santri)', 'grup' => 'KLINIK'],
-        // Laundry: lihat = papan & riwayat, buat = menerima cucian, ubah = memajukan proses & menyerahkan,
-        // hapus = membatalkan kantong yang masih Diterima. Master jenis pakaian dipisah.
-        ['kode' => 'laundry', 'nama' => 'Laundry (terima, proses, serahkan)', 'grup' => 'LAUNDRY'],
+        // Laundry dipecah per bagian (3 Nov 2026) — petugas hanya menyentuh cucian santri bagiannya
+        // (App\Support\BagianLaundry). lihat = papan & riwayat, buat = menerima cucian, ubah = memajukan
+        // proses & menyerahkan, hapus = membatalkan kantong yang masih Diterima.
+        ['kode' => 'laundry-ikhwan', 'nama' => 'Laundry Ikhwan (terima, proses, serahkan — santri putra)', 'grup' => 'LAUNDRY'],
+        ['kode' => 'laundry-akhwat', 'nama' => 'Laundry Akhwat (terima, proses, serahkan — santri putri)', 'grup' => 'LAUNDRY'],
+        // Dashboard: grafik & angka 12 bulan, termasuk nilai tagihan — hak sendiri, bukan ikut papan.
+        ['kode' => 'laundry-dashboard', 'nama' => 'Laundry — Dashboard (pemakaian & tagihan 12 bulan)', 'grup' => 'LAUNDRY'],
         ['kode' => 'laundry-master', 'nama' => 'Laundry — Jenis Pakaian & Pengaturan (tarif, kuota)', 'grup' => 'LAUNDRY'],
         // Keuangan: lihat = daftar per bulan, buat = susun & terbitkan tagihan kelebihan, ubah = kecualikan santri.
         ['kode' => 'laundry-tagihan', 'nama' => 'Laundry — Kuota & Tagihan Kelebihan', 'grup' => 'LAUNDRY'],

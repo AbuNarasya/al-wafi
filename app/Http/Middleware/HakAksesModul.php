@@ -25,6 +25,24 @@ class HakAksesModul
 {
     public function handle(Request $request, Closure $next, string $kode, string $aksi = 'lihat'): Response
     {
+        // "a|b": lolos bila berhak atas SALAH SATU modul (mis. laundry ikhwan / akhwat —
+        // penyaringan per bagian dilakukan controller-nya).
+        if (str_contains($kode, '|')) {
+            $daftar = explode('|', $kode);
+            foreach ($daftar as $k) {
+                if (\App\Support\Akses::boleh($k, $aksi)) {
+                    return $next($request);
+                }
+            }
+            if (! array_filter($daftar, fn ($k) => \App\Support\Instans::modulHidup($k))) {
+                abort(404);
+            }
+            if (! Auth::user()) {
+                abort(401, 'Belum masuk.');
+            }
+            abort(403, "Anda tidak punya hak \"{$aksi}\" pada modul ini.");
+        }
+
         if (ModulRegistry::isBebas($kode)) {
             return $next($request);
         }
