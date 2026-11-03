@@ -164,6 +164,11 @@ final class ModulRegistry
         ['kode' => 'kelas', 'nama' => 'Kelas (rombel) & Penempatan Kelas', 'grup' => 'DATA SISWA/SANTRI'],
         // Pengunduran diri santri aktif: lihat = membuka daftar. Wali kelas & kepala sekolah ditetapkan di
         // master Kelas/Jenjang; clearance per pihak lewat tiga modul di bawah (admin: ubah = mengeluarkan santri).
+        ['kode' => 'absensi-asrama', 'nama' => 'Absensi Asrama dari ISE (data masuk & log kiriman)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan'],
+        ['kode' => 'perizinan', 'nama' => 'Perizinan Insidental (lihat · buat = atas nama wali · ubah = pos keluar/masuk)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan'],
+        ['kode' => 'perizinan-tingkat-1', 'nama' => 'Perizinan — persetujuan tingkat 1 (centang Ubah)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan'],
+        ['kode' => 'perizinan-tingkat-2', 'nama' => 'Perizinan — persetujuan tingkat 2 (centang Ubah)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan'],
+        ['kode' => 'perizinan-pengaturan', 'nama' => 'Perizinan — pengaturan (tingkat persetujuan & batas waktu)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan'],
         ['kode' => 'pengunduran-diri', 'nama' => 'Pengunduran Diri Santri (daftar & detail)', 'grup' => 'DATA SISWA/SANTRI'],
         ['kode' => 'clearance-keuangan', 'nama' => 'Clearance Pengunduran Diri — Keuangan', 'grup' => 'DATA SISWA/SANTRI'],
         ['kode' => 'clearance-kesantrian', 'nama' => 'Clearance Pengunduran Diri — Kesantrian', 'grup' => 'DATA SISWA/SANTRI'],
@@ -297,7 +302,7 @@ final class ModulRegistry
         'PENGAJUAN PEMBAYARAN' => ['Pengajuan'],
         'KEUANGAN' => ['Vendor & Customer', 'Aset & Persediaan', 'Transaksi', 'Laporan', 'Kontrol'],
         'PPSB' => ['Setting Awal', 'Transaksi'],
-        'KEPENDIDIKAN' => ['Administrasi', 'Transaksi', 'Kontrol'],
+        'KEPENDIDIKAN' => ['Administrasi', 'Transaksi', 'Absensi dan Perizinan', 'Kontrol'],
         'TAGIHAN LAIN-LAIN' => ['Setting Tagihan Lain Lain', 'Transaksi'],
     ];
 

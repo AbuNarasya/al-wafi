@@ -208,6 +208,10 @@ final class Navigation
         // santri yang benar-benar bersekolah. Modul hak aksesnya tetap `santri`.
         ['url' => '/kesantrian/alumni', 'label' => 'Alumni', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
         ['url' => '/kesantrian/santri-keluar', 'label' => 'Santri Keluar', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        ['url' => '/kesantrian/absensi-asrama', 'label' => 'Absensi Asrama (ISE)', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modul' => 'absensi-asrama'],
+        ['url' => '/kesantrian/perizinan', 'label' => 'Perizinan Insidental', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modulAny' => ['perizinan', 'perizinan-tingkat-1', 'perizinan-tingkat-2']],
+        ['url' => '/kesantrian/perizinan/pos', 'label' => 'Pos Keluar/Masuk Santri', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modul' => 'perizinan'],
+        ['url' => '/kesantrian/perizinan/pengaturan', 'label' => 'Pengaturan Perizinan', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modul' => 'perizinan-pengaturan'],
         ['url' => '/kesantrian/pengunduran-diri', 'label' => 'Pengunduran Diri', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'pengunduran-diri'],
         ['url' => '/kesantrian/kelas', 'label' => 'Kelas', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kelas'],
         ['url' => '/kesantrian/kelas/penempatan', 'label' => 'Penempatan Kelas', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kelas'],
@@ -333,7 +337,7 @@ final class Navigation
         // perjalanan santri, dan memecahnya jadi sub cuma menambah satu ketukan
         // untuk daftar yang justru paling sering dibuka.
         'PPSB' => ['Setting Awal', 'Transaksi'],
-        'KEPENDIDIKAN' => ['Administrasi', 'Transaksi', 'Kontrol'],
+        'KEPENDIDIKAN' => ['Administrasi', 'Transaksi', 'Absensi dan Perizinan', 'Kontrol'],
         // "Setting Tagihan Lain Lain" belum punya item: layar jenis & cara tagih
         // serta matriks tarifnya baru lahir di langkah 4 rancangan v2. Sub tanpa
         // item memang tidak dirender (lihat groups()), jadi menyebutnya di sini

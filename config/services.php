@@ -48,6 +48,12 @@ return [
         'bank_va' => ['bca_va', 'bni_va', 'bri_va', 'echannel', 'permata_va', 'bsi_va', 'cimb_va'],
     ],
 
+    // Penerima kiriman ISE (absensi asrama, dst.) — kosong = pintunya mati (404). Lihat docs/integrasi-ise-absensi.md.
+    'ise' => [
+        'token' => env('ISE_TOKEN'),
+        'ip' => env('ISE_IP'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

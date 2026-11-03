@@ -109,6 +109,9 @@ final class TugasSaya
                     ->orWhere(fn ($w) => $w->where('status', 'berjalan')->where('batas_persetujuan', '<', now())))->count() : 0,
                 'sesi tarik tunai menunggu diambil/dibagikan'],
 
+            // Perizinan Insidental yang menunggu keputusan tingkat pengguna ini.
+            ['/kesantrian/perizinan', \App\Services\Modules\PerizinanService::jumlahMenungguSaya(), 'pengajuan izin menunggu persetujuan'],
+
             // Janji bayar wali yang sudah lewat sementara tagihannya belum lunas — saatnya menagih lagi.
             ['/kesantrian/penagihan-tunggakan', Akses::boleh('penagihan-tunggakan', 'buat')
                 ? \App\Services\Modules\PenagihanTunggakanService::jumlahJanjiLewat() : 0, 'santri janji bayarnya sudah lewat'],

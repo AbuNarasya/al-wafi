@@ -32,6 +32,8 @@ final class MenuPortal
         'tabungan' => ['portal.dompet.tabungan', 'Tabungan', 'bank', '#7c3aed', 'keuangan', 'dompet'],
         'tarik_tunai' => ['portal.tarik_tunai.index', 'Penarikan tunai', 'kartu', '#b45309', 'keuangan', 'dompet'],
         'data' => ['portal.data', 'Data wali & santri', 'data', '#475569', 'administrasi', null],
+        'perizinan' => ['portal.perizinan', 'Perizinan', 'keluar', '#0f766e', 'administrasi', null],
+        'kehadiran' => ['portal.kehadiran', 'Kehadiran asrama', 'absensi', '#15803d', 'akademik', null],
         'pendaftaran' => ['portal.daftar', 'Pendaftaran', 'psb', '#9b7bb0', 'administrasi', null],
         'klinik' => ['portal.klinik', 'Riwayat klinik', 'klinik', '#b91c1c', 'lainnya', null],
         'laundry' => ['portal.laundry', 'Laundry', 'laundry', '#0891b2', 'lainnya', null],

@@ -218,6 +218,9 @@ Route::prefix('api/dompet-toko/v1')->middleware([\App\Http\Middleware\TandaTanga
         Route::get('/pencairan', 'pencairan');
         Route::post('/pencairan/terima', 'terimaPencairan');
     });
+// Penerima kiriman ISE (4 Nov 2026) — tanpa sesi & CSRF; token Bearer (TokenIse). Mati (404) bila ISE_TOKEN kosong.
+Route::prefix('api/ise/v1')->middleware([\App\Http\Middleware\TokenIse::class, 'throttle:600,1'])
+    ->post('/absensi-asrama', [\App\Http\Controllers\Api\IseController::class, 'absensiAsrama'])->name('api.ise.absensi_asrama');
 Route::post('/midtrans/notifikasi', \App\Http\Controllers\MidtransNotifikasiController::class)
     ->name('midtrans.notifikasi')->middleware('throttle:120,1');
 // Kartu belanja Wafi Mart per anak — di bawah /wali/anak, BUKAN /wali/data (mode verifikasi).
@@ -237,6 +240,17 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\A
     Route::post('/anak/{id}/pengunduran-diri/ulang', 'ajukanUlang')->name('mundur.ulang')->middleware('throttle:10,1')->whereNumber('id');
     Route::post('/anak/{id}/pengunduran-diri/batal', 'batal')->name('mundur.batal')->middleware('throttle:10,1')->whereNumber('id');
     Route::get('/pengunduran-diri/dokumen/{dokumen}', 'dokumen')->name('mundur.dokumen')->whereNumber('dokumen');
+});
+// Kehadiran Asrama (4 Nov 2026) — absen kiriman ISE; di /wali/kehadiran, BUKAN /wali/data.
+Route::get('/wali/kehadiran', [\App\Http\Controllers\PortalKehadiranController::class, 'index'])->name('portal.kehadiran')->middleware('portal.wali');
+// Perizinan Insidental (4 Nov 2026) — wali mengajukan izin anak; di /wali/perizinan, BUKAN /wali/data.
+Route::prefix('wali/perizinan')->name('portal.perizinan')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalPerizinanController::class)->group(function () {
+    Route::get('/', 'index')->name('');
+    Route::get('/ajukan', 'form')->name('.ajukan');
+    Route::post('/ajukan', 'ajukan')->name('.kirim')->middleware('throttle:10,1');
+    Route::get('/{id}', 'lihat')->name('.lihat')->whereNumber('id');
+    Route::post('/{id}/batal', 'batal')->name('.batal')->middleware('throttle:10,1')->whereNumber('id');
+    Route::get('/{id}/lampiran', 'lampiran')->name('.lampiran')->whereNumber('id');
 });
 // Penarikan tunai kegiatan (uang saku untuk outbound/rihlah) — di /wali/tarik-tunai, BUKAN /wali/data.
 Route::prefix('wali/tarik-tunai')->name('portal.tarik_tunai.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalTarikTunaiController::class)->group(function () {
@@ -1413,6 +1427,24 @@ Route::middleware('auth')->group(function () {
             Route::get('/', 'index')->name('index')->middleware('hakakses:outstanding-lain,lihat');
             Route::put('/{idTagihan}', 'koreksi')->name('koreksi')->middleware('hakakses:outstanding-lain,ubah')->whereNumber('idTagihan');
         });
+
+    // Absensi asrama kiriman ISE — data masuk, tak tercocok, log kiriman.
+    Route::get('kesantrian/absensi-asrama', [\App\Http\Controllers\AbsensiAsramaController::class, 'index'])->name('absensi_asrama.index')->middleware('hakakses:absensi-asrama,lihat');
+
+    // Perizinan Insidental (4 Nov 2026) — persetujuan bertingkat, atas nama wali, pos keluar/masuk, pengaturan.
+    Route::prefix('kesantrian/perizinan')->name('perizinan.')->controller(\App\Http\Controllers\PerizinanController::class)->group(function () {
+        Route::get('/', 'index')->name('index')->middleware('hakakses:perizinan|perizinan-tingkat-1|perizinan-tingkat-2,lihat');
+        Route::get('/buat', 'buat')->name('buat')->middleware('hakakses:perizinan,buat');
+        Route::post('/buat', 'simpan')->name('simpan')->middleware('hakakses:perizinan,buat');
+        Route::get('/pos', 'pos')->name('pos')->middleware('hakakses:perizinan,ubah');
+        Route::get('/pengaturan', 'pengaturan')->name('pengaturan')->middleware('hakakses:perizinan-pengaturan,lihat');
+        Route::put('/pengaturan', 'simpanPengaturan')->name('pengaturan.simpan')->middleware('hakakses:perizinan-pengaturan,ubah');
+        Route::get('/{perizinan}', 'show')->name('show')->middleware('hakakses:perizinan|perizinan-tingkat-1|perizinan-tingkat-2,lihat')->whereNumber('perizinan');
+        Route::get('/{perizinan}/lampiran', 'lampiran')->name('lampiran')->middleware('hakakses:perizinan|perizinan-tingkat-1|perizinan-tingkat-2,lihat')->whereNumber('perizinan');
+        Route::post('/{perizinan}/setujui', 'setujui')->name('setujui')->middleware('hakakses:perizinan-tingkat-1|perizinan-tingkat-2,ubah')->whereNumber('perizinan');
+        Route::post('/{perizinan}/tolak', 'tolak')->name('tolak')->middleware('hakakses:perizinan-tingkat-1|perizinan-tingkat-2,ubah')->whereNumber('perizinan');
+        Route::post('/{perizinan}/pos', 'catatPos')->name('catat_pos')->middleware('hakakses:perizinan,ubah')->whereNumber('perizinan');
+    });
 
     // Penagihan Tunggakan — admin sekolah menagih wali secara manual & mencatat prosesnya per tagihan
     // (keputusan user 3 Nov 2026). Semua jenis tagihan & semua jenjang yang sudah lewat jatuh tempo.
