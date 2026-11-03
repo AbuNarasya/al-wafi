@@ -36,8 +36,8 @@
         @endforelse
 
         <div class="flex gap-2">
-            <a href="{{ route('portal.verifikasi.wali') }}" class="flex-1 rounded-2xl bg-white py-3 text-center text-sm font-bold text-slate-700 ring-1 ring-slate-300"><span class="inline-block rtl:-scale-x-100">&larr;</span> {{ __('Kembali') }}</a>
-            <button class="flex-[2] rounded-2xl bg-brand py-3 text-sm font-bold text-white">{{ __('Simpan & lanjut') }} <span class="inline-block rtl:-scale-x-100">&rarr;</span></button>
+            <a href="{{ route('portal.verifikasi.wali') }}" class="flex shrink-0 items-center justify-center gap-1 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-slate-700 ring-1 ring-slate-300"><span class="inline-block rtl:-scale-x-100">&larr;</span> {{ __('Kembali') }}</a>
+            <button class="flex-1 rounded-2xl bg-brand py-3 text-sm font-bold text-white">{{ __('Simpan & lanjut') }} <span class="inline-block rtl:-scale-x-100">&rarr;</span></button>
         </div>
     </form>
 @endsection

@@ -46,8 +46,8 @@
         @error('setuju')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
 
         <div class="mt-3 flex gap-2">
-            <a href="{{ route('portal.verifikasi.santri') }}" class="flex-1 rounded-2xl bg-white py-3 text-center text-sm font-bold text-slate-700 ring-1 ring-slate-300"><span class="inline-block rtl:-scale-x-100">&larr;</span> {{ __('Kembali') }}</a>
-            <button class="flex-[2] rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white">{{ __('Selesai — data sudah benar') }}</button>
+            <a href="{{ route('portal.verifikasi.santri') }}" class="flex shrink-0 items-center justify-center gap-1 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-slate-700 ring-1 ring-slate-300"><span class="inline-block rtl:-scale-x-100">&larr;</span> {{ __('Kembali') }}</a>
+            <button class="flex-1 rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white">{{ __('Selesai — data sudah benar') }}</button>
         </div>
     </form>
 @endsection

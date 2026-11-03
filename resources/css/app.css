@@ -181,6 +181,10 @@ input.border-gray-300, select.border-gray-300, textarea.border-gray-300 {
         padding-top: 10px;
         padding-bottom: calc(10px + env(safe-area-inset-bottom));
     }
+    /* Portal wali (body bg-slate-100): latar papan mengikuti halaman — putih tetap tampil
+       sebagai kotak putih, apalagi di mode gelap (3 Nov 2026). */
+    body.bg-slate-100 form [data-aksi-form] { background: rgba(241, 245, 249, .97); }
+    .wali-gelap body.bg-slate-100 form [data-aksi-form] { background: rgba(11, 18, 32, .97); }
 
     /* Tombol kirim memenuhi lebar; Batal secukupnya. Jempol mengarah ke tombol
        utama, dan "Batal" tak pernah sebesar "Simpan". */
