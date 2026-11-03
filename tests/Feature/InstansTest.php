@@ -166,4 +166,15 @@ class InstansTest extends TestCase
         $this->actingAs($this->admin)->get('/kesantrian/santri')->assertOk();
         $this->assertNotContains('Kasir (POS)', $this->labelMenu());
     }
+
+    public function test_wafi_mart_mencari_lewat_tombol_bukan_tiap_ketukan(): void
+    {
+        $this->instans('wafimart');
+        $this->actingAs($this->admin)->get('/inventory')->assertOk()
+            ->assertSee('data-cari-manual', false)->assertSee('>Cari</button>', false);
+
+        $this->instans('alwafi');
+        $this->actingAs($this->admin)->get('/inventory')->assertOk()
+            ->assertDontSee('data-cari-manual', false)->assertDontSee('>Cari</button>', false);
+    }
 }

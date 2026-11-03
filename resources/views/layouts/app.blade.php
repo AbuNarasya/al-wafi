@@ -10,7 +10,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="h-full bg-gray-100 text-gray-800 antialiased">
+<body class="h-full bg-gray-100 text-gray-800 antialiased" @if (\App\Support\Instans::adalah('wafimart')) data-cari-manual @endif>
 {{--
   Menu samping: TETAP seperti dulu di layar ≥1024px (terbuka tiap halaman dimuat,
   tombol tiga garis tetap bekerja). Di bawah itu ia menjadi LACI yang tertutup.

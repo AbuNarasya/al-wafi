@@ -1453,6 +1453,9 @@ Alpine.start();
     const KUNCI = 'filterFokus';
 
     document.addEventListener('input', (e) => {
+        // Instans Wafi Mart: cari hanya lewat tombol Cari / Enter (permintaan user 3 Nov 2026) —
+        // daftar barangnya besar, memuat ulang tiap ketukan terasa berat. Lihat layouts.app.
+        if (document.body.hasAttribute('data-cari-manual')) return;
         const el = e.target.closest?.('[data-filter-auto]');
         if (!el || !el.form) return;
 
