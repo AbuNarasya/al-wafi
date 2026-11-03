@@ -47,9 +47,8 @@
             <p class="mt-2 text-xs text-slate-500">{{ __('Orang tua / wali lain yang emailnya sudah diisi masuk dengan cara yang sama, memakai emailnya sendiri.') }}</p>
         </section>
     @endif
-    <a href="{{ route('portal.masuk') }}" class="mt-4 block w-full rounded-2xl bg-white py-3 text-center text-sm font-bold text-brand ring-1 ring-slate-300">{{ __('Ke halaman Masuk') }}</a>
-
-    {{-- Tab yang dibuka dari WhatsApp sering tak boleh ditutup lewat skrip — bila
+    {{-- Hanya tombol Tutup — tanpa "Ke halaman Masuk" (permintaan user 3 Nov 2026).
+         Tab yang dibuka dari WhatsApp sering tak boleh ditutup lewat skrip — bila
          window.close() ditolak, pesan pengganti yang muncul. --}}
     <div x-data="{ ditolak: false }" class="mt-5">
         <button type="button" @click="window.close(); setTimeout(() => ditolak = true, 400)"

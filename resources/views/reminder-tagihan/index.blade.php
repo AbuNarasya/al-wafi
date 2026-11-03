@@ -39,6 +39,11 @@
                              hint="Jam pengiriman otomatis oleh scheduler." />
                 </div>
 
+                {{-- Keputusan user 3 Nov 2026: SPP tanpa jatuh tempo tak pernah terhitung menunggak. --}}
+                <x-field name="tanggal_jatuh_tempo_spp" label="Tanggal Jatuh Tempo SPP Bawaan" type="number"
+                         :value="$s->tanggal_jatuh_tempo_spp" min="1" max="31"
+                         hint="Tanggal 1–31 di bulan periode SPP (mis. 10 → SPP 2026-09 jatuh tempo 10/09/2026; bulan pendek memakai hari terakhirnya). Dipakai saat SPP diterbitkan tanpa jatuh tempo, dan saat disimpan mengisi SPP belum lunas yang jatuh temponya masih kosong. Kosongkan bila tak dipakai." />
+
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
                         <p class="mb-2 text-sm font-medium text-gray-700">Sumber tagihan yang dipantau</p>

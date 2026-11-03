@@ -487,6 +487,8 @@ class SppService
                 // "siap terbit" tiap bulan, selamanya. Statusnya langsung lunas (tak ada
                 // yang perlu dibayar) dan `sudah_akrual` false karena memang tak masuk
                 // jurnal mana pun.
+                // Jatuh tempo kosong → tanggal bawaan dari pengaturan Reminder Tagihan (keputusan user 3 Nov 2026).
+                $data['jatuh_tempo'] = ($data['jatuh_tempo'] ?? null) ?: JatuhTempoSpp::untukPeriode($data['periode']);
                 TagihanSantri::insert(array_map(function ($r) use ($kode, $data, $jenis, $nomorJurnal, $now) {
                     $nol = Money::isZero($r['nominal']);
 

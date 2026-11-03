@@ -109,6 +109,10 @@ final class TugasSaya
                     ->orWhere(fn ($w) => $w->where('status', 'berjalan')->where('batas_persetujuan', '<', now())))->count() : 0,
                 'sesi tarik tunai menunggu diambil/dibagikan'],
 
+            // Janji bayar wali yang sudah lewat sementara tagihannya belum lunas — saatnya menagih lagi.
+            ['/kesantrian/penagihan-tunggakan', Akses::boleh('penagihan-tunggakan', 'buat')
+                ? \App\Services\Modules\PenagihanTunggakanService::jumlahJanjiLewat() : 0, 'santri janji bayarnya sudah lewat'],
+
             ...self::jatuhTempo(),
         ];
     }

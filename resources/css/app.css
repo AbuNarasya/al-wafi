@@ -24,6 +24,7 @@
 .wali-gelap .text-amber-900, .wali-gelap .text-amber-800, .wali-gelap .text-amber-700 { color: #fcd34d; }
 .wali-gelap .text-red-800, .wali-gelap .text-red-700 { color: #fca5a5; }
 .wali-gelap .text-brand { color: #8fb4ee; }
+.wali-gelap .ring-brand { --tw-ring-color: #5b8fd9; }
 .wali-gelap input, .wali-gelap select, .wali-gelap textarea { background-color: #0f172a; color: #e5e7eb; border-color: #334155; }
 /* Latar emas tetap emas, jadi tulisannya harus TETAP gelap — penimpaan `text-slate-900` di atas
    membuatnya abu terang di atas kuning (tombol "Isi saldo" tak terbaca, 13 Okt 2026). */

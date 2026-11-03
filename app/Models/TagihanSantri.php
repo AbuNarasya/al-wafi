@@ -81,6 +81,12 @@ class TagihanSantri extends Model
         return $this->hasMany(RencanaAngsuranUangPangkal::class, 'id_tagihan', 'id');
     }
 
+    /** Catatan penagihan manual oleh admin sekolah (Penagihan Tunggakan), terbaru dulu. */
+    public function catatanPenagihan(): HasMany
+    {
+        return $this->hasMany(CatatanPenagihan::class, 'id_tagihan', 'id')->orderByDesc('id');
+    }
+
     public function potongan(): HasOne
     {
         return $this->hasOne(PotonganUangPangkal::class, 'id_tagihan', 'id');

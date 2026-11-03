@@ -118,6 +118,30 @@ class OutstandingSppTest extends TestCase
             ->reduce(fn ($t, $l) => Money::add($t, Money::sub($l->debet, $l->kredit)), '0');
     }
 
+    /** Jatuh tempo SPP bawaan dari pengaturan Reminder Tagihan (keputusan user 3 Nov 2026). */
+    public function test_jatuh_tempo_bawaan_mengisi_spp_kosong_dan_yang_baru_terbit(): void
+    {
+        $santri = $this->santriAktif();
+        $this->terbitkan('2026-07');
+        $this->assertNull($this->tagihanSpp($santri)->jatuh_tempo, 'tanpa bawaan: tetap kosong seperti dulu');
+
+        $isi = ['hari_sebelum' => '7,3,1', 'jam_kirim' => '07:00', 'tanggal_jatuh_tempo_spp' => 31];
+        $this->actingAs(\App\Models\User::find($this->admin))->put(route('reminder_tagihan.update'), $isi)
+            ->assertSessionHas('status', fn ($p) => str_contains($p, 'Jatuh tempo 1 tagihan SPP'));
+        $this->assertSame('2026-07-31', $this->tagihanSpp($santri)->jatuh_tempo->toDateString());
+
+        // Yang sudah diisi tak ditimpa; bulan pendek memakai hari terakhirnya.
+        $this->put(route('reminder_tagihan.update'), ['tanggal_jatuh_tempo_spp' => 10] + $isi);
+        $this->assertSame('2026-07-31', $this->tagihanSpp($santri)->jatuh_tempo->toDateString());
+        $this->assertSame('2027-02-28', \App\Services\Modules\JatuhTempoSpp::untukPeriode('2027-02', 31));
+        $this->assertNull(\App\Services\Modules\JatuhTempoSpp::untukPeriode('UJI', 10));
+
+        // SPP baru terbit tanpa jatuh tempo → tanggal bawaan.
+        $this->terbitkan('2026-08');
+        $this->assertSame('2026-08-10', $this->tagihanSpp($santri)->jatuh_tempo->toDateString());
+        $this->put(route('reminder_tagihan.update'), ['tanggal_jatuh_tempo_spp' => 40] + $isi)->assertSessionHasErrors('tanggal_jatuh_tempo_spp');
+    }
+
     /** Yang baru terbit & belum dibayar memang menggantung di sini. */
     public function test_tagihan_yang_baru_terbit_masuk_daftar(): void
     {

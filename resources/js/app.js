@@ -1484,3 +1484,61 @@ Alpine.start();
     });
 })();
 
+
+/**
+ * BATANG GESER ATAS untuk tabel lebar (permintaan user 3 Nov 2026): tabel yang lebih lebar dari layar
+ * (pembungkus `.overflow-x-auto`) dulu hanya bisa digeser dari batang di BAWAH tabel — harus menggulir
+ * ke dasar dulu. Kini ada kembarannya di atas tabel; keduanya bergerak bersama. Muncul hanya bila
+ * tabelnya memang meluap. Lewati pembungkus ber-`data-tanpa-geser-atas`.
+ */
+(function () {
+    function pasang(bungkus) {
+        if (bungkus._geserAtas || bungkus.hasAttribute('data-tanpa-geser-atas') || ! bungkus.querySelector('table')) return;
+        const atas = document.createElement('div');
+        atas.className = 'geser-atas';
+        atas.setAttribute('aria-hidden', 'true');
+        atas.style.cssText = 'overflow-x:auto;overflow-y:hidden;height:14px;margin-bottom:2px;display:none';
+        const isi = document.createElement('div');
+        isi.style.height = '1px';
+        atas.appendChild(isi);
+        bungkus.parentNode.insertBefore(atas, bungkus);
+        bungkus._geserAtas = atas;
+
+        // Tanpa kunci: yang sudah sama posisinya tak disetel lagi, jadi pantulan berhenti sendiri.
+        const ikut = (dari, ke) => () => {
+            if (Math.abs(ke.scrollLeft - dari.scrollLeft) >= 1) ke.scrollLeft = dari.scrollLeft;
+        };
+        atas.addEventListener('scroll', ikut(atas, bungkus), { passive: true });
+        bungkus.addEventListener('scroll', ikut(bungkus, atas), { passive: true });
+
+        const ukur = () => {
+            const luap = bungkus.scrollWidth > bungkus.clientWidth + 1;
+            atas.style.display = luap ? 'block' : 'none';
+            atas.style.width = bungkus.clientWidth + 'px';
+            isi.style.width = bungkus.scrollWidth + 'px';
+            atas.scrollLeft = bungkus.scrollLeft;
+        };
+        ukur();
+        if (window.ResizeObserver) {
+            const ro = new ResizeObserver(ukur);
+            ro.observe(bungkus);
+            bungkus.querySelectorAll('table').forEach((t) => ro.observe(t));
+        } else {
+            window.addEventListener('resize', ukur);
+        }
+    }
+
+    function sapu() {
+        document.querySelectorAll('.overflow-x-auto').forEach(pasang);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        sapu();
+        // Tabel yang dirender Alpine belakangan (atau panel yang dibuka) ikut diproses.
+        let tunda;
+        new MutationObserver(() => {
+            clearTimeout(tunda);
+            tunda = setTimeout(sapu, 200);
+        }).observe(document.body, { childList: true, subtree: true });
+    });
+})();

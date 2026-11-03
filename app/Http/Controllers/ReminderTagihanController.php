@@ -40,6 +40,7 @@ class ReminderTagihanController extends Controller
         $data = $request->validate([
             'hari_sebelum' => ['required', 'string', 'max:100', 'regex:/^\s*\d{1,2}\s*(,\s*\d{1,2}\s*)*$/'],
             'jam_kirim' => ['required', 'date_format:H:i'],
+            'tanggal_jatuh_tempo_spp' => ['nullable', 'integer', 'between:1,31'],
         ], [
             'hari_sebelum.regex' => 'Isi daftar hari dipisah koma, contoh: 7,3,1 (0 = tepat hari jatuh tempo).',
         ]);
@@ -51,9 +52,16 @@ class ReminderTagihanController extends Controller
             $data[$flag] = $request->boolean($flag);
         }
 
+        $data['tanggal_jatuh_tempo_spp'] = $data['tanggal_jatuh_tempo_spp'] ?? null;
         $this->service->simpan($data);
 
-        return redirect()->route('reminder_tagihan.index')->with('status', 'Pengaturan reminder berhasil disimpan.');
+        $pesan = 'Pengaturan reminder berhasil disimpan.';
+        // SPP belum lunas yang jatuh temponya masih kosong langsung diisi tanggal bawaan — yang sudah diisi tak disentuh.
+        if ($data['tanggal_jatuh_tempo_spp'] && ($n = \App\Services\Modules\JatuhTempoSpp::isiYangKosong((int) $data['tanggal_jatuh_tempo_spp'])) > 0) {
+            $pesan .= " Jatuh tempo {$n} tagihan SPP yang masih kosong diisi tanggal {$data['tanggal_jatuh_tempo_spp']} bulan periodenya.";
+        }
+
+        return redirect()->route('reminder_tagihan.index')->with('status', $pesan);
     }
 
     public function kirim(): RedirectResponse

@@ -37,8 +37,13 @@
 
     {{-- Wali TERDAFTAR yang baru pertama kali masuk: kode email SEKALI, lalu membuat password.
          Pendaftaran santri baru punya pintunya sendiri di halaman depan (portal.daftar_baru). --}}
-    <details class="mt-4 rounded-3xl bg-white p-4 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200" @if (old('lewat_kode')) open @endif>
-        <summary class="cursor-pointer font-semibold text-slate-900">{{ __('Wali terdaftar, baru pertama kali masuk?') }}</summary>
+    {{-- Disorot biru (permintaan user 3 Nov 2026): wali hasil verifikasi data masuk lewat pintu ini. --}}
+    <details class="group mt-4 rounded-3xl bg-blue-50 p-4 text-sm text-slate-600 shadow-sm ring-2 ring-brand" @if (old('lewat_kode')) open @endif>
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-2 [&::-webkit-details-marker]:hidden">
+            <span><b class="text-slate-900">{{ __('Wali terdaftar, baru pertama kali masuk?') }}</b>
+                <span class="block text-xs text-slate-600 group-open:hidden">{{ __('Ketuk di sini untuk menerima kode lewat email.') }}</span></span>
+            <x-portal.ikon nama="kanan" kelas="h-4 w-4 shrink-0 text-brand transition-transform group-open:rotate-90" />
+        </summary>
         <p class="mt-2">{{ __('Masukkan email yang tercatat di data keluarga — kami kirim kode 6 angka. Sesudah kodenya benar, Anda membuat password untuk masuk berikutnya.') }}</p>
         <form method="POST" action="{{ route('portal.masuk') }}" data-no-confirm class="mt-3 space-y-3">
             @csrf

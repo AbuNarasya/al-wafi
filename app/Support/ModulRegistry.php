@@ -236,6 +236,7 @@ final class ModulRegistry
         ['kode' => 'kebijakan-khusus', 'nama' => 'Kebijakan Khusus Santri (keringanan, potongan, beasiswa)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Kontrol'],
         ['kode' => 'outstanding-spp', 'nama' => 'Outstanding SPP (tunggakan & koreksi nominal)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Kontrol'],
         ['kode' => 'outstanding-lain', 'nama' => 'Outstanding Tagihan Lain (lain-lain & daftar ulang)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Kontrol'],
+        ['kode' => 'penagihan-tunggakan', 'nama' => 'Penagihan Tunggakan (catatan penagihan manual ke wali)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Kontrol'],
 
         // ---- Sistem ----
         // 'void-approvals' DIBUANG 2026-07-28: menunya menunjuk /void-approvals

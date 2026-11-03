@@ -1408,6 +1408,15 @@ Route::middleware('auth')->group(function () {
             Route::put('/{idTagihan}', 'koreksi')->name('koreksi')->middleware('hakakses:outstanding-lain,ubah')->whereNumber('idTagihan');
         });
 
+    // Penagihan Tunggakan — admin sekolah menagih wali secara manual & mencatat prosesnya per tagihan
+    // (keputusan user 3 Nov 2026). Semua jenis tagihan & semua jenjang yang sudah lewat jatuh tempo.
+    Route::prefix('kesantrian/penagihan-tunggakan')->name('penagihan_tunggakan.')
+        ->controller(\App\Http\Controllers\PenagihanTunggakanController::class)->group(function () {
+            Route::get('/', 'index')->name('index')->middleware('hakakses:penagihan-tunggakan,lihat');
+            Route::get('/{id}', 'show')->name('show')->middleware('hakakses:penagihan-tunggakan,lihat')->whereNumber('id');
+            Route::post('/{id}/catatan', 'catat')->name('catat')->middleware('hakakses:penagihan-tunggakan,buat')->whereNumber('id');
+        });
+
     // Wali / Keluarga Santri (staf). Alamat `/wali` dipakai Portal Wali.
     Route::prefix('datawali')->name('wali.')->group(function () {
         $w = WaliController::class;
