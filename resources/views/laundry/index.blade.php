@@ -22,6 +22,7 @@
                 <a href="{{ route('laundry.terima') }}" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white">+ Terima cucian</a>
             @endif
             @if (\App\Support\Akses::boleh(\App\Support\BagianLaundry::BAGIAN[$bagian]['modul'], 'ubah'))
+                <a href="{{ route('laundry.pemeriksaan') }}" class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white">Pemeriksaan</a>
                 <a href="{{ route('laundry.serahkan') }}" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">Serahkan cucian</a>
             @endif
         </div>
@@ -29,7 +30,8 @@
     <p class="mt-2 text-xs text-gray-500">Diserahkan hari ini: <b>{{ $diserahkanHariIni }}</b> kantong.
         Kantong yang Selesai diserahkan lewat <b>Serahkan cucian</b> (tap kartu santri &amp; cocokkan pakaian).</p>
 
-    <div class="mt-4 grid gap-4 lg:grid-cols-3">
+    {{-- Empat kolom (paket 1): Diterima → (meja pemeriksaan) → Diperiksa → Diproses → Selesai. --}}
+    <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         @foreach ($kolom as $status => $daftar)
             @php $bisaMaju = isset(\App\Models\Laundry::MAJU[$status]) && \App\Support\Akses::boleh(\App\Support\BagianLaundry::BAGIAN[$bagian]['modul'], 'ubah'); @endphp
             {{-- Tanpa dialog konfirmasi: dipakai puluhan kali sehari, dan langkahnya ringan (tak menyentuh uang). --}}
@@ -54,7 +56,8 @@
                                 </a>
                                 <span class="shrink-0 text-end text-xs text-gray-500">{{ $l->berat }} kg<br>{{ $l->jumlahPotong() }} pcs</span>
                             </div>
-                            <p class="mt-1 text-xs text-gray-400">{{ \App\Models\Laundry::LABEL[$status] }} {{ $l->{"{$status}_pada"}?->timezone('Asia/Jakarta')->format('d/m H:i') }}</p>
+                            <p class="mt-1 flex justify-between text-xs text-gray-400"><span>{{ \App\Models\Laundry::LABEL[$status] }} {{ $l->{"{$status}_pada"}?->timezone('Asia/Jakarta')->format('d/m H:i') }}</span>
+                                @if ($status === 'diterima' && \App\Support\Akses::boleh(\App\Support\BagianLaundry::BAGIAN[$bagian]['modul'], 'ubah'))<a href="{{ route('laundry.periksa', $l->id) }}" class="font-semibold text-sky-700 hover:underline">Periksa &rarr;</a>@endif</p>
                         </div>
                     @empty
                         <p class="py-6 text-center text-sm text-gray-400">Kosong</p>

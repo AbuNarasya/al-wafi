@@ -31,7 +31,7 @@ class NotifikasiWali extends Model
         'midtrans_lunas' => 'tagihan', 'tagihan_terbit' => 'tagihan', 'pengingat_tagihan' => 'tagihan', 'va_dibatalkan' => 'tagihan',
         'topup_dompet_ditolak' => 'dompet', 'mutasi_dompet' => 'dompet',
         'tarik_tunai' => 'pengajuan', 'tarik_tabungan' => 'pengajuan', 'pengunduran_diri' => 'pengajuan', 'klinik' => 'kesehatan',
-        'laundry_selesai' => 'laundry', 'laundry_diserahkan' => 'laundry', 'laundry_kuota' => 'laundry',
+        'laundry_selesai' => 'laundry', 'laundry_diserahkan' => 'laundry', 'laundry_kuota' => 'laundry', 'laundry_tertahan' => 'laundry',
     ];
 
     protected $table = 'notifikasi_wali';

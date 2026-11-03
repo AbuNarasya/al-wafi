@@ -95,37 +95,43 @@ class LaundryTagihanController extends Controller
         $jenisSah = JenisBiaya::where('status', 'aktif')->get()->filter(fn ($j) => \App\Models\TipeBiaya::perilakuDari($j->tipe) === 'lain')->pluck('kode')->all();
         $d = $request->validate([
             'tarif_per_kg' => ['required', 'numeric', 'min:0', 'max:1000000'],
-            'kuota_bawaan_kg' => ['required', 'numeric', 'min:0', 'max:999'],
+            'kuota_ikhwan_kg' => ['required', 'numeric', 'min:0', 'max:999'], 'kuota_akhwat_kg' => ['required', 'numeric', 'min:0', 'max:999'],
             'kode_jenis_bawaan' => ['nullable', Rule::in($jenisSah)],
             'hari_terbit' => ['required', 'integer', 'between:1,28'],
+            'tahan_setelah_periode' => ['nullable', 'integer', 'between:0,24'],
             'terbit_otomatis' => ['nullable', 'boolean'],
-            'jenjang' => ['nullable', 'array'], 'jenjang.*.kuota_kg' => ['nullable', 'numeric', 'min:0', 'max:999'],
+            'jenjang' => ['nullable', 'array'], 'jenjang.*.kuota_ikhwan_kg' => ['nullable', 'numeric', 'min:0', 'max:999'],
+            'jenjang.*.kuota_akhwat_kg' => ['nullable', 'numeric', 'min:0', 'max:999'],
             'jenjang.*.kode_jenis' => ['nullable', Rule::in($jenisSah)],
         ]);
         $lama = (array) $this->svc->pengaturan();
         DB::transaction(function () use ($d, $request) {
             DB::table('pengaturan_laundry')->updateOrInsert(['id' => 1], [
-                'tarif_per_kg' => Money::of($d['tarif_per_kg']), 'kuota_bawaan_kg' => Money::of($d['kuota_bawaan_kg']),
+                'tarif_per_kg' => Money::of($d['tarif_per_kg']), 'kuota_ikhwan_kg' => Money::of($d['kuota_ikhwan_kg']), 'kuota_akhwat_kg' => Money::of($d['kuota_akhwat_kg']),
                 'kode_jenis_bawaan' => $d['kode_jenis_bawaan'] ?? null, 'hari_terbit' => (int) $d['hari_terbit'],
                 'terbit_otomatis' => $request->boolean('terbit_otomatis'), 'diubah_oleh' => $request->user()->id_pengguna, 'updated_at' => now(),
+                'tahan_setelah_periode' => (int) ($d['tahan_setelah_periode'] ?? 0),
             ]);
             $kodeJenjang = Jenjang::pluck('kode')->all();
             foreach (($d['jenjang'] ?? []) as $kode => $isi) {
                 if (! in_array($kode, $kodeJenjang, true)) {
                     continue;
                 }
-                $kuota = ($isi['kuota_kg'] ?? '') === '' || $isi['kuota_kg'] === null ? null : Money::of($isi['kuota_kg']);
+                // Sel kosong = ikut kuota bawaan bagiannya; baris tanpa isian sama sekali dihapus.
+                $sel = fn (string $k) => ($isi[$k] ?? '') === '' || $isi[$k] === null ? null : Money::of($isi[$k]);
+                [$ikhwan, $akhwat] = [$sel('kuota_ikhwan_kg'), $sel('kuota_akhwat_kg')];
                 $jenis = ($isi['kode_jenis'] ?? '') ?: null;
-                if ($kuota === null && $jenis === null) {
+                if ($ikhwan === null && $akhwat === null && $jenis === null) {
                     DB::table('pengaturan_laundry_jenjang')->where('kode_jenjang', $kode)->delete();
                 } else {
-                    DB::table('pengaturan_laundry_jenjang')->updateOrInsert(['kode_jenjang' => $kode], ['kuota_kg' => $kuota, 'kode_jenis' => $jenis, 'updated_at' => now(), 'created_at' => now()]);
+                    DB::table('pengaturan_laundry_jenjang')->updateOrInsert(['kode_jenjang' => $kode], ['kuota_ikhwan_kg' => $ikhwan, 'kuota_akhwat_kg' => $akhwat,
+                        'kode_jenis' => $jenis, 'updated_at' => now(), 'created_at' => now()]);
                 }
             }
         });
         Jejak::catat('ubah_pengaturan_laundry', ['modul' => 'laundry-master', 'id_pengguna' => $request->user()->id_pengguna,
-            'detail' => ['lama' => array_intersect_key($lama, array_flip(['tarif_per_kg', 'kuota_bawaan_kg', 'kode_jenis_bawaan', 'hari_terbit', 'terbit_otomatis'])),
-                'baru' => array_intersect_key($d, array_flip(['tarif_per_kg', 'kuota_bawaan_kg', 'kode_jenis_bawaan', 'hari_terbit'])) + ['terbit_otomatis' => $request->boolean('terbit_otomatis')]]]);
+            'detail' => ['lama' => array_intersect_key($lama, array_flip(['tarif_per_kg', 'kuota_ikhwan_kg', 'kuota_akhwat_kg', 'kode_jenis_bawaan', 'hari_terbit', 'terbit_otomatis', 'tahan_setelah_periode'])),
+                'baru' => array_intersect_key($d, array_flip(['tarif_per_kg', 'kuota_ikhwan_kg', 'kuota_akhwat_kg', 'kode_jenis_bawaan', 'hari_terbit', 'tahan_setelah_periode'])) + ['terbit_otomatis' => $request->boolean('terbit_otomatis')]]]);
 
         return back()->with('status', 'Pengaturan laundry disimpan.');
     }
@@ -154,7 +160,7 @@ class LaundryTagihanController extends Controller
 
         return Santri::with('kelas:id,nama')->whereIn('id', $pakai->keys())->get(['id', 'nama', 'nis', 'kode_jenjang', 'id_kelas', 'jenis_kelamin'])
             ->map(function ($s) use ($pakai, $tarif) {
-                $kuota = $this->svc->kuota($s->kode_jenjang);
+                $kuota = $this->svc->kuota($s->kode_jenjang, $s->jenis_kelamin);
                 $kg = Money::of($pakai[$s->id]);
                 $lebih = Money::gt($kg, $kuota) ? Money::sub($kg, $kuota) : '0.00';
 

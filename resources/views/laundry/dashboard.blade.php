@@ -58,10 +58,25 @@
             </div>
         @endforeach
     </div>
+    {{-- Bisa diklik → rinciannya di Monitor Kelebihan Laundry (paket 2, 3 Nov 2026), bila petugas berhak membukanya. --}}
+    @php
+        $bisaMonitor = \App\Support\Akses::boleh('laundry-monitor', 'lihat');
+        $rentang = ['tampil' => 'tagihan', 'dari' => $baris->first()->bulan, 'sampai' => $sampai] + array_filter(['bagian' => $bagian]);
+        $kartu = [
+            ['Tagihan kelebihan 12 bulan', $rp($baris->where('perkiraan', false)->sum('ditagih')), 'text-gray-900', $rentang],
+            ['Sudah lunas', $rp($baris->sum('lunas')), 'text-emerald-700', $rentang + ['status' => 'lunas']],
+            ['Belum lunas (semua bulan)', $rp($belumLunas), 'text-amber-700', ['tampil' => 'tagihan', 'status' => 'belum'] + array_filter(['bagian' => $bagian])],
+        ];
+    @endphp
     <div class="mt-3 grid gap-3 sm:grid-cols-3">
-        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm">Tagihan kelebihan 12 bulan: <b class="tabular-nums">{{ $rp($baris->where('perkiraan', false)->sum('ditagih')) }}</b></div>
-        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm">Sudah lunas: <b class="tabular-nums text-emerald-700">{{ $rp($baris->sum('lunas')) }}</b></div>
-        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm">Belum lunas (semua bulan): <b class="tabular-nums text-amber-700">{{ $rp($belumLunas) }}</b></div>
+        @foreach ($kartu as [$judul, $nilai, $warna, $saring])
+            @if ($bisaMonitor)
+                <a href="{{ route('laundry.monitor', $saring) }}" class="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm transition hover:border-brand hover:shadow">
+                    <span>{{ $judul }}: <b class="tabular-nums {{ $warna }}">{{ $nilai }}</b></span><span class="text-xs text-brand">rincian &rarr;</span></a>
+            @else
+                <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm">{{ $judul }}: <b class="tabular-nums {{ $warna }}">{{ $nilai }}</b></div>
+            @endif
+        @endforeach
     </div>
 
     {{-- ---- Grafik 12 bulan ---- --}}

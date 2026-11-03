@@ -303,9 +303,11 @@ final class Navigation
         // Ikhwan / akhwat dipisah (3 Nov 2026): dua papan berhak sendiri; terima/serahkan/riwayat satu menu
         // yang isinya tersaring menurut hak petugas.
         ['url' => '/laundry/dashboard', 'label' => 'Dashboard Laundry', 'group' => 'LAUNDRY', 'modul' => 'laundry-dashboard'],
+        ['url' => '/laundry/monitor', 'label' => 'Monitor Kelebihan Laundry', 'group' => 'LAUNDRY', 'modul' => 'laundry-monitor'],
         ['url' => '/laundry/ikhwan', 'label' => 'Papan Laundry Ikhwan', 'group' => 'LAUNDRY', 'modul' => 'laundry-ikhwan'],
         ['url' => '/laundry/akhwat', 'label' => 'Papan Laundry Akhwat', 'group' => 'LAUNDRY', 'modul' => 'laundry-akhwat'],
         ['url' => '/laundry/terima', 'label' => 'Terima Cucian (tap kartu)', 'group' => 'LAUNDRY', 'modulAny' => ['laundry-ikhwan', 'laundry-akhwat']],
+        ['url' => '/laundry/pemeriksaan', 'label' => 'Pemeriksaan Cucian (timbang ulang)', 'group' => 'LAUNDRY', 'modulAny' => ['laundry-ikhwan', 'laundry-akhwat']],
         ['url' => '/laundry/serahkan', 'label' => 'Serahkan Cucian (tap kartu)', 'group' => 'LAUNDRY', 'modulAny' => ['laundry-ikhwan', 'laundry-akhwat']],
         ['url' => '/laundry/riwayat', 'label' => 'Riwayat Laundry', 'group' => 'LAUNDRY', 'modulAny' => ['laundry-ikhwan', 'laundry-akhwat']],
         ['url' => '/laundry/tagihan', 'label' => 'Kuota & Tagihan', 'group' => 'LAUNDRY', 'modul' => 'laundry-tagihan'],

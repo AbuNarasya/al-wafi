@@ -3,6 +3,11 @@
 @section('title', 'Terima Cucian')
 
 @section('content')
+    {{-- Label kantong baru: dicetak lewat iframe tersembunyi (dialog cetak muncul sendiri). --}}
+    @if (session('cetak_label'))
+        <iframe src="{{ route('laundry.label', session('cetak_label')) }}?cetak=1" style="position:absolute;width:0;height:0;border:0" title="Label kantong"></iframe>
+        <p class="mb-2 text-sm"><a href="{{ route('laundry.label', session('cetak_label')) }}?cetak=1" target="_blank" class="text-brand hover:underline">Cetak ulang label kantong</a></p>
+    @endif
     <a href="{{ route('laundry.index') }}" class="text-sm text-brand hover:underline">&larr; Papan Laundry</a>
 
     @unless ($santri)
@@ -10,9 +15,8 @@
     @else
         <div class="mt-3 grid gap-4 lg:grid-cols-3">
             <form method="POST" action="{{ route('laundry.simpan_terima') }}" data-no-confirm class="space-y-4 rounded-xl border border-gray-200 bg-white p-4 text-sm shadow-sm lg:col-span-2"
-                  x-data="{ item: @js(old('item', [['id_jenis_pakaian' => '', 'jumlah' => '']])), berat: @js(old('berat', '')),
+                  x-data="{ berat: @js(old('berat', '')),
                             terpakai: @js((float) $kuota['terpakai']), kuota: @js((float) $kuota['kuota']), tarif: @js($kuota['tarif'] !== null ? (float) $kuota['tarif'] : null),
-                            get potong() { return this.item.reduce((t, b) => t + (parseInt(b.jumlah) || 0), 0) },
                             get sesudah() { return this.terpakai + (parseFloat(this.berat) || 0) },
                             get lebih() { return Math.max(0, this.sesudah - this.kuota) } }">
                 @csrf
@@ -39,23 +43,8 @@
                     <span x-show="lebih <= 0"> · sisa <span x-text="Math.max(0, kuota - sesudah).toLocaleString('id-ID', { maximumFractionDigits: 2 })"></span> kg</span>
                 </div>
 
-                <div>
-                    <div class="flex items-baseline justify-between">
-                        <span class="text-xs text-gray-500">Daftar pakaian * — dicocokkan lagi saat diserahkan</span>
-                        <span class="text-xs text-gray-500"><b x-text="potong"></b> potong</span>
-                    </div>
-                    <template x-for="(b, i) in item" :key="i">
-                        <div class="mt-1 flex gap-2">
-                            <select :name="`item[${i}][id_jenis_pakaian]`" x-model="b.id_jenis_pakaian" class="flex-1 rounded-lg border-gray-300 text-sm">
-                                <option value="">— jenis pakaian —</option>
-                                @foreach ($jenis as $j)<option value="{{ $j->id }}">{{ $j->nama }}</option>@endforeach
-                            </select>
-                            <input :name="`item[${i}][jumlah]`" x-model="b.jumlah" type="number" min="1" max="200" placeholder="jml" class="w-20 rounded-lg border-gray-300 text-sm">
-                            <button type="button" @click="item.splice(i, 1)" class="px-2 text-gray-400" x-show="item.length > 1">&times;</button>
-                        </div>
-                    </template>
-                    <button type="button" @click="item.push({ id_jenis_pakaian: '', jumlah: '' })" class="mt-1 text-xs text-brand hover:underline">+ pakaian</button>
-                </div>
+                {{-- Paket 1 (3 Nov 2026): di penerimaan cukup DITIMBANG — jenis & jumlah pakaian dicatat di meja pemeriksaan. --}}
+                <p class="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">Cukup ditimbang. Jenis &amp; jumlah pakaian dicatat di meja <b>Pemeriksaan</b>, sekaligus timbang ulang. Label kantong tercetak otomatis sesudah disimpan.</p>
 
                 <label class="block"><span class="text-xs text-gray-500">Catatan (noda, sobek, pakaian khusus, …)</span>
                     <textarea name="catatan" rows="2" class="w-full rounded-lg border-gray-300 text-sm">{{ old('catatan') }}</textarea></label>

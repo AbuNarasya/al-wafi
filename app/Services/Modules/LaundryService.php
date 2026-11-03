@@ -14,10 +14,14 @@ use Illuminate\Support\Facades\DB;
 /**
  * LAUNDRY tahap 1 (keputusan user 26 Okt 2026).
  *
- *   terima    — santri tap kartu (atau dicari manual), petugas mencatat berat + daftar pakaian (WAJIB) → `diterima`
- *   majukan   — papan proses: `diterima` → `diproses` → `selesai`, satu-satu atau sekaligus banyak
+ *   terima    — santri tap kartu (atau dicari manual), petugas MENIMBANG saja → `diterima` (paket 1, 3 Nov 2026)
+ *   periksa   — meja pemeriksaan: timbang ulang + jenis & jumlah pakaian (WAJIB) → `diperiksa`; berat ulang yang dihitung kuota
+ *   majukan   — papan proses: `diperiksa` → `diproses` → `selesai` (sudah dipacking), satu-satu atau sekaligus banyak
  *   serahkan  — santri tap kartu lagi, pakaian dicocokkan satu per satu → `diserahkan`; kurang = ditandai + catatan wajib
- *   batalkan  — hanya selama masih `diterima` (salah catat)
+ *   batalkan  — selama masih `diterima` / `diperiksa` (salah catat)
+ *   ubah      — berat, daftar pakaian & catatan sampai diserahkan; alasan wajib, tercatat di jejak audit
+ *   TERTAHAN  — (paket 3) santri yang menunggak kelebihan laundry ≥ N periode lewat jatuh tempo tak bisa mengambil cucian;
+ *               setor tetap boleh. Izin mendesak (`$izin` = alasan) boleh berkali-kali, tercatat di jejak audit.
  *
  * Tiap langkah menyimpan waktu & petugasnya. Kuota & tagihan kelebihan menyusul (tahap 2).
  */
@@ -37,7 +41,8 @@ class LaundryService
         if ($berat <= 0 || $berat > self::BERAT_MAKS) {
             throw new AppException(422, 'Berat cucian harus lebih dari 0 dan paling banyak '.self::BERAT_MAKS.' kg — periksa lagi timbangannya.');
         }
-        $baris = $this->rapikanItem($item);
+        // Daftar pakaian di penerimaan TIDAK wajib lagi — dicatat di meja pemeriksaan (paket 1).
+        $baris = $this->rapikanItem($item, wajib: false);
 
         // Pemakaian bulan ini SEBELUM setoran — untuk kabar kuota yang dikirim sekali saat melewati 80% / 100%.
         $kuota = new TagihanLaundryService;
@@ -52,7 +57,7 @@ class LaundryService
             $base = DocNumber::docBase($awalan, now());
             $l = Laundry::create([
                 'nomor' => DocNumber::nextDocNumber($base, Laundry::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor')),
-                'id_santri' => $santri->id, 'berat' => $berat, 'catatan' => trim((string) $catatan) ?: null,
+                'id_santri' => $santri->id, 'berat' => $berat, 'berat_terima' => $berat, 'catatan' => trim((string) $catatan) ?: null,
                 'status' => 'diterima', 'cara_terima' => $cara, 'diterima_pada' => now(), 'diterima_oleh' => $idPengguna,
             ]);
             foreach ($baris as $b) {
@@ -81,7 +86,16 @@ class LaundryService
             if ($sah->isNotEmpty()) {
                 Laundry::whereIn('id', $sah->pluck('id'))->update(['status' => $ke, "{$ke}_pada" => now(), "{$ke}_oleh" => $idPengguna]);
                 if ($ke === 'selesai') {
+                    $monitor = new MonitorLaundryService;
                     foreach (Laundry::with(['item', 'santri.wali'])->whereIn('id', $sah->pluck('id'))->get() as $l) {
+                        // Paket 3: santri tertahan dikabari bahwa cucian sudah selesai TETAPI belum bisa diambil.
+                        if ($tahan = $monitor->tertahan($l->santri)) {
+                            $this->kabari($l, Teks::k('Cucian :nama selesai, tetapi tertahan', ['nama' => $l->santri->nama]),
+                                Teks::k(':nomor sudah selesai dicuci, tetapi belum bisa diambil karena tunggakan kelebihan laundry :periode periode (Rp :nominal) sudah lewat jatuh tempo. Silakan lunasi di menu Tagihan.',
+                                    ['nomor' => $l->nomor, 'periode' => $tahan->jumlah, 'nominal' => number_format((float) $tahan->sisa, 0, ',', '.')]), 'laundry_tertahan');
+
+                            continue;
+                        }
                         $this->kabari($l, Teks::k('Cucian :nama siap diambil', ['nama' => $l->santri->nama]),
                             Teks::k(':nomor (:berat kg, :potong potong) sudah selesai dicuci dan bisa diambil di laundry.',
                                 ['nomor' => $l->nomor, 'berat' => self::kg($l->berat), 'potong' => $l->jumlahPotong()]), 'laundry_selesai');
@@ -96,7 +110,7 @@ class LaundryService
     /** Kantong santri yang siap diambil (selesai) — dan yang belum selesai, untuk diberitahukan di layar penyerahan. */
     public function untukDiserahkan(Santri $santri): Collection
     {
-        return Laundry::with('item')->where('id_santri', $santri->id)->whereIn('status', ['diterima', 'diproses', 'selesai'])
+        return Laundry::with('item')->where('id_santri', $santri->id)->whereIn('status', Laundry::BERJALAN)
             ->orderBy('diterima_pada')->get();
     }
 
@@ -107,13 +121,19 @@ class LaundryService
      * @param  list<int>  $ids
      * @param  array<int|string, int|string>  $kembali
      */
-    public function serahkan(Santri $santri, array $ids, array $kembali, ?string $catatan, string $cara, int $idPengguna): int
+    public function serahkan(Santri $santri, array $ids, array $kembali, ?string $catatan, string $cara, int $idPengguna, ?string $izin = null): int
     {
         if ($ids === []) {
             throw new AppException(422, 'Pilih kantong yang diserahkan.');
         }
+        $tahan = (new MonitorLaundryService)->tertahan($santri);
+        $izin = trim((string) $izin);
+        if ($tahan && $izin === '') {
+            throw new AppException(423, "Cucian {$santri->nama} TERTAHAN: tunggakan kelebihan laundry {$tahan->jumlah} periode (Rp "
+                .number_format((float) $tahan->sisa, 0, ',', '.').') sudah lewat jatuh tempo. Lunasi dulu, atau minta izin mendesak dari admin laundry.');
+        }
 
-        return DB::transaction(function () use ($santri, $ids, $kembali, $catatan, $cara, $idPengguna) {
+        return DB::transaction(function () use ($santri, $ids, $kembali, $catatan, $cara, $idPengguna, $tahan, $izin) {
             $kantong = Laundry::with('item')->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
             foreach ($kantong as $l) {
                 if ((int) $l->id_santri !== (int) $santri->id) {
@@ -145,6 +165,11 @@ class LaundryService
             if ($adaKurang && trim((string) $catatan) === '') {
                 throw new AppException(422, 'Ada pakaian yang kurang — tulis catatan (mis. dicari dulu / diganti / sudah dikonfirmasi santri).');
             }
+            if ($tahan) {
+                \App\Support\Audit\Jejak::catat('izin_laundry_tertahan', ['modul' => 'laundry-izin', 'ref_jenis' => 'Santri', 'ref_id' => $santri->id,
+                    'id_pengguna' => $idPengguna, 'detail' => ['santri' => $santri->nama, 'kantong' => $kantong->pluck('nomor')->all(), 'alasan' => $izin,
+                        'tunggakan_periode' => $tahan->periode, 'tunggakan_rp' => (string) $tahan->sisa]]);
+            }
             foreach ($kantong as $l) {
                 $l->setRelation('santri', $santri->loadMissing('wali'));
                 $kurang = $l->item->filter(fn ($it) => $it->kurang() > 0)->map(fn ($it) => "{$it->nama_pakaian} {$it->kurang()}")->join(', ');
@@ -165,8 +190,8 @@ class LaundryService
         }
         DB::transaction(function () use ($l, $alasan, $idPengguna) {
             $kini = Laundry::whereKey($l->id)->lockForUpdate()->first();
-            if ($kini->status !== 'diterima') {
-                throw new AppException(422, 'Hanya kantong yang masih berstatus Diterima yang bisa dibatalkan.');
+            if (! in_array($kini->status, ['diterima', 'diperiksa'], true)) {
+                throw new AppException(422, 'Hanya kantong yang belum dicuci (Diterima / Diperiksa) yang bisa dibatalkan.');
             }
             $this->assertBelumDitagih($kini);
             $kini->update(['status' => 'dibatalkan', 'dibatalkan_pada' => now(), 'dibatalkan_oleh' => $idPengguna, 'alasan_batal' => trim($alasan)]);
@@ -222,26 +247,90 @@ class LaundryService
     }
 
     /** Koreksi salah timbang — selama bulannya belum ditagih. Tercatat di jejak audit (lama → baru + alasan). */
-    public function koreksiBerat(Laundry $l, string $berat, string $alasan, int $idPengguna): void
+    /**
+     * MEJA PEMERIKSAAN (paket 1, 3 Nov 2026): timbang ulang + daftar pakaian (wajib) → `diperiksa`. Berat ulang inilah
+     * yang dihitung kuota; berat penerimaan tetap di `berat_terima`. Kabar kuota dihitung ulang dari berat baru.
+     *
+     * @param  list<array{id_jenis_pakaian:int|string, jumlah:int|string}>  $item
+     */
+    public function periksa(Laundry $l, string $berat, array $item, ?string $catatan, int $idPengguna): Laundry
     {
-        $baru = round((float) $berat, 2);
-        if ($baru <= 0 || $baru > self::BERAT_MAKS) {
-            throw new AppException(422, 'Berat harus lebih dari 0 dan paling banyak '.self::BERAT_MAKS.' kg.');
-        }
-        if (trim($alasan) === '') {
-            throw new AppException(422, 'Tulis alasan koreksi berat.');
-        }
-        DB::transaction(function () use ($l, $baru, $alasan, $idPengguna) {
-            $kini = Laundry::whereKey($l->id)->lockForUpdate()->first();
-            if ($kini->status === 'dibatalkan') {
-                throw new AppException(422, 'Kantong yang dibatalkan tak bisa dikoreksi.');
+        $baru = $this->beratSah($berat);
+        $baris = $this->rapikanItem($item);
+        $kuota = new TagihanLaundryService;
+
+        return DB::transaction(function () use ($l, $baru, $baris, $catatan, $idPengguna, $kuota) {
+            $kini = Laundry::with('santri.wali')->whereKey($l->id)->lockForUpdate()->firstOrFail();
+            if ($kini->status !== 'diterima') {
+                throw new AppException(422, "{$kini->nomor} berstatus \"{$kini->labelStatus()}\" — hanya kantong yang baru Diterima yang diperiksa.");
             }
-            $this->assertBelumDitagih($kini);
-            $lama = (string) $kini->berat;
-            $kini->update(['berat' => $baru]);
-            \App\Support\Audit\Jejak::catat('koreksi_berat_laundry', ['modul' => 'laundry', 'ref_jenis' => 'Laundry', 'ref_id' => $kini->id,
-                'id_pengguna' => $idPengguna, 'detail' => ['nomor' => $kini->nomor, 'lama' => $lama, 'baru' => (string) $baru, 'alasan' => trim($alasan)]]);
+            if (round((float) $kini->berat, 2) !== $baru) {
+                $this->assertBelumDitagih($kini);
+            }
+            $sebelum = $kuota->ringkas($kini->santri);
+            $kini->item()->delete();
+            foreach ($baris as $b) {
+                $kini->item()->create($b);
+            }
+            $tambahan = trim((string) $catatan);
+            $kini->update(['berat' => $baru, 'status' => 'diperiksa', 'diperiksa_pada' => now(), 'diperiksa_oleh' => $idPengguna,
+                'catatan' => $tambahan === '' ? $kini->catatan : trim(($kini->catatan ? $kini->catatan."\n" : '').$tambahan)]);
+            $this->kabariKuota($kini->santri, $sebelum, $kuota->ringkas($kini->santri));
+
+            return $kini->load('item');
         });
+    }
+
+    /**
+     * UBAH DATA (paket 1): berat, daftar pakaian, catatan — sampai kantong diserahkan. Alasan wajib; isi lama & baru
+     * dicatat di jejak audit. Berat terkunci bila kelebihan bulan itu sudah ditagih. Daftar pakaian wajib sejak diperiksa.
+     *
+     * @param  list<array{id_jenis_pakaian:int|string, jumlah:int|string}>  $item
+     */
+    public function ubah(Laundry $l, string $berat, array $item, ?string $catatan, string $alasan, int $idPengguna): void
+    {
+        $baru = $this->beratSah($berat);
+        if (trim($alasan) === '') {
+            throw new AppException(422, 'Tulis alasan perubahan data.');
+        }
+
+        DB::transaction(function () use ($l, $baru, $item, $catatan, $alasan, $idPengguna) {
+            $kini = Laundry::with('item')->whereKey($l->id)->lockForUpdate()->firstOrFail();
+            if (! in_array($kini->status, Laundry::BERJALAN, true)) {
+                throw new AppException(422, "{$kini->nomor} sudah {$kini->labelStatus()} — datanya tak bisa diubah lagi.");
+            }
+            $baris = $this->rapikanItem($item, wajib: $kini->status !== 'diterima');
+            $daftar = fn ($rows) => collect($rows)->map(fn ($b) => "{$b['nama_pakaian']} {$b['jumlah']}")->implode(', ');
+            $lama = ['berat' => (string) $kini->berat, 'pakaian' => $daftar($kini->item->map->only(['nama_pakaian', 'jumlah'])), 'catatan' => (string) $kini->catatan];
+            $sesudah = ['berat' => number_format($baru, 2, '.', ''), 'pakaian' => $daftar($baris), 'catatan' => trim((string) $catatan)];
+            $berubah = array_keys(array_filter($sesudah, fn ($v, $k) => $v !== $lama[$k], ARRAY_FILTER_USE_BOTH));
+            if ($berubah === []) {
+                throw new AppException(422, 'Tidak ada data yang berubah.');
+            }
+            if (in_array('berat', $berubah, true)) {
+                $this->assertBelumDitagih($kini);
+            }
+            if (in_array('pakaian', $berubah, true)) {
+                $kini->item()->delete();
+                foreach ($baris as $b) {
+                    $kini->item()->create($b);
+                }
+            }
+            $kini->update(['berat' => $baru, 'catatan' => $sesudah['catatan'] ?: null]);
+            \App\Support\Audit\Jejak::catat('ubah_laundry', ['modul' => 'laundry', 'ref_jenis' => 'Laundry', 'ref_id' => $kini->id,
+                'id_pengguna' => $idPengguna, 'detail' => ['nomor' => $kini->nomor, 'alasan' => trim($alasan)]
+                    + collect($berubah)->mapWithKeys(fn ($k) => [$k => ['lama' => $lama[$k], 'baru' => $sesudah[$k]]])->all()]);
+        });
+    }
+
+    private function beratSah(string $berat): float
+    {
+        $b = round((float) $berat, 2);
+        if ($b <= 0 || $b > self::BERAT_MAKS) {
+            throw new AppException(422, 'Berat harus lebih dari 0 dan paling banyak '.self::BERAT_MAKS.' kg — periksa lagi timbangannya.');
+        }
+
+        return $b;
     }
 
     /** Bulan yang kelebihannya sudah DITAGIH terkunci: angkanya sudah jadi tagihan wali. */
@@ -257,7 +346,7 @@ class LaundryService
      *
      * @return list<array{id_jenis_pakaian:int, nama_pakaian:string, jumlah:int}>
      */
-    private function rapikanItem(array $item): array
+    private function rapikanItem(array $item, bool $wajib = true): array
     {
         $gabung = [];
         foreach ($item as $b) {
@@ -272,6 +361,9 @@ class LaundryService
             $gabung[$id] = ($gabung[$id] ?? 0) + $n;
         }
         if ($gabung === []) {
+            if (! $wajib) {
+                return [];
+            }
             throw new AppException(422, 'Daftar pakaian wajib diisi — catat jenis dan jumlah tiap pakaian.');
         }
         $jenis = JenisPakaianLaundry::whereIn('id', array_keys($gabung))->where('aktif', true)->pluck('nama', 'id');

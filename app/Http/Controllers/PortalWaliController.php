@@ -233,11 +233,16 @@ class PortalWaliController extends Controller
         $wali = SesiWali::wali();
         $peran = SesiWali::peran($request);
 
+        $kuotaLaundry = $monitorLaundry = null;
         $anak = Santri::with(['jenjang:kode,nama', 'kelas:id,nama', 'tagihan' => fn ($q) => $q->where('perilaku', 'registrasi')
             ->whereNotIn('status', ['batal', 'dihapus'])])
             ->where('id_wali', $wali->id)->orderBy('nama')->get()
-            ->map(function (Santri $s) {
+            ->map(function (Santri $s) use (&$kuotaLaundry, &$monitorLaundry) {
                 $tahap = array_search($s->status, self::TAHAP_PSB, true);
+                // Laundry (paket 3, 3 Nov 2026): penanda over kuota & cucian tertahan — hanya santri aktif.
+                $aktif = $s->status === 'aktif';
+                $kuotaLaundry ??= new \App\Services\Modules\TagihanLaundryService;
+                $monitorLaundry ??= new \App\Services\Modules\MonitorLaundryService;
 
                 return [
                     'id' => $s->id,
@@ -256,6 +261,8 @@ class PortalWaliController extends Controller
                         ? collect((new \App\Services\Modules\DokumenSantriService)->statusBerkas($s))->where('kelompok', 'registrasi')
                             ->whereIn('status', ['belum', 'perlu_diganti'])->count()
                         : 0,
+                    'laundry_over' => $aktif && (float) $kuotaLaundry->ringkas($s)['lebih'] > 0,
+                    'laundry_tahan' => $aktif ? $monitorLaundry->tertahan($s) : null,
                 ];
             });
 

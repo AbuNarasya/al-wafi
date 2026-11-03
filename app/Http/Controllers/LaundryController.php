@@ -33,7 +33,7 @@ class LaundryController extends Controller
         $jk = BagianLaundry::BAGIAN[$bagian]['jk'];
         $cari = trim((string) $request->query('cari', ''));
         $q = Laundry::with(['santri:id,nama,nis,kode_jenjang,id_kelas', 'santri.kelas:id,nama', 'item'])
-            ->whereIn('status', ['diterima', 'diproses', 'selesai'])
+            ->whereIn('status', Laundry::BERJALAN)
             ->whereHas('santri', fn ($s) => $s->where('jenis_kelamin', $jk))
             ->when($cari !== '', fn ($w) => $w->where(fn ($x) => $x->where('nomor', 'ilike', "%{$cari}%")
                 ->orWhereHas('santri', fn ($s) => $s->where('nama', 'ilike', "%{$cari}%")->orWhere('nis', 'ilike', "%{$cari}%"))))
@@ -41,7 +41,7 @@ class LaundryController extends Controller
 
         return view('laundry.index', [
             'cari' => $cari, 'bagian' => $bagian, 'labelBagian' => BagianLaundry::BAGIAN[$bagian]['label'],
-            'kolom' => collect(['diterima', 'diproses', 'selesai'])->mapWithKeys(fn ($s) => [$s => $q->where('status', $s)->values()]),
+            'kolom' => collect(Laundry::BERJALAN)->mapWithKeys(fn ($s) => [$s => $q->where('status', $s)->values()]),
             'diserahkanHariIni' => Laundry::where('status', 'diserahkan')->whereDate('diserahkan_pada', today())
                 ->whereHas('santri', fn ($s) => $s->where('jenis_kelamin', $jk))->count(),
         ]);
@@ -54,8 +54,7 @@ class LaundryController extends Controller
 
         return view('laundry.terima', [
             'santri' => $santri, 'cara' => $cara, 'galat' => $galat, 'hasilCari' => $hasilCari, 'uid' => $request->query('kartu'),
-            'jenis' => JenisPakaianLaundry::where('aktif', true)->orderBy('nama')->get(['id', 'nama']),
-            'berjalan' => $santri ? Laundry::where('id_santri', $santri->id)->whereIn('status', ['diterima', 'diproses', 'selesai'])->orderBy('diterima_pada')->get() : collect(),
+            'berjalan' => $santri ? Laundry::where('id_santri', $santri->id)->whereIn('status', Laundry::BERJALAN)->orderBy('diterima_pada')->get() : collect(),
             // Kuota bulan ini (tahap 2) — perkiraan kelebihan dihitung ulang di layar saat berat diketik.
             'kuota' => $santri ? (new \App\Services\Modules\TagihanLaundryService)->ringkas($santri) : null,
         ]);
@@ -66,19 +65,21 @@ class LaundryController extends Controller
         $d = $request->validate([
             'berat' => ['required', 'numeric', 'gt:0', 'max:'.LaundryService::BERAT_MAKS],
             'catatan' => ['nullable', 'string', 'max:1000'],
-            'item' => ['required', 'array', 'max:60'], 'item.*.id_jenis_pakaian' => ['nullable', 'integer'], 'item.*.jumlah' => ['nullable', 'integer', 'min:0', 'max:200'],
+            'item' => ['nullable', 'array', 'max:60'], 'item.*.id_jenis_pakaian' => ['nullable', 'integer'], 'item.*.jumlah' => ['nullable', 'integer', 'min:0', 'max:200'],
         ]);
         [$santri, $cara, $galat] = $this->kenali($request, 'buat');
         if (! $santri) {
             return redirect()->route('laundry.terima')->with('error', $galat ?? 'Santri tidak dikenali — tap ulang kartunya.');
         }
         try {
-            $l = $this->svc->terima($santri, (string) $d['berat'], $d['item'], $d['catatan'] ?? null, $cara, $request->user()->id_pengguna);
+            $l = $this->svc->terima($santri, (string) $d['berat'], $d['item'] ?? [], $d['catatan'] ?? null, $cara, $request->user()->id_pengguna);
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('laundry.terima')->with('status', "{$l->nomor} — cucian {$santri->nama} ({$l->berat} kg, {$l->jumlahPotong()} potong) diterima. Siap untuk santri berikutnya.");
+        // Label kantong langsung dicetak (layar penerimaan membuka dialog cetak lewat `cetak_label`).
+        return redirect()->route('laundry.terima')->with('status', "{$l->nomor} — cucian {$santri->nama} ({$l->berat} kg) diterima. Tempel labelnya di kantong.")
+            ->with('cetak_label', $l->id);
     }
 
     public function majukan(Request $request): RedirectResponse
@@ -107,19 +108,24 @@ class LaundryController extends Controller
         [$santri, $cara, $galat, $hasilCari] = $this->kenali($request, 'ubah');
 
         return view('laundry.serahkan', ['santri' => $santri, 'cara' => $cara, 'galat' => $galat, 'hasilCari' => $hasilCari,
-            'uid' => $request->query('kartu'), 'kantong' => $santri ? $this->svc->untukDiserahkan($santri) : collect()]);
+            'uid' => $request->query('kartu'), 'kantong' => $santri ? $this->svc->untukDiserahkan($santri) : collect(),
+            // Paket 3: tertahan karena tunggakan kelebihan laundry; izin mendesak hanya bagi pemegang hak laundry-izin.
+            'tertahan' => $santri ? (new \App\Services\Modules\MonitorLaundryService)->tertahan($santri) : null,
+            'bolehIzin' => \App\Support\Akses::boleh('laundry-izin', 'ubah')]);
     }
 
     public function simpanSerahkan(Request $request): RedirectResponse
     {
         $d = $request->validate(['id' => ['required', 'array', 'min:1'], 'id.*' => ['integer'], 'kembali' => ['nullable', 'array'],
-            'kembali.*' => ['integer', 'min:0'], 'catatan_serah' => ['nullable', 'string', 'max:1000']], ['id.required' => 'Pilih kantong yang diserahkan.']);
+            'kembali.*' => ['integer', 'min:0'], 'catatan_serah' => ['nullable', 'string', 'max:1000'], 'izin' => ['nullable', 'string', 'max:500']],
+            ['id.required' => 'Pilih kantong yang diserahkan.']);
+        abort_if(filled($d['izin'] ?? null) && ! \App\Support\Akses::boleh('laundry-izin', 'ubah'), 403, 'Izin mengambil cucian tertahan hanya untuk pemegang hak Laundry — Izin.');
         [$santri, $cara, $galat] = $this->kenali($request, 'ubah');
         if (! $santri) {
             return redirect()->route('laundry.serahkan')->with('error', $galat ?? 'Santri tidak dikenali — tap ulang kartunya.');
         }
         try {
-            $n = $this->svc->serahkan($santri, array_map('intval', $d['id']), $d['kembali'] ?? [], $d['catatan_serah'] ?? null, $cara, $request->user()->id_pengguna);
+            $n = $this->svc->serahkan($santri, array_map('intval', $d['id']), $d['kembali'] ?? [], $d['catatan_serah'] ?? null, $cara, $request->user()->id_pengguna, $d['izin'] ?? null);
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
@@ -142,7 +148,7 @@ class LaundryController extends Controller
         $this->pastikanBagian($laundry, 'lihat');
         $laundry->load(['santri.kelas', 'santri.jenjang', 'item']);
 
-        return view('laundry.show', ['l' => $laundry,
+        return view('laundry.show', ['l' => $laundry, 'jenis' => $this->jenisAktif(),
             'terkunci' => (new \App\Services\Modules\TagihanLaundryService)->terkunci($laundry->id_santri, $laundry->diterima_pada->format('Y-m')),
             'petugas' => \App\Models\User::whereIn('id_pengguna', array_filter(array_map(fn ($s) => $laundry->{"{$s}_oleh"}, [...array_keys(Laundry::LANGKAH), 'dibatalkan'])))
                 ->pluck('nama', 'id_pengguna')]);
@@ -161,17 +167,86 @@ class LaundryController extends Controller
         return back()->with('status', "{$laundry->nomor} dibatalkan.");
     }
 
-    public function koreksiBerat(Request $request, Laundry $laundry): RedirectResponse
+    /** Ubah data kantong (paket 1): berat, daftar pakaian, catatan — alasan wajib, tercatat di jejak audit. */
+    public function ubah(Request $request, Laundry $laundry): RedirectResponse
     {
         $this->pastikanBagian($laundry, 'ubah');
-        $d = $request->validate(['berat' => ['required', 'numeric', 'gt:0', 'max:'.LaundryService::BERAT_MAKS], 'alasan' => ['required', 'string', 'max:500']]);
+        $d = $request->validate([
+            'berat' => ['required', 'numeric', 'gt:0', 'max:'.LaundryService::BERAT_MAKS],
+            'catatan' => ['nullable', 'string', 'max:1000'], 'alasan' => ['required', 'string', 'max:500'],
+            'item' => ['nullable', 'array', 'max:60'], 'item.*.id_jenis_pakaian' => ['nullable', 'integer'], 'item.*.jumlah' => ['nullable', 'integer', 'min:0', 'max:200'],
+        ], ['alasan.required' => 'Tulis alasan perubahan data.']);
         try {
-            $this->svc->koreksiBerat($laundry, (string) $d['berat'], $d['alasan'], $request->user()->id_pengguna);
+            $this->svc->ubah($laundry, (string) $d['berat'], $d['item'] ?? [], $d['catatan'] ?? null, $d['alasan'], $request->user()->id_pengguna);
         } catch (AppException $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return back()->with('status', 'Berat dikoreksi.');
+        return back()->with('status', "Data {$laundry->nomor} diubah.");
+    }
+
+    // ---- Meja pemeriksaan (paket 1, 3 Nov 2026) ----
+
+    /** Pindai label / ketik nomor kantong → formulir pemeriksaannya; di bawahnya antrean yang belum diperiksa. */
+    public function pemeriksaan(Request $request): View|RedirectResponse
+    {
+        $nomor = strtoupper(trim((string) $request->query('nomor', '')));
+        if ($nomor !== '') {
+            $l = Laundry::with('santri')->where('nomor', $nomor)->first();
+            if (! $l || ! in_array(BagianLaundry::dariJk($l->santri?->jenis_kelamin), BagianLaundry::boleh('ubah'), true)) {
+                return redirect()->route('laundry.pemeriksaan')->with('error', "Kantong {$nomor} tidak ditemukan di bagian laundry Anda.");
+            }
+
+            return redirect()->route('laundry.periksa', $l->id);
+        }
+
+        return view('laundry.pemeriksaan', [
+            'antrean' => Laundry::with(['santri:id,nama,nis,id_kelas', 'santri.kelas:id,nama'])->where('status', 'diterima')
+                ->whereHas('santri', fn ($s) => $s->whereIn('jenis_kelamin', BagianLaundry::jkBoleh('ubah')))
+                ->orderBy('diterima_pada')->get(),
+        ]);
+    }
+
+    public function formPeriksa(Laundry $laundry): View|RedirectResponse
+    {
+        $this->pastikanBagian($laundry, 'ubah');
+        if ($laundry->status !== 'diterima') {
+            return redirect()->route('laundry.show', $laundry->id)->with('error', "{$laundry->nomor} sudah {$laundry->labelStatus()}.");
+        }
+        $laundry->load(['santri.kelas', 'santri.jenjang', 'item']);
+
+        return view('laundry.periksa', ['l' => $laundry, 'jenis' => $this->jenisAktif(),
+            'kuota' => (new \App\Services\Modules\TagihanLaundryService)->ringkas($laundry->santri)]);
+    }
+
+    public function simpanPeriksa(Request $request, Laundry $laundry): RedirectResponse
+    {
+        $this->pastikanBagian($laundry, 'ubah');
+        $d = $request->validate([
+            'berat' => ['required', 'numeric', 'gt:0', 'max:'.LaundryService::BERAT_MAKS], 'catatan' => ['nullable', 'string', 'max:1000'],
+            'item' => ['required', 'array', 'max:60'], 'item.*.id_jenis_pakaian' => ['nullable', 'integer'], 'item.*.jumlah' => ['nullable', 'integer', 'min:0', 'max:200'],
+        ]);
+        try {
+            $l = $this->svc->periksa($laundry, (string) $d['berat'], $d['item'], $d['catatan'] ?? null, $request->user()->id_pengguna);
+        } catch (AppException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('laundry.pemeriksaan')->with('status', "{$l->nomor} diperiksa — {$l->berat} kg, {$l->jumlahPotong()} potong. Pindai kantong berikutnya.");
+    }
+
+    /** Label kantong 58 mm: nomor, nama, kelas, QR nomor. `?cetak=1` langsung membuka dialog cetak. */
+    public function label(Laundry $laundry): View
+    {
+        $this->pastikanBagian($laundry, 'lihat');
+
+        return view('laundry.label', ['l' => $laundry->load(['santri.kelas', 'santri.jenjang'])]);
+    }
+
+    /** @return \Illuminate\Support\Collection<int,JenisPakaianLaundry> */
+    private function jenisAktif()
+    {
+        return JenisPakaianLaundry::where('aktif', true)->orderBy('nama')->get(['id', 'nama']);
     }
 
     public function riwayat(Request $request): View

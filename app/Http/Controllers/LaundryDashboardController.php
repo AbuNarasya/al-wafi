@@ -66,10 +66,10 @@ class LaundryDashboardController extends Controller
             $perSantri = DB::table('laundry as l')->join('santri as s', 's.id', '=', 'l.id_santri')
                 ->where('l.status', '!=', 'dibatalkan')->whereBetween('l.diterima_pada', [$awal, $akhir])->whereIn('s.jenis_kelamin', $jk)
                 ->whereIn(DB::raw("to_char(l.diterima_pada, 'YYYY-MM')"), $tanpaTagihan)
-                ->selectRaw("to_char(l.diterima_pada, 'YYYY-MM') as bln, l.id_santri, s.kode_jenjang, sum(l.berat) as kg")
-                ->groupBy('bln', 'l.id_santri', 's.kode_jenjang')->get();
+                ->selectRaw("to_char(l.diterima_pada, 'YYYY-MM') as bln, l.id_santri, s.kode_jenjang, s.jenis_kelamin, sum(l.berat) as kg")
+                ->groupBy('bln', 'l.id_santri', 's.kode_jenjang', 's.jenis_kelamin')->get();
             foreach ($perSantri as $r) {
-                $lebih = max(0, (float) $r->kg - (float) $svc->kuota($r->kode_jenjang));
+                $lebih = max(0, (float) $r->kg - (float) $svc->kuota($r->kode_jenjang, $r->jenis_kelamin));
                 $perkiraan[$r->bln] ??= ['santri_lebih' => 0, 'kg_lebih' => 0.0, 'ditagih' => null];
                 if ($lebih > 0) {
                     $perkiraan[$r->bln]['santri_lebih']++;

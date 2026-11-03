@@ -19,31 +19,36 @@ use Illuminate\Support\Facades\DB;
  *
  *  • Pemakaian = jumlah berat kantong yang DITERIMA dalam bulan kalender itu (kecuali dibatalkan). Kuota tak punya
  *    saldo yang di-reset: tiap bulan dihitung dari awal, jadi sisa memang tak terbawa dan tak ada tombol reset.
- *  • Kuota = pengaturan jenjang santri, atau kuota bawaan (20 kg).
+ *  • Kuota = MATRIKS jenjang × ikhwan/akhwat (3 Nov 2026); sel kosong = kuota bawaan bagian itu.
  *  • Tanggal 1: draf disusun untuk bulan lalu. Keuangan meninjau (kecualikan / susun ulang). Pada `hari_terbit`
  *    draf terbit otomatis lewat TagihanLainService — jurnal, portal, VA & auto-debet ikut seperti tagihan lain.
  *  • Bulan yang sudah ada tagihannya TERKUNCI: kantong di bulan itu tak bisa dikoreksi beratnya / dibatalkan.
  */
 class TagihanLaundryService
 {
-    /** @return object{tarif_per_kg:?string, kuota_bawaan_kg:string, kode_jenis_bawaan:?string, hari_terbit:int, terbit_otomatis:bool, diubah_oleh:?int} */
+    /** @return object{tarif_per_kg:?string, kuota_ikhwan_kg:string, kuota_akhwat_kg:string, kode_jenis_bawaan:?string, hari_terbit:int, terbit_otomatis:bool, diubah_oleh:?int} */
     public function pengaturan(): object
     {
         return DB::table('pengaturan_laundry')->where('id', 1)->first()
-            ?? (object) ['tarif_per_kg' => null, 'kuota_bawaan_kg' => '20', 'kode_jenis_bawaan' => null, 'hari_terbit' => 5, 'terbit_otomatis' => true, 'diubah_oleh' => null];
+            ?? (object) ['tarif_per_kg' => null, 'kuota_ikhwan_kg' => '20', 'kuota_akhwat_kg' => '20', 'kode_jenis_bawaan' => null, 'hari_terbit' => 5, 'terbit_otomatis' => true, 'diubah_oleh' => null, 'tahan_setelah_periode' => 0];
     }
 
-    /** @return Collection<string,object> kode_jenjang → {kuota_kg, kode_jenis} */
+    /** @return Collection<string,object> kode_jenjang → {kuota_ikhwan_kg, kuota_akhwat_kg, kode_jenis} */
     public function pengaturanJenjang(): Collection
     {
         return DB::table('pengaturan_laundry_jenjang')->get()->keyBy('kode_jenjang');
     }
 
-    public function kuota(?string $kodeJenjang): string
+    /**
+     * Kuota satu sel matriks: (jenjang, jenis kelamin santri). Sel kosong → kuota bawaan bagian itu. Jenis kelamin
+     * kosong dianggap ikhwan (santri seperti itu tak bisa menyetor laundry juga — lihat LaundryService::awalanNomor).
+     */
+    public function kuota(?string $kodeJenjang, ?string $jenisKelamin = null): string
     {
+        $kolom = 'kuota_'.(\App\Support\BagianLaundry::dariJk($jenisKelamin) ?? 'ikhwan').'_kg';
         $j = $kodeJenjang ? $this->pengaturanJenjang()->get($kodeJenjang) : null;
 
-        return Money::of($j?->kuota_kg ?? $this->pengaturan()->kuota_bawaan_kg);
+        return Money::of($j?->{$kolom} ?? $this->pengaturan()->{$kolom});
     }
 
     public function jenisUntuk(?string $kodeJenjang): ?string
@@ -77,7 +82,7 @@ class TagihanLaundryService
     public function ringkas(Santri $santri, ?string $periode = null, string|float $tambahan = 0): array
     {
         $periode ??= now()->format('Y-m');
-        $kuota = $this->kuota($santri->kode_jenjang);
+        $kuota = $this->kuota($santri->kode_jenjang, $santri->jenis_kelamin);
         $terpakai = Money::add($this->terpakai($santri->id, $periode), Money::of($tambahan));
         $lebih = Money::gt($terpakai, $kuota) ? Money::sub($terpakai, $kuota) : '0.00';
         $tarif = $this->pengaturan()->tarif_per_kg;
@@ -116,7 +121,7 @@ class TagihanLaundryService
             DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32("tagihan-laundry:{$periode}")]);
             $pakai = Laundry::where('status', '!=', 'dibatalkan')->whereBetween('diterima_pada', [$awal, $akhir])
                 ->selectRaw('id_santri, sum(berat) as kg')->groupBy('id_santri')->pluck('kg', 'id_santri');
-            $santri = Santri::whereIn('id', $pakai->keys())->get(['id', 'kode_jenjang'])->keyBy('id');
+            $santri = Santri::whereIn('id', $pakai->keys())->get(['id', 'kode_jenjang', 'jenis_kelamin'])->keyBy('id');
             $tetap = TagihanLaundry::where('periode', $periode)->whereIn('status', ['terbit', 'dikecualikan'])->pluck('id_santri')->flip();
 
             $draf = 0;
@@ -126,7 +131,7 @@ class TagihanLaundryService
                     continue;
                 }
                 $jenjang = $santri[$id]->kode_jenjang;
-                $kuota = $this->kuota($jenjang);
+                $kuota = $this->kuota($jenjang, $santri[$id]->jenis_kelamin);
                 $kg = Money::of($kg);
                 if (! Money::gt($kg, $kuota)) {
                     continue;

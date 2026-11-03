@@ -16,8 +16,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Laundry tahap 1 (26 Okt 2026): terima (tap kartu / cari manual) → proses → selesai → serahkan (tap kartu +
- * cocokkan pakaian). Daftar pakaian wajib; kurang saat diserahkan wajib bercatatan.
+ * Laundry tahap 1 (26 Okt 2026) + paket 1 (3 Nov 2026): terima (tap kartu / cari manual, TIMBANG SAJA) → pemeriksaan
+ * (timbang ulang + daftar pakaian wajib) → proses → selesai → serahkan (tap kartu + cocokkan pakaian). Kurang saat
+ * diserahkan wajib bercatatan.
  */
 class LaundryTest extends TestCase
 {
@@ -61,21 +62,40 @@ class LaundryTest extends TestCase
     public function test_alur_lengkap_terima_proses_selesai_serahkan(): void
     {
         $this->actingAs($this->petugas)->get(route('laundry.terima', ['kartu' => 'SALAH']))->assertSee('Kartu tidak dikenal');
-        $this->actingAs($this->petugas)->get(route('laundry.terima', ['kartu' => 'KARTU001']))->assertOk()->assertSee('AHMAD FAUZI')->assertSee('Gamis');
+        $this->actingAs($this->petugas)->get(route('laundry.terima', ['kartu' => 'KARTU001']))->assertOk()->assertSee('AHMAD FAUZI');
 
-        // Daftar pakaian wajib.
-        $this->actingAs($this->petugas)->post(route('laundry.simpan_terima'), ['kartu' => 'KARTU001', 'berat' => '2', 'item' => [['id_jenis_pakaian' => '', 'jumlah' => '']]])
-            ->assertSessionHas('error', fn ($m) => str_contains($m, 'wajib'));
-        $this->terima(['kartu' => 'KARTU001'])->assertSessionHas('status');
+        // Penerimaan cukup ditimbang (paket 1) — label kantong langsung dicetak.
+        $this->actingAs($this->petugas)->get(route('laundry.terima', ['kartu' => 'KARTU001']))->assertDontSee('+ pakaian');
+        $this->actingAs($this->petugas)->post(route('laundry.simpan_terima'), ['kartu' => 'KARTU001', 'berat' => '3.4'])
+            ->assertSessionHas('status')->assertSessionHas('cetak_label');
         $l = Laundry::sole();
-        $this->assertSame(['diterima', 'kartu', 4], [$l->status, $l->cara_terima, $l->jumlahPotong()]);
+        $this->assertSame(['diterima', 'kartu', 0, '3.40'], [$l->status, $l->cara_terima, $l->jumlahPotong(), (string) $l->berat_terima]);
+        $this->actingAs($this->petugas)->get(route('laundry.label', $l->id))->assertOk()->assertSee($l->nomor)->assertSee('data-qr="'.$l->nomor.'"', false);
+
+        // Tak bisa dimajukan dari papan sebelum diperiksa.
+        $this->actingAs($this->petugas)->post(route('laundry.majukan'), ['dari' => 'diterima', 'id' => [$l->id]])->assertSessionHasErrors('dari');
+
+        // Meja pemeriksaan: pindai label → formulir; daftar pakaian wajib; berat ulang yang dihitung.
+        $this->actingAs($this->petugas)->get(route('laundry.pemeriksaan', ['nomor' => strtolower($l->nomor)]))->assertRedirect(route('laundry.periksa', $l->id));
+        $this->actingAs($this->petugas)->get(route('laundry.pemeriksaan', ['nomor' => 'LDI-0000-9999']))->assertSessionHas('error');
+        $this->actingAs($this->petugas)->get(route('laundry.periksa', $l->id))->assertOk()->assertSee('<option value="Gamis">', false);
+        $this->actingAs($this->petugas)->post(route('laundry.simpan_periksa', $l->id), ['berat' => '3.1', 'item' => [['id_jenis_pakaian' => '', 'jumlah' => '']]])
+            ->assertSessionHas('error', fn ($m) => str_contains($m, 'wajib'));
+        $this->actingAs($this->petugas)->post(route('laundry.simpan_periksa', $l->id), ['berat' => '3.1', 'catatan' => 'Noda di gamis',
+            'item' => [['id_jenis_pakaian' => $this->gamis, 'jumlah' => 3], ['id_jenis_pakaian' => $this->handuk, 'jumlah' => 1]]])
+            ->assertRedirect(route('laundry.pemeriksaan'));
+        $l->refresh();
+        $this->assertSame(['diperiksa', '3.10', '3.40', 4, 'Noda di gamis'], [$l->status, (string) $l->berat, (string) $l->berat_terima, $l->jumlahPotong(), $l->catatan]);
+        $this->assertSame($this->petugas->id_pengguna, (int) $l->diperiksa_oleh);
+        $this->actingAs($this->petugas)->post(route('laundry.simpan_periksa', $l->id), ['berat' => '3', 'item' => [['id_jenis_pakaian' => $this->gamis, 'jumlah' => 1]]])
+            ->assertSessionHas('error'); // sudah diperiksa
         $this->assertSame($this->petugas->id_pengguna, (int) $l->diterima_oleh);
 
         // Belum Selesai → tak bisa diserahkan.
         $this->actingAs($this->petugas)->get(route('laundry.serahkan', ['kartu' => 'KARTU001']))->assertSee('Tidak ada cucian yang siap diambil');
 
-        $this->actingAs($this->petugas)->post(route('laundry.majukan'), ['dari' => 'diterima', 'id' => [$l->id]])->assertSessionHas('status');
-        $this->actingAs($this->petugas)->post(route('laundry.majukan'), ['dari' => 'diterima', 'id' => [$l->id]])
+        $this->actingAs($this->petugas)->post(route('laundry.majukan'), ['dari' => 'diperiksa', 'id' => [$l->id]])->assertSessionHas('status');
+        $this->actingAs($this->petugas)->post(route('laundry.majukan'), ['dari' => 'diperiksa', 'id' => [$l->id]])
             ->assertSessionHas('status', fn ($m) => str_contains($m, '1 dilewati')); // sudah dimajukan petugas lain
         $this->actingAs($this->petugas)->post(route('laundry.majukan'), ['dari' => 'diproses', 'id' => [$l->id]]);
         $this->assertSame('selesai', $l->refresh()->status);
@@ -171,7 +191,38 @@ class LaundryTest extends TestCase
         $this->actingAs($this->petugas)->get(route('laundry.papan', 'ikhwan'))->assertDontSee('SITI AISYAH');
         $this->actingAs($this->petugas)->get(route('laundry.riwayat'))->assertDontSee('SITI AISYAH');
         $this->actingAs($this->petugas)->get(route('laundry.show', $l->id))->assertForbidden();
-        $this->actingAs($this->petugas)->post(route('laundry.majukan'), ['dari' => 'diterima', 'id' => [$l->id]])->assertSessionHas('error');
+        $this->actingAs($this->petugas)->get(route('laundry.periksa', $l->id))->assertForbidden();
+        $this->actingAs($this->petugas)->get(route('laundry.pemeriksaan', ['nomor' => $l->nomor]))->assertSessionHas('error');
+        $this->actingAs($this->petugas)->post(route('laundry.simpan_periksa', $l->id), ['berat' => '2', 'item' => [['id_jenis_pakaian' => $this->gamis, 'jumlah' => 2]]])->assertForbidden();
         $this->assertSame('diterima', $l->fresh()->status);
+    }
+
+    /** Paket 1 (3 Nov 2026): ubah data salah input — alasan wajib, jejak audit; batal sampai diperiksa. */
+    public function test_ubah_data_dengan_alasan_dan_batal_sampai_diperiksa(): void
+    {
+        $this->terima(['kartu' => 'KARTU001']);
+        $l = Laundry::sole();
+        (new \App\Services\Modules\LaundryService)->periksa($l, '3.4', [['id_jenis_pakaian' => $this->gamis, 'jumlah' => 3]], null, $this->petugas->id_pengguna);
+        $this->actingAs($this->petugas)->get(route('laundry.show', $l->id))->assertOk()->assertSee('Ubah data')->assertSee('Cetak label kantong');
+
+        $isi = ['berat' => '2.8', 'catatan' => 'Salah timbang', 'item' => [['id_jenis_pakaian' => $this->gamis, 'jumlah' => 2], ['id_jenis_pakaian' => $this->handuk, 'jumlah' => 1]]];
+        $this->actingAs($this->petugas)->put(route('laundry.ubah', $l->id), $isi)->assertSessionHasErrors('alasan');
+        $this->actingAs($this->petugas)->put(route('laundry.ubah', $l->id), ['item' => []] + $isi + ['alasan' => 'x'])
+            ->assertSessionHas('error', fn ($m) => str_contains($m, 'wajib')); // sudah diperiksa → pakaian wajib
+        $this->actingAs($this->petugas)->put(route('laundry.ubah', $l->id), $isi + ['alasan' => 'Salah input petugas'])->assertSessionHas('status');
+        $l->refresh();
+        $this->assertSame(['2.80', 3, 'Salah timbang'], [(string) $l->berat, $l->jumlahPotong(), $l->catatan]);
+        $jejak = \Illuminate\Support\Facades\DB::table('activity_log')->where('aksi', 'ubah_laundry')->sole();
+        $this->assertStringContainsString('Salah input petugas', $jejak->detail);
+        $this->assertStringContainsString('Gamis 3', $jejak->detail);
+        $this->actingAs($this->petugas)->put(route('laundry.ubah', $l->id), $isi + ['alasan' => 'lagi'])
+            ->assertSessionHas('error', fn ($m) => str_contains($m, 'Tidak ada data yang berubah'));
+
+        // Batal masih boleh saat Diperiksa; sesudah dicuci tidak.
+        $l->update(['status' => 'diproses']);
+        $this->actingAs($this->petugas)->post(route('laundry.batal', $l->id), ['alasan' => 'x'])->assertSessionHas('error');
+        $l->update(['status' => 'diperiksa']);
+        $this->actingAs($this->petugas)->post(route('laundry.batal', $l->id), ['alasan' => 'Salah santri'])->assertSessionHas('status');
+        $this->actingAs($this->petugas)->put(route('laundry.ubah', $l->id), $isi + ['alasan' => 'x'])->assertSessionHas('error');
     }
 }

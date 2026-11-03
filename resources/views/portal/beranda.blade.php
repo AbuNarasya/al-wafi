@@ -120,6 +120,19 @@
                             </a>
                         @endif
                     @endif
+
+                    {{-- Laundry (paket 3, 3 Nov 2026): cucian tertahan lebih penting dari over kuota. --}}
+                    @if ($a['laundry_tahan'])
+                        <a href="{{ route('portal.laundry', ['anak' => $a['id']]) }}" class="mt-3 flex items-center justify-between rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-900 ring-1 ring-red-200">
+                            <span><b>{{ __('Cucian bersih tertahan') }}</b> · {{ __('tunggakan laundry :periode periode', ['periode' => $a['laundry_tahan']->jumlah]) }}</span>
+                            <span class="font-semibold">{{ __('Lihat') }} <span class="inline-block rtl:-scale-x-100">&rarr;</span></span>
+                        </a>
+                    @elseif ($a['laundry_over'])
+                        <a href="{{ route('portal.laundry', ['anak' => $a['id']]) }}" class="mt-3 flex items-center justify-between rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                            <span><b>{{ __('Over kuota') }}</b> · {{ __('laundry bulan ini melebihi kuota') }}</span>
+                            <span class="font-semibold">{{ __('Lihat') }} <span class="inline-block rtl:-scale-x-100">&rarr;</span></span>
+                        </a>
+                    @endif
                 </div>
             @empty
                 <div class="rounded-3xl bg-white p-6 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">{{ __('Belum ada anak yang terdaftar.') }}</div>

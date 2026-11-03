@@ -53,6 +53,13 @@ class PortalLaundryTest extends TestCase
         return $this->svc->terima($s, $kg, [['id_jenis_pakaian' => JenisPakaianLaundry::where('nama', 'Gamis')->value('id'), 'jumlah' => $potong]], null, 'kartu', $this->petugas);
     }
 
+    /** Meja pemeriksaan (paket 1): timbang ulang dengan berat & pakaian yang sama, lalu masuk proses cuci. */
+    private function periksa(Laundry $l): void
+    {
+        $this->svc->periksa($l, (string) $l->berat, $l->item->map(fn ($it) => ['id_jenis_pakaian' => $it->id_jenis_pakaian, 'jumlah' => $it->jumlah])->all(), null, $this->petugas);
+        $this->svc->majukan([$l->id], 'diperiksa', $this->petugas);
+    }
+
     private function masuk(): void
     {
         $this->post(route('portal.masuk.sandi'), ['email' => 'i@contoh.id', 'sandi' => 'sandiUji12345']);
@@ -70,7 +77,8 @@ class PortalLaundryTest extends TestCase
         $this->assertStringContainsString('terlampaui', $kuota[1]);
         $this->assertSame('laundry', NotifikasiWali::where('jenis', 'laundry_kuota')->value('kategori'));
 
-        $this->svc->majukan([$a->id, $b->id], 'diterima', $this->petugas);
+        $this->periksa($a);
+        $this->periksa($b);
         $this->svc->majukan([$a->id, $b->id], 'diproses', $this->petugas);
         $this->assertSame(2, NotifikasiWali::where('jenis', 'laundry_selesai')->count());
 
@@ -84,13 +92,13 @@ class PortalLaundryTest extends TestCase
     public function test_halaman_laundry_portal_per_anak_dan_tiga_bahasa(): void
     {
         $a = $this->setor($this->ahmad, '22');
-        $this->svc->majukan([$a->id], 'diterima', $this->petugas);
+        $this->periksa($a);
         $this->svc->majukan([$a->id], 'diproses', $this->petugas);
         $this->setor($this->lain, '5');
 
         $this->masuk();
         $this->get(route('portal.laundry'))->assertOk()
-            ->assertSee('AHMAD')->assertSee('Siap diambil')->assertSee('Melebihi kuota 2,0 kg')->assertSee('14.000')
+            ->assertSee('AHMAD')->assertSee('Siap diambil')->assertSee('Melebihi kuota 2,0 kg')->assertSee('Over kuota')->assertSee('Sudah diperiksa')->assertSee('14.000')
             ->assertDontSee('ORANG LAIN');
         // Anak keluarga lain lewat ?anak= tak bisa diintip — jatuh ke anak sendiri.
         $this->get(route('portal.laundry', ['anak' => $this->lain->id]))->assertOk()->assertSee('AHMAD')->assertDontSee('ORANG LAIN');
@@ -107,7 +115,7 @@ class PortalLaundryTest extends TestCase
     public function test_riwayat_memperlihatkan_perjalanan_tiap_langkah(): void
     {
         $a = $this->setor($this->ahmad, '5');
-        $this->svc->majukan([$a->id], 'diterima', $this->petugas);
+        $this->periksa($a);
         $this->svc->majukan([$a->id], 'diproses', $this->petugas);
         $this->svc->serahkan($this->ahmad, [$a->id], [$a->item()->first()->id => 4], null, 'kartu', $this->petugas);
 

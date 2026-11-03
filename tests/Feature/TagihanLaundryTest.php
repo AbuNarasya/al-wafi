@@ -62,7 +62,7 @@ class TagihanLaundryTest extends TestCase
         TipeBiaya::firstOrCreate(['kode' => 'lain'], ['nama' => 'Lain-lain', 'perilaku' => 'lain', 'urutan' => 4, 'bawaan' => true, 'status' => 'aktif']);
         $this->buatBiaya(['kode' => 'LDR', 'nama' => 'Laundry', 'tipe' => 'lain', 'kode_coa_pendapatan' => '4.ZZLD.1', 'kode_coa_piutang' => '1.ZZLD.1', 'kode_unit' => 'ZZLD']);
         DB::table('pengaturan_laundry')->where('id', 1)->update(['tarif_per_kg' => 7000, 'kode_jenis_bawaan' => 'LDR', 'diubah_oleh' => $this->keu->id_pengguna]);
-        DB::table('pengaturan_laundry_jenjang')->insert(['kode_jenjang' => 'J003', 'kuota_kg' => 15]); // SMA: 15 kg
+        DB::table('pengaturan_laundry_jenjang')->insert(['kode_jenjang' => 'J003', 'kuota_ikhwan_kg' => 15]); // SMA ikhwan: 15 kg
 
         $w = Wali::create(['kontak_utama' => 'ibu', 'nama_ibu' => 'Ibu', 'telepon_ibu' => '0811', 'nama' => 'Ibu', 'telepon' => '0811', 'status' => 'aktif']);
         $buat = fn ($nis, $nama, $j) => Santri::create(['no_pendaftaran' => "L-{$nis}", 'nis' => $nis, 'id_wali' => $w->id, 'nama' => $nama,
@@ -91,6 +91,12 @@ class TagihanLaundryTest extends TestCase
         $r = $svc->ringkas($this->smp, null, 5);   // timbangan berikutnya 5 kg
         $this->assertSame(['3.00', '21000.00'], [$r['lebih'], $r['perkiraan']]);
         $this->assertSame('15.00', $svc->ringkas($this->sma)['kuota']);
+        // Matriks (3 Nov 2026): sel akhwat SMA kosong → bawaan akhwat; bawaan akhwat boleh beda dari ikhwan.
+        DB::table('pengaturan_laundry')->where('id', 1)->update(['kuota_akhwat_kg' => 25]);
+        $this->assertSame(['25.00', '15.00', '20.00'], [$svc->kuota('J003', 'P'), $svc->kuota('J003', 'L'), $svc->kuota('J002', 'L')]);
+        $this->sma->update(['jenis_kelamin' => 'P']);
+        $this->assertSame('25.00', $svc->ringkas($this->sma->fresh())['kuota']);
+        $this->sma->update(['jenis_kelamin' => 'L']);
 
         // Bulan berikutnya mulai dari nol — sisa kuota tak terbawa.
         Carbon::setTestNow('2026-11-02 08:00:00');
@@ -136,21 +142,22 @@ class TagihanLaundryTest extends TestCase
         $this->assertSame([$this->smp->id], TagihanSantri::pluck('id_santri')->all(), 'yang dikecualikan tak ditagih');
 
         try {
-            (new LaundryService)->koreksiBerat($a, '20', 'salah timbang', $this->keu->id_pengguna);
+            (new LaundryService)->ubah($a, '20', [['id_jenis_pakaian' => JenisPakaianLaundry::value('id'), 'jumlah' => 5]], null, 'salah timbang', $this->keu->id_pengguna);
             $this->fail('bulan yang sudah ditagih harus terkunci');
         } catch (AppException $e) {
             $this->assertStringContainsString('terkunci', $e->getMessage());
         }
-        $this->actingAs($this->keu)->get(route('laundry.show', $a->id))->assertSee('kantong terkunci');
+        $this->actingAs($this->keu)->get(route('laundry.show', $a->id))->assertSee('berat</b> terkunci', false);
     }
 
     public function test_koreksi_berat_sebelum_ditagih_masuk_hitungan_draf(): void
     {
         $a = $this->setor($this->smp, '25');
-        $this->actingAs($this->keu)->post(route('laundry.koreksi_berat', $a->id), ['berat' => '2.5', 'alasan' => 'Salah ketik'])->assertSessionHas('status');
+        $this->actingAs($this->keu)->put(route('laundry.ubah', $a->id), ['berat' => '2.5', 'alasan' => 'Salah ketik',
+            'item' => [['id_jenis_pakaian' => JenisPakaianLaundry::value('id'), 'jumlah' => 5]]])->assertSessionHas('status');
         Carbon::setTestNow('2026-11-02 09:00:00');
         $this->assertSame(0, (new TagihanLaundryService)->susunDraf('2026-10')['draf']);
-        $this->assertTrue(DB::table('activity_log')->where('aksi', 'koreksi_berat_laundry')->exists());
+        $this->assertTrue(DB::table('activity_log')->where('aksi', 'ubah_laundry')->exists());
     }
 
     public function test_bulan_berjalan_tak_bisa_ditagih_dan_layar_kuota_pengaturan(): void
@@ -161,11 +168,13 @@ class TagihanLaundryTest extends TestCase
         $this->actingAs($this->keu)->get(route('laundry.tagihan', ['periode' => '2026-10']))->assertOk()
             ->assertSee('perkiraan')->assertSee('melebihi kuota')->assertSee('AHMAD');
 
-        $this->actingAs($this->keu)->put(route('laundry.pengaturan.simpan'), ['tarif_per_kg' => '8000', 'kuota_bawaan_kg' => '18', 'kode_jenis_bawaan' => 'LDR',
-            'hari_terbit' => 3, 'terbit_otomatis' => '1', 'jenjang' => ['J003' => ['kuota_kg' => '', 'kode_jenis' => '']]])->assertSessionHas('status');
+        $this->actingAs($this->keu)->put(route('laundry.pengaturan.simpan'), ['tarif_per_kg' => '8000', 'kuota_ikhwan_kg' => '18', 'kuota_akhwat_kg' => '25', 'kode_jenis_bawaan' => 'LDR',
+            'hari_terbit' => 3, 'terbit_otomatis' => '1', 'jenjang' => ['J003' => ['kuota_ikhwan_kg' => '', 'kuota_akhwat_kg' => '22', 'kode_jenis' => '']]])->assertSessionHas('status');
         $p = (new TagihanLaundryService)->pengaturan();
-        $this->assertSame(['8000.00', '18.00', 3], [(string) $p->tarif_per_kg, (string) $p->kuota_bawaan_kg, (int) $p->hari_terbit]);
-        $this->assertSame('18.00', (new TagihanLaundryService)->kuota('J003'), 'override SMA dikosongkan → ikut bawaan');
+        $this->assertSame(['8000.00', '18.00', '25.00', 3], [(string) $p->tarif_per_kg, (string) $p->kuota_ikhwan_kg, (string) $p->kuota_akhwat_kg, (int) $p->hari_terbit]);
+        $this->assertSame('18.00', (new TagihanLaundryService)->kuota('J003', 'L'), 'sel ikhwan SMA dikosongkan → ikut bawaan ikhwan');
+        $this->assertSame('22.00', (new TagihanLaundryService)->kuota('J003', 'P'));
+        $this->actingAs($this->keu)->get(route('laundry.pengaturan'))->assertOk()->assertSee('name="jenjang[J003][kuota_akhwat_kg]"', false);
         $this->actingAs($this->keu)->get(route('laundry.terima', ['santri' => $this->smp->id]))->assertSee('Kuota Oktober');
     }
 
@@ -175,7 +184,8 @@ class TagihanLaundryTest extends TestCase
         $this->setor($this->smp, '11.5');   // Oktober: Ahmad 23,5 kg → lebih 3,5 kg = Rp 24.500
         $this->setor($this->sma, '14');
         $svc = new LaundryService;
-        $svc->majukan([$a->id], 'diterima', $this->keu->id_pengguna);
+        $svc->periksa($a, (string) $a->berat, [['id_jenis_pakaian' => JenisPakaianLaundry::value('id'), 'jumlah' => 5]], null, $this->keu->id_pengguna);
+        $svc->majukan([$a->id], 'diperiksa', $this->keu->id_pengguna);
         $svc->majukan([$a->id], 'diproses', $this->keu->id_pengguna);
         $svc->serahkan($this->smp, [$a->id], [], null, 'kartu', $this->keu->id_pengguna);
         Carbon::setTestNow('2026-11-05 01:15:00');
@@ -192,6 +202,96 @@ class TagihanLaundryTest extends TestCase
         // Bagian akhwat: santri uji semuanya ikhwan → kosong.
         $this->actingAs($this->keu)->get(route('laundry.dashboard', ['sampai' => '2026-10', 'bagian' => 'akhwat']))->assertOk()
             ->assertDontSee('AHMAD')->assertSee('0,0 kg');
+    }
+
+    /** Paket 2 (3 Nov 2026): Monitor Kelebihan — pemakaian vs kuota, tagihan lunas/belum, tunggakan lewat jatuh tempo. */
+    public function test_monitor_kelebihan_dan_kartu_dashboard_bisa_diklik(): void
+    {
+        $this->setor($this->smp, '23.5');   // Oktober: lebih 3,5 kg
+        $this->setor($this->sma, '10');
+        $this->actingAs($this->keu)->get(route('laundry.monitor'))->assertForbidden();
+        HakAksesModul::create(['id_pengguna' => $this->keu->id_pengguna, 'kode_modul' => 'laundry-monitor', 'lihat' => true, 'menu' => true]);
+        \App\Support\Akses::lupakan();
+
+        $this->actingAs($this->keu)->get(route('laundry.monitor', ['periode' => '2026-10', 'saring' => 'over']))->assertOk()
+            ->assertSee('AHMAD')->assertDontSee('BUDI')->assertSee('Rp 24.500');
+
+        Carbon::setTestNow('2026-11-05 01:15:00');
+        (new TagihanLaundryService)->jalankanJadwal();
+        $this->actingAs($this->keu)->get(route('laundry.dashboard', ['sampai' => '2026-10']))->assertOk()
+            ->assertSee(route('laundry.monitor', ['tampil' => 'tagihan', 'status' => 'belum']))->assertSee('rincian');
+        $this->actingAs($this->keu)->get(route('laundry.monitor', ['tampil' => 'tagihan', 'status' => 'belum']))->assertOk()
+            ->assertSee('AHMAD')->assertSee('belum dibayar');
+        $this->actingAs($this->keu)->get(route('laundry.monitor', ['tampil' => 'tagihan', 'status' => 'lunas']))->assertOk()->assertDontSee('AHMAD');
+
+        // Tunggakan hanya yang SUDAH lewat jatuh tempo (terbit + 14 hari).
+        $mon = new \App\Services\Modules\MonitorLaundryService;
+        $this->assertCount(0, $mon->tunggakan());
+        Carbon::setTestNow('2026-11-25 08:00:00');
+        $t = $mon->tunggakanSantri($this->smp);
+        $this->assertSame([1, '24500.00', ['2026-10']], [$t->jumlah, $t->sisa, $t->periode]);
+        $this->actingAs($this->keu)->get(route('laundry.monitor', ['tampil' => 'tunggakan']))->assertOk()->assertSee('AHMAD')->assertSee('Okt 2026');
+    }
+
+    /**
+     * Paket 3 (3 Nov 2026): menunggak ≥ N periode LEWAT jatuh tempo → cucian bersih tertahan (setor tetap boleh);
+     * izin mendesak oleh hak laundry-izin, alasan wajib, tercatat, boleh berkali-kali; wali dikabari & melihat penandanya.
+     */
+    public function test_penahanan_pengambilan_izin_mendesak_dan_penanda_portal(): void
+    {
+        $this->setor($this->smp, '23.5');
+        Carbon::setTestNow('2026-11-05 01:15:00');
+        (new TagihanLaundryService)->jalankanJadwal();
+        Carbon::setTestNow('2026-11-25 08:00:00');
+        $mon = new \App\Services\Modules\MonitorLaundryService;
+        $this->assertNull($mon->tertahan($this->smp), 'pengaturan 0 = tak ada penahanan');
+        DB::table('pengaturan_laundry')->where('id', 1)->update(['tahan_setelah_periode' => 2]);
+        $this->assertNull($mon->tertahan($this->smp), 'baru 1 periode menunggak');
+        DB::table('pengaturan_laundry')->where('id', 1)->update(['tahan_setelah_periode' => 1]);
+        $this->assertNotNull($mon->tertahan($this->smp));
+
+        $w = $this->smp->wali;
+        $w->update(['email_ibu' => 'ibu@contoh.id']);
+
+        // Setor tetap boleh; selesai → kabar "tertahan", bukan "siap diambil".
+        $svc = new LaundryService;
+        $l = $this->setor($this->smp, '3');
+        $svc->periksa($l, '3', [['id_jenis_pakaian' => JenisPakaianLaundry::value('id'), 'jumlah' => 5]], null, $this->keu->id_pengguna);
+        $svc->majukan([$l->id], 'diperiksa', $this->keu->id_pengguna);
+        $svc->majukan([$l->id], 'diproses', $this->keu->id_pengguna);
+        $this->assertStringContainsString('tertahan', \App\Models\NotifikasiWali::where('jenis', 'laundry_tertahan')->sole()->judul);
+        $this->assertSame(0, \App\Models\NotifikasiWali::where('jenis', 'laundry_selesai')->count());
+
+        // Petugas tanpa hak izin: layar menolak, kiriman berizin 403, tanpa izin ditolak layanan.
+        $this->actingAs($this->keu)->get(route('laundry.serahkan', ['santri' => $this->smp->id]))->assertOk()
+            ->assertSee('Cucian TERTAHAN')->assertSee('Tertahan — tidak bisa diserahkan');
+        $kirim = ['santri' => $this->smp->id, 'id' => [$l->id]];
+        $this->actingAs($this->keu)->post(route('laundry.simpan_serahkan'), $kirim)->assertSessionHas('error', fn ($m) => str_contains($m, 'TERTAHAN'));
+        $this->actingAs($this->keu)->post(route('laundry.simpan_serahkan'), $kirim + ['izin' => 'Pulang darurat'])->assertForbidden();
+        $this->assertSame('selesai', $l->fresh()->status);
+
+        HakAksesModul::create(['id_pengguna' => $this->keu->id_pengguna, 'kode_modul' => 'laundry-izin', 'lihat' => true, 'ubah' => true, 'menu' => true]);
+        \App\Support\Akses::lupakan();
+        $this->actingAs($this->keu)->get(route('laundry.serahkan', ['santri' => $this->smp->id]))->assertSee('Izinkan &amp; serahkan (mendesak)', false);
+        $this->actingAs($this->keu)->post(route('laundry.simpan_serahkan'), $kirim + ['izin' => 'Pulang darurat'])->assertSessionHas('status');
+        $this->assertSame('diserahkan', $l->fresh()->status);
+        $jejak = DB::table('activity_log')->where('aksi', 'izin_laundry_tertahan')->sole();
+        $this->assertStringContainsString('Pulang darurat', $jejak->detail);
+
+        // Izin tak hanya sekali: kantong berikutnya bisa diizinkan lagi.
+        $l2 = $this->setor($this->smp, '2');
+        $svc->periksa($l2, '2', [['id_jenis_pakaian' => JenisPakaianLaundry::value('id'), 'jumlah' => 2]], null, $this->keu->id_pengguna);
+        $svc->majukan([$l2->id], 'diperiksa', $this->keu->id_pengguna);
+        $svc->majukan([$l2->id], 'diproses', $this->keu->id_pengguna);
+        $svc->serahkan($this->smp, [$l2->id], [], null, 'manual', $this->keu->id_pengguna, 'Wali sudah transfer, menunggu verifikasi');
+        $this->assertSame(2, DB::table('activity_log')->where('aksi', 'izin_laundry_tertahan')->count());
+
+        // Portal wali: spanduk tertahan di halaman Laundry & penanda di Beranda.
+        (new \App\Services\PortalWali\KataSandiWali)->simpan($w->fresh(), 'ibu', 'sandiUji12345', 'sandiUji12345');
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class)
+            ->post(route('portal.masuk.sandi'), ['email' => 'ibu@contoh.id', 'sandi' => 'sandiUji12345']);
+        $this->get(route('portal.beranda'))->assertOk()->assertSee('Cucian bersih tertahan');
+        $this->get(route('portal.laundry'))->assertOk()->assertSee('Cucian bersih tertahan')->assertSee('Bayar tagihan');
     }
 
     public function test_saklar_terbit_otomatis_dari_layar_tagihan(): void

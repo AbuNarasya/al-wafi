@@ -155,6 +155,8 @@ final class ModulRegistry
         ['kode' => 'laundry-akhwat', 'nama' => 'Laundry Akhwat (terima, proses, serahkan — santri putri)', 'grup' => 'LAUNDRY'],
         // Dashboard: grafik & angka 12 bulan, termasuk nilai tagihan — hak sendiri, bukan ikut papan.
         ['kode' => 'laundry-dashboard', 'nama' => 'Laundry — Dashboard (pemakaian & tagihan 12 bulan)', 'grup' => 'LAUNDRY'],
+        ['kode' => 'laundry-izin', 'nama' => 'Laundry — Izin mengambil cucian tertahan (mendesak, centang Ubah)', 'grup' => 'LAUNDRY'],
+        ['kode' => 'laundry-monitor', 'nama' => 'Laundry — Monitor Kelebihan (kuota, tagihan & tunggakan)', 'grup' => 'LAUNDRY'],
         ['kode' => 'laundry-master', 'nama' => 'Laundry — Jenis Pakaian & Pengaturan (tarif, kuota)', 'grup' => 'LAUNDRY'],
         // Keuangan: lihat = daftar per bulan, buat = susun & terbitkan tagihan kelebihan, ubah = kecualikan santri.
         ['kode' => 'laundry-tagihan', 'nama' => 'Laundry — Kuota & Tagihan Kelebihan', 'grup' => 'LAUNDRY'],

@@ -13,8 +13,14 @@ class Laundry extends Model
 
     protected $guarded = ['id'];
 
-    /** Urutan langkah; `dibatalkan` di luar urutan (hanya dari `diterima`). */
-    public const LANGKAH = ['diterima' => 'Diterima', 'diproses' => 'Diproses', 'selesai' => 'Selesai', 'diserahkan' => 'Diserahkan'];
+    /**
+     * Urutan langkah; `dibatalkan` di luar urutan (dari `diterima` / `diperiksa`). `diperiksa` (paket 1, 3 Nov 2026) =
+     * timbang ulang + jenis & jumlah pakaian di meja pemeriksaan; `selesai` = sudah dipacking.
+     */
+    public const LANGKAH = ['diterima' => 'Diterima', 'diperiksa' => 'Diperiksa', 'diproses' => 'Diproses', 'selesai' => 'Selesai', 'diserahkan' => 'Diserahkan'];
+
+    /** Masih di laundry (belum diserahkan / dibatalkan). */
+    public const BERJALAN = ['diterima', 'diperiksa', 'diproses', 'selesai'];
 
     public const LABEL = self::LANGKAH + ['dibatalkan' => 'Dibatalkan'];
 
@@ -22,16 +28,19 @@ class Laundry extends Model
      * Label langkah di PORTAL WALI — kalimat untuk orang tua, dan sengaja beda kunci terjemahan dari "Diterima"
      * (yang sudah berarti "diterima sebagai santri" / Accepted).
      */
-    public const LANGKAH_PORTAL = ['diterima' => 'Cucian diterima', 'diproses' => 'Sedang dicuci', 'selesai' => 'Siap diambil', 'diserahkan' => 'Sudah diambil'];
+    public const LANGKAH_PORTAL = ['diterima' => 'Cucian diterima', 'diperiksa' => 'Sudah diperiksa', 'diproses' => 'Sedang dicuci', 'selesai' => 'Siap diambil', 'diserahkan' => 'Sudah diambil'];
 
-    /** Langkah berikutnya yang boleh dari papan proses. Diserahkan HANYA lewat penyerahan (tap kartu + cocokkan). */
-    public const MAJU = ['diterima' => 'diproses', 'diproses' => 'selesai'];
+    /**
+     * Langkah berikutnya yang boleh dari papan proses. `diterima` → `diperiksa` HANYA lewat layar pemeriksaan (timbang ulang
+     * + daftar pakaian); diserahkan HANYA lewat penyerahan (tap kartu + cocokkan).
+     */
+    public const MAJU = ['diperiksa' => 'diproses', 'diproses' => 'selesai'];
 
     protected function casts(): array
     {
         return [
-            'berat' => 'decimal:2', 'ada_kurang' => 'boolean',
-            'diterima_pada' => 'datetime', 'diproses_pada' => 'datetime', 'selesai_pada' => 'datetime',
+            'berat' => 'decimal:2', 'berat_terima' => 'decimal:2', 'ada_kurang' => 'boolean',
+            'diterima_pada' => 'datetime', 'diperiksa_pada' => 'datetime', 'diproses_pada' => 'datetime', 'selesai_pada' => 'datetime',
             'diserahkan_pada' => 'datetime', 'dibatalkan_pada' => 'datetime',
         ];
     }

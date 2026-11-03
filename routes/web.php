@@ -823,9 +823,11 @@ Route::middleware('auth')->group(function () {
         // Ikhwan / akhwat (3 Nov 2026): /laundry membuka papan bagian pertama yang berhak; tiap papan diperiksa haknya di controller.
         Route::get('/', 'index')->name('index')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,lihat');
         Route::get('/dashboard', [\App\Http\Controllers\LaundryDashboardController::class, 'index'])->name('dashboard')->middleware('hakakses:laundry-dashboard,lihat');
+        Route::get('/monitor', [\App\Http\Controllers\LaundryMonitorController::class, 'index'])->name('monitor')->middleware('hakakses:laundry-monitor,lihat');
         Route::get('/{bagian}', 'papan')->name('papan')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,lihat')->whereIn('bagian', ['ikhwan', 'akhwat']);
         Route::get('/terima', 'terima')->name('terima')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,buat');
         Route::post('/terima', 'simpanTerima')->name('simpan_terima')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,buat');
+        Route::get('/pemeriksaan', 'pemeriksaan')->name('pemeriksaan')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,ubah');
         Route::post('/majukan', 'majukan')->name('majukan')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,ubah');
         Route::get('/serahkan', 'serahkan')->name('serahkan')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,ubah');
         Route::post('/serahkan', 'simpanSerahkan')->name('simpan_serahkan')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,ubah');
@@ -835,7 +837,11 @@ Route::middleware('auth')->group(function () {
         Route::put('/jenis-pakaian/{id}', 'ubahJenis')->name('jenis.ubah')->middleware('hakakses:laundry-master,ubah')->whereNumber('id');
         Route::get('/{laundry}', 'show')->name('show')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,lihat')->whereNumber('laundry');
         Route::post('/{laundry}/batal', 'batal')->name('batal')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,hapus')->whereNumber('laundry');
-        Route::post('/{laundry}/koreksi-berat', 'koreksiBerat')->name('koreksi_berat')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,ubah')->whereNumber('laundry');
+        // Paket 1 (3 Nov 2026): ubah data kantong, meja pemeriksaan (timbang ulang + daftar pakaian), label kantong ber-QR.
+        Route::put('/{laundry}', 'ubah')->name('ubah')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,ubah')->whereNumber('laundry');
+        Route::get('/{laundry}/periksa', 'formPeriksa')->name('periksa')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,ubah')->whereNumber('laundry');
+        Route::post('/{laundry}/periksa', 'simpanPeriksa')->name('simpan_periksa')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,ubah')->whereNumber('laundry');
+        Route::get('/{laundry}/label', 'label')->name('label')->middleware('hakakses:laundry-ikhwan|laundry-akhwat,lihat')->whereNumber('laundry');
     });
     // Laundry tahap 2: kuota bulanan, tagihan kelebihan (keuangan), pengaturan tarif & kuota.
     Route::prefix('laundry')->name('laundry.')->controller(\App\Http\Controllers\LaundryTagihanController::class)->group(function () {
