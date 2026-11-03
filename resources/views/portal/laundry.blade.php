@@ -63,7 +63,8 @@
                 <div class="flex items-start justify-between gap-2 text-sm">
                     <div>
                         <p class="font-semibold text-slate-900">{{ $l->nomor }}</p>
-                        <p class="text-xs text-slate-500">{{ __(':berat kg · :potong potong', ['berat' => number_format((float) $l->berat, 1, ',', '.'), 'potong' => $l->jumlahPotong()]) }}</p>
+                        {{-- Berat penerimaan hanya formalitas: berat & jumlah potong tampil sesudah diperiksa (3 Nov 2026). --}}
+                        @if ($l->status !== 'diterima')<p class="text-xs text-slate-500">{{ __(':berat kg · :potong potong', ['berat' => number_format((float) $l->berat, 1, ',', '.'), 'potong' => $l->jumlahPotong()]) }}</p>@endif
                     </div>
                     @if ($l->status === 'selesai' && $tertahan)<span class="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">{{ __('Tertahan') }}</span>
                     @elseif ($l->status === 'selesai')<span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">{{ __('Siap diambil') }}</span>@endif
@@ -109,7 +110,7 @@
                 <details class="px-4 py-3 text-sm">
                     <summary class="flex cursor-pointer items-start justify-between gap-2">
                         <span><span class="font-medium text-slate-900">{{ $l->diterima_pada->timezone('Asia/Jakarta')->locale(app()->getLocale())->translatedFormat('j M Y') }}</span>
-                            <span class="block text-xs text-slate-500">{{ __(':berat kg · :potong potong', ['berat' => number_format((float) $l->berat, 1, ',', '.'), 'potong' => $l->jumlahPotong()]) }}</span></span>
+                            @if ($l->diperiksa_pada || $l->status === 'diserahkan')<span class="block text-xs text-slate-500">{{ __(':berat kg · :potong potong', ['berat' => number_format((float) $l->berat, 1, ',', '.'), 'potong' => $l->jumlahPotong()]) }}</span>@endif</span>
                         <span class="text-end text-xs">
                             @if ($l->status === 'dibatalkan')<span class="text-slate-400">{{ __('Dibatalkan') }}</span>
                             @elseif ($l->ada_kurang)<span class="font-semibold text-red-700">{{ __('Ada yang kurang') }}</span>

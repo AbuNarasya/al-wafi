@@ -338,6 +338,7 @@ class PortalKeluargaController extends Controller
                 'menu' => array_filter($tersedia, fn ($m) => $m[4] === $kode)])->filter(fn ($g) => $g['menu'] !== []),
             'tersedia' => $tersedia,
             'pilihan' => \App\Services\PortalWali\MenuPortal::pilihan($wali, $peran),
+            'peringatan' => \App\Services\PortalWali\MenuPortal::peringatan($wali),
         ]);
     }
 

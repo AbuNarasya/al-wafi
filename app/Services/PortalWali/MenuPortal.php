@@ -54,6 +54,30 @@ final class MenuPortal
         }, array_filter(self::KATALOG, fn ($m) => $m[5] !== 'dompet' || $berdompet));
     }
 
+    /**
+     * Ikon yang diberi TANDA SERU merah di pojoknya (permintaan user 3 Nov 2026): Laundry bila ada anak aktif yang
+     * pemakaian bulan ini melebihi kuota atau cuciannya tertahan karena tunggakan.
+     *
+     * @return array<string,string> kunci menu => keterangan (untuk aria-label/title)
+     */
+    public static function peringatan(Wali $wali): array
+    {
+        $kuota = new \App\Services\Modules\TagihanLaundryService;
+        $monitor = new \App\Services\Modules\MonitorLaundryService;
+        $hasil = [];
+        foreach (\App\Models\Santri::where('id_wali', $wali->id)->where('status', 'aktif')->get(['id', 'kode_jenjang', 'jenis_kelamin']) as $s) {
+            if ($monitor->tertahan($s)) {
+                $hasil['laundry'] = __('Cucian bersih tertahan');
+                break;
+            }
+            if ((float) $kuota->ringkas($s, hanyaDiperiksa: true)['lebih'] > 0) {
+                $hasil['laundry'] = __('Over kuota');
+            }
+        }
+
+        return $hasil;
+    }
+
     /** @return array<string,string> kode grup => nama grup dalam bahasa portal */
     public static function grup(): array
     {

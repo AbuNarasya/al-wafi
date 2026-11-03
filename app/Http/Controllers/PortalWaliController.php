@@ -261,7 +261,7 @@ class PortalWaliController extends Controller
                         ? collect((new \App\Services\Modules\DokumenSantriService)->statusBerkas($s))->where('kelompok', 'registrasi')
                             ->whereIn('status', ['belum', 'perlu_diganti'])->count()
                         : 0,
-                    'laundry_over' => $aktif && (float) $kuotaLaundry->ringkas($s)['lebih'] > 0,
+                    'laundry_over' => $aktif && (float) $kuotaLaundry->ringkas($s, hanyaDiperiksa: true)['lebih'] > 0,
                     'laundry_tahan' => $aktif ? $monitorLaundry->tertahan($s) : null,
                 ];
             });
@@ -278,6 +278,7 @@ class PortalWaliController extends Controller
             'saldoDompet' => $punyaDompet ? (\App\Models\DompetWali::where('id_wali', $wali->id)->value('saldo') ?? 0) : null,
             // Ikon menu utama pilihan wali (paling banyak 7) — sisanya di "Menu Lengkap".
             'menuUtama' => \App\Services\PortalWali\MenuPortal::pilihan($wali, (string) $peran),
+            'peringatan' => \App\Services\PortalWali\MenuPortal::peringatan($wali),
         ]);
     }
 

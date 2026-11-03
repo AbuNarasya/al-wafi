@@ -54,9 +54,9 @@ class PortalLaundryTest extends TestCase
     }
 
     /** Meja pemeriksaan (paket 1): timbang ulang dengan berat & pakaian yang sama, lalu masuk proses cuci. */
-    private function periksa(Laundry $l): void
+    private function periksa(Laundry $l, ?string $berat = null): void
     {
-        $this->svc->periksa($l, (string) $l->berat, $l->item->map(fn ($it) => ['id_jenis_pakaian' => $it->id_jenis_pakaian, 'jumlah' => $it->jumlah])->all(), null, $this->petugas);
+        $this->svc->periksa($l, $berat ?? (string) $l->berat, $l->item->map(fn ($it) => ['id_jenis_pakaian' => $it->id_jenis_pakaian, 'jumlah' => $it->jumlah])->all(), null, $this->petugas);
         $this->svc->majukan([$l->id], 'diperiksa', $this->petugas);
     }
 
@@ -67,18 +67,20 @@ class PortalLaundryTest extends TestCase
 
     public function test_kabar_selesai_diserahkan_dan_kuota_sekali_di_tiap_ambang(): void
     {
-        $a = $this->setor($this->ahmad, '17');     // 0 → 85% : hampir habis
-        $b = $this->setor($this->ahmad, '2');      // 85% → 95% : tak ada kabar baru
-        $this->setor($this->ahmad, '3');           // 95% → 110% : terlampaui
-        $this->setor($this->ahmad, '1');           // sudah lewat : tak ada kabar baru
+        // Kabar kuota dihitung dari berat FINAL (pemeriksaan) — penerimaan sendiri tak mengabarkan apa pun (3 Nov 2026).
+        $a = $this->setor($this->ahmad, '25');     // berat penerimaan formalitas
+        $this->assertSame(0, NotifikasiWali::where('jenis', 'laundry_kuota')->count(), 'penerimaan tak mengabarkan kuota');
+        $this->periksa($a, '17');                  // 0 → 85% : hampir habis
+        $b = $this->setor($this->ahmad, '2');
+        $this->periksa($b);                        // 85% → 95% : tak ada kabar baru
+        $this->periksa($this->setor($this->ahmad, '3'));   // 95% → 110% : terlampaui
+        $this->periksa($this->setor($this->ahmad, '1'));   // sudah lewat : tak ada kabar baru
         $kuota = NotifikasiWali::where('jenis', 'laundry_kuota')->orderBy('id')->pluck('judul')->all();
         $this->assertCount(2, $kuota);
         $this->assertStringContainsString('hampir habis', $kuota[0]);
         $this->assertStringContainsString('terlampaui', $kuota[1]);
         $this->assertSame('laundry', NotifikasiWali::where('jenis', 'laundry_kuota')->value('kategori'));
 
-        $this->periksa($a);
-        $this->periksa($b);
         $this->svc->majukan([$a->id, $b->id], 'diproses', $this->petugas);
         $this->assertSame(2, NotifikasiWali::where('jenis', 'laundry_selesai')->count());
 
@@ -92,6 +94,8 @@ class PortalLaundryTest extends TestCase
     public function test_halaman_laundry_portal_per_anak_dan_tiga_bahasa(): void
     {
         $a = $this->setor($this->ahmad, '22');
+        $this->masuk();
+        $this->get(route('portal.laundry'))->assertOk()->assertDontSee('22,0 kg')->assertSee('0,0</b> / 20,0 kg', false)->assertDontSee('Over kuota');
         $this->periksa($a);
         $this->svc->majukan([$a->id], 'diproses', $this->petugas);
         $this->setor($this->lain, '5');
@@ -109,7 +113,10 @@ class PortalLaundryTest extends TestCase
         $this->get(route('portal.laundry'))->assertOk()->assertSee('Ready for pickup');
 
         // Menu tersedia di katalog portal.
-        $this->get(route('portal.menu'))->assertOk()->assertSee(route('portal.laundry'), false);
+        $this->get(route('portal.menu'))->assertOk()->assertSee(route('portal.laundry'), false)
+            ->assertSee('aria-label="Over quota">!</span>', false); // tanda seru merah di ikon Laundry (bahasa Inggris)
+        $this->post(route('portal.bahasa'), ['bahasa' => 'id']);
+        $this->get(route('portal.menu'))->assertSee('aria-label="Over kuota">!</span>', false);
     }
 
     public function test_riwayat_memperlihatkan_perjalanan_tiap_langkah(): void

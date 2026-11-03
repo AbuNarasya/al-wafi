@@ -24,7 +24,7 @@ class PortalLaundryController extends Controller
 
         return view('portal.laundry', [
             'anak' => $anak, 'pilih' => $pilih,
-            'kuota' => $pilih ? $svc->ringkas($pilih) : null,
+            'kuota' => $pilih ? $svc->ringkas($pilih, hanyaDiperiksa: true) : null,
             // Paket 3: cucian bersih tertahan karena tunggakan kelebihan laundry lewat jatuh tempo.
             'tertahan' => $pilih ? (new \App\Services\Modules\MonitorLaundryService)->tertahan($pilih) : null,
             'berjalan' => $pilih ? Laundry::with('item')->where('id_santri', $pilih->id)->whereIn('status', Laundry::BERJALAN)

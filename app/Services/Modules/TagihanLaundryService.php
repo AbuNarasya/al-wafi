@@ -66,11 +66,16 @@ class TagihanLaundryService
         return [$awal, $awal->copy()->endOfMonth()];
     }
 
-    public function terpakai(int $idSantri, string $periode): string
+    /**
+     * `$hanyaDiperiksa` (3 Nov 2026): berat penerimaan hanya formalitas — berat FINAL = timbang ulang di pemeriksaan.
+     * Portal wali & kabar kuota hanya menghitung kantong yang sudah diperiksa; layar petugas & penagihan menghitung semua.
+     */
+    public function terpakai(int $idSantri, string $periode, bool $hanyaDiperiksa = false): string
     {
         [$awal, $akhir] = self::batas($periode);
 
         return Money::of(Laundry::where('id_santri', $idSantri)->where('status', '!=', 'dibatalkan')
+            ->when($hanyaDiperiksa, fn ($q) => $q->where('status', '!=', 'diterima'))
             ->whereBetween('diterima_pada', [$awal, $akhir])->sum('berat'));
     }
 
@@ -79,11 +84,11 @@ class TagihanLaundryService
      *
      * @return array{periode:string, kuota:string, terpakai:string, sisa:string, lebih:string, tarif:?string, perkiraan:?string}
      */
-    public function ringkas(Santri $santri, ?string $periode = null, string|float $tambahan = 0): array
+    public function ringkas(Santri $santri, ?string $periode = null, string|float $tambahan = 0, bool $hanyaDiperiksa = false): array
     {
         $periode ??= now()->format('Y-m');
         $kuota = $this->kuota($santri->kode_jenjang, $santri->jenis_kelamin);
-        $terpakai = Money::add($this->terpakai($santri->id, $periode), Money::of($tambahan));
+        $terpakai = Money::add($this->terpakai($santri->id, $periode, $hanyaDiperiksa), Money::of($tambahan));
         $lebih = Money::gt($terpakai, $kuota) ? Money::sub($terpakai, $kuota) : '0.00';
         $tarif = $this->pengaturan()->tarif_per_kg;
 

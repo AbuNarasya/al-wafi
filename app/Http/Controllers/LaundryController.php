@@ -187,24 +187,34 @@ class LaundryController extends Controller
 
     // ---- Meja pemeriksaan (paket 1, 3 Nov 2026) ----
 
-    /** Pindai label / ketik nomor kantong → formulir pemeriksaannya; di bawahnya antrean yang belum diperiksa. */
+    /**
+     * Pindai label / ketik nomor kantong → formulir pemeriksaannya. Tanpa pemindai atau label tak tercetak (permintaan
+     * user 3 Nov 2026): ketik nama / NIS santri — antrean disaring; satu kantong cocok langsung dibuka.
+     */
     public function pemeriksaan(Request $request): View|RedirectResponse
     {
-        $nomor = strtoupper(trim((string) $request->query('nomor', '')));
-        if ($nomor !== '') {
-            $l = Laundry::with('santri')->where('nomor', $nomor)->first();
-            if (! $l || ! in_array(BagianLaundry::dariJk($l->santri?->jenis_kelamin), BagianLaundry::boleh('ubah'), true)) {
-                return redirect()->route('laundry.pemeriksaan')->with('error', "Kantong {$nomor} tidak ditemukan di bagian laundry Anda.");
+        $isian = trim((string) $request->query('nomor', ''));
+        $jk = BagianLaundry::jkBoleh('ubah');
+        if ($isian !== '' && ($l = Laundry::with('santri')->where('nomor', strtoupper($isian))->first())) {
+            if (! in_array($l->santri?->jenis_kelamin, $jk, true)) {
+                return redirect()->route('laundry.pemeriksaan')->with('error', "Kantong {$l->nomor} tidak ditemukan di bagian laundry Anda.");
             }
 
             return redirect()->route('laundry.periksa', $l->id);
         }
+        $antrean = Laundry::with(['santri:id,nama,nis,id_kelas', 'santri.kelas:id,nama'])->where('status', 'diterima')
+            ->whereHas('santri', fn ($s) => $s->whereIn('jenis_kelamin', $jk))
+            ->when($isian !== '', fn ($w) => $w->where(fn ($x) => $x->where('nomor', 'ilike', "%{$isian}%")
+                ->orWhereHas('santri', fn ($s) => $s->where('nama', 'ilike', "%{$isian}%")->orWhere('nis', 'ilike', "%{$isian}%"))))
+            ->orderBy('diterima_pada')->get();
+        if ($isian !== '' && $antrean->isEmpty()) {
+            return redirect()->route('laundry.pemeriksaan')->with('error', "Tidak ada kantong menunggu pemeriksaan yang cocok dengan \"{$isian}\".");
+        }
+        if ($isian !== '' && $antrean->count() === 1) {
+            return redirect()->route('laundry.periksa', $antrean->first()->id);
+        }
 
-        return view('laundry.pemeriksaan', [
-            'antrean' => Laundry::with(['santri:id,nama,nis,id_kelas', 'santri.kelas:id,nama'])->where('status', 'diterima')
-                ->whereHas('santri', fn ($s) => $s->whereIn('jenis_kelamin', BagianLaundry::jkBoleh('ubah')))
-                ->orderBy('diterima_pada')->get(),
-        ]);
+        return view('laundry.pemeriksaan', ['antrean' => $antrean, 'cari' => $isian]);
     }
 
     public function formPeriksa(Laundry $laundry): View|RedirectResponse

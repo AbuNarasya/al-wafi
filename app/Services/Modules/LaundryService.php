@@ -44,15 +44,12 @@ class LaundryService
         // Daftar pakaian di penerimaan TIDAK wajib lagi — dicatat di meja pemeriksaan (paket 1).
         $baris = $this->rapikanItem($item, wajib: false);
 
-        // Pemakaian bulan ini SEBELUM setoran — untuk kabar kuota yang dikirim sekali saat melewati 80% / 100%.
-        $kuota = new TagihanLaundryService;
-        $sebelum = $kuota->ringkas($santri);
-
         // Nomor per pusat penerimaan (keputusan user 3 Nov 2026): LDI- ikhwan, LDA- akhwat, urutan masing-masing.
         // Kantong lama tetap LDR-. Kuncinya juga per awalan — dua pusat tak saling menunggu.
         $awalan = self::awalanNomor($santri);
 
-        return DB::transaction(function () use ($santri, $berat, $baris, $catatan, $cara, $idPengguna, $kuota, $sebelum, $awalan) {
+        // Kabar kuota TIDAK dikirim di sini: berat penerimaan hanya formalitas — kabarnya menunggu berat final di pemeriksaan.
+        return DB::transaction(function () use ($santri, $berat, $baris, $catatan, $cara, $idPengguna, $awalan) {
             DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('laundry-nomor-'.$awalan)]);
             $base = DocNumber::docBase($awalan, now());
             $l = Laundry::create([
@@ -63,8 +60,6 @@ class LaundryService
             foreach ($baris as $b) {
                 $l->item()->create($b);
             }
-            $this->kabariKuota($santri, $sebelum, $kuota->ringkas($santri));
-
             return $l;
         });
     }
@@ -267,7 +262,7 @@ class LaundryService
             if (round((float) $kini->berat, 2) !== $baru) {
                 $this->assertBelumDitagih($kini);
             }
-            $sebelum = $kuota->ringkas($kini->santri);
+            $sebelum = $kuota->ringkas($kini->santri, hanyaDiperiksa: true);
             $kini->item()->delete();
             foreach ($baris as $b) {
                 $kini->item()->create($b);
@@ -275,7 +270,7 @@ class LaundryService
             $tambahan = trim((string) $catatan);
             $kini->update(['berat' => $baru, 'status' => 'diperiksa', 'diperiksa_pada' => now(), 'diperiksa_oleh' => $idPengguna,
                 'catatan' => $tambahan === '' ? $kini->catatan : trim(($kini->catatan ? $kini->catatan."\n" : '').$tambahan)]);
-            $this->kabariKuota($kini->santri, $sebelum, $kuota->ringkas($kini->santri));
+            $this->kabariKuota($kini->santri, $sebelum, $kuota->ringkas($kini->santri, hanyaDiperiksa: true));
 
             return $kini->load('item');
         });

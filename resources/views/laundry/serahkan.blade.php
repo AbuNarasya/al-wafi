@@ -44,7 +44,8 @@
                 @if ($cara === 'kartu')<input type="hidden" name="kartu" value="{{ $uid }}">@else<input type="hidden" name="santri" value="{{ $santri->id }}">@endif
                 {{-- Paket 1 (3 Nov 2026): pindai QR label kantong untuk memastikan kantong yang diserahkan benar milik santri ini. --}}
                 <div class="rounded-xl border border-gray-200 bg-white p-4 text-sm shadow-sm">
-                    <label class="block font-semibold text-gray-900" for="pindai">Pindai label kantong</label>
+                    <label class="block font-semibold text-gray-900" for="pindai">Pindai label kantong <span class="text-xs font-normal text-gray-500">(tidak wajib)</span></label>
+                    <p class="text-xs text-gray-500">Tanpa pemindai / label tak tercetak: cocokkan nomor &amp; nama di kantong dengan daftar di bawah, lalu ketuk <b>Cocok</b>. Kantong tetap bisa diserahkan tanpa dipindai.</p>
                     <input id="pindai" autofocus autocomplete="off" placeholder="pindai QR / ketik nomor lalu Enter" @keydown.enter.prevent="pindai($event)"
                            class="mt-1 w-72 rounded-lg border-gray-300 font-mono uppercase">
                     <p x-show="pesan" x-cloak x-text="pesan" class="mt-1 text-sm font-semibold" :class="galat ? 'text-red-700' : 'text-emerald-700'"></p>
@@ -55,7 +56,9 @@
                         <label class="flex items-center gap-2 font-semibold text-gray-900">
                             <input type="checkbox" name="id[]" value="{{ $l->id }}" checked class="rounded border-gray-300">
                             {{ $l->nomor }} · {{ $l->berat }} kg · diterima {{ $l->diterima_pada->timezone('Asia/Jakarta')->format('d/m H:i') }}
-                            <span x-show="cocok.includes(@js($l->nomor))" x-cloak class="ms-auto rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] text-emerald-800">label cocok</span>
+                            <span x-show="cocok.includes(@js($l->nomor))" x-cloak class="ms-auto rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] text-emerald-800">cocok</span>
+                            <button type="button" x-show="! cocok.includes(@js($l->nomor))" @click.prevent="cocok.push(@js($l->nomor)); galat = false; pesan = @js($l->nomor) + ' dicocokkan manual.'"
+                                    class="ms-auto rounded border border-emerald-300 px-2 py-0.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">Cocok</button>
                         </label>
                         @if ($l->catatan)<p class="mt-1 text-xs text-gray-500">Catatan: {{ $l->catatan }}</p>@endif
                         <table class="mt-2 w-full">

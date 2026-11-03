@@ -60,7 +60,8 @@
             @foreach ($menuUtama as $kunci)
                 @php [$rute, $label, $ikon, $warna] = \App\Services\PortalWali\MenuPortal::KATALOG[$kunci]; @endphp
                 <a href="{{ route($rute) }}" class="flex flex-col items-center gap-1.5 text-center">
-                    <span class="flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-sm" style="background: {{ $warna }}"><x-portal.ikon :nama="$ikon" /></span>
+                    <span class="relative flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-sm" style="background: {{ $warna }}"><x-portal.ikon :nama="$ikon" />
+                        @isset($peringatan[$kunci])<span class="absolute -end-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs font-black leading-none text-white ring-2 ring-white" title="{{ $peringatan[$kunci] }}" aria-label="{{ $peringatan[$kunci] }}">!</span>@endisset</span>
                     <span class="text-[11px] leading-tight text-slate-700">{{ __($label) }}</span>
                 </a>
             @endforeach

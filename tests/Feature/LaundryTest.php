@@ -78,6 +78,10 @@ class LaundryTest extends TestCase
         // Meja pemeriksaan: pindai label → formulir; daftar pakaian wajib; berat ulang yang dihitung.
         $this->actingAs($this->petugas)->get(route('laundry.pemeriksaan', ['nomor' => strtolower($l->nomor)]))->assertRedirect(route('laundry.periksa', $l->id));
         $this->actingAs($this->petugas)->get(route('laundry.pemeriksaan', ['nomor' => 'LDI-0000-9999']))->assertSessionHas('error');
+        // Tanpa pemindai / label tak tercetak: cari nama atau NIS santri (3 Nov 2026).
+        $this->actingAs($this->petugas)->get(route('laundry.pemeriksaan', ['nomor' => 'ahmad']))->assertRedirect(route('laundry.periksa', $l->id));
+        $this->actingAs($this->petugas)->get(route('laundry.pemeriksaan', ['nomor' => '242507001']))->assertRedirect(route('laundry.periksa', $l->id));
+        $this->actingAs($this->petugas)->get(route('laundry.pemeriksaan', ['nomor' => 'Budi']))->assertSessionHas('error');
         $this->actingAs($this->petugas)->get(route('laundry.periksa', $l->id))->assertOk()->assertSee('<option value="Gamis">', false);
         $this->actingAs($this->petugas)->post(route('laundry.simpan_periksa', $l->id), ['berat' => '3.1', 'item' => [['id_jenis_pakaian' => '', 'jumlah' => '']]])
             ->assertSessionHas('error', fn ($m) => str_contains($m, 'wajib'));
@@ -103,7 +107,8 @@ class LaundryTest extends TestCase
 
         // Serahkan: handuk kurang 1 → catatan wajib.
         $handuk = $l->item->firstWhere('id_jenis_pakaian', $this->handuk);
-        $this->actingAs($this->petugas)->get(route('laundry.serahkan', ['kartu' => 'KARTU001']))->assertSee($l->nomor)->assertSee('Handuk');
+        $this->actingAs($this->petugas)->get(route('laundry.serahkan', ['kartu' => 'KARTU001']))->assertSee($l->nomor)->assertSee('Handuk')
+            ->assertSee('(tidak wajib)')->assertSee('>Cocok</button>', false); // cocokkan manual tanpa pemindai
         $this->actingAs($this->petugas)->post(route('laundry.simpan_serahkan'), ['kartu' => 'KARTU001', 'id' => [$l->id], 'kembali' => [$handuk->id => 0]])
             ->assertSessionHas('error', fn ($m) => str_contains($m, 'kurang'));
         $this->assertSame('selesai', $l->refresh()->status, 'gagal = tak ada yang berubah');

@@ -7,17 +7,18 @@
 
     {{-- Paket 1 (3 Nov 2026): kantong dibuka di meja pemeriksaan — timbang ulang + jenis & jumlah pakaian. --}}
     <form method="GET" action="{{ route('laundry.pemeriksaan') }}" class="mt-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <label class="block text-sm font-semibold text-gray-900" for="nomor">Pindai label kantong</label>
-        <p class="text-xs text-gray-500">Arahkan pemindai ke QR label, atau ketik nomor kantong lalu Enter.</p>
-        <div class="mt-2 flex gap-2">
-            <input id="nomor" name="nomor" autofocus autocomplete="off" placeholder="LDI-2611-0001"
-                   class="w-72 rounded-lg border-gray-300 font-mono text-lg uppercase">
+        <label class="block text-sm font-semibold text-gray-900" for="nomor">Pindai label kantong — atau cari nama santri</label>
+        <p class="text-xs text-gray-500">Arahkan pemindai ke QR label, ketik nomor kantong, atau — bila tak ada pemindai / label tak tercetak — ketik <b>nama atau NIS santri</b>, lalu Enter.</p>
+        <div class="mt-2 flex flex-wrap gap-2">
+            <input id="nomor" name="nomor" value="{{ $cari ?? '' }}" autofocus autocomplete="off" placeholder="LDI-2611-0001 / nama / NIS"
+                   class="w-80 rounded-lg border-gray-300 text-lg">
             <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white">Buka</button>
+            @if (! empty($cari))<a href="{{ route('laundry.pemeriksaan') }}" class="self-center text-sm text-gray-500 hover:underline">tampilkan semua</a>@endif
         </div>
     </form>
 
     <div class="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <p class="border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-900">Antrean pemeriksaan <span class="font-normal text-gray-500">({{ $antrean->count() }} kantong, terlama di atas)</span></p>
+        <p class="border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-900">Antrean pemeriksaan <span class="font-normal text-gray-500">({{ $antrean->count() }} kantong{{ ! empty($cari) ? ' cocok dengan "'.$cari.'"' : '' }}, terlama di atas)</span></p>
         <table class="min-w-full divide-y divide-gray-100 text-sm">
             <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <tr><th class="px-4 py-2">Nomor</th><th class="px-4 py-2">Santri</th><th class="px-4 py-2 text-right">Berat terima</th><th class="px-4 py-2">Diterima</th><th class="px-4 py-2"></th></tr>
