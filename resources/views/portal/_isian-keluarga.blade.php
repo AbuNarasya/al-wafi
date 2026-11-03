@@ -11,18 +11,21 @@
     $kelasLabel = 'mb-1 block text-sm font-medium text-slate-700';
     $emailLangsung ??= false;
     $punyaSandi ??= [];
+    $opsional = '<span class="text-xs font-normal text-slate-400">('.e(__('tidak wajib')).')</span>';
 @endphp
+
+@include('portal._keterangan-wajib')
 
 <section class="space-y-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
     <h2 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span>{{ __('Keluarga') }}</h2>
     <div>
-        <label for="nik" class="{{ $kelasLabel }}">{{ __('NIK kepala keluarga') }}</label>
+        <label for="nik" class="{{ $kelasLabel }}">{{ __('NIK kepala keluarga') }} {!! $opsional !!}</label>
         <input id="nik" name="nik" inputmode="numeric" data-bukan-rupiah maxlength="16" value="{{ old('nik', $wali->nik) }}" class="{{ $kelasInput }}">
         <p class="mt-1 text-xs text-slate-500">{{ __('16 angka, sesuai Kartu Keluarga / KTP.') }}</p>
         @error('nik')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
     </div>
     <div>
-        <label for="alamat" class="{{ $kelasLabel }}">{{ __('Alamat rumah') }}</label>
+        <label for="alamat" class="{{ $kelasLabel }}">{{ __('Alamat rumah') }} {!! $opsional !!}</label>
         <textarea id="alamat" name="alamat" rows="3" maxlength="1000" class="{{ $kelasInput }}">{{ old('alamat', $wali->alamat) }}</textarea>
         @error('alamat')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
     </div>
@@ -52,19 +55,19 @@
 
         <div x-show="buka" @if (! $bukaAwal) x-cloak @endif class="mt-3 space-y-3">
             <div>
-                <label for="nama_{{ $p }}" class="{{ $kelasLabel }}">{{ __('Nama lengkap') }} @if ($utama)<span class="text-red-500">*</span>@endif</label>
+                <label for="nama_{{ $p }}" class="{{ $kelasLabel }}">{{ __('Nama lengkap') }} @if ($utama)<span class="text-red-500">*</span> @else{!! $opsional !!}@endif</label>
                 <input id="nama_{{ $p }}" name="nama_{{ $p }}" value="{{ old('nama_'.$p, $wali->{'nama_'.$p}) }}" maxlength="255" @required($utama) class="{{ $kelasInput }}">
                 @error('nama_'.$p)<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
             </div>
             <div>
-                <label for="telepon_{{ $p }}" class="{{ $kelasLabel }}">{{ __('Nomor HP / WhatsApp') }} @if ($utama)<span class="text-red-500">*</span>@endif</label>
+                <label for="telepon_{{ $p }}" class="{{ $kelasLabel }}">{{ __('Nomor HP / WhatsApp') }} @if ($utama)<span class="text-red-500">*</span> @else{!! $opsional !!}@endif</label>
                 <input id="telepon_{{ $p }}" name="telepon_{{ $p }}" inputmode="tel" placeholder="0812 3456 7890"
                        value="{{ old('telepon_'.$p, $wali->{'telepon_'.$p}) }}" @required($utama) class="{{ $kelasInput }}">
                 @error('telepon_'.$p)<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
             </div>
             @if ($emailLangsung)
                 <div>
-                    <label for="email_{{ $p }}" class="{{ $kelasLabel }}">{{ __('Email') }} @if ($saya && empty($punyaSandi[$p]))<span class="text-red-500">*</span>@endif</label>
+                    <label for="email_{{ $p }}" class="{{ $kelasLabel }}">{{ __('Email') }} @if (! empty($punyaSandi[$p])) @elseif ($saya)<span class="text-red-500">*</span> @else{!! $opsional !!}@endif</label>
                     @if (! empty($punyaSandi[$p]))
                         {{-- Sudah pernah masuk portal: emailnya hanya bisa diganti orangnya sendiri. --}}
                         <div class="break-all rounded-2xl bg-slate-50 px-4 py-3 text-base font-semibold text-slate-900">{{ $wali->{'email_'.$p} }}</div>
@@ -80,7 +83,7 @@
                 </div>
             @endif
             <div>
-                <label for="pekerjaan_{{ $p }}" class="{{ $kelasLabel }}">{{ __('Pekerjaan') }}</label>
+                <label for="pekerjaan_{{ $p }}" class="{{ $kelasLabel }}">{{ __('Pekerjaan') }} {!! $opsional !!}</label>
                 <select id="pekerjaan_{{ $p }}" name="pekerjaan_{{ $p }}" x-model="kerja" class="{{ $kelasInput }}">
                     <option value="">{{ __('— pilih —') }}</option>
                     @foreach (\App\Models\Wali::PEKERJAAN as $kerja)
@@ -94,7 +97,7 @@
                 @error('pekerjaan_lain_'.$p)<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
             </div>
             <div>
-                <label for="pendapatan_{{ $p }}" class="{{ $kelasLabel }}">{{ __('Rentang pendapatan per bulan') }}</label>
+                <label for="pendapatan_{{ $p }}" class="{{ $kelasLabel }}">{{ __('Rentang pendapatan per bulan') }} {!! $opsional !!}</label>
                 <select id="pendapatan_{{ $p }}" name="pendapatan_{{ $p }}" class="{{ $kelasInput }}">
                     <option value="">{{ __('— pilih —') }}</option>
                     @foreach (\App\Models\Wali::PENDAPATAN as $kode => $teks)

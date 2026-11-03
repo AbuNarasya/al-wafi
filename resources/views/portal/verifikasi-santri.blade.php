@@ -6,6 +6,7 @@
     @include('portal._langkah-verifikasi', ['aktif' => 2, 'lewat' => $lewat])
 
     <p class="mb-3 text-sm text-slate-500">{!! __('Periksa dan betulkan data santri. Data yang sudah benar tidak perlu diubah. Isian bertanda :bintang wajib diisi.', ['bintang' => '<span class="text-red-500">*</span>']) !!}</p>
+    <div class="mb-4">@include('portal._keterangan-wajib')</div>
 
     {{-- novalidate: isian wajib di panel anak yang tertutup tak bisa disorot browser (kirim gagal diam-diam);
          server yang memeriksa, lalu panel anak yang bermasalah terbuka dengan pesannya. --}}

@@ -94,7 +94,25 @@ class PortalDompetController extends Controller
             return redirect()->route('portal.pin');
         }
 
-        return view('portal.pin-konfirmasi', ['tujuan' => MasukWali::samarkanEmail($this->emailSaya($request)), 'menit' => MasukWali::MENIT]);
+        return view('portal.pin-konfirmasi', [
+            'tujuan' => MasukWali::samarkanEmail($this->emailSaya($request)), 'menit' => MasukWali::MENIT,
+            'sisaJeda' => $this->masuk()->sisaJeda($this->emailSaya($request), 'pin'),
+        ]);
+    }
+
+    /** Kirim ulang kode PIN; PIN baru yang menunggu tetap yang tadi diketik. */
+    public function kirimUlangKodePin(Request $request): RedirectResponse
+    {
+        if (! $request->session()->has(self::PIN_BARU)) {
+            return redirect()->route('portal.pin');
+        }
+        try {
+            $kodeUji = $this->masuk()->mintaKode($this->emailSaya($request), 'pin', $request->ip());
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('portal.pin.konfirmasi')->with('kode_uji', $kodeUji)->with('status', __('Kode baru sudah dikirim. Kode sebelumnya tidak berlaku lagi.'));
     }
 
     public function konfirmasiPin(Request $request): RedirectResponse

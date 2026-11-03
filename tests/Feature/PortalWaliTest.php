@@ -188,6 +188,33 @@ class PortalWaliTest extends TestCase
         Notification::assertSentOnDemandTimes(KodeMasukWali::class, 1);
     }
 
+    /** Kirim ulang kode: terbuka sesudah 3 menit, kode lama gugur (keputusan user 3 Nov 2026). */
+    public function test_kirim_ulang_kode_sesudah_tiga_menit_dan_kode_lama_gugur(): void
+    {
+        $this->keluarga();
+        $lama = $this->mintaKode('hasan@contoh.id');
+        $this->get(route('portal.kode'))->assertOk()
+            ->assertSee(route('portal.kode.ulang'), false)->assertSee('Kirim ulang dalam')->assertSee('03:00');
+
+        // Sebelum 3 menit: ditolak server walau tombolnya diakali.
+        $this->travel(2)->minutes();
+        $this->post(route('portal.kode.ulang'))->assertSessionHas('error');
+        Notification::assertSentOnDemandTimes(KodeMasukWali::class, 1);
+
+        $this->travel(61)->seconds();
+        $this->get(route('portal.kode'))->assertSee('Kirim ulang kode');
+        $this->post(route('portal.kode.ulang'))->assertRedirect(route('portal.kode'))->assertSessionHas('status');
+        Notification::assertSentOnDemandTimes(KodeMasukWali::class, 2);
+
+        $this->post(route('portal.kode'), ['kode' => $lama])->assertSessionHas('error');
+        $this->assertGuest('wali');
+    }
+
+    public function test_kirim_ulang_tanpa_email_menunggu_kembali_ke_masuk(): void
+    {
+        $this->post(route('portal.kode.ulang'))->assertRedirect(route('portal.masuk'));
+    }
+
     /** Mode uji dev.erp: kode tampil di layar HANYA bila saklar menyala DAN surel mode log. */
     public function test_kode_tampil_di_layar_hanya_dalam_mode_uji(): void
     {

@@ -136,7 +136,8 @@ class PortalDataTest extends TestCase
 
     public function test_kiriman_tanpa_perubahan_tak_mencatat_apa_pun(): void
     {
-        $this->sebagai()->put(route('portal.data.santri', $this->ahmad->id), $this->isianSantri(['nama' => 'ahmad fauzi']))
+        $this->ahmad->update(['tanggal_lahir' => '2013-05-02']);
+        $this->sebagai()->put(route('portal.data.santri', $this->ahmad->id), $this->isianSantri(['nama' => 'ahmad fauzi', 'tanggal_lahir' => '2013-05-02']))
             ->assertSessionHas('status', 'Tidak ada data yang berubah.');
 
         $this->assertSame(0, ActivityLog::where('modul', UbahDataWali::MODUL_JEJAK)->count());

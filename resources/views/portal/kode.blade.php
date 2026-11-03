@@ -30,5 +30,6 @@
         <button class="mt-4 w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white">{{ __('Masuk') }}</button>
     </form>
 
-    <a href="{{ route('portal.masuk') }}" class="mt-5 block text-center text-sm font-semibold text-brand">{{ __('Ganti email atau minta kode baru') }}</a>
+    @include('portal._kirim-ulang', ['aksi' => route('portal.kode.ulang'), 'sisa' => $sisaJeda])
+    <a href="{{ route('portal.masuk') }}" class="mt-3 block text-center text-sm font-semibold text-slate-500">{{ __('Ganti email') }}</a>
 @endsection

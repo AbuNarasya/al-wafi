@@ -64,6 +64,9 @@ class ReminderTagihanController extends Controller
             : ($hasil['kandidat'] > 0
                 ? "Tidak ada notifikasi baru — {$hasil['kandidat']} tagihan dalam jendela pengingat sudah pernah diingatkan."
                 : 'Tidak ada tagihan yang melewati titik pengingat saat ini.');
+        if ($hasil['wali'] > 0) {
+            $pesan .= " Pengingat ke wali (portal & HP): {$hasil['wali']} kabar per anak.";
+        }
 
         return redirect()->route('reminder_tagihan.index')->with('status', $pesan);
     }

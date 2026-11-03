@@ -91,7 +91,7 @@ class ReminderTagihanTest extends TestCase
         $this->assertSame(0, $svc->kirim()['terkirim']);
 
         ReminderSetting::create(['id' => 1, 'aktif' => false]);
-        $this->assertSame(['terkirim' => 0, 'kandidat' => 0], $svc->kirim());
+        $this->assertSame(['terkirim' => 0, 'kandidat' => 0, 'wali' => 0], $svc->kirim());
     }
 
     public function test_tagihan_terlambat_memakai_titik_terkecil(): void
@@ -104,6 +104,47 @@ class ReminderTagihanTest extends TestCase
             ->where('id_pengguna', $this->admin)->first();
         $this->assertNotNull($notif);
         $this->assertStringContainsString('TERLAMBAT 5 hari', $notif->pesan);
+    }
+
+    /** Wali ikut diingatkan (portal + push HP): H-3, H-1, lalu sekali sesudah lewat — tiap titik sekali (keputusan user 3 Nov 2026). */
+    public function test_wali_diingatkan_tiap_titik_sekali_dan_sesudah_lewat(): void
+    {
+        $tagihan = $this->buatTagihan(now()->addDays(3)->toDateString());
+        $wali = $tagihan->santri->wali;
+        $wali->update(['email_ayah' => 'budi@contoh.id', 'email_ibu' => 'siti@contoh.id']);
+        \Illuminate\Support\Facades\DB::table('bahasa_wali')->insert(['id_wali' => $wali->id, 'peran' => 'ibu', 'bahasa' => 'en']);
+        $svc = new ReminderTagihanService;
+        $kabar = fn () => \App\Models\NotifikasiWali::where('jenis', 'pengingat_tagihan')->orderBy('id')->get();
+
+        $this->assertSame(1, $svc->kirim()['wali']);
+        $this->assertSame(['ayah', 'ibu'], $kabar()->pluck('peran')->all());
+        $ayah = $kabar()->firstWhere('peran', 'ayah');
+        $this->assertSame('tagihan', $ayah->kategori);
+        $this->assertSame('Pengingat jatuh tempo tagihan — AHMAD', $ayah->judul);
+        $this->assertStringContainsString('Registrasi UJI Rp 150.000, jatuh tempo', $ayah->pesan);
+        $this->assertStringContainsString('(3 hari lagi)', $ayah->pesan);
+        $this->assertStringContainsString('(in 3 days)', $kabar()->firstWhere('peran', 'ibu')->pesan);
+
+        // Hari yang sama / titik yang sama: tak berulang.
+        $this->assertSame(0, $svc->kirim()['wali']);
+        $this->travel(1)->days();
+        $this->assertSame(0, $svc->kirim()['wali'], 'H-2 masih titik H-3');
+
+        $this->travel(1)->days();   // H-1
+        $this->assertSame(1, $svc->kirim()['wali']);
+        $this->travel(2)->days();   // lewat 1 hari
+        $this->assertSame(1, $svc->kirim()['wali']);
+        $this->assertStringStartsWith('Tagihan lewat jatuh tempo', $kabar()->where('peran', 'ayah')->last()->judul);
+        $this->travel(3)->days();
+        $this->assertSame(0, $svc->kirim()['wali'], 'kabar lewat jatuh tempo hanya sekali');
+        $this->assertCount(6, $kabar());
+
+        // Sumber tagihan santri dimatikan: wali pun tak diingatkan.
+        TagihanSantri::create(['id_santri' => $tagihan->id_santri, 'kode_jenis' => 'REG', 'periode' => 'UJI-2',
+            'nominal' => '50000', 'sisa' => '50000', 'status' => 'belum_bayar', 'jatuh_tempo' => now()->addDay()->toDateString()]);
+        $svc->simpan(['aktif' => true, 'hari_sebelum' => '7,3,1', 'sumber_tagihan_santri' => false, 'sumber_invoice_vendor' => true,
+            'sumber_angsuran_uang_pangkal' => true, 'penerima_admin' => true, 'penerima_tim_keuangan' => true, 'penerima_akses_modul' => false, 'jam_kirim' => '07:00']);
+        $this->assertSame(0, $svc->kirim()['wali']);
     }
 
     public function test_parse_hari_normalisasi(): void

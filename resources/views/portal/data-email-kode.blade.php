@@ -20,5 +20,6 @@
                class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] focus:border-brand focus:ring-brand">
         <button class="mt-4 w-full rounded-2xl bg-brand py-3 text-sm font-bold text-white">{{ __('Ganti email :peran', ['peran' => mb_strtolower(__($label))]) }}</button>
     </form>
-    <a href="{{ route('portal.data.email', $peran) }}" class="mt-5 block text-center text-sm font-semibold text-brand">{{ __('Salah ketik? Ulangi dari awal') }}</a>
+    @include('portal._kirim-ulang', ['aksi' => route('portal.data.email.kode.ulang'), 'sisa' => $sisaJeda])
+    <a href="{{ route('portal.data.email', $peran) }}" class="mt-3 block text-center text-sm font-semibold text-brand">{{ __('Salah ketik? Ulangi dari awal') }}</a>
 @endsection

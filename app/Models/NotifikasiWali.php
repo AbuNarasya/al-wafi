@@ -28,7 +28,7 @@ class NotifikasiWali extends Model
     /** Jenis kabar → kategori. Jenis yang tak terdaftar masuk "lainnya". */
     public const JENIS_KATEGORI = [
         'pembayaran_santri_ditolak' => 'tagihan', 'pembayaran_santri_diverifikasi' => 'tagihan',
-        'midtrans_lunas' => 'tagihan', 'tagihan_terbit' => 'tagihan', 'va_dibatalkan' => 'tagihan',
+        'midtrans_lunas' => 'tagihan', 'tagihan_terbit' => 'tagihan', 'pengingat_tagihan' => 'tagihan', 'va_dibatalkan' => 'tagihan',
         'topup_dompet_ditolak' => 'dompet', 'mutasi_dompet' => 'dompet',
         'tarik_tunai' => 'pengajuan', 'tarik_tabungan' => 'pengajuan', 'pengunduran_diri' => 'pengajuan', 'klinik' => 'kesehatan',
         'laundry_selesai' => 'laundry', 'laundry_diserahkan' => 'laundry', 'laundry_kuota' => 'laundry',

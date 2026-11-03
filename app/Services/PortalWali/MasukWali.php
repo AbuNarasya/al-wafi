@@ -27,7 +27,8 @@ class MasukWali
 {
     public const MENIT = 10;
 
-    public const JEDA_DETIK = 60;
+    /** Jeda minta kode lagi untuk email & tujuan yang sama — tombol "Kirim ulang kode" terbuka sesudahnya (keputusan user 3 Nov 2026). */
+    public const JEDA_DETIK = 180;
 
     public const MAKS_SALAH = 5;
 
@@ -66,9 +67,8 @@ class MasukWali
             throw new AppException(422, __('Alamat email tidak sah.'));
         }
 
-        $terakhir = OtpWali::where('email', $email)->where('tujuan', $tujuan)->latest('id')->value('created_at');
-        if ($terakhir && now()->diffInSeconds($terakhir, true) < self::JEDA_DETIK) {
-            throw new AppException(429, __('Kode baru saja dikirim. Tunggu satu menit sebelum meminta lagi.'));
+        if (($sisa = $this->sisaJeda($email, $tujuan)) > 0) {
+            throw new AppException(429, __('Kode baru saja dikirim. Tunggu :menit menit sebelum meminta lagi.', ['menit' => (int) ceil($sisa / 60)]));
         }
         foreach (['email' => [$email, self::BATAS_EMAIL], 'ip' => [$ip ?? '-', self::BATAS_IP]] as $jenis => [$nilai, [$maks, $detik]]) {
             $kunci = "portal-otp:{$jenis}:{$nilai}";
@@ -94,6 +94,14 @@ class MasukWali
         Notification::route('mail', $email)->notify((new KodeMasukWali($kode, self::MENIT))->locale(app()->getLocale()));
 
         return self::modeUji() ? $kode : null;
+    }
+
+    /** Detik yang tersisa sebelum kode baru boleh diminta (0 = boleh sekarang). */
+    public function sisaJeda(string $email, string $tujuan): int
+    {
+        $terakhir = OtpWali::where('email', self::normalEmail($email))->where('tujuan', $tujuan)->latest('id')->value('created_at');
+
+        return $terakhir ? max(0, self::JEDA_DETIK - (int) now()->diffInSeconds($terakhir, true)) : 0;
     }
 
     /** Benar = kode terbaru, belum kedaluwarsa, belum dipakai. Lima kali salah = kodenya hangus. */

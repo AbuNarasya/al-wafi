@@ -43,9 +43,13 @@ class LaundryService
         $kuota = new TagihanLaundryService;
         $sebelum = $kuota->ringkas($santri);
 
-        return DB::transaction(function () use ($santri, $berat, $baris, $catatan, $cara, $idPengguna, $kuota, $sebelum) {
-            DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('laundry-nomor')]);
-            $base = DocNumber::docBase('LDR', now());
+        // Nomor per pusat penerimaan (keputusan user 3 Nov 2026): LDI- ikhwan, LDA- akhwat, urutan masing-masing.
+        // Kantong lama tetap LDR-. Kuncinya juga per awalan — dua pusat tak saling menunggu.
+        $awalan = self::awalanNomor($santri);
+
+        return DB::transaction(function () use ($santri, $berat, $baris, $catatan, $cara, $idPengguna, $kuota, $sebelum, $awalan) {
+            DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('laundry-nomor-'.$awalan)]);
+            $base = DocNumber::docBase($awalan, now());
             $l = Laundry::create([
                 'nomor' => DocNumber::nextDocNumber($base, Laundry::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor')),
                 'id_santri' => $santri->id, 'berat' => $berat, 'catatan' => trim((string) $catatan) ?: null,
@@ -170,6 +174,16 @@ class LaundryService
     }
 
     /** Kabar ke keluarga (kategori push "Progress laundry"), disusun per orang dalam bahasanya. Tak pernah menggagalkan transaksi. */
+    /** Awalan nomor kantong menurut pusat penerimaan: LDI (ikhwan), LDA (akhwat). */
+    public static function awalanNomor(Santri $santri): string
+    {
+        return match (\App\Support\BagianLaundry::dariJk($santri->jenis_kelamin)) {
+            'akhwat' => 'LDA',
+            'ikhwan' => 'LDI',
+            default => throw new AppException(422, "Jenis kelamin {$santri->nama} belum diisi, jadi belum masuk laundry ikhwan maupun akhwat. Lengkapi datanya dulu."),
+        };
+    }
+
     private function kabari(Laundry $l, Teks $judul, Teks $pesan, string $jenis): void
     {
         try {

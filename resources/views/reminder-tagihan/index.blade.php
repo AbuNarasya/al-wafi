@@ -90,6 +90,10 @@
                         terkirim tidak dikirim ulang. Pengiriman otomatis butuh scheduler aktif
                         (<code class="rounded bg-gray-100 px-1">php artisan schedule:work</code>).
                     </p>
+                    <p class="mt-2 text-sm text-gray-500">
+                        Bila sumber <b>Tagihan santri</b> aktif, <b>wali</b> ikut diingatkan lewat kabar Portal Wali &amp;
+                        notifikasi HP pada titik yang sama, plus satu kali sesudah lewat jatuh tempo — satu kabar per anak.
+                    </p>
                     <form method="POST" action="{{ route('reminder_tagihan.kirim') }}" class="mt-4"
                           data-confirm="Kirim reminder tagihan sekarang ke semua penerima?">
                         @csrf

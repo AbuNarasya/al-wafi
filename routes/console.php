@@ -14,7 +14,7 @@ Artisan::command('inspire', function () {
 
 Artisan::command('reminder:tagihan', function (ReminderTagihanService $service) {
     $hasil = $service->kirim();
-    $this->info("Reminder tagihan: {$hasil['terkirim']} notifikasi baru ({$hasil['kandidat']} tagihan dalam jendela pengingat).");
+    $this->info("Reminder tagihan: {$hasil['terkirim']} notifikasi baru ({$hasil['kandidat']} tagihan dalam jendela pengingat); {$hasil['wali']} kabar pengingat ke wali.");
 })->purpose('Kirim notifikasi reminder tagihan yang mendekati jatuh tempo');
 
 // Jadwal harian pada jam dari pengaturan. try/catch: file ini juga dimuat saat

@@ -48,8 +48,10 @@ class KebijakanKhususController extends Controller
             'jenisOptions' => KebijakanKhusus::JENIS,
             'caraOptions' => KebijakanKhusus::CARA,
             'taOptions' => ['' => '— semua tahun ajaran —'] + TahunAjaran::orderByDesc('kode')->pluck('kode', 'kode')->all(),
+            // TANPA batas jumlah: dulu limit(500) menyembunyikan santri setelah urutan ke-500 menurut abjad
+            // (produksi 764 santri aktif, laporan user 3 Nov 2026). Kotak pilihnya bisa dicari.
             'santriOptions' => Santri::whereIn('status', ['aktif', 'calon'])->orderBy('nama')
-                ->limit(500)->get()->mapWithKeys(fn ($s) => [$s->id => trim("{$s->nama} ({$s->nis})", ' ()')])->all(),
+                ->get(['id', 'nama', 'nis'])->mapWithKeys(fn ($s) => [$s->id => trim("{$s->nama} ({$s->nis})", ' ()')])->all(),
             // Surat yang masih kurang per baris — dihitung sekali per halaman.
             'kurangSurat' => collect($rows->items())->mapWithKeys(
                 fn ($k) => [$k->id => $this->service->suratYangKurang($k->id)],

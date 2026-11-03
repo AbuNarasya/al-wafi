@@ -20,7 +20,12 @@
             'cp_wali_kelas_asal' => ['Kontak wali kelas', 'tel'],
         ],
     ];
+    $opsional = '<span class="text-xs font-normal text-slate-400">('.e(__('tidak wajib')).')</span>';
 @endphp
+
+@unless ($banyak)
+    @include('portal._keterangan-wajib')
+@endunless
 
 <section class="space-y-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
     <h2 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span>{{ __('Identitas') }}</h2>
@@ -43,19 +48,19 @@
     </div>
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-            <label for="{{ $id('tempat_lahir') }}" class="{{ $kelasLabel }}">{{ __('Tempat lahir') }}</label>
-            <input id="{{ $id('tempat_lahir') }}" name="{{ $nm('tempat_lahir') }}" value="{{ old($kunci('tempat_lahir'), $santri->tempat_lahir) }}" maxlength="255" class="{{ $kelasInput }}">
+            <label for="{{ $id('tempat_lahir') }}" class="{{ $kelasLabel }}">{{ __('Tempat lahir') }} <span class="text-red-500">*</span></label>
+            <input id="{{ $id('tempat_lahir') }}" name="{{ $nm('tempat_lahir') }}" value="{{ old($kunci('tempat_lahir'), $santri->tempat_lahir) }}" maxlength="255" required class="{{ $kelasInput }}">
             @error($kunci('tempat_lahir'))<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
         </div>
         <div>
-            <label for="{{ $id('tanggal_lahir') }}" class="{{ $kelasLabel }}">{{ __('Tanggal lahir') }}</label>
+            <label for="{{ $id('tanggal_lahir') }}" class="{{ $kelasLabel }}">{{ __('Tanggal lahir') }} <span class="text-red-500">*</span></label>
             <input id="{{ $id('tanggal_lahir') }}" type="date" name="{{ $nm('tanggal_lahir') }}" max="{{ now()->subDay()->format('Y-m-d') }}"
-                   value="{{ old($kunci('tanggal_lahir'), $santri->tanggal_lahir?->format('Y-m-d')) }}" class="{{ $kelasInput }}">
+                   value="{{ old($kunci('tanggal_lahir'), $santri->tanggal_lahir?->format('Y-m-d')) }}" required class="{{ $kelasInput }}">
             @error($kunci('tanggal_lahir'))<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
         </div>
     </div>
     <div>
-        <label for="{{ $id('nisn') }}" class="{{ $kelasLabel }}">{{ __('NISN') }}</label>
+        <label for="{{ $id('nisn') }}" class="{{ $kelasLabel }}">{{ __('NISN') }} {!! $opsional !!}</label>
         <input id="{{ $id('nisn') }}" name="{{ $nm('nisn') }}" inputmode="numeric" data-bukan-rupiah value="{{ old($kunci('nisn'), $santri->nisn) }}" maxlength="20" class="{{ $kelasInput }}">
         <p class="mt-1 text-xs text-slate-500">{{ __('Nomor Induk Siswa Nasional, 10 angka — tertera di rapor / kartu NISN.') }}</p>
         @error($kunci('nisn'))<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
@@ -67,7 +72,7 @@
         <h2 class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span>{{ __($judul) }}</h2>
         @foreach ($kolom as $nama => [$label, $jenis])
             <div>
-                <label for="{{ $id($nama) }}" class="{{ $kelasLabel }}">{{ __($label) }}</label>
+                <label for="{{ $id($nama) }}" class="{{ $kelasLabel }}">{{ __($label) }} {!! $opsional !!}</label>
                 @if ($jenis === 'textarea')
                     <textarea id="{{ $id($nama) }}" name="{{ $nm($nama) }}" rows="2" maxlength="1000" class="{{ $kelasInput }}">{{ old($kunci($nama), $santri->{$nama}) }}</textarea>
                 @else

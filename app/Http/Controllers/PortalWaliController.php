@@ -130,7 +130,26 @@ class PortalWaliController extends Controller
             return redirect()->route('portal.masuk');
         }
 
-        return view('portal.kode', ['tujuan' => MasukWali::samarkanEmail($email), 'menit' => MasukWali::MENIT]);
+        return view('portal.kode', [
+            'tujuan' => MasukWali::samarkanEmail($email), 'menit' => MasukWali::MENIT,
+            'sisaJeda' => $this->masuk->sisaJeda($email, 'masuk'),
+        ]);
+    }
+
+    /** Kirim ulang kode ke email yang sedang menunggu — terbuka sesudah MasukWali::JEDA_DETIK. */
+    public function kirimUlangKode(Request $request): RedirectResponse
+    {
+        $email = $request->session()->get(SesiWali::MENUNGGU);
+        if (! $email) {
+            return redirect()->route('portal.masuk');
+        }
+        try {
+            $kodeUji = $this->masuk->mintaKode($email, 'masuk', $request->ip());
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('portal.kode')->with('kode_uji', $kodeUji)->with('status', __('Kode baru sudah dikirim. Kode sebelumnya tidak berlaku lagi.'));
     }
 
     public function periksaKode(Request $request): View|RedirectResponse

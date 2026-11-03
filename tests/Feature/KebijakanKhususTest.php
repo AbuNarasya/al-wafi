@@ -102,6 +102,24 @@ class KebijakanKhususTest extends TestCase
         return $s->refresh();
     }
 
+    /** Dulu dibatasi 500 menurut abjad: santri ke-501 (produksi 764 santri) tak bisa dipilih (laporan user 3 Nov 2026). */
+    public function test_pilihan_santri_memuat_semua_santri_aktif_tanpa_batas_500(): void
+    {
+        $dasar = $this->santri('AAA Pertama');
+        $baris = $dasar->replicate(['nis'])->getAttributes();
+        $salinan = [];
+        for ($i = 0; $i < 510; $i++) {
+            $salinan[] = ['nama' => sprintf('B Santri %03d', $i), 'nis' => null, 'no_pendaftaran' => sprintf('UJI-%04d', $i)] + $baris;
+        }
+        foreach (array_chunk($salinan, 100) as $potong) {
+            Santri::insert($potong);
+        }
+        $this->santri('ZAINAB TERAKHIR');
+
+        $this->actingAs(User::find($this->admin))->get(route('kebijakan_khusus.index'))->assertOk()
+            ->assertSee('AAA PERTAMA')->assertSee('ZAINAB TERAKHIR');
+    }
+
     private function ajukan(Santri $s, array $ubah = []): KebijakanKhusus
     {
         return (new KebijakanKhususService)->ajukan(array_merge([

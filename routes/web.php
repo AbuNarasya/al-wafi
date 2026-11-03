@@ -146,6 +146,7 @@ Route::prefix('wali')->name('portal.')->controller(PortalWaliController::class)-
     Route::get('/lupa-password', 'formLupa')->name('lupa_sandi');
     Route::get('/kode', 'formKode')->name('kode');
     Route::post('/kode', 'periksaKode')->middleware('throttle:20,1');
+    Route::post('/kode/ulang', 'kirimUlangKode')->name('kode.ulang')->middleware('throttle:5,1');
     Route::post('/keluar', 'keluar')->name('keluar');
     // Bahasa portal (Indonesia / English / العربية) — boleh sebelum masuk; sesudah masuk ikut tersimpan per orang.
     Route::post('/bahasa', 'gantiBahasa')->name('bahasa')->middleware('throttle:30,1');
@@ -249,6 +250,7 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(Po
     Route::post('/pin/kode', 'mintaKodePin')->name('pin.kode')->middleware('throttle:5,1');
     Route::get('/pin/konfirmasi', 'formKonfirmasiPin')->name('pin.konfirmasi');
     Route::post('/pin/konfirmasi', 'konfirmasiPin')->middleware('throttle:10,1');
+    Route::post('/pin/konfirmasi/ulang', 'kirimUlangKodePin')->name('pin.konfirmasi.ulang')->middleware('throttle:5,1');
     Route::post('/pin/ganti', 'gantiPin')->name('pin.ganti')->middleware('throttle:10,1');
     Route::get('/dompet/pindah', 'formPindah')->name('dompet.pindah');
     Route::post('/dompet/pindah', 'pindah')->middleware('throttle:10,1');
@@ -265,6 +267,7 @@ Route::prefix('wali/data')->name('portal.')->middleware('portal.wali')->controll
     Route::put('/keluarga', 'simpanKeluarga')->middleware('throttle:20,1');
     Route::get('/email/kode', 'formKodeEmail')->name('data.email.kode');
     Route::post('/email/kode', 'konfirmasiEmail')->middleware('throttle:10,1');
+    Route::post('/email/kode/ulang', 'kirimUlangKodeEmail')->name('data.email.kode.ulang')->middleware('throttle:5,1');
     Route::get('/email/{peran}', 'formEmail')->name('data.email')->whereIn('peran', ['ayah', 'ibu', 'wali']);
     Route::post('/email/{peran}', 'kirimKodeEmail')->whereIn('peran', ['ayah', 'ibu', 'wali'])->middleware('throttle:5,1');
 });

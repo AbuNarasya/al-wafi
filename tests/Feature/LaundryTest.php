@@ -158,6 +158,11 @@ class LaundryTest extends TestCase
         $this->actingAs($petugasAkhwat)->post(route('laundry.simpan_terima'), ['kartu' => 'KARTUP01', 'berat' => '2',
             'item' => [['id_jenis_pakaian' => $this->gamis, 'jumlah' => 2]]])->assertSessionHas('status');
         $l = Laundry::sole();
+        // Nomor per pusat penerimaan: akhwat LDA-, urutannya sendiri.
+        $this->assertSame('LDA-'.now()->format('ym').'-0001', $l->nomor);
+        Akses::lupakan();
+        $this->terima(['kartu' => 'KARTU001'])->assertSessionHas('status');
+        $this->assertSame('LDI-'.now()->format('ym').'-0001', Laundry::where('id_santri', $this->ahmad->id)->value('nomor'), 'ikhwan mulai dari 0001 sendiri');
         $this->actingAs($petugasAkhwat)->get(route('laundry.papan', 'akhwat'))->assertOk()->assertSee('SITI AISYAH');
         $this->actingAs($petugasAkhwat)->get(route('laundry.papan', 'ikhwan'))->assertForbidden();
 

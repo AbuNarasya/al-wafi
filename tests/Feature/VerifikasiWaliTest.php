@@ -177,8 +177,10 @@ class VerifikasiWaliTest extends TestCase
         Notification::assertSentOnDemandTimes(KodeMasukWali::class, 0);
 
         // ② Data santri.
-        $this->get(route('portal.verifikasi.santri'))->assertOk()->assertSee('AHMAD');
-        $this->put(route('portal.verifikasi.santri'), ['santri' => [$this->ahmad->id => ['jenis_kelamin' => 'L', 'tempat_lahir' => 'Bogor']]])
+        $this->get(route('portal.verifikasi.santri'))->assertOk()->assertSee('AHMAD')->assertSee('tidak wajib')->assertSee('wajib diisi');
+        $this->put(route('portal.verifikasi.santri'), ['santri' => [$this->ahmad->id => ['jenis_kelamin' => 'L', 'tempat_lahir' => '', 'tanggal_lahir' => '']]])
+            ->assertSessionHasErrors(["santri.{$this->ahmad->id}.tempat_lahir", "santri.{$this->ahmad->id}.tanggal_lahir"]);
+        $this->put(route('portal.verifikasi.santri'), ['santri' => [$this->ahmad->id => ['jenis_kelamin' => 'L', 'tempat_lahir' => 'Bogor', 'tanggal_lahir' => '2013-05-02']]])
             ->assertRedirect(route('portal.verifikasi.konfirmasi'));
         $this->assertSame('Bogor', $this->ahmad->fresh()->tempat_lahir);
 

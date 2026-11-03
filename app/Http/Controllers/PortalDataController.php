@@ -70,6 +70,11 @@ class PortalDataController extends Controller
     public function simpanSantri(Request $request, int $id): RedirectResponse
     {
         $santri = $this->anak($id);
+        // Status dulu, baru isian — santri berstatus akhir tak perlu ditegur soal isian wajib.
+        if (! UbahDataWali::bolehUbahSantri($santri)) {
+            return redirect()->route('portal.data')->with('error', __('Data santri berstatus :status tidak bisa diubah lewat portal. Hubungi bagian kesantrian.',
+                ['status' => \App\Support\BahasaPortal::statusSantri((string) $santri->status)]));
+        }
         $data = $request->validate(...self::aturanSantri());
 
         try {
@@ -117,8 +122,9 @@ class PortalDataController extends Controller
     {
         $aturan = [
             'jenis_kelamin' => ['required', Rule::in(array_keys(UbahDataWali::JENIS_KELAMIN))],
-            'tempat_lahir' => ['nullable', 'string', 'max:255'],
-            'tanggal_lahir' => ['nullable', 'date', 'before:today'],
+            // Tempat & tanggal lahir wajib (keputusan user 3 Nov 2026).
+            'tempat_lahir' => ['required', 'string', 'max:255'],
+            'tanggal_lahir' => ['required', 'date', 'before:today'],
             'nisn' => ['nullable', 'string', 'regex:/^[0-9]{1,20}$/'],
             'asal_sekolah' => ['nullable', 'string', 'max:255'],
             'alamat_sekolah_asal' => ['nullable', 'string', 'max:1000'],
@@ -233,7 +239,23 @@ class PortalDataController extends Controller
         return view('portal.data-email-kode', [
             'peran' => $peran, 'label' => Wali::PERAN[$peran] ?? $peran,
             'tujuan' => $email, 'menit' => MasukWali::MENIT,
+            'sisaJeda' => app(MasukWali::class)->sisaJeda($email, 'ganti_email'),
         ]);
+    }
+
+    public function kirimUlangKodeEmail(Request $request, MasukWali $masuk): RedirectResponse
+    {
+        [, $email] = $request->session()->get(self::EMAIL_BARU) + [null, null];
+        if (! $email) {
+            return redirect()->route('portal.data', ['tab' => 'wali']);
+        }
+        try {
+            $kodeUji = $masuk->mintaKode($email, 'ganti_email', $request->ip());
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('portal.data.email.kode')->with('kode_uji', $kodeUji)->with('status', __('Kode baru sudah dikirim. Kode sebelumnya tidak berlaku lagi.'));
     }
 
     public function konfirmasiEmail(Request $request, MasukWali $masuk, IngatPerangkat $perangkat): RedirectResponse

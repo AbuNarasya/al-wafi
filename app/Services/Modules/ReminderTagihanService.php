@@ -200,16 +200,18 @@ class ReminderTagihanService
      * pengingat. Aman dipanggil berulang (harian / tombol manual): titik yang
      * sudah terkirim tidak dikirim ulang.
      *
-     * @return array{terkirim:int,kandidat:int}
+     * @return array{terkirim:int,kandidat:int,wali:int} wali = kabar pengingat ke keluarga santri
      */
     public function kirim(): array
     {
         $s = $this->pengaturan();
         if (! $s->aktif) {
-            return ['terkirim' => 0, 'kandidat' => 0];
+            return ['terkirim' => 0, 'kandidat' => 0, 'wali' => 0];
         }
 
         $hari = self::parseHari($s->hari_sebelum);
+        // Wali ikut diingatkan lewat kabar portal & push HP (keputusan user 3 Nov 2026), titik H-n yang sama.
+        $wali = $s->sumber_tagihan_santri ? \App\Services\PortalWali\KabarKeluarga::pengingatJatuhTempo($hari) : 0;
         $penerima = $this->penerima($s);
         $items = [];
 
@@ -235,7 +237,7 @@ class ReminderTagihanService
         }
 
         if ($items === []) {
-            return ['terkirim' => 0, 'kandidat' => 0];
+            return ['terkirim' => 0, 'kandidat' => 0, 'wali' => $wali];
         }
 
         // Dedup terhadap DB: pasangan (id_pengguna, ref_id) yang sudah pernah dikirim.
@@ -264,6 +266,6 @@ class ReminderTagihanService
 
         $hasil = (new NotificationService)->kirim($kirim);
 
-        return ['terkirim' => $hasil['terkirim'], 'kandidat' => count($items)];
+        return ['terkirim' => $hasil['terkirim'], 'kandidat' => count($items), 'wali' => $wali];
     }
 }
