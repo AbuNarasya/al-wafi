@@ -14,7 +14,7 @@
                  Santri (PPSB) maupun Santri (Kependidikan). --}}
             <a href="{{ $kembali }}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Kembali</a>
             <div class="flex items-center gap-2">
-                @if (\App\Support\Akses::boleh('santri', 'ubah'))
+                @if (\App\Support\Akses::boleh('santri', 'ubah') || \App\Support\Akses::boleh('santri-data', 'ubah'))
                     <a href="{{ route('santri.edit', $santri->id) }}" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">✏️ Ubah Data</a>
                 @endif
                 @if (\App\Support\Akses::boleh('rekap-pembayaran'))

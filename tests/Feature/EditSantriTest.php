@@ -195,6 +195,44 @@ class EditSantriTest extends TestCase
         $this->actingAs($orang)->put(route('santri.update', $this->santri->id), $this->isian())->assertForbidden();
     }
 
+    /**
+     * Hak `santri-data` (4 Nov 2026): non-admin boleh melihat semua daftar santri & mengubah biodata TERMASUK nama
+     * (tercatat di Jejak Audit), tanpa aksi tahapan, aktivasi, buat, maupun unduh. Pemegang `santri` (Ubah)
+     * yang bukan admin tetap tak bisa mengubah nama.
+     */
+    public function test_hak_ubah_data_santri_untuk_non_admin(): void
+    {
+        $staf = User::create(['username' => 'zzed_data', 'nama' => 'Staf Data', 'password_hash' => 'x',
+            'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif']);
+        \App\Models\HakAksesModul::create(['id_pengguna' => $staf->id_pengguna, 'kode_modul' => 'santri-data',
+            'lihat' => true, 'ubah' => true, 'buat' => false, 'hapus' => false, 'menu' => true]);
+
+        foreach (['santri.aktif', 'santri.calon', 'santri.alumni', 'santri.keluar', 'santri.mundur', 'santri.siap_aktivasi'] as $rute) {
+            $this->actingAs($staf)->get(route($rute))->assertOk();
+        }
+        $this->actingAs($staf)->get(route('santri.show', $this->santri->id))->assertOk()->assertSee('Ubah Data');
+        $this->actingAs($staf)->get(route('santri.edit', $this->santri->id))->assertOk()->assertSee('Perubahan nama tercatat');
+        $this->actingAs($staf)->get(route('santri.create'))->assertForbidden();
+        $this->actingAs($staf)->get(route('santri.unduh', 'aktif'))->assertForbidden();
+        $this->actingAs($staf)->post(route('santri.aksi', [$this->santri->id, 'luluskan']))->assertForbidden();
+        $this->actingAs($staf)->post(route('santri.aktivasi_massal'))->assertForbidden();
+
+        $this->actingAs($staf)->put(route('santri.update', $this->santri->id), $this->isian(['nama' => 'Zaid bin Umar']))
+            ->assertRedirect(route('santri.show', $this->santri->id));
+        $this->assertSame('ZAID BIN UMAR', $this->santri->fresh()->nama);
+        $jejak = \App\Models\ActivityLog::where('aksi', 'ubah_nama_santri')->sole();
+        $detail = is_array($jejak->detail) ? $jejak->detail : json_decode((string) $jejak->detail, true);
+        $this->assertSame([$staf->id_pengguna, 'ZAID', 'ZAID BIN UMAR'], [(int) $jejak->id_pengguna, $detail['lama'], $detail['baru']]);
+
+        // Pemegang `santri` (Ubah) non-admin: nama tetap terkunci.
+        $psb = User::create(['username' => 'zzed_psb', 'nama' => 'Petugas PSB', 'password_hash' => 'x',
+            'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif']);
+        \App\Models\HakAksesModul::create(['id_pengguna' => $psb->id_pengguna, 'kode_modul' => 'santri',
+            'lihat' => true, 'ubah' => true, 'buat' => false, 'hapus' => false, 'menu' => true]);
+        $this->actingAs($psb)->put(route('santri.update', $this->santri->id), $this->isian(['nama' => 'Nama Lain']))->assertRedirect();
+        $this->assertSame('ZAID BIN UMAR', $this->santri->fresh()->nama);
+    }
+
     public function test_wali_bisa_dipindahkan(): void
     {
         $baru = Wali::create(['nama' => 'Wali Baru', 'telepon' => '081200003', 'status' => 'aktif']);

@@ -183,7 +183,8 @@ class TingkatJenjangTest extends TestCase
         // Selain Wali (dan Kartu Santri, modulnya sendiri), semuanya memakai modul hak akses yang sama.
         $this->assertSame(
             ['wali', 'santri', 'pengunduran-diri', 'kelas', 'kartu-santri'],
-            $menu->pluck('modul')->unique()->values()->all(),
+            // Daftar santri terbuka bagi `santri` ATAU `santri-data` (4 Nov 2026) — modul utamanya tetap `santri`.
+            $menu->map(fn ($n) => $n['modul'] ?? $n['modulAny'][0] ?? null)->unique()->values()->all(),
         );
         // Grupnya tanpa sub: satu deret, tak perlu ketukan tambahan.
         $this->assertSame([], $menu->pluck('sub')->filter()->all());

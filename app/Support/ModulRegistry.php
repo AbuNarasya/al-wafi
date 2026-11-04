@@ -143,6 +143,8 @@ final class ModulRegistry
         // satu daftar orang yang sama dengan penyaring berbeda.
         ['kode' => 'wali', 'nama' => 'Wali / Keluarga Santri', 'grup' => 'DATA SISWA/SANTRI'],
         ['kode' => 'santri', 'nama' => 'Calon Santri & Santri (semua tahap)', 'grup' => 'DATA SISWA/SANTRI'],
+        // 4 Nov 2026: edit biodata saja — tanpa aksi tahapan PPSB, aktivasi, buat, unduh. Boleh mengubah NAMA (tercatat di Jejak Audit).
+        ['kode' => 'santri-data', 'nama' => 'Ubah Data Santri — biodata saja, termasuk nama (lihat · ubah)', 'grup' => 'DATA SISWA/SANTRI'],
         // TANPA MENU sendiri: dibuka dari halaman santri. Ikut ke grup ini karena
         // isinya berkas orang yang sama, bukan urusan pendaftaran.
         ['kode' => 'dokumen-santri', 'nama' => 'Berkas Santri (KTP, akta, KK, med check)', 'grup' => 'DATA SISWA/SANTRI'],

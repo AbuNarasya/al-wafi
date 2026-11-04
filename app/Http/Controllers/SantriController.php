@@ -277,12 +277,18 @@ class SantriController extends Controller
      *  • `no_pendaftaran` — nomor dokumen yang sudah tercetak & dirujuk.
      *  • `nominal_spp` — sudah punya jalurnya sendiri (SPP → nominal khusus).
      */
+    /** Nama santri boleh diubah admin & pemegang hak `santri-data` (Ubah). */
+    public static function bolehUbahNama(): bool
+    {
+        return (bool) auth()->user()?->is_admin || Akses::boleh('santri-data', 'ubah');
+    }
+
     public function update(Request $request, int $id): RedirectResponse
     {
         $santri = Santri::findOrFail($id);
-        // Nama santri hanya bisa diubah ADMIN (keputusan user 14 Okt 2026). Dari staf lain
-        // nama tak diterima sama sekali — dibuang walau ikut terkirim.
-        $admin = (bool) $request->user()?->is_admin;
+        // Nama santri hanya bisa diubah ADMIN atau pemegang hak `santri-data` (keputusan user 14 Okt & 4 Nov 2026).
+        // Dari staf lain nama tak diterima sama sekali — dibuang walau ikut terkirim.
+        $admin = self::bolehUbahNama();
 
         $data = $request->validate([
             'id_wali' => ['required', 'integer', 'exists:wali,id'],
@@ -307,11 +313,16 @@ class SantriController extends Controller
         if (! $admin) {
             unset($data['nama']);
         }
+        $namaLama = $santri->nama;
 
         try {
-            $this->service->update($id, $data);
+            $baru = $this->service->update($id, $data);
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
+        }
+        if ($baru->nama !== $namaLama) {
+            \App\Support\Audit\Jejak::catat('ubah_nama_santri', ['modul' => 'santri-data', 'ref_jenis' => 'Santri', 'ref_id' => $id,
+                'id_pengguna' => $request->user()?->id_pengguna, 'detail' => ['lama' => $namaLama, 'baru' => $baru->nama]]);
         }
 
         return redirect()->route('santri.show', $id)->with('status', 'Data santri diperbarui.');

@@ -191,25 +191,25 @@ final class Navigation
         // Urutannya mengikuti perjalanan santri: keluarganya → calon (diproses →
         // siap aktivasi → mundur) → aktif → dua daftar arsip.
         ['url' => '/datawali', 'label' => 'Wali / Keluarga', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'wali'],
-        ['url' => '/ppsb/calon-santri', 'label' => 'Calon Santri', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        ['url' => '/ppsb/calon-santri', 'label' => 'Calon Santri', 'group' => 'DATA SISWA/SANTRI', 'modulAny' => ['santri', 'santri-data']],
         // Berkasnya tuntas, tinggal menunggu tahun ajarannya dimulai. Dipisah dari
         // Calon Santri supaya jumlah yang MASIH diproses tak bercampur dengan yang
         // sudah selesai diurus — dan supaya aktivasi massalnya punya satu tempat.
-        ['url' => '/ppsb/siap-aktivasi', 'label' => 'Calon Santri Siap Aktivasi', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        ['url' => '/ppsb/siap-aktivasi', 'label' => 'Calon Santri Siap Aktivasi', 'group' => 'DATA SISWA/SANTRI', 'modulAny' => ['santri', 'santri-data']],
         // Arsip, sejajar dengan Alumni & Santri Keluar: calon yang mundur bukan
         // lagi pekerjaan berjalan, dan membiarkannya di daftar Calon membuat
         // jumlah pendaftar di layar tak pernah sama dengan yang ditunggu.
-        ['url' => '/ppsb/calon-mundur', 'label' => 'Calon Mengundurkan Diri', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        ['url' => '/ppsb/calon-mundur', 'label' => 'Calon Mengundurkan Diri', 'group' => 'DATA SISWA/SANTRI', 'modulAny' => ['santri', 'santri-data']],
         // SATU daftar untuk seluruh jenjang. Penyaring jenjang ada DI HALAMANNYA
         // (`?jenjang=…`), bukan dipecah jadi menu sendiri-sendiri seperti dulu:
         // sidebar jadi memanjang seiring bertambahnya jenjang, padahal isinya
         // halaman yang sama dengan satu penyaring berbeda.
-        ['url' => '/kesantrian/santri', 'label' => 'Santri Aktif', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        ['url' => '/kesantrian/santri', 'label' => 'Santri Aktif', 'group' => 'DATA SISWA/SANTRI', 'modulAny' => ['santri', 'santri-data']],
         // Alumni & santri keluar berdaftar SENDIRI: dulu keduanya ikut nongol di
         // daftar Santri, sehingga jumlah di layar tak pernah sama dengan jumlah
         // santri yang benar-benar bersekolah. Modul hak aksesnya tetap `santri`.
-        ['url' => '/kesantrian/alumni', 'label' => 'Alumni', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
-        ['url' => '/kesantrian/santri-keluar', 'label' => 'Santri Keluar', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
+        ['url' => '/kesantrian/alumni', 'label' => 'Alumni', 'group' => 'DATA SISWA/SANTRI', 'modulAny' => ['santri', 'santri-data']],
+        ['url' => '/kesantrian/santri-keluar', 'label' => 'Santri Keluar', 'group' => 'DATA SISWA/SANTRI', 'modulAny' => ['santri', 'santri-data']],
         ['url' => '/kesantrian/absensi-asrama', 'label' => 'Absensi Asrama (ISE)', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modul' => 'absensi-asrama'],
         ['url' => '/kesantrian/perizinan', 'label' => 'Perizinan Insidental', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modulAny' => ['perizinan', 'perizinan-tingkat-1', 'perizinan-tingkat-2']],
         ['url' => '/kesantrian/perizinan-rutin', 'label' => 'Perizinan Rutin', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modulAny' => ['perizinan', 'perizinan-tingkat-1', 'perizinan-tingkat-2', 'perizinan-jadwal']],

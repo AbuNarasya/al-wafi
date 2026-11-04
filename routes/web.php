@@ -1222,17 +1222,17 @@ Route::middleware('auth')->group(function () {
     // tetap menempel pada orang yang sama. Keempatnya memakai modul hak akses
     // `santri` — tak ada hak akses baru yang perlu diberikan.
     Route::controller(SantriController::class)->group(function () {
-        Route::get('/ppsb/calon-santri', 'index')->name('santri.calon')->defaults('lingkup', 'calon')->middleware('hakakses:santri,lihat');
+        Route::get('/ppsb/calon-santri', 'index')->name('santri.calon')->defaults('lingkup', 'calon')->middleware('hakakses:santri|santri-data,lihat');
         // Calon yang mundur berdaftar sendiri — arsip PPSB, bukan pekerjaan berjalan.
-        Route::get('/ppsb/calon-mundur', 'index')->name('santri.mundur')->defaults('lingkup', 'mundur')->middleware('hakakses:santri,lihat');
+        Route::get('/ppsb/calon-mundur', 'index')->name('santri.mundur')->defaults('lingkup', 'mundur')->middleware('hakakses:santri|santri-data,lihat');
         // Calon yang berkasnya sudah tuntas & tinggal menunggu tahun ajarannya
         // dimulai. Berdaftar sendiri supaya jumlah "calon yang masih diproses"
         // di layar tak bercampur dengan yang sudah selesai diurus.
-        Route::get('/ppsb/siap-aktivasi', 'index')->name('santri.siap_aktivasi')->defaults('lingkup', 'siap_aktivasi')->middleware('hakakses:santri,lihat');
+        Route::get('/ppsb/siap-aktivasi', 'index')->name('santri.siap_aktivasi')->defaults('lingkup', 'siap_aktivasi')->middleware('hakakses:santri|santri-data,lihat');
         Route::post('/ppsb/siap-aktivasi/aktifkan', 'aktivasiMassal')->name('santri.aktivasi_massal')->middleware('hakakses:santri,ubah');
-        Route::get('/kesantrian/santri', 'index')->name('santri.aktif')->defaults('lingkup', 'aktif')->middleware('hakakses:santri,lihat');
-        Route::get('/kesantrian/alumni', 'index')->name('santri.alumni')->defaults('lingkup', 'alumni')->middleware('hakakses:santri,lihat');
-        Route::get('/kesantrian/santri-keluar', 'index')->name('santri.keluar')->defaults('lingkup', 'keluar')->middleware('hakakses:santri,lihat');
+        Route::get('/kesantrian/santri', 'index')->name('santri.aktif')->defaults('lingkup', 'aktif')->middleware('hakakses:santri|santri-data,lihat');
+        Route::get('/kesantrian/alumni', 'index')->name('santri.alumni')->defaults('lingkup', 'alumni')->middleware('hakakses:santri|santri-data,lihat');
+        Route::get('/kesantrian/santri-keluar', 'index')->name('santri.keluar')->defaults('lingkup', 'keluar')->middleware('hakakses:santri|santri-data,lihat');
         // Unduh daftar yang sedang tampil — satu rute untuk keenam daftar, membawa
         // penyaring & pencarian yang aktif lewat query string.
         Route::get('/santri/unduh/{lingkup}', 'unduh')->name('santri.unduh')
@@ -1240,11 +1240,11 @@ Route::middleware('auth')->group(function () {
             ->middleware('hakakses:santri,lihat');
         Route::get('/santri/create', 'create')->name('santri.create')->middleware('hakakses:santri,buat');
         Route::post('/santri', 'store')->name('santri.store')->middleware('hakakses:santri,buat');
-        Route::get('/santri/{id}', 'show')->name('santri.show')->middleware('hakakses:santri,lihat')->whereNumber('id');
+        Route::get('/santri/{id}', 'show')->name('santri.show')->middleware('hakakses:santri|santri-data,lihat')->whereNumber('id');
         // Sunting data santri. Yang PPSB (jalur, gelombang, tahun ajaran) &
         // status sengaja tak ikut — lihat SantriController::update().
-        Route::get('/santri/{id}/edit', 'edit')->name('santri.edit')->middleware('hakakses:santri,ubah')->whereNumber('id');
-        Route::put('/santri/{id}', 'update')->name('santri.update')->middleware('hakakses:santri,ubah')->whereNumber('id');
+        Route::get('/santri/{id}/edit', 'edit')->name('santri.edit')->middleware('hakakses:santri|santri-data,ubah')->whereNumber('id');
+        Route::put('/santri/{id}', 'update')->name('santri.update')->middleware('hakakses:santri|santri-data,ubah')->whereNumber('id');
         Route::post('/santri/{id}/aksi/{aksi}', 'aksi')->name('santri.aksi')->middleware('hakakses:santri,ubah')->whereNumber('id');
         // Koreksi nominal tagihan — hak TERPISAH dari `santri,ubah`. Ia mengubah
         // piutang yang sudah dibukukan dan menerbitkan jurnal penyesuaian, jadi
