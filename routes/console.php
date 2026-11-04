@@ -133,6 +133,13 @@ Artisan::command('laundry:tagihan', function (App\Services\Modules\TagihanLaundr
 })->purpose('Susun draf & terbitkan tagihan kelebihan kuota laundry bulan lalu');
 Schedule::command('laundry:tagihan')->dailyAt('01:15')->withoutOverlapping();
 
+// Perizinan Rutin (4 Nov 2026): sehari sebelum batas pengajuan, keluarga yang anaknya tercakup & belum mengajukan
+// dikabari. Sekali per jadwal (pengingat_pada).
+Artisan::command('perizinan:pengingat-rutin', function (App\Services\Modules\PerizinanRutinService $svc) {
+    $this->info($svc->kirimPengingat().' keluarga dikabari.');
+})->purpose('Pengingat batas pengajuan penjengukan/kepulangan');
+Schedule::command('perizinan:pengingat-rutin')->dailyAt('07:00')->withoutOverlapping();
+
 // Batch tagihan yang waktu rilisnya sudah lewat. Tiap 5 menit — bukan harian:
 // petugas menetapkan waktu rilis sampai ke menitnya, dan menjanjikan "terbit
 // pukul 07:00" lalu baru menerbitkannya tengah malam adalah janji yang ingkar.

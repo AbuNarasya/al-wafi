@@ -212,6 +212,8 @@ final class Navigation
         ['url' => '/kesantrian/santri-keluar', 'label' => 'Santri Keluar', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'santri'],
         ['url' => '/kesantrian/absensi-asrama', 'label' => 'Absensi Asrama (ISE)', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modul' => 'absensi-asrama'],
         ['url' => '/kesantrian/perizinan', 'label' => 'Perizinan Insidental', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modulAny' => ['perizinan', 'perizinan-tingkat-1', 'perizinan-tingkat-2']],
+        ['url' => '/kesantrian/perizinan-rutin', 'label' => 'Perizinan Rutin', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modulAny' => ['perizinan', 'perizinan-tingkat-1', 'perizinan-tingkat-2', 'perizinan-jadwal']],
+        ['url' => '/kesantrian/perizinan-rutin/jadwal', 'label' => 'Jadwal Perizinan Rutin', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modul' => 'perizinan-jadwal'],
         ['url' => '/kesantrian/perizinan/pos', 'label' => 'Pos Keluar/Masuk Santri', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modul' => 'perizinan'],
         ['url' => '/kesantrian/perizinan/pengaturan', 'label' => 'Pengaturan Perizinan', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modul' => 'perizinan-pengaturan'],
         ['url' => '/kesantrian/pengunduran-diri', 'label' => 'Pengunduran Diri', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'pengunduran-diri'],

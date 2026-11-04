@@ -1,7 +1,7 @@
 @extends('layouts.portal')
 
-@section('title', __('Perizinan'))
-@section('kembali', route('portal.perizinan', ['anak' => $z->id_santri]))
+@section('title', $z->id_jadwal ? __('Perizinan Rutin') : __('Perizinan Insidental'))
+@section('kembali', $z->id_jadwal ? route('portal.perizinan_rutin') : route('portal.perizinan', ['anak' => $z->id_santri]))
 
 @section('content')
     @php $jam = fn ($t) => $t?->timezone('Asia/Jakarta')->locale(app()->getLocale())->translatedFormat('j M Y, H:i'); @endphp
@@ -17,14 +17,16 @@
                 <div><dt class="text-xs text-slate-500">{{ __('Waktu keluar') }}</dt><dd class="text-slate-800">{{ $jam($z->rencana_keluar) }}</dd></div>
                 <div><dt class="text-xs text-slate-500">{{ __('Waktu kembali') }}</dt><dd class="text-slate-800">{{ $jam($z->rencana_kembali) }}</dd></div>
             </div>
-            @if ($z->penjemput_nama)<div><dt class="text-xs text-slate-500">{{ __('Penjemput') }}</dt><dd class="text-slate-800">{{ $z->penjemput_nama }}{{ $z->penjemput_hubungan ? ' ('.$z->penjemput_hubungan.')' : '' }}</dd></div>@endif
+            @if ($z->penjemput_nama)<div><dt class="text-xs text-slate-500">{{ __('Penjemput') }}@if ($z->penjemput_jenis === 'wakil') · {{ __('Diwakilkan') }}@elseif ($z->penjemput_jenis === 'wali') · {{ __('Dijemput wali') }}@endif</dt>
+                <dd class="text-slate-800">{{ $z->penjemput_nama }}{{ $z->penjemput_hubungan ? ' ('.__($z->penjemput_hubungan).')' : '' }}{{ $z->penjemput_hp ? ' · '.$z->penjemput_hp : '' }}
+                    @if ($z->penjemput_foto_path)<a href="{{ route('portal.perizinan.foto_penjemput', $z->id) }}" target="_blank" class="block text-brand">{{ __('Foto KTP / identitas') }}</a>@endif</dd></div>@endif
             @if ($z->lampiran_path)<div><dt class="text-xs text-slate-500">{{ __('Lampiran') }}</dt><dd><a href="{{ route('portal.perizinan.lampiran', $z->id) }}" target="_blank" class="text-brand">{{ $z->lampiran_nama }}</a></dd></div>@endif
             @if ($z->status === 'ditolak')<div class="rounded-2xl bg-red-50 p-3 text-red-800"><dt class="text-xs">{{ __('Alasan ditolak') }}</dt><dd>{{ $z->alasan_tolak }}</dd></div>@endif
         </dl>
 
         {{-- Perjalanan izin --}}
         <ol class="mt-4 space-y-2 border-s-2 border-slate-200 ps-4 text-xs">
-            @foreach ([['Diajukan', $z->created_at], ['Disetujui', in_array($z->status, ['disetujui', 'keluar', 'kembali'], true) ? ($z->tingkat2_pada ?? $z->tingkat1_pada) : null],
+            @foreach ([['Diajukan', $z->created_at], ['Disetujui', in_array($z->status, ['disetujui', 'keluar', 'kembali'], true) ? ($z->tingkat2_pada ?? $z->tingkat1_pada ?? ($z->disetujui_otomatis ? $z->created_at : null)) : null],
                        ['Ditolak', $z->ditolak_pada], ['Keluar pondok', $z->keluar_pada], ['Kembali di pondok', $z->kembali_pada], ['Dibatalkan', $z->dibatalkan_pada]] as [$label, $waktu])
                 @continue(! $waktu)
                 <li class="relative"><span class="absolute -start-[1.4rem] top-0.5 h-2.5 w-2.5 rounded-full bg-teal-600 ring-2 ring-white"></span>

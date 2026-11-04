@@ -255,6 +255,13 @@ Route::prefix('wali/perizinan')->name('portal.perizinan')->middleware('portal.wa
     Route::get('/{id}', 'lihat')->name('.lihat')->whereNumber('id');
     Route::post('/{id}/batal', 'batal')->name('.batal')->middleware('throttle:10,1')->whereNumber('id');
     Route::get('/{id}/lampiran', 'lampiran')->name('.lampiran')->whereNumber('id');
+    Route::get('/{id}/foto-penjemput', 'fotoPenjemput')->name('.foto_penjemput')->whereNumber('id');
+});
+// Perizinan Rutin (penjengukan & kepulangan per jadwal pesantren, Tahap 2) — di luar /wali/data.
+Route::prefix('wali/perizinan-rutin')->name('portal.perizinan_rutin')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalPerizinanRutinController::class)->group(function () {
+    Route::get('/', 'index')->name('');
+    Route::get('/{id}/ajukan', 'form')->name('.ajukan')->whereNumber('id');
+    Route::post('/{id}/ajukan', 'ajukan')->name('.kirim')->middleware('throttle:10,1')->whereNumber('id');
 });
 // Penarikan tunai kegiatan (uang saku untuk outbound/rihlah) — di /wali/tarik-tunai, BUKAN /wali/data.
 Route::prefix('wali/tarik-tunai')->name('portal.tarik_tunai.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalTarikTunaiController::class)->group(function () {
@@ -1447,9 +1454,27 @@ Route::middleware('auth')->group(function () {
         Route::put('/pengaturan', 'simpanPengaturan')->name('pengaturan.simpan')->middleware('hakakses:perizinan-pengaturan,ubah');
         Route::get('/{perizinan}', 'show')->name('show')->middleware('hakakses:perizinan|perizinan-tingkat-1|perizinan-tingkat-2,lihat')->whereNumber('perizinan');
         Route::get('/{perizinan}/lampiran', 'lampiran')->name('lampiran')->middleware('hakakses:perizinan|perizinan-tingkat-1|perizinan-tingkat-2,lihat')->whereNumber('perizinan');
+        Route::get('/{perizinan}/foto-penjemput', 'fotoPenjemput')->name('foto_penjemput')->middleware('hakakses:perizinan|perizinan-tingkat-1|perizinan-tingkat-2,lihat')->whereNumber('perizinan');
         Route::post('/{perizinan}/setujui', 'setujui')->name('setujui')->middleware('hakakses:perizinan-tingkat-1|perizinan-tingkat-2,ubah')->whereNumber('perizinan');
         Route::post('/{perizinan}/tolak', 'tolak')->name('tolak')->middleware('hakakses:perizinan-tingkat-1|perizinan-tingkat-2,ubah')->whereNumber('perizinan');
         Route::post('/{perizinan}/pos', 'catatPos')->name('catat_pos')->middleware('hakakses:perizinan,ubah')->whereNumber('perizinan');
+    });
+
+    // Perizinan Rutin — Penjengukan & Kepulangan per jadwal (Tahap 2, 4 Nov 2026). Matriks & jadwal: hak perizinan-jadwal.
+    Route::prefix('kesantrian/perizinan-rutin')->name('perizinan_rutin.')->controller(\App\Http\Controllers\PerizinanRutinController::class)->group(function () {
+        $lihat = 'hakakses:perizinan|perizinan-tingkat-1|perizinan-tingkat-2|perizinan-jadwal,lihat';
+        Route::get('/', 'index')->name('index')->middleware($lihat);
+        Route::get('/jadwal', 'jadwal')->name('jadwal')->middleware('hakakses:perizinan-jadwal,lihat');
+        Route::put('/aturan/{tipe}', 'simpanAturan')->name('aturan')->middleware('hakakses:perizinan-jadwal,ubah');
+        Route::post('/bangkitkan', 'bangkitkan')->name('bangkitkan')->middleware('hakakses:perizinan-jadwal,ubah');
+        Route::post('/tambah', 'tambah')->name('tambah')->middleware('hakakses:perizinan-jadwal,ubah');
+        Route::get('/{jadwal}', 'show')->name('show')->middleware($lihat)->whereNumber('jadwal');
+        Route::post('/{jadwal}/setujui-semua', 'setujuiSemua')->name('setujui_semua')->middleware('hakakses:perizinan-tingkat-1|perizinan-tingkat-2,ubah')->whereNumber('jadwal');
+        Route::get('/{jadwal}/edit', 'edit')->name('edit')->middleware('hakakses:perizinan-jadwal,ubah')->whereNumber('jadwal');
+        Route::put('/{jadwal}', 'update')->name('update')->middleware('hakakses:perizinan-jadwal,ubah')->whereNumber('jadwal');
+        Route::post('/{jadwal}/tiadakan', 'tiadakan')->name('tiadakan')->middleware('hakakses:perizinan-jadwal,ubah')->whereNumber('jadwal');
+        Route::post('/{jadwal}/aktifkan', 'aktifkan')->name('aktifkan')->middleware('hakakses:perizinan-jadwal,ubah')->whereNumber('jadwal');
+        Route::delete('/{jadwal}', 'destroy')->name('destroy')->middleware('hakakses:perizinan-jadwal,ubah')->whereNumber('jadwal');
     });
 
     // Penagihan Tunggakan — admin sekolah menagih wali secara manual & mencatat prosesnya per tagihan

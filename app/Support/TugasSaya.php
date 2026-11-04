@@ -111,6 +111,9 @@ final class TugasSaya
 
             // Perizinan Insidental yang menunggu keputusan tingkat pengguna ini.
             ['/kesantrian/perizinan', \App\Services\Modules\PerizinanService::jumlahMenungguSaya(), 'pengajuan izin menunggu persetujuan'],
+            ['/kesantrian/perizinan-rutin', \App\Services\Modules\PerizinanService::jumlahMenungguSaya(rutin: true), 'pengajuan penjengukan/kepulangan menunggu'],
+            ['/kesantrian/perizinan-rutin/jadwal', Akses::boleh('perizinan-jadwal', 'ubah')
+                ? \App\Services\Modules\PerizinanRutinService::jadwalBulanDepanBelumAda() : 0, 'jenis perizinan rutin belum berjadwal bulan depan'],
 
             // Janji bayar wali yang sudah lewat sementara tagihannya belum lunas — saatnya menagih lagi.
             ['/kesantrian/penagihan-tunggakan', Akses::boleh('penagihan-tunggakan', 'buat')

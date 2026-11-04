@@ -11,7 +11,11 @@
 @endphp
 
 @section('content')
-    <a href="{{ route('perizinan.index') }}" class="text-sm text-brand hover:underline">&larr; Perizinan Insidental</a>
+    @if ($z->id_jadwal)
+        <a href="{{ route('perizinan_rutin.show', $z->id_jadwal) }}" class="text-sm text-brand hover:underline">&larr; Perizinan Rutin · jadwal {{ $z->jadwal?->mulai?->format('d/m/Y') }}</a>
+    @else
+        <a href="{{ route('perizinan.index') }}" class="text-sm text-brand hover:underline">&larr; Perizinan Insidental</a>
+    @endif
 
     <div class="mt-3 grid gap-4 lg:grid-cols-3">
         <div class="space-y-4 lg:col-span-2">
@@ -31,7 +35,7 @@
                     <div><dt class="text-xs text-gray-500">Rencana keluar</dt><dd>{{ $jam($z->rencana_keluar) }}</dd></div>
                     <div><dt class="text-xs text-gray-500">Rencana kembali</dt><dd>{{ $jam($z->rencana_kembali) }}</dd></div>
                     <div class="sm:col-span-2"><dt class="text-xs text-gray-500">Penjemput</dt>
-                        <dd>{{ $z->penjemput_nama ?: '—' }}{{ $z->penjemput_hubungan ? ' ('.$z->penjemput_hubungan.')' : '' }}{{ $z->penjemput_hp ? ' · '.$z->penjemput_hp : '' }}</dd></div>
+                        <dd>@include('perizinan._penjemput')</dd></div>
                     <div class="sm:col-span-2"><dt class="text-xs text-gray-500">Diajukan</dt>
                         <dd>{{ $z->diajukan_oleh ? 'Staf atas nama wali — '.($petugas[$z->diajukan_oleh] ?? '') : 'Wali ('.($z->diajukan_peran ?? '—').') lewat portal' }} · {{ $jam($z->created_at) }}</dd></div>
                     @if ($z->lampiran_path)
@@ -62,6 +66,7 @@
             <p class="mb-2 font-semibold text-gray-900">Perjalanan izin</p>
             <ol class="space-y-2">
                 @foreach ([['Diajukan', $z->created_at, $z->diajukan_oleh, null],
+                           ['Disetujui otomatis', $z->disetujui_otomatis ? $z->created_at : null, null, 'Persetujuan otomatis untuk jenis izin ini'],
                            [$p->label_tingkat1, $z->tingkat1_pada, $z->tingkat1_oleh, $z->tingkat1_catatan],
                            [$p->label_tingkat2, $z->tingkat2_pada, $z->tingkat2_oleh, $z->tingkat2_catatan],
                            ['Ditolak', $z->ditolak_pada, $z->ditolak_oleh, $z->alasan_tolak],

@@ -1,6 +1,6 @@
 @extends('layouts.portal')
 
-@section('title', __('Perizinan'))
+@section('title', __('Perizinan Insidental'))
 @section('kembali', route('portal.beranda'))
 
 @section('content')
@@ -8,7 +8,7 @@
     <div class="mb-4 flex items-center gap-3">
         <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-700 text-white shadow-sm"><x-portal.ikon nama="keluar" /></span>
         <div class="min-w-0">
-            <h1 class="truncate text-xl font-bold text-slate-900">{{ __('Perizinan') }}</h1>
+            <h1 class="truncate text-xl font-bold text-slate-900">{{ __('Perizinan Insidental') }}</h1>
             <p class="truncate text-sm text-slate-500">{{ $pilih?->nama ?? __('Belum ada anak berstatus santri aktif.') }}</p>
         </div>
     </div>

@@ -4,6 +4,7 @@ namespace App\Services\Modules;
 
 use App\Exceptions\AppException;
 use App\Models\HakAksesModul;
+use App\Models\JadwalPerizinanRutin;
 use App\Models\Perizinan;
 use App\Models\Santri;
 use App\Models\TipeIzin;
@@ -26,8 +27,14 @@ use Illuminate\Support\Facades\DB;
  *   Ditolak (alasan wajib) di tingkat mana pun; wali boleh membatalkan selama santri belum keluar.
  *
  *  • Tipe izin: Sakit, Haji/Umroh, Keperluan Keluarga, Lain-lain (izin PULANG) & Keluar Lingkungan Ma'had (kembali
- *    di HARI YANG SAMA). Keperluan wajib untuk tipe bertanda. Batas waktu pengajuan per tipe (jam sebelum keluar)
+ *    di HARI YANG SAMA). Keperluan wajib untuk tipe bertanda. Batas pengajuan H-n per tipe (NULL = tanpa batas)
  *    hanya berlaku bagi wali — staf boleh mencatat izin mendadak.
+ *  • Persetujuan per tipe (Tahap 1, 4 Nov 2026): `otomatis` → langsung disetujui; `petugas` → tingkat 1/2.
+ *  • Penjemput: dijemput WALI (ayah/ibu/wali — nama & HP diambil dari data keluarga) atau DIWAKILKAN
+ *    (isian wajibnya dicentang petugas: pengaturan_perizinan.wakil_wajib).
+ *  • Perizinan RUTIN (Tahap 2): jenis ber-`rutin` hanya lewat JADWAL (PerizinanRutinService); waktunya = waktu jadwal.
+ *  • Kebijakan TUNGGAKAN per jenis (Tahap 3, TunggakanIzin): `tolak` → tak bisa diajukan & tertahan di pos keluar;
+ *    `tahan_kembali` → tertahan di pos masuk. Pemegang hak `perizinan-tunggakan` boleh mengizinkan (beralasan, Jejak Audit).
  *  • Satu santri tak boleh punya dua izin hidup yang rentangnya bertumpuk.
  *  • Hak: `perizinan` (lihat · buat = atas nama wali · ubah = pos keluar/masuk), `perizinan-tingkat-1` &
  *    `perizinan-tingkat-2` (ubah = setujui/tolak), `perizinan-pengaturan`.
@@ -35,6 +42,12 @@ use Illuminate\Support\Facades\DB;
 class PerizinanService
 {
     public const MODUL_TINGKAT = [1 => 'perizinan-tingkat-1', 2 => 'perizinan-tingkat-2'];
+
+    /** Isian penjemput DIWAKILKAN yang bisa diwajibkan petugas. */
+    public const ISIAN_WAKIL = ['nama' => 'Nama', 'hubungan' => 'Hubungan dengan santri', 'hp' => 'No. HP',
+        'identitas' => 'NIK / no. identitas', 'foto_identitas' => 'Foto KTP / identitas', 'keterangan' => 'Keterangan'];
+
+    public const WAKIL_WAJIB_BAWAAN = ['nama', 'hubungan', 'hp', 'identitas', 'foto_identitas'];
 
     /** @return object{tingkat1_aktif:bool, tingkat2_aktif:bool, label_tingkat1:string, label_tingkat2:string} */
     public static function pengaturan(): object
@@ -46,6 +59,8 @@ class PerizinanService
         if (! $p->tingkat1_aktif && ! $p->tingkat2_aktif) {
             $p->tingkat2_aktif = true; // jaga-jaga: minimal satu tingkat selalu berlaku
         }
+        $wajib = isset($p->wakil_wajib) ? json_decode((string) $p->wakil_wajib, true) : null;
+        $p->wakil_wajib = is_array($wajib) ? array_values(array_intersect(array_keys(self::ISIAN_WAKIL), $wajib)) : self::WAKIL_WAJIB_BAWAAN;
 
         return $p;
     }
@@ -53,7 +68,7 @@ class PerizinanService
     /**
      * @param  array{kode_tipe:string, keperluan?:?string, rencana_keluar:string, rencana_kembali:string, penjemput_nama?:?string, penjemput_hubungan?:?string, penjemput_hp?:?string}  $d
      */
-    public function ajukan(Santri $santri, array $d, ?Wali $wali = null, ?string $peran = null, ?User $staf = null, ?UploadedFile $lampiran = null): Perizinan
+    public function ajukan(Santri $santri, array $d, ?Wali $wali = null, ?string $peran = null, ?User $staf = null, ?UploadedFile $lampiran = null, ?UploadedFile $fotoIdentitas = null, ?JadwalPerizinanRutin $jadwal = null): Perizinan
     {
         if ($wali && (int) $santri->id_wali !== (int) $wali->id) {
             throw new AppException(404, __('Santri tidak ditemukan.'));
@@ -63,6 +78,24 @@ class PerizinanService
         }
         $tipe = TipeIzin::where('kode', $d['kode_tipe'] ?? '')->where('aktif', true)->first()
             ?? throw new AppException(422, __('Tipe izin tidak dikenal atau sedang tidak dibuka.'));
+        if ($tipe->rutin && ! $jadwal) {
+            throw new AppException(422, __('Penjengukan dan kepulangan diajukan lewat menu Perizinan Rutin.'));
+        }
+        if ($jadwal) {
+            if ($jadwal->status !== 'aktif') {
+                throw new AppException(422, __('Jadwal ini ditiadakan.'));
+            }
+            if (! $jadwal->mencakup($santri)) {
+                throw new AppException(422, __('Jadwal ini bukan untuk jenjang/kelompok :nama.', ['nama' => $santri->nama]));
+            }
+            $d['rencana_keluar'] = $jadwal->mulai->toDateTimeString();
+            $d['rencana_kembali'] = $jadwal->selesai->toDateTimeString();
+        }
+        // Kebijakan tunggakan "izin tidak diberikan" (Tahap 3) — berlaku juga bagi staf.
+        if ($h = TunggakanIzin::hambatan($tipe, $santri, 'tolak')) {
+            throw new AppException(422, __('Izin :tipe untuk :nama tidak dapat diberikan: masih ada :tunggakan. Mohon selesaikan tagihan terlebih dahulu.',
+                ['tipe' => __($tipe->nama), 'nama' => $santri->nama, 'tunggakan' => TunggakanIzin::teks($h)]));
+        }
         $keperluan = trim((string) ($d['keperluan'] ?? ''));
         if ($tipe->wajib_keperluan && $keperluan === '') {
             throw new AppException(422, __('Sebutkan keperluannya.'));
@@ -72,43 +105,57 @@ class PerizinanService
         if ($kembali->lte($keluar)) {
             throw new AppException(422, __('Waktu kembali harus sesudah waktu keluar.'));
         }
-        if (! $tipe->pulang && ! $keluar->isSameDay($kembali)) {
+        if (! $jadwal && ! $tipe->pulang && ! $keluar->isSameDay($kembali)) {
             throw new AppException(422, __('Izin keluar lingkungan ma\'had harus kembali di hari yang sama.'));
         }
         // Batas waktu pengajuan hanya untuk wali; staf boleh mencatat izin mendadak.
-        if (! $staf && $tipe->batas_jam > 0 && $keluar->lt(now()->addHours($tipe->batas_jam))) {
-            throw new AppException(422, __('Izin :tipe diajukan paling lambat :jam jam sebelum waktu keluar.', ['tipe' => __($tipe->nama), 'jam' => $tipe->batas_jam]));
+        // Batas H-n (hari kalender sebelum tanggal keluar) — hanya untuk wali.
+        if (! $staf && ($batas = $tipe->batasPengajuan($keluar)) && now()->gt($batas)) {
+            throw new AppException(422, __('Izin :tipe diajukan paling lambat :batas sebelum tanggal keluar (:tanggal).', [
+                'tipe' => __($tipe->nama), 'batas' => $tipe->labelBatas(), 'tanggal' => $batas->format('d/m/Y')]));
         }
+        $penjemput = $this->penjemput($santri, $d, $fotoIdentitas);
+        $otomatis = $tipe->persetujuan === 'otomatis';
         if (! $staf && $keluar->lt(now()->subMinutes(10))) {
             throw new AppException(422, __('Waktu keluar sudah lewat.'));
         }
 
-        $p = DB::transaction(function () use ($santri, $d, $tipe, $keperluan, $keluar, $kembali, $wali, $peran, $staf, $lampiran) {
+        $p = DB::transaction(function () use ($santri, $tipe, $keperluan, $keluar, $kembali, $wali, $peran, $staf, $lampiran, $fotoIdentitas, $penjemput, $otomatis, $jadwal) {
             DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('perizinan-santri-'.$santri->id)]);
             $bertumpuk = Perizinan::where('id_santri', $santri->id)->whereIn('status', Perizinan::AKTIF)
                 ->where('rencana_keluar', '<', $kembali)->where('rencana_kembali', '>', $keluar)->exists();
             if ($bertumpuk) {
-                throw new AppException(422, __('Sudah ada izin lain untuk anak ini pada rentang waktu tersebut.'));
+                throw new AppException(422, __('Sudah ada izin lain untuk :nama pada rentang waktu tersebut.', ['nama' => $santri->nama]));
             }
             $base = DocNumber::docBase('IZN', now());
             $p = Perizinan::create([
                 'nomor' => DocNumber::nextDocNumber($base, Perizinan::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor')),
                 'id_santri' => $santri->id, 'kode_tipe' => $tipe->kode, 'keperluan' => $keperluan ?: null,
                 'rencana_keluar' => $keluar, 'rencana_kembali' => $kembali,
-                'penjemput_nama' => trim((string) ($d['penjemput_nama'] ?? '')) ?: null,
-                'penjemput_hubungan' => trim((string) ($d['penjemput_hubungan'] ?? '')) ?: null,
-                'penjemput_hp' => trim((string) ($d['penjemput_hp'] ?? '')) ?: null,
-                'status' => self::pengaturan()->tingkat1_aktif ? 'menunggu_1' : 'menunggu_2',
+                ...$penjemput,
+                'status' => $otomatis ? 'disetujui' : (self::pengaturan()->tingkat1_aktif ? 'menunggu_1' : 'menunggu_2'),
+                'disetujui_otomatis' => $otomatis, 'id_jadwal' => $jadwal?->id,
                 'id_wali' => $wali?->id ?? $santri->id_wali, 'diajukan_peran' => $peran, 'diajukan_oleh' => $staf?->id_pengguna,
             ]);
             if ($lampiran) {
                 $p->update(['lampiran_path' => $lampiran->store("perizinan/{$p->id}", 'local'),
                     'lampiran_nama' => mb_substr($lampiran->getClientOriginalName(), 0, 250)]);
             }
+            if ($fotoIdentitas && ($penjemput['penjemput_jenis'] ?? null) === 'wakil') {
+                $p->update(['penjemput_foto_path' => $fotoIdentitas->store("perizinan/{$p->id}", 'local'),
+                    'penjemput_foto_nama' => mb_substr($fotoIdentitas->getClientOriginalName(), 0, 250)]);
+            }
 
             return $p;
         });
 
+        if ($otomatis) {
+            $this->kabariWali($p, Teks::k('Izin :nama disetujui', ['nama' => $santri->nama]),
+                Teks::k('Izin :tipe untuk :nama (:keluar – :kembali) disetujui.', $this->isianWaktu($p)));
+            $this->ingatkanTahanKembali($p);
+
+            return $p;
+        }
         $this->kabariStaf($p, 'Pengajuan izin perlu disetujui');
         if ($staf) {
             $this->kabariWali($p, Teks::k('Izin :nama dicatat pesantren', ['nama' => $santri->nama]),
@@ -116,6 +163,46 @@ class PerizinanService
         }
 
         return $p;
+    }
+
+    /**
+     * Kolom penjemput. `wali` → nama & HP diambil dari data keluarga sesuai peran (ayah/ibu/wali);
+     * `wakil` → isian yang diwajibkan petugas harus ada; kosong (hanya staf) → isian bebas seperti dulu.
+     *
+     * @return array<string,mixed>
+     */
+    private function penjemput(Santri $santri, array $d, ?UploadedFile $foto): array
+    {
+        $isi = fn (string $k) => trim((string) ($d[$k] ?? '')) ?: null;
+        $jenis = $d['penjemput_jenis'] ?? null;
+
+        if ($jenis === 'wali') {
+            $peran = (string) ($d['penjemput_peran'] ?? '');
+            $keluarga = $santri->wali;
+            if (! isset(Wali::PERAN[$peran]) || ! $keluarga || trim((string) $keluarga->{"nama_{$peran}"}) === '') {
+                throw new AppException(422, __('Pilih siapa yang menjemput (data :peran belum ada di data keluarga).', ['peran' => __(Wali::PERAN[$peran] ?? 'wali')]));
+            }
+
+            return ['penjemput_jenis' => 'wali', 'penjemput_peran' => $peran,
+                'penjemput_nama' => trim((string) $keluarga->{"nama_{$peran}"}), 'penjemput_hubungan' => Wali::PERAN[$peran],
+                'penjemput_hp' => $keluarga->{"telepon_{$peran}"} ?: null];
+        }
+        if ($jenis === 'wakil') {
+            $nilai = ['nama' => $isi('penjemput_nama'), 'hubungan' => $isi('penjemput_hubungan'), 'hp' => $isi('penjemput_hp'),
+                'identitas' => $isi('penjemput_identitas'), 'foto_identitas' => $foto, 'keterangan' => $isi('penjemput_keterangan')];
+            $kurang = array_filter(self::pengaturan()->wakil_wajib, fn ($k) => empty($nilai[$k]));
+            if ($kurang !== []) {
+                throw new AppException(422, __('Penjemput diwakilkan: lengkapi :isian.', [
+                    'isian' => implode(', ', array_map(fn ($k) => __(self::ISIAN_WAKIL[$k]), $kurang))]));
+            }
+
+            return ['penjemput_jenis' => 'wakil', 'penjemput_peran' => null, 'penjemput_nama' => $nilai['nama'],
+                'penjemput_hubungan' => $nilai['hubungan'], 'penjemput_hp' => $nilai['hp'],
+                'penjemput_identitas' => $nilai['identitas'], 'penjemput_keterangan' => $nilai['keterangan']];
+        }
+
+        return ['penjemput_jenis' => null, 'penjemput_nama' => $isi('penjemput_nama'),
+            'penjemput_hubungan' => $isi('penjemput_hubungan'), 'penjemput_hp' => $isi('penjemput_hp')];
     }
 
     /** Tingkat yang sedang diminta untuk pengajuan ini (1/2), null bila tidak menunggu. */
@@ -154,6 +241,7 @@ class PerizinanService
             } else {
                 $this->kabariWali($kini, Teks::k('Izin :nama disetujui', ['nama' => $kini->santri->nama]),
                     Teks::k('Izin :tipe untuk :nama (:keluar – :kembali) disetujui.', $this->isianWaktu($kini)));
+                $this->ingatkanTahanKembali($kini);
             }
 
             return $kini;
@@ -195,34 +283,61 @@ class PerizinanService
     }
 
     /** Pos: santri keluar (izin harus sudah disetujui). */
-    public function catatKeluar(Perizinan $p, User $u, string $cara): void
+    public function catatKeluar(Perizinan $p, User $u, string $cara, ?string $izinTunggakan = null): void
     {
-        $this->pindah($p, 'disetujui', 'keluar', $u, $cara, fn (Perizinan $k) => [
+        $this->pindah($p, 'disetujui', 'keluar', $u, $cara, $izinTunggakan, fn (Perizinan $k) => [
             Teks::k(':nama sudah keluar pondok', ['nama' => $k->santri->nama]),
             Teks::k(':nama keluar pondok :waktu (izin :tipe). Jadwal kembali :kembali.', $this->isianWaktu($k) + ['waktu' => $this->jam(now())]),
         ]);
     }
 
     /** Pos: santri kembali ke pondok. */
-    public function catatKembali(Perizinan $p, User $u, string $cara): void
+    public function catatKembali(Perizinan $p, User $u, string $cara, ?string $izinTunggakan = null): void
     {
-        $this->pindah($p, 'keluar', 'kembali', $u, $cara, fn (Perizinan $k) => [
+        $this->pindah($p, 'keluar', 'kembali', $u, $cara, $izinTunggakan, fn (Perizinan $k) => [
             Teks::k(':nama sudah kembali di pondok', ['nama' => $k->santri->nama]),
             Teks::k(':nama kembali di pondok :waktu.', ['nama' => $k->santri->nama, 'waktu' => $this->jam(now())]),
         ]);
     }
 
-    private function pindah(Perizinan $p, string $dari, string $ke, User $u, string $cara, \Closure $kabar): void
+    private function pindah(Perizinan $p, string $dari, string $ke, User $u, string $cara, ?string $izinTunggakan, \Closure $kabar): void
     {
-        DB::transaction(function () use ($p, $dari, $ke, $u, $cara, $kabar) {
+        DB::transaction(function () use ($p, $dari, $ke, $u, $cara, $izinTunggakan, $kabar) {
             $kini = Perizinan::with(['santri', 'tipe'])->whereKey($p->id)->lockForUpdate()->firstOrFail();
             if ($kini->status !== $dari) {
                 throw new AppException(422, "{$kini->nomor} berstatus \"{$kini->labelStatus()}\".");
             }
+            // Kebijakan tunggakan (Tahap 3): tertahan kecuali diizinkan pemegang hak, beralasan.
+            if ($h = TunggakanIzin::diPos($kini, $ke)) {
+                $alasan = trim((string) $izinTunggakan);
+                if ($alasan === '') {
+                    throw new AppException(422, "{$kini->santri->nama} TERTAHAN — ".TunggakanIzin::teks($h).'. Hanya petugas berhak yang bisa mengizinkan, dengan alasan.');
+                }
+                if (! Akses::boleh(TunggakanIzin::MODUL_IZIN, 'ubah')) {
+                    throw new AppException(403, 'Anda tidak berhak mengizinkan santri yang tertahan karena tunggakan.');
+                }
+                \App\Support\Audit\Jejak::catat('izin_perizinan_tunggakan', ['modul' => TunggakanIzin::MODUL_IZIN, 'ref_jenis' => 'Perizinan', 'ref_id' => $kini->id,
+                    'id_pengguna' => $u->id_pengguna, 'detail' => ['nomor' => $kini->nomor, 'santri' => $kini->santri->nama, 'aksi' => $ke,
+                        'alasan' => $alasan, 'tunggakan_jumlah' => $h->jumlah, 'tunggakan_rp' => (string) $h->sisa]]);
+            }
             $kini->update(['status' => $ke, "{$ke}_pada" => now(), "{$ke}_oleh" => $u->id_pengguna, "{$ke}_cara" => $cara]);
             [$judul, $pesan] = $kabar($kini);
             $this->kabariWali($kini, $judul, $pesan);
+            if ($ke === 'keluar') {
+                $this->ingatkanTahanKembali($kini);
+            }
         });
+    }
+
+    /** Kebijakan "tak boleh kembali sebelum tunggakan diselesaikan" berlaku & sedang terpenuhi → beri tahu wali. */
+    private function ingatkanTahanKembali(Perizinan $p): void
+    {
+        $p->loadMissing(['tipe', 'santri']);
+        if ($h = TunggakanIzin::hambatan($p->tipe, $p->santri, 'tahan_kembali')) {
+            $this->kabariWali($p, Teks::k('Perhatian: syarat kembali ke pondok', []),
+                Teks::k(':nama belum dapat kembali ke pondok sebelum tunggakan diselesaikan (:tunggakan). Mohon diselesaikan sebelum jadwal kembali.',
+                    ['nama' => $p->santri->nama, 'tunggakan' => TunggakanIzin::teks($h)]));
+        }
     }
 
     /** Izin santri yang relevan di pos: disetujui (siap keluar) & sedang di luar. */
@@ -232,7 +347,7 @@ class PerizinanService
     }
 
     /** Penanda Tugas Saya: pengajuan yang menunggu keputusan pengguna yang sedang masuk. */
-    public static function jumlahMenungguSaya(): int
+    public static function jumlahMenungguSaya(bool $rutin = false): int
     {
         $p = self::pengaturan();
         $status = [];
@@ -243,7 +358,7 @@ class PerizinanService
             $status[] = 'menunggu_2';
         }
 
-        return $status === [] ? 0 : Perizinan::whereIn('status', $status)->count();
+        return $status === [] ? 0 : Perizinan::whereIn('status', $status)->when($rutin, fn ($q) => $q->whereNotNull('id_jadwal'), fn ($q) => $q->whereNull('id_jadwal'))->count();
     }
 
     // ---- Kabar ----

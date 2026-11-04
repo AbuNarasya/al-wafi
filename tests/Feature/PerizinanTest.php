@@ -76,7 +76,7 @@ class PerizinanTest extends TestCase
     {
         return $timpa + ['id_santri' => $this->ahmad->id, 'kode_tipe' => 'keluarga', 'keperluan' => 'Pernikahan kakak',
             'rencana_keluar' => '2026-11-06T14:00', 'rencana_kembali' => '2026-11-08T17:00',
-            'penjemput_nama' => 'Bapak Hasan', 'penjemput_hubungan' => 'ayah', 'penjemput_hp' => '081299990000'];
+            'penjemput_jenis' => 'wali', 'penjemput_peran' => 'ibu'];
     }
 
     private function tugas(User $u): int
@@ -98,9 +98,10 @@ class PerizinanTest extends TestCase
         $kirim(['keperluan' => ''])->assertSessionHas('error', 'Sebutkan keperluannya.');
         $kirim(['kode_tipe' => 'keluar_lingkungan', 'keperluan' => 'Beli buku'])->assertSessionHas('error', fn ($m) => str_contains($m, 'hari yang sama'));
         $kirim(['rencana_kembali' => '2026-11-06T10:00'])->assertSessionHas('error', fn ($m) => str_contains($m, 'sesudah'));
-        DB::table('tipe_izin')->where('kode', 'keluarga')->update(['batas_jam' => 72]);
-        $kirim([])->assertSessionHas('error', fn ($m) => str_contains($m, '72 jam'));
-        DB::table('tipe_izin')->where('kode', 'keluarga')->update(['batas_jam' => 24]);
+        // Batas H-n: keluar 6 Nov, sekarang 4 Nov → H-3 lewat, H-2 masih boleh.
+        DB::table('tipe_izin')->where('kode', 'keluarga')->update(['batas_hari' => 3]);
+        $kirim([])->assertSessionHas('error', fn ($m) => str_contains($m, 'H-3') && str_contains($m, '03/11/2026'));
+        DB::table('tipe_izin')->where('kode', 'keluarga')->update(['batas_hari' => 2]);
         $kirim([])->assertRedirect();
         $z = Perizinan::sole();
         $this->assertSame(['menunggu_2', 'Pernikahan kakak', 'ibu'], [$z->status, $z->keperluan, $z->diajukan_peran]);
@@ -122,7 +123,7 @@ class PerizinanTest extends TestCase
         // Wali melihat statusnya; masih bisa membatalkan sebelum keluar.
         $this->masukWali();
         $this->get(route('portal.perizinan'))->assertOk()->assertSee('Disetujui');
-        $this->get(route('portal.perizinan.lihat', $z->id))->assertOk()->assertSee('Bapak Hasan')->assertSee('Batalkan pengajuan');
+        $this->get(route('portal.perizinan.lihat', $z->id))->assertOk()->assertSee('Ibu Aminah')->assertSee('Dijemput wali')->assertSee('Batalkan pengajuan');
         $this->post(route('portal.perizinan.batal', $z->id))->assertSessionHas('status');
         $this->assertSame('dibatalkan', $z->fresh()->status);
     }
@@ -172,7 +173,7 @@ class PerizinanTest extends TestCase
 
     public function test_staf_atas_nama_wali_tanpa_batas_waktu_dan_pengaturan(): void
     {
-        DB::table('tipe_izin')->where('kode', 'sakit')->update(['batas_jam' => 48]);
+        DB::table('tipe_izin')->where('kode', 'sakit')->update(['batas_hari' => 5]);
         $this->actingAs($this->kesantrian)->get(route('perizinan.buat'))->assertOk();
         $this->actingAs($this->kesantrian)->post(route('perizinan.simpan'), $this->isian(['kode_tipe' => 'sakit', 'keperluan' => 'Demam tinggi',
             'rencana_keluar' => '2026-11-04T09:00', 'rencana_kembali' => '2026-11-07T09:00']))->assertSessionHas('status');
@@ -187,9 +188,77 @@ class PerizinanTest extends TestCase
         $isi = ['label_tingkat1' => 'Musyrif', 'label_tingkat2' => 'Kesantrian', 'tingkat1_aktif' => '0', 'tingkat2_aktif' => '0'];
         $this->actingAs($admin)->put(route('perizinan.pengaturan.simpan'), $isi)->assertSessionHas('error');
         $this->actingAs($admin)->put(route('perizinan.pengaturan.simpan'), ['tingkat1_aktif' => '1', 'tingkat2_aktif' => '1',
-            'tipe' => ['sakit' => ['aktif' => '1', 'batas_jam' => '0'], 'keluarga' => ['batas_jam' => '24']]] + $isi)->assertSessionHas('status');
-        $this->assertSame([true, false, 24], [(bool) DB::table('tipe_izin')->where('kode', 'sakit')->value('aktif'),
-            (bool) DB::table('tipe_izin')->where('kode', 'keluarga')->value('aktif'), (int) DB::table('tipe_izin')->where('kode', 'keluarga')->value('batas_jam')]);
+            'tipe' => ['sakit' => ['aktif' => '1', 'batas_hari' => '', 'persetujuan' => 'otomatis'], 'keluarga' => ['batas_hari' => '3']],
+            'wakil_wajib' => ['nama', 'hp']] + $isi)->assertSessionHas('status');
+        $this->assertSame([true, null, 'otomatis', false, 3, 'petugas'], [(bool) DB::table('tipe_izin')->where('kode', 'sakit')->value('aktif'),
+            DB::table('tipe_izin')->where('kode', 'sakit')->value('batas_hari'), DB::table('tipe_izin')->where('kode', 'sakit')->value('persetujuan'),
+            (bool) DB::table('tipe_izin')->where('kode', 'keluarga')->value('aktif'), (int) DB::table('tipe_izin')->where('kode', 'keluarga')->value('batas_hari'),
+            DB::table('tipe_izin')->where('kode', 'keluarga')->value('persetujuan')]);
+        $this->assertSame(['nama', 'hp'], \App\Services\Modules\PerizinanService::pengaturan()->wakil_wajib);
         $this->assertTrue((bool) DB::table('pengaturan_perizinan')->value('tingkat1_aktif'));
+    }
+
+    /** Tahap 1 (4 Nov 2026): persetujuan otomatis per jenis izin. */
+    public function test_persetujuan_otomatis_langsung_disetujui(): void
+    {
+        DB::table('tipe_izin')->where('kode', 'sakit')->update(['persetujuan' => 'otomatis']);
+        $this->masukWali();
+        $this->post(route('portal.perizinan.kirim'), $this->isian(['kode_tipe' => 'sakit', 'keperluan' => '']))
+            ->assertSessionHas('status', fn ($m) => str_contains($m, 'disetujui'));
+        $z = Perizinan::sole();
+        $this->assertSame(['disetujui', true], [$z->status, $z->disetujui_otomatis]);
+        $this->assertSame(0, $this->tugas($this->kesantrian), 'tak ada yang perlu diputus petugas');
+        $this->assertSame('Izin AHMAD disetujui', NotifikasiWali::where('jenis', 'perizinan')->value('judul'));
+        $this->actingAs($this->pos)->get(route('perizinan.pos', ['kartu' => 'KARTUA01']))->assertSee('Catat KELUAR');
+        $this->actingAs($this->kesantrian)->get(route('perizinan.show', $z->id))->assertOk()->assertSee('Disetujui otomatis');
+    }
+
+    /** Tahap 1: penjemput wali diambil dari data keluarga; diwakilkan wajib melengkapi isian yang ditentukan petugas. */
+    public function test_penjemput_wali_atau_diwakilkan(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $this->masukWali();
+        $this->get(route('portal.perizinan.ajukan'))->assertOk()->assertSee('Dijemput wali')->assertSee('Diwakilkan')->assertSee('Ibu Aminah');
+        $kirim = fn (array $d) => $this->post(route('portal.perizinan.kirim'), $this->isian($d));
+
+        // Wajib memilih; peran yang datanya kosong ditolak.
+        $kirim(['penjemput_jenis' => ''])->assertSessionHasErrors('penjemput_jenis');
+        $kirim(['penjemput_peran' => 'ayah'])->assertSessionHas('error', fn ($m) => str_contains($m, 'Ayah'));
+        $kirim([])->assertRedirect();
+        $z = Perizinan::sole();
+        $this->assertSame(['wali', 'ibu', 'Ibu Aminah', 'Ibu', '081234567891'],
+            [$z->penjemput_jenis, $z->penjemput_peran, $z->penjemput_nama, $z->penjemput_hubungan, $z->penjemput_hp]);
+
+        // Diwakilkan: isian wajib bawaan = nama, hubungan, HP, identitas, foto.
+        $wakil = ['penjemput_jenis' => 'wakil', 'rencana_keluar' => '2026-11-10T08:00', 'rencana_kembali' => '2026-11-11T08:00',
+            'penjemput_nama' => 'Paman Umar', 'penjemput_hubungan' => 'paman', 'penjemput_hp' => '081277770000'];
+        $kirim($wakil)->assertSessionHas('error', fn ($m) => str_contains($m, 'NIK') && str_contains($m, 'Foto'));
+        $kirim($wakil + ['penjemput_identitas' => '3201010101010001',
+            'penjemput_foto' => \Illuminate\Http\UploadedFile::fake()->image('ktp.jpg')])->assertRedirect();
+        $w = Perizinan::latest('id')->first();
+        $this->assertSame(['wakil', 'Paman Umar', '3201010101010001'], [$w->penjemput_jenis, $w->penjemput_nama, $w->penjemput_identitas]);
+        \Illuminate\Support\Facades\Storage::disk('local')->assertExists($w->penjemput_foto_path);
+        $this->get(route('portal.perizinan.foto_penjemput', $w->id))->assertOk();
+
+        // Petugas pos melihat identitas & foto penjemput.
+        $this->actingAs($this->kesantrian)->post(route('perizinan.setujui', $w->id))->assertSessionHas('status');
+        Carbon::setTestNow('2026-11-10 08:00:00');
+        $this->actingAs($this->pos)->get(route('perizinan.pos', ['kartu' => 'KARTUA01']))->assertOk()
+            ->assertSee('Diwakilkan')->assertSee('3201010101010001')->assertSee(route('perizinan.foto_penjemput', $w->id), false);
+        $this->actingAs($this->pos)->get(route('perizinan.foto_penjemput', $w->id))->assertOk();
+
+        // Isian wajib bisa dikurangi petugas.
+        DB::table('pengaturan_perizinan')->update(['wakil_wajib' => json_encode(['nama'])]);
+        Carbon::setTestNow('2026-11-04 08:00:00');
+        $this->masukWali();
+        $kirim(['penjemput_jenis' => 'wakil', 'penjemput_nama' => 'Bibi Sarah', 'rencana_keluar' => '2026-11-20T08:00', 'rencana_kembali' => '2026-11-21T08:00'])->assertRedirect();
+        $this->assertSame('Bibi Sarah', Perizinan::latest('id')->value('penjemput_nama'));
+    }
+
+    public function test_menu_portal_bernama_perizinan_insidental(): void
+    {
+        $this->masukWali();
+        $this->get(route('portal.menu'))->assertOk()->assertSee('Perizinan Insidental');
+        $this->get(route('portal.perizinan'))->assertOk()->assertSee('Perizinan Insidental');
     }
 }

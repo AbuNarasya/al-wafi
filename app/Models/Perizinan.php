@@ -24,7 +24,7 @@ class Perizinan extends Model
 
     protected function casts(): array
     {
-        $c = ['rencana_keluar' => 'datetime', 'rencana_kembali' => 'datetime', 'dibatalkan_pada' => 'datetime'];
+        $c = ['rencana_keluar' => 'datetime', 'rencana_kembali' => 'datetime', 'dibatalkan_pada' => 'datetime', 'disetujui_otomatis' => 'boolean'];
         foreach (['tingkat1', 'tingkat2', 'ditolak', 'keluar', 'kembali'] as $l) {
             $c["{$l}_pada"] = 'datetime';
         }
@@ -35,6 +35,11 @@ class Perizinan extends Model
     public function santri(): BelongsTo
     {
         return $this->belongsTo(Santri::class, 'id_santri');
+    }
+
+    public function jadwal(): BelongsTo
+    {
+        return $this->belongsTo(JadwalPerizinanRutin::class, 'id_jadwal');
     }
 
     public function tipe(): BelongsTo

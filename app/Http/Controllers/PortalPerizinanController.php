@@ -34,7 +34,7 @@ class PortalPerizinanController extends Controller
         $pilih = $anak->firstWhere('id', (int) $request->query('anak')) ?? $anak->first();
 
         return view('portal.perizinan', ['anak' => $anak, 'pilih' => $pilih,
-            'daftar' => $pilih ? Perizinan::with('tipe')->where('id_santri', $pilih->id)->orderByDesc('rencana_keluar')->limit(30)->get() : collect()]);
+            'daftar' => $pilih ? Perizinan::with('tipe')->where('id_santri', $pilih->id)->whereNull('id_jadwal')->orderByDesc('rencana_keluar')->limit(30)->get() : collect()]);
     }
 
     public function form(Request $request): View|RedirectResponse
@@ -45,23 +45,26 @@ class PortalPerizinanController extends Controller
         }
 
         return view('portal.perizinan-ajukan', ['anak' => $anak, 'pilih' => (int) $request->query('anak') ?: $anak->first()->id,
-            'tipe' => TipeIzin::where('aktif', true)->orderBy('urutan')->get()]);
+            'tipe' => TipeIzin::where('aktif', true)->where('rutin', false)->orderBy('urutan')->get(),
+            'keluarga' => SesiWali::wali(), 'wakilWajib' => PerizinanService::pengaturan()->wakil_wajib]);
     }
 
     public function ajukan(Request $request): RedirectResponse
     {
-        $d = $request->validate(PerizinanController::aturan() + ['id_santri' => ['required', 'integer']], [
+        // Wali wajib memilih siapa yang menjemput (Tahap 1, 4 Nov 2026).
+        $d = $request->validate(['penjemput_jenis' => ['required', 'in:wali,wakil'], 'id_santri' => ['required', 'integer']] + PerizinanController::aturan(), [
             'rencana_keluar.required' => __('Isi waktu keluar.'), 'rencana_kembali.required' => __('Isi waktu kembali.'),
-            'penjemput_hp.regex' => __('Nomor HP penjemput tidak sah.'),
+            'penjemput_hp.regex' => __('Nomor HP penjemput tidak sah.'), 'penjemput_jenis.required' => __('Pilih siapa yang menjemput.'),
         ]);
         $santri = $this->anak()->firstWhere('id', (int) $d['id_santri']) ?? abort(404);
         try {
-            $z = $this->svc->ajukan(Santri::findOrFail($santri->id), $d, SesiWali::wali(), (string) SesiWali::peran($request), lampiran: $request->file('lampiran'));
+            $z = $this->svc->ajukan(Santri::findOrFail($santri->id), $d, SesiWali::wali(), (string) SesiWali::peran($request), lampiran: $request->file('lampiran'), fotoIdentitas: $request->file('penjemput_foto'));
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('portal.perizinan.lihat', $z->id)->with('status', __('Pengajuan izin terkirim. Anda akan dikabari setelah diputuskan.'));
+        return redirect()->route('portal.perizinan.lihat', $z->id)->with('status', $z->disetujui_otomatis
+            ? __('Izin disetujui. Tunjukkan kepada petugas pos saat menjemput.') : __('Pengajuan izin terkirim. Anda akan dikabari setelah diputuskan.'));
     }
 
     public function lihat(int $id): View
@@ -86,5 +89,13 @@ class PortalPerizinanController extends Controller
         abort_unless($z->lampiran_path, 404);
 
         return Unggahan::sajikan('local', $z->lampiran_path, $z->lampiran_nama);
+    }
+
+    public function fotoPenjemput(int $id)
+    {
+        $z = $this->milikSaya($id);
+        abort_unless($z->penjemput_foto_path, 404);
+
+        return Unggahan::sajikan('local', $z->penjemput_foto_path, $z->penjemput_foto_nama);
     }
 }

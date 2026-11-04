@@ -12,7 +12,7 @@
         @csrf
         <div>
             <h2 class="text-base font-semibold text-gray-900">Catat izin atas nama wali</h2>
-            <p class="text-sm text-gray-500">Mis. santri sakit mendadak dan wali menelepon. Batas waktu pengajuan tidak berlaku; tetap melalui persetujuan. Walinya dikabari.</p>
+            <p class="text-sm text-gray-500">Mis. santri sakit mendadak dan wali menelepon. Batas waktu pengajuan tidak berlaku; persetujuan mengikuti pengaturan jenis izinnya. Walinya dikabari.</p>
         </div>
         <x-field name="id_santri" label="Santri" :value="old('id_santri')" :options="$santriOptions" required />
         <label class="block text-sm"><span class="mb-1 block font-medium text-gray-700">Tipe izin <span class="text-red-500">*</span></span>
@@ -28,13 +28,27 @@
                 <input type="datetime-local" name="rencana_kembali" required value="{{ old('rencana_kembali') }}" class="w-full rounded-lg border-gray-300 text-sm"></label>
         </div>
         <p x-show="harian.includes(tipe)" x-cloak class="text-xs text-amber-700">Keluar lingkungan ma'had: kembali di hari yang sama.</p>
-        <div class="grid gap-4 sm:grid-cols-3">
-            <label class="block text-sm"><span class="mb-1 block font-medium text-gray-700">Penjemput</span>
-                <input name="penjemput_nama" value="{{ old('penjemput_nama') }}" maxlength="255" class="w-full rounded-lg border-gray-300 text-sm"></label>
-            <label class="block text-sm"><span class="mb-1 block font-medium text-gray-700">Hubungan</span>
-                <input name="penjemput_hubungan" value="{{ old('penjemput_hubungan') }}" maxlength="100" placeholder="mis. ayah" class="w-full rounded-lg border-gray-300 text-sm"></label>
-            <label class="block text-sm"><span class="mb-1 block font-medium text-gray-700">No. HP penjemput</span>
-                <input name="penjemput_hp" value="{{ old('penjemput_hp') }}" inputmode="tel" class="w-full rounded-lg border-gray-300 text-sm"></label>
+        @php $wakilWajib = \App\Services\Modules\PerizinanService::pengaturan()->wakil_wajib; $tanda = fn ($k) => in_array($k, $wakilWajib, true) ? ' *' : ''; @endphp
+        <div x-data="{ jenis: @js(old('penjemput_jenis', '')) }" class="space-y-3 rounded-lg border border-gray-200 p-4">
+            <div class="flex flex-wrap items-end gap-4">
+                <label class="block text-sm"><span class="mb-1 block font-medium text-gray-700">Penjemput</span>
+                    <select name="penjemput_jenis" x-model="jenis" class="rounded-lg border-gray-300 text-sm">
+                        <option value="">Belum diketahui</option><option value="wali">Dijemput wali</option><option value="wakil">Diwakilkan</option>
+                    </select></label>
+                <label x-show="jenis === 'wali'" x-cloak class="block text-sm"><span class="mb-1 block font-medium text-gray-700">Siapa</span>
+                    <select name="penjemput_peran" class="rounded-lg border-gray-300 text-sm">
+                        @foreach (\App\Models\Wali::PERAN as $k => $l)<option value="{{ $k }}" @selected(old('penjemput_peran') === $k)>{{ $l }}</option>@endforeach
+                    </select></label>
+                <p x-show="jenis === 'wali'" x-cloak class="text-xs text-gray-500">Nama &amp; HP diambil dari data keluarga santri.</p>
+            </div>
+            <div x-show="jenis === 'wakil'" x-cloak class="grid gap-3 sm:grid-cols-3">
+                <label class="block text-sm"><span class="mb-1 block text-gray-700">Nama{{ $tanda('nama') }}</span><input name="penjemput_nama" value="{{ old('penjemput_nama') }}" maxlength="255" class="w-full rounded-lg border-gray-300 text-sm"></label>
+                <label class="block text-sm"><span class="mb-1 block text-gray-700">Hubungan{{ $tanda('hubungan') }}</span><input name="penjemput_hubungan" value="{{ old('penjemput_hubungan') }}" maxlength="100" placeholder="mis. paman" class="w-full rounded-lg border-gray-300 text-sm"></label>
+                <label class="block text-sm"><span class="mb-1 block text-gray-700">No. HP{{ $tanda('hp') }}</span><input name="penjemput_hp" value="{{ old('penjemput_hp') }}" inputmode="tel" class="w-full rounded-lg border-gray-300 text-sm"></label>
+                <label class="block text-sm"><span class="mb-1 block text-gray-700">NIK / no. identitas{{ $tanda('identitas') }}</span><input name="penjemput_identitas" value="{{ old('penjemput_identitas') }}" maxlength="50" class="w-full rounded-lg border-gray-300 text-sm"></label>
+                <label class="block text-sm sm:col-span-2"><span class="mb-1 block text-gray-700">Foto KTP / identitas{{ $tanda('foto_identitas') }}</span><input type="file" name="penjemput_foto" accept=".pdf,.jpg,.jpeg,.png,.webp" class="text-sm"></label>
+                <label class="block text-sm sm:col-span-3"><span class="mb-1 block text-gray-700">Keterangan{{ $tanda('keterangan') }}</span><input name="penjemput_keterangan" value="{{ old('penjemput_keterangan') }}" maxlength="500" class="w-full rounded-lg border-gray-300 text-sm"></label>
+            </div>
         </div>
         <label class="block text-sm"><span class="mb-1 block font-medium text-gray-700">Lampiran (opsional, maks. {{ \App\Support\Unggahan::maksLabel() }})</span>
             <input type="file" name="lampiran" accept=".pdf,.jpg,.jpeg,.png,.webp" class="text-sm"></label>

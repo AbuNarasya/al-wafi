@@ -27,7 +27,7 @@ class PerizinanController extends Controller
         $cari = trim((string) $request->query('q', ''));
         $tipe = $request->query('tipe');
         $jk = in_array($request->query('jk'), ['L', 'P'], true) ? $request->query('jk') : null;
-        $dasar = fn () => Perizinan::query()
+        $dasar = fn () => Perizinan::query()->whereNull('id_jadwal')   // rutin punya layarnya sendiri
             ->when($cari !== '', fn ($w) => $w->where(fn ($x) => $x->where('nomor', 'ilike', "%{$cari}%")
                 ->orWhereHas('santri', fn ($s) => $s->where('nama', 'ilike', "%{$cari}%")->orWhere('nis', 'ilike', "%{$cari}%"))))
             ->when($tipe, fn ($w) => $w->where('kode_tipe', $tipe))
@@ -40,17 +40,17 @@ class PerizinanController extends Controller
             'tab' => $tab, 'cari' => $cari, 'tipe' => $tipe, 'jk' => $jk,
             'jumlah' => collect(self::TAB)->map(fn ($l, $k) => $k === 'riwayat' ? null
                 : $dasar()->whereIn('status', match ($k) { 'menunggu' => Perizinan::MENUNGGU, default => [$k] })->count()),
-            'terlambat' => Perizinan::where('status', 'keluar')->where('rencana_kembali', '<', now())->count(),
+            'terlambat' => Perizinan::where('status', 'keluar')->where('rencana_kembali', '<', now())->count(),   // insidental + rutin
             'rows' => $dasar()->with(['santri:id,nama,nis,id_kelas,jenis_kelamin', 'santri.kelas:id,nama', 'tipe'])->whereIn('status', $status)
                 ->orderBy($tab === 'riwayat' ? 'updated_at' : 'rencana_keluar', $tab === 'riwayat' ? 'desc' : 'asc')->paginate(50)->withQueryString(),
-            'opsiTipe' => TipeIzin::orderBy('urutan')->pluck('nama', 'kode'),
+            'opsiTipe' => TipeIzin::where('rutin', false)->orderBy('urutan')->pluck('nama', 'kode'),
             'p' => PerizinanService::pengaturan(),
         ]);
     }
 
     public function show(Perizinan $perizinan): View
     {
-        $perizinan->load(['santri.kelas', 'santri.jenjang', 'santri.wali', 'tipe']);
+        $perizinan->load(['santri.kelas', 'santri.jenjang', 'santri.wali', 'tipe', 'jadwal']);
         $id = array_filter(array_map(fn ($l) => $perizinan->{"{$l}_oleh"}, ['tingkat1', 'tingkat2', 'ditolak', 'keluar', 'kembali']));
 
         return view('perizinan.show', ['z' => $perizinan, 'p' => PerizinanService::pengaturan(),
@@ -79,12 +79,20 @@ class PerizinanController extends Controller
         return Unggahan::sajikan('local', $perizinan->lampiran_path, $perizinan->lampiran_nama);
     }
 
+    /** Foto identitas penjemput yang diwakilkan — dicocokkan petugas pos sebelum santri dilepas. */
+    public function fotoPenjemput(Perizinan $perizinan)
+    {
+        abort_unless($perizinan->penjemput_foto_path, 404);
+
+        return Unggahan::sajikan('local', $perizinan->penjemput_foto_path, $perizinan->penjemput_foto_nama);
+    }
+
     // ---- Atas nama wali ----
 
     public function buat(): View
     {
         return view('perizinan.buat', [
-            'tipe' => TipeIzin::where('aktif', true)->orderBy('urutan')->get(),
+            'tipe' => TipeIzin::where('aktif', true)->where('rutin', false)->orderBy('urutan')->get(),
             'santriOptions' => Santri::where('status', 'aktif')->orderBy('nama')->get(['id', 'nama', 'nis'])
                 ->mapWithKeys(fn ($s) => [$s->id => trim("{$s->nama} ({$s->nis})", ' ()')])->all(),
         ]);
@@ -94,12 +102,12 @@ class PerizinanController extends Controller
     {
         $d = $request->validate(self::aturan() + ['id_santri' => ['required', 'integer', 'exists:santri,id']]);
         try {
-            $z = $this->svc->ajukan(Santri::findOrFail($d['id_santri']), $d, staf: $request->user(), lampiran: $request->file('lampiran'));
+            $z = $this->svc->ajukan(Santri::findOrFail($d['id_santri']), $d, staf: $request->user(), lampiran: $request->file('lampiran'), fotoIdentitas: $request->file('penjemput_foto'));
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('perizinan.show', $z->id)->with('status', "{$z->nomor} dicatat — menunggu persetujuan.");
+        return redirect()->route('perizinan.show', $z->id)->with('status', "{$z->nomor} dicatat — ".($z->disetujui_otomatis ? 'langsung disetujui (persetujuan otomatis).' : 'menunggu persetujuan.'));
     }
 
     /** @return array<string,list<string>> Aturan isian pengajuan (dipakai juga portal wali). */
@@ -111,6 +119,10 @@ class PerizinanController extends Controller
             'rencana_keluar' => ['required', 'date'], 'rencana_kembali' => ['required', 'date'],
             'penjemput_nama' => ['nullable', 'string', 'max:255'], 'penjemput_hubungan' => ['nullable', 'string', 'max:100'],
             'penjemput_hp' => ['nullable', 'string', 'regex:/^[0-9+\-\s()]{8,20}$/'],
+            // Penjemput (Tahap 1, 4 Nov 2026): wali sendiri atau diwakilkan — isian wajib wakil dicek di service.
+            'penjemput_jenis' => ['nullable', 'in:wali,wakil'], 'penjemput_peran' => ['nullable', 'in:ayah,ibu,wali'],
+            'penjemput_identitas' => ['nullable', 'string', 'max:50'], 'penjemput_keterangan' => ['nullable', 'string', 'max:500'],
+            'penjemput_foto' => Unggahan::aturan(wajib: false),
             'lampiran' => Unggahan::aturan(wajib: false),
         ];
     }
@@ -127,11 +139,11 @@ class PerizinanController extends Controller
 
     public function catatPos(Request $request, Perizinan $perizinan): RedirectResponse
     {
-        $d = $request->validate(['aksi' => ['required', 'in:keluar,kembali'], 'cara' => ['required', 'in:kartu,manual']]);
+        $d = $request->validate(['aksi' => ['required', 'in:keluar,kembali'], 'cara' => ['required', 'in:kartu,manual'], 'izin_tunggakan' => ['nullable', 'string', 'max:500']]);
         try {
             $d['aksi'] === 'keluar'
-                ? $this->svc->catatKeluar($perizinan, $request->user(), $d['cara'])
-                : $this->svc->catatKembali($perizinan, $request->user(), $d['cara']);
+                ? $this->svc->catatKeluar($perizinan, $request->user(), $d['cara'], $d['izin_tunggakan'] ?? null)
+                : $this->svc->catatKembali($perizinan, $request->user(), $d['cara'], $d['izin_tunggakan'] ?? null);
         } catch (AppException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -177,7 +189,11 @@ class PerizinanController extends Controller
     {
         $d = $request->validate([
             'label_tingkat1' => ['required', 'string', 'max:100'], 'label_tingkat2' => ['required', 'string', 'max:100'],
-            'tipe' => ['nullable', 'array'], 'tipe.*.batas_jam' => ['nullable', 'integer', 'between:0,720'],
+            'tipe' => ['nullable', 'array'], 'tipe.*.batas_hari' => ['nullable', 'integer', 'between:0,365'],
+            'tipe.*.persetujuan' => ['nullable', 'in:otomatis,petugas'],
+            'tipe.*.tunggakan_kebijakan' => ['nullable', 'in:tidak,tolak,tahan_kembali'],
+            'tipe.*.tunggakan_periode' => ['nullable', 'integer', 'between:1,60'], 'tipe.*.tunggakan_lingkup' => ['nullable', 'in:spp,semua'],
+            'wakil_wajib' => ['nullable', 'array'], 'wakil_wajib.*' => ['in:'.implode(',', array_keys(PerizinanService::ISIAN_WAKIL))],
         ]);
         if (! $request->boolean('tingkat1_aktif') && ! $request->boolean('tingkat2_aktif')) {
             return back()->withInput()->with('error', 'Aktifkan minimal satu tingkat persetujuan.');
@@ -186,10 +202,17 @@ class PerizinanController extends Controller
             DB::table('pengaturan_perizinan')->updateOrInsert(['id' => 1], [
                 'tingkat1_aktif' => $request->boolean('tingkat1_aktif'), 'tingkat2_aktif' => $request->boolean('tingkat2_aktif'),
                 'label_tingkat1' => trim($d['label_tingkat1']), 'label_tingkat2' => trim($d['label_tingkat2']),
+                'wakil_wajib' => json_encode(array_values($d['wakil_wajib'] ?? [])),
                 'diubah_oleh' => $request->user()->id_pengguna, 'updated_at' => now(),
             ]);
             foreach (TipeIzin::all() as $t) {
-                $t->update(['aktif' => $request->boolean("tipe.{$t->kode}.aktif"), 'batas_jam' => (int) ($d['tipe'][$t->kode]['batas_jam'] ?? 0)]);
+                // Batas kosong = tanpa batas pengajuan; 0 = H-0 (paling lambat hari itu juga).
+                $batas = $d['tipe'][$t->kode]['batas_hari'] ?? null;
+                $t->update(['aktif' => $request->boolean("tipe.{$t->kode}.aktif"), 'batas_hari' => $batas === null || $batas === '' ? null : (int) $batas,
+                    'persetujuan' => $d['tipe'][$t->kode]['persetujuan'] ?? $t->persetujuan,
+                    'tunggakan_kebijakan' => $d['tipe'][$t->kode]['tunggakan_kebijakan'] ?? $t->tunggakan_kebijakan,
+                    'tunggakan_periode' => (int) ($d['tipe'][$t->kode]['tunggakan_periode'] ?? $t->tunggakan_periode),
+                    'tunggakan_lingkup' => $d['tipe'][$t->kode]['tunggakan_lingkup'] ?? $t->tunggakan_lingkup]);
             }
         });
 

@@ -9,13 +9,14 @@
         $kelasLabel = 'mb-1 block text-sm font-medium text-slate-700';
         $wajib = $tipe->where('wajib_keperluan', true)->pluck('kode')->values();
         $harian = $tipe->where('pulang', false)->pluck('kode')->values();
-        $batas = $tipe->pluck('batas_jam', 'kode');
+        $batas = $tipe->mapWithKeys(fn ($t) => [$t->kode => $t->batas_hari]);
+        $otomatis = $tipe->where('persetujuan', 'otomatis')->pluck('kode')->values();
     @endphp
     <h1 class="mb-1 mt-2 text-xl font-bold text-slate-900">{{ __('Ajukan izin') }}</h1>
     <p class="mb-4 text-sm text-slate-500">{{ __('Izin diputuskan pesantren. Anda dikabari lewat portal & HP setiap ada perubahan.') }}</p>
 
     <form method="POST" action="{{ route('portal.perizinan.kirim') }}" enctype="multipart/form-data" data-no-confirm class="space-y-4"
-          x-data="{ tipe: @js(old('kode_tipe', '')), wajib: @js($wajib), harian: @js($harian), batas: @js($batas) }">
+          x-data="{ tipe: @js(old('kode_tipe', '')), wajib: @js($wajib), harian: @js($harian), batas: @js($batas), otomatis: @js($otomatis) }">
         @csrf
         <section class="space-y-4 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <div>
@@ -34,7 +35,8 @@
                         </label>
                     @endforeach
                 </div>
-                <p x-show="batas[tipe] > 0" x-cloak class="mt-1 text-xs text-amber-700">{{ __('Diajukan paling lambat') }} <span x-text="batas[tipe]"></span> {{ __('jam sebelum waktu keluar.') }}</p>
+                <p x-show="tipe && batas[tipe] !== null && batas[tipe] !== undefined" x-cloak class="mt-1 text-xs text-amber-700">{{ __('Diajukan paling lambat') }} H-<span x-text="batas[tipe]"></span> {{ __('sebelum tanggal keluar.') }}</p>
+                <p x-show="otomatis.includes(tipe)" x-cloak class="mt-1 text-xs text-emerald-700">{{ __('Izin ini langsung disetujui setelah dikirim.') }}</p>
             </div>
             <div>
                 <label for="keperluan" class="{{ $kelasLabel }}">{{ __('Keperluan') }} <span x-show="wajib.includes(tipe)" class="text-red-500">*</span>
@@ -50,14 +52,9 @@
             <p x-show="harian.includes(tipe)" x-cloak class="text-xs text-amber-700">{{ __('Izin keluar lingkungan ma\'had: kembali di hari yang sama.') }}</p>
         </section>
 
+        @include('portal._penjemput-isian')
+
         <section class="space-y-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-            <h2 class="text-sm font-bold text-slate-800">{{ __('Penjemput') }} <span class="text-xs font-normal text-slate-400">({{ __('tidak wajib') }})</span></h2>
-            <input name="penjemput_nama" value="{{ old('penjemput_nama') }}" maxlength="255" placeholder="{{ __('Nama penjemput') }}" class="{{ $kelasInput }}">
-            <div class="grid grid-cols-2 gap-3">
-                <input name="penjemput_hubungan" value="{{ old('penjemput_hubungan') }}" maxlength="100" placeholder="{{ __('Hubungan, mis. ayah') }}" class="{{ $kelasInput }}">
-                <input name="penjemput_hp" value="{{ old('penjemput_hp') }}" inputmode="tel" placeholder="{{ __('No. HP') }}" class="{{ $kelasInput }}">
-            </div>
-            @error('penjemput_hp')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
             <label class="block text-sm text-slate-700">{{ __('Lampiran (surat dokter, jadwal keberangkatan, dll.)') }} <span class="text-xs text-slate-400">({{ __('tidak wajib') }}, {{ \App\Support\Unggahan::maksLabel() }})</span>
                 <input type="file" name="lampiran" accept=".pdf,.jpg,.jpeg,.png,.webp" class="mt-1 block w-full text-sm"></label>
         </section>
