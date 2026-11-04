@@ -252,6 +252,15 @@
         </section>
     @endif
 
+    {{-- Surat pernyataan yang disetujui saat mendaftar (4 Nov 2026) — hanya bila versinya ber-PDF. --}}
+    @if ($suratPdf)
+        <a href="{{ route('portal.surat_pdf', $suratPdf->id) }}" target="_blank" rel="noopener"
+           class="mt-5 flex items-center justify-between gap-2 rounded-3xl bg-white px-4 py-3 text-sm shadow-sm ring-1 ring-slate-200">
+            <span class="font-medium text-slate-900">&#128196; {{ __('Surat pernyataan yang Anda setujui') }}</span>
+            <span class="shrink-0 text-xs font-semibold text-brand">{{ __('Unduh PDF') }}</span>
+        </a>
+    @endif
+
     {{-- Pengunduran diri (21 Okt 2026): untuk santri aktif, atau bila sudah ada pengajuannya. --}}
     @if ($aktif || \App\Models\PengajuanKeluar::where('id_santri', $santri->id)->exists())
         <a href="{{ route('portal.mundur', $santri->id) }}" class="mt-8 block text-center text-sm font-semibold text-slate-500 underline">{{ __('Pengunduran diri santri') }}</a>

@@ -251,6 +251,10 @@
                         <span class="text-xs font-semibold text-brand" x-text="baca ? @js(__('Tutup')) : @js(__('Baca'))"></span>
                     </button>
                     <div x-show="baca" x-cloak class="max-h-80 overflow-y-auto whitespace-pre-line border-t border-slate-100 px-4 py-3 text-sm leading-relaxed text-slate-700">{{ $surat->isi }}</div>
+                    @if ($surat->berkas_pdf)
+                        <a href="{{ route('portal.surat_pdf', $surat->id) }}" target="_blank" rel="noopener"
+                           class="flex items-center gap-2 border-t border-slate-100 px-4 py-3 text-sm font-semibold text-brand">&#128196; {{ __('Unduh surat pernyataan (PDF)') }}</a>
+                    @endif
                 </div>
                 <label class="mt-3 flex items-start gap-3 text-sm text-slate-700">
                     <input type="checkbox" name="setuju" value="1" required @checked(old('setuju')) class="mt-0.5 rounded border-slate-300 text-brand focus:ring-brand">

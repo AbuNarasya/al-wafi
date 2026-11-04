@@ -6,7 +6,9 @@ use App\Exceptions\AppException;
 use App\Models\PersetujuanTerm;
 use App\Models\TermTemplate;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * SURAT PERNYATAAN WALI — teks berversi yang disetujui wali saat mendaftar di portal.
@@ -35,14 +37,22 @@ class SuratPernyataanService
         return TermTemplate::where('status', 'aktif')->orderByDesc('versi')->first();
     }
 
-    public function create(array $data, int $idPengguna): TermTemplate
+    /** Folder berkas PDF surat pernyataan di disk `local` (tak bisa dibuka langsung dari web). */
+    public const FOLDER_PDF = 'surat-pernyataan';
+
+    /** Batas PDF surat pernyataan — lebih longgar dari Unggahan::MAKS_KB (keputusan user 4 Nov 2026). */
+    public const MAKS_PDF_KB = 2048;
+
+    public function create(array $data, int $idPengguna, ?UploadedFile $pdf = null): TermTemplate
     {
-        return DB::transaction(function () use ($data, $idPengguna) {
+        $berkas = $pdf ? $this->simpanPdf($pdf) : [];
+
+        return DB::transaction(function () use ($data, $idPengguna, $berkas) {
             // Dikunci supaya dua petugas yang menyimpan bersamaan tak berebut nomor yang sama.
             DB::statement('LOCK TABLE term_template IN SHARE ROW EXCLUSIVE MODE');
             $versi = (int) TermTemplate::max('versi') + 1;
 
-            $baru = TermTemplate::create($this->bersih($data) + [
+            $baru = TermTemplate::create($this->bersih($data) + $berkas + [
                 'versi' => $versi,
                 // Versi pertama langsung aktif: tanpa itu portal tak punya surat sama sekali.
                 'status' => TermTemplate::where('status', 'aktif')->exists() ? 'nonaktif' : 'aktif',
@@ -53,13 +63,35 @@ class SuratPernyataanService
         });
     }
 
-    public function update(int $id, array $data): TermTemplate
+    /** PDF ikut terkunci bersama versinya: hanya bisa diganti/dihapus selama belum ada yang menyetujui. */
+    public function update(int $id, array $data, ?UploadedFile $pdf = null, bool $hapusPdf = false): TermTemplate
     {
         $surat = $this->cari($id);
         $this->pastikanBelumDipakai($surat, 'diubah');
-        $surat->update($this->bersih($data));
+        $lama = $surat->berkas_pdf;
+
+        $isi = $this->bersih($data);
+        if ($pdf) {
+            $isi += $this->simpanPdf($pdf);
+        } elseif ($hapusPdf) {
+            $isi += ['berkas_pdf' => null, 'berkas_pdf_nama' => null];
+        }
+        $surat->update($isi);
+
+        if ($lama && $lama !== $surat->berkas_pdf) {
+            Storage::disk('local')->delete($lama);
+        }
 
         return $surat;
+    }
+
+    /** @return array{berkas_pdf:string,berkas_pdf_nama:string} */
+    private function simpanPdf(UploadedFile $pdf): array
+    {
+        return [
+            'berkas_pdf' => $pdf->store(self::FOLDER_PDF, 'local'),
+            'berkas_pdf_nama' => mb_substr($pdf->getClientOriginalName(), 0, 255),
+        ];
     }
 
     public function aktifkan(int $id): TermTemplate
@@ -82,6 +114,9 @@ class SuratPernyataanService
             throw new AppException(422, "Versi {$surat->versi} sedang aktif. Aktifkan versi lain dulu, baru hapus yang ini.");
         }
         $surat->delete();
+        if ($surat->berkas_pdf) {
+            Storage::disk('local')->delete($surat->berkas_pdf);
+        }
     }
 
     public static function dipakai(TermTemplate $surat): int

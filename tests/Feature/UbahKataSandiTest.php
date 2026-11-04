@@ -69,7 +69,7 @@ class UbahKataSandiTest extends TestCase
 
         // Bukti yang sebenarnya: pintu masuk menerima sandi baru, menolak lama.
         $this->post('/login', ['username' => 'siti', 'password' => 'baru456'])
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route('beranda'));
 
         $this->post('/login', ['username' => 'siti', 'password' => 'lama123'])
             ->assertSessionHasErrors('username');

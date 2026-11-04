@@ -433,6 +433,10 @@ class PortalKeluargaController extends Controller
                 'diganti' => $registrasi->where('status', 'perlu_diganti')->count(),
             ],
             'santri' => $s, 'aktif' => $aktif, 'tahapPsb' => $tahapPsb === false ? null : $tahapPsb,
+            // Versi surat pernyataan yang disetujui untuk anak ini — tautan unduh bila ber-PDF.
+            'suratPdf' => \App\Models\TermTemplate::whereNotNull('berkas_pdf')
+                ->whereIn('id', \App\Models\PersetujuanTerm::where('id_santri', $s->id)->where('id_wali', $s->id_wali)->select('id_term_template'))
+                ->orderByDesc('versi')->first(),
             'label' => self::labelStatusSantri((string) $s->status),
             'sisa' => $belum->sum(fn ($t) => (float) $t->sisa),
             'belum' => $belum->take(5)->map(fn (TagihanSantri $t) => [

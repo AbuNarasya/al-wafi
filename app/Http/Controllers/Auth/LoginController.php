@@ -19,7 +19,7 @@ class LoginController extends Controller
     public function showLogin(): View|RedirectResponse
     {
         if (Auth::check()) {
-            return redirect()->route('dashboard');
+            return redirect()->route('beranda');
         }
 
         return view('auth.login');
@@ -46,7 +46,8 @@ class LoginController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        // Semua login mendarat di Beranda (4 Nov 2026) — kecuali yang tadinya membuka alamat tertentu.
+        return redirect()->intended(route('beranda'));
     }
 
     public function logout(Request $request): RedirectResponse

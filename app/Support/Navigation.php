@@ -21,6 +21,8 @@ final class Navigation
      * @var list<array{url:string,label:string,group:string,sub?:string,modul?:string,adminOnly?:bool,staffOnly?:bool,staffOrMudirBagian?:bool,direktoratOrAdmin?:bool}>
      */
     public const ITEMS = [
+        // Beranda (4 Nov 2026): tanpa modul — semua pengguna yang login melihatnya.
+        ['url' => '/beranda', 'label' => 'Beranda', 'group' => ''],
         // Cukup berhak atas SALAH SATU tab untuk melihat menunya.
         ['url' => '/dashboard', 'label' => 'Dashboard', 'group' => '', 'modulAny' => ['dashboard', 'dashboard-ppsb', 'dashboard-anggaran', 'dashboard-kesantrian']],
 

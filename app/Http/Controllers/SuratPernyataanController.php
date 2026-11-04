@@ -35,7 +35,7 @@ class SuratPernyataanController extends Controller
     public function store(Request $request): RedirectResponse
     {
         try {
-            $surat = $this->service->create($this->validated($request), (int) $request->user()->id_pengguna);
+            $surat = $this->service->create($this->validated($request), (int) $request->user()->id_pengguna, $request->file('berkas_pdf'));
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
@@ -58,7 +58,7 @@ class SuratPernyataanController extends Controller
     public function update(Request $request, int $id): RedirectResponse
     {
         try {
-            $surat = $this->service->update($id, $this->validated($request));
+            $surat = $this->service->update($id, $this->validated($request), $request->file('berkas_pdf'), $request->boolean('hapus_pdf'));
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
@@ -89,12 +89,26 @@ class SuratPernyataanController extends Controller
         return redirect()->route('surat_pernyataan.index')->with('status', 'Surat pernyataan dihapus.');
     }
 
+    /** PDF surat versi ini — untuk petugas (unduhan wali lewat PortalSuratPernyataanController). */
+    public function pdf(int $id): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $surat = TermTemplate::findOrFail($id);
+        abort_unless($surat->berkas_pdf, 404);
+
+        return \App\Support\Unggahan::sajikan('local', $surat->berkas_pdf, $surat->berkas_pdf_nama);
+    }
+
     private function validated(Request $request): array
     {
         return $request->validate([
             'judul' => ['required', 'string', 'max:255'],
             'isi' => ['required', 'string', 'max:50000'],
             'berlaku_mulai' => ['required', 'date'],
+            // Opsional, PDF saja, ≤ 2 MB (lebih longgar dari batas unggahan umum).
+            'berkas_pdf' => ['nullable', 'file', 'mimes:pdf', 'max:'.SuratPernyataanService::MAKS_PDF_KB],
+        ], [
+            'berkas_pdf.mimes' => 'Berkas surat pernyataan harus PDF.',
+            'berkas_pdf.max' => 'Berkas PDF maksimal 2 MB.',
         ]);
     }
 }

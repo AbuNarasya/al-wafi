@@ -154,6 +154,10 @@ Route::prefix('wali')->name('portal.')->controller(PortalWaliController::class)-
     Route::middleware('portal.wali:pendaftar')->group(function () {
         Route::get('/daftar', 'formDaftar')->name('daftar');
         Route::post('/daftar', 'simpanDaftar')->middleware('throttle:10,1');
+        // PDF surat pernyataan (4 Nov 2026): versi aktif, atau versi yang pernah disetujui keluarga ini.
+        // Di luar /wali/data — pemegang link verifikasi tak ikut bisa membukanya.
+        Route::get('/surat-pernyataan/{id}/pdf', [\App\Http\Controllers\PortalSuratPernyataanController::class, 'pdf'])
+            ->name('surat_pdf')->whereNumber('id');
     });
     Route::middleware('portal.wali')->group(function () {
         Route::get('/beranda', 'beranda')->name('beranda');
@@ -322,7 +326,9 @@ Route::prefix('wali')->name('portal.verifikasi.')->controller(\App\Http\Controll
 
 // ---- Aplikasi (wajib login) ----
 Route::middleware('auth')->group(function () {
-    Route::get('/', fn () => redirect()->route('dashboard'));
+    // Beranda (4 Nov 2026): pendaratan SEMUA login, tanpa hak khusus — Dashboard ber-hak sendiri.
+    Route::get('/', fn () => redirect()->route('beranda'));
+    Route::get('/beranda', [\App\Http\Controllers\BerandaController::class, 'index'])->name('beranda');
 
     // Tanpa middleware hakakses: satu rute melayani dua tab (keuangan & PPSB)
     // dengan hak berbeda — gerbangnya di DashboardController::index().
@@ -698,6 +704,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [$s, 'index'])->name('index')->middleware('hakakses:surat-pernyataan,lihat');
         Route::get('/create', [$s, 'create'])->name('create')->middleware('hakakses:surat-pernyataan,buat');
         Route::post('/', [$s, 'store'])->name('store')->middleware('hakakses:surat-pernyataan,buat');
+        Route::get('/{id}/pdf', [$s, 'pdf'])->name('pdf')->middleware('hakakses:surat-pernyataan,lihat')->whereNumber('id');
         Route::get('/{id}/edit', [$s, 'edit'])->name('edit')->middleware('hakakses:surat-pernyataan,ubah')->whereNumber('id');
         Route::put('/{id}', [$s, 'update'])->name('update')->middleware('hakakses:surat-pernyataan,ubah')->whereNumber('id');
         Route::post('/{id}/aktifkan', [$s, 'aktifkan'])->name('aktifkan')->middleware('hakakses:surat-pernyataan,ubah')->whereNumber('id');

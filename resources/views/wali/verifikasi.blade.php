@@ -109,7 +109,7 @@
     {{-- Saringan --}}
     <form method="GET" class="mb-3 flex flex-wrap gap-2">
         @if ($status !== '')<input type="hidden" name="status" value="{{ $status }}">@endif
-        <input type="search" name="q" value="{{ $q }}" placeholder="Cari nama keluarga, nama santri, atau NIS…" class="w-full max-w-sm rounded-lg border-gray-300 text-sm">
+        <input type="search" name="q" value="{{ $q }}" placeholder="Cari nama santri, ayah, ibu, wali, atau NIS…" class="w-full max-w-sm rounded-lg border-gray-300 text-sm">
         <button class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Cari</button>
     </form>
 

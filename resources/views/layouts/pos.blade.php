@@ -28,7 +28,7 @@
         <div class="flex items-center gap-3 text-sm">
             @yield('aksi')
             <span class="hidden text-white/70 sm:inline">{{ auth()->user()->nama }}</span>
-            <a href="{{ route('dashboard') }}" class="rounded border border-white/30 px-2 py-1 text-xs hover:bg-white/10">Keluar ke ERP</a>
+            <a href="{{ route('beranda') }}" class="rounded border border-white/30 px-2 py-1 text-xs hover:bg-white/10">Keluar ke ERP</a>
         </div>
     </header>
 

@@ -45,7 +45,11 @@ class WaliVerifikasiController extends Controller
         $q = mb_strtolower(trim((string) $request->query('q', '')));
         $tersaring = $baris
             ->when($status !== '', fn ($c) => $c->where('status', $status))
-            ->when($q !== '', fn ($c) => $c->filter(fn ($b) => str_contains(mb_strtolower($b['wali']->nama.' '.$b['wali']->santri->pluck('nama')->implode(' ').' '.$b['wali']->santri->pluck('nis')->implode(' ')), $q)))
+            // Dicari di nama keluarga, nama ayah, ibu, wali, nama santri, dan NIS (4 Nov 2026).
+            ->when($q !== '', fn ($c) => $c->filter(fn ($b) => str_contains(mb_strtolower(implode(' ', [
+                $b['wali']->nama, $b['wali']->nama_ayah, $b['wali']->nama_ibu, $b['wali']->nama_wali,
+                $b['wali']->santri->pluck('nama')->implode(' '), $b['wali']->santri->pluck('nis')->implode(' '),
+            ])), $q)))
             ->values();
 
         $halaman = LengthAwarePaginator::resolveCurrentPage();

@@ -58,6 +58,11 @@
                     <div class="max-h-96 overflow-y-auto whitespace-pre-line rounded-lg bg-gray-50 p-4 text-sm leading-relaxed text-gray-800">{{ $r->isi }}</div>
 
                     <div class="mt-3 flex flex-wrap items-center justify-end gap-3 text-sm">
+                        @if ($r->berkas_pdf)
+                            <a href="{{ route('surat_pernyataan.pdf', $r->id) }}" target="_blank" rel="noopener" class="me-auto text-brand hover:underline">&#128196; {{ $r->berkas_pdf_nama }}</a>
+                        @else
+                            <span class="me-auto text-xs text-gray-400">Tanpa PDF &mdash; wali hanya membaca teks di atas.</span>
+                        @endif
                         @if ($bolehUbah && $r->status !== 'aktif')
                             <form method="POST" action="{{ route('surat_pernyataan.aktifkan', $r->id) }}"
                                   onsubmit="return confirm('Jadikan versi {{ $r->versi }} sebagai surat yang tampil kepada wali? Versi aktif sekarang akan dinonaktifkan.')">

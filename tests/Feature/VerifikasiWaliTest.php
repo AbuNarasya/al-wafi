@@ -86,6 +86,22 @@ class VerifikasiWaliTest extends TestCase
         $this->actingAs($this->admin)->get(route('wali.verifikasi'))->assertOk()->assertSee('Ibu Aminah')->assertDontSee('Lulus');
     }
 
+    /** 4 Nov 2026: cari juga nama ayah, ibu, dan wali — bukan hanya nama kontak utama & santri. */
+    public function test_cari_nama_santri_ayah_ibu_dan_wali(): void
+    {
+        $dua = Wali::create(['kontak_utama' => 'wali', 'nama_wali' => 'Paman Umar', 'telepon_wali' => '0833',
+            'nama_ibu' => 'Ibu Zainab', 'nama_ayah' => 'Bapak Yusuf', 'nama' => 'Keluarga Dua', 'telepon' => '0833', 'status' => 'aktif']);
+        Santri::create(['no_pendaftaran' => 'ZZVW-3', 'nama' => 'Bilal', 'jenis_kelamin' => 'L', 'kode_jenjang' => 'SMP',
+            'jalur' => 'reguler', 'status' => 'aktif', 'id_wali' => $dua->id]);
+
+        $cari = fn (string $q) => $this->actingAs($this->admin)->get(route('wali.verifikasi', ['q' => $q]))->assertOk();
+        $cari('hasan')->assertSee('Ibu Aminah')->assertDontSee('Keluarga Dua');      // ayah
+        $cari('zainab')->assertSee('Keluarga Dua')->assertDontSee('Ibu Aminah');     // ibu
+        $cari('umar')->assertSee('Keluarga Dua')->assertDontSee('Ibu Aminah');       // wali
+        $cari('bilal')->assertSee('Keluarga Dua')->assertDontSee('Ibu Aminah');      // santri
+        $cari('2425001')->assertSee('Ibu Aminah')->assertDontSee('Keluarga Dua');    // NIS
+    }
+
     public function test_daftar_wali_menampilkan_anak_bertaut_ke_detail_santri(): void
     {
         $this->actingAs($this->admin)->get(route('wali.index'))->assertOk()
