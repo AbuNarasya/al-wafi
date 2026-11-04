@@ -655,13 +655,14 @@
                                             <x-asal-tarif :bagian="$asalTarifUangPangkal['bagian']" :teks="$asalTarifUangPangkal['label']" />
                                             @if ($nominalDefaultUangPangkal !== null) — boleh diubah bila calon ini berbeda. @endif
                                         </span>
+                                        <span class="mt-0.5 block text-[11px] text-gray-400"><b>0</b> = gratis 100% (tagihan terbit Rp 0, langsung lunas) — tulis alasannya di Keterangan.</span>
                                     </label>
                                 @endif
                                 {{-- Perlengkapan TIDAK dipotong potongan gelombang: terbit utuh
                                      sebagai tagihan tersendiri, dengan jadwal termin sendiri. --}}
                                 @if ($bisaTagih['perlengkapan'])
                                     <label class="block text-xs text-gray-600">Biaya Perlengkapan
-                                        <x-input-rupiah name="nominal_perlengkapan" placeholder="kosongkan bila tidak dipungut"
+                                        <x-input-rupiah name="nominal_perlengkapan" placeholder="kosongkan bila tidak dipungut · 0 = gratis"
                                                         :value="old('nominal_perlengkapan', $nominalDefaultPerlengkapan)" class="mt-0.5" />
                                         <span class="mt-0.5 block text-[11px] text-gray-400">
                                             Terbit sebagai tagihan terpisah dan <b>tidak dipotong</b> potongan gelombang.
@@ -673,7 +674,8 @@
                                     <input type="date" name="jatuh_tempo" class="mt-0.5 w-full rounded border-gray-300 text-sm">
                                 </label>
                                 <label class="block text-xs text-gray-600">Keterangan
-                                    <input type="text" name="keterangan" placeholder="opsional" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                    <input type="text" name="keterangan" value="{{ old('keterangan') }}" placeholder="wajib bila nominal 0 (mis. beasiswa penuh)" class="mt-0.5 w-full rounded border-gray-300 text-sm">
+                                    @error('keterangan')<span class="mt-0.5 block text-[11px] text-red-600">Tulis alasannya bila tagihan digratiskan (nominal 0).</span>@enderror
                                 </label>
                             </div>
 
@@ -785,6 +787,7 @@
                                 <div class="grid gap-2 sm:grid-cols-3">
                                     <label class="block text-xs text-gray-600">Nominal Normal yang Benar <span class="text-red-500">*</span>
                                         <x-input-rupiah name="nominal" required :value="old('nominal', $k['nominal_normal'])" class="mt-0.5" />
+                                        <span class="mt-0.5 block text-[11px] text-gray-400"><b>0</b> = gratis 100% (lunas tanpa pembayaran).</span>
                                     </label>
                                     <label class="block text-xs text-gray-600">Jatuh Tempo
                                         <input type="date" name="jatuh_tempo" value="{{ old('jatuh_tempo', optional($k['tagihan']->jatuh_tempo)->format('Y-m-d')) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
@@ -832,6 +835,7 @@
                                 <div class="grid gap-2 sm:grid-cols-3">
                                     <label class="block text-xs text-gray-600">Nominal yang Benar <span class="text-red-500">*</span>
                                         <x-input-rupiah name="nominal" required :value="old('nominal', $kp['tagihan']->nominal)" class="mt-0.5" />
+                                        <span class="mt-0.5 block text-[11px] text-gray-400"><b>0</b> = gratis 100% (lunas tanpa pembayaran).</span>
                                     </label>
                                     <label class="block text-xs text-gray-600">Jatuh Tempo
                                         <input type="date" name="jatuh_tempo" value="{{ old('jatuh_tempo', optional($kp['tagihan']->jatuh_tempo)->format('Y-m-d')) }}" class="mt-0.5 w-full rounded border-gray-300 text-sm">
@@ -992,7 +996,7 @@
                                     @endif
                                     <label class="block text-xs text-gray-600">Perlengkapan
                                         <x-input-rupiah name="nominal_perlengkapan" :value="($tp['status'] ?? null) === 'ada' ? $tp['nominal'] : ''"
-                                                        placeholder="kosongkan bila tak dipungut" class="mt-0.5" />
+                                                        placeholder="kosongkan bila tak dipungut · 0 = gratis" class="mt-0.5" />
                                     </label>
                                     <label class="block text-xs text-gray-600">Jatuh Tempo
                                         <input type="date" name="jatuh_tempo" class="mt-0.5 w-full rounded border-gray-300 text-sm">

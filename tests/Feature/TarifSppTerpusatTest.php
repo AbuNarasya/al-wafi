@@ -484,6 +484,53 @@ class TarifSppTerpusatTest extends TestCase
         $this->assertSame('khusus', $hasil['asal']);
     }
 
+    /**
+     * GRATIS 100% (keputusan user 4 Nov 2026): uang pangkal & perlengkapan boleh 0 → terbit Rp 0, langsung lunas,
+     * tanpa potongan & tanpa jurnal; alasannya wajib. Perlengkapan KOSONG tetap = tidak dipungut. Dulu uang pangkal 0
+     * menolak seluruh formulir — SPP 0 di formulir yang sama ikut tak tersimpan (kasus Maryam & Fatimah).
+     */
+    public function test_uang_pangkal_dan_perlengkapan_boleh_nol_gratis(): void
+    {
+        $this->buatSpp('SPP-UMUM', '250000', null);
+        $this->buatUangPangkal('SD');
+        $this->buatBiaya(['kode' => 'PLK-SD', 'nama' => 'Perlengkapan', 'tipe' => 'perlengkapan', 'nominal' => '3000000', 'kode_jenjang' => 'SD',
+            'kode_coa_pendapatan' => self::PEND, 'kode_unit' => self::UNIT, 'tahun_ajaran' => self::TA]);
+        $calon = $this->calonLolos('SD');
+        $kirim = fn (array $isi) => $this->actingAs(User::first())->post(route('santri.aksi', ['id' => $calon->id, 'aksi' => 'tagih-uang-pangkal']), $isi);
+
+        $kirim(['nominal' => '0', 'nominal_perlengkapan' => '0', 'ubah_spp' => '1', 'nominal_spp' => '0'])->assertSessionHasErrors('keterangan');
+        $this->assertSame(0, TagihanSantri::where('id_santri', $calon->id)->whereIn('perilaku', ['uang_pangkal', 'perlengkapan'])->count());
+
+        $kirim(['nominal' => '0', 'nominal_perlengkapan' => '0', 'keterangan' => 'Beasiswa penuh yatim', 'ubah_spp' => '1', 'nominal_spp' => '0'])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        foreach (['uang_pangkal', 'perlengkapan'] as $perilaku) {
+            $t = TagihanSantri::where('id_santri', $calon->id)->where('perilaku', $perilaku)->sole();
+            $this->assertSame(['0.00', '0.00', 'lunas'], [(string) $t->nominal, (string) $t->sisa, $t->status], $perilaku);
+        }
+        $this->assertSame('0.00', $calon->refresh()->nominal_spp, 'SPP 0 ikut tersimpan');
+
+        // Akrual daftar ulang: sisa 0 → tanpa jurnal, walau jenis biayanya tanpa akun piutang.
+        $jurnal = JournalEntry::count();
+        (new SantriService)->akrualkanTagihan($calon, TagihanSantri::with('jenis')->where('id_santri', $calon->id)->whereIn('perilaku', ['uang_pangkal', 'perlengkapan'])->get()->all(),
+            User::first()->id_pengguna, 'uji');
+        $this->assertSame($jurnal, JournalEntry::count());
+
+        // Koreksi ke 0 pada tagihan yang sudah terbit (kasus Rp 1).
+        $calon2 = $this->calonLolos('SD');
+        $this->actingAs(User::first())->post(route('santri.aksi', ['id' => $calon2->id, 'aksi' => 'tagih-uang-pangkal']), ['nominal' => '1', 'nominal_perlengkapan' => '1']);
+        foreach (['koreksi-uang-pangkal' => 'uang_pangkal', 'koreksi-perlengkapan' => 'perlengkapan'] as $aksi => $perilaku) {
+            $this->actingAs(User::first())->post(route('santri.aksi', ['id' => $calon2->id, 'aksi' => $aksi]), ['nominal' => '0', 'alasan' => 'Digratiskan'])
+                ->assertSessionHasNoErrors();
+            $t = TagihanSantri::where('id_santri', $calon2->id)->where('perilaku', $perilaku)->sole();
+            $this->assertSame(['0.00', 'lunas'], [(string) $t->sisa, $t->status], $perilaku);
+        }
+
+        // Perlengkapan KOSONG tetap = tidak dipungut.
+        $calon3 = $this->calonLolos('SD');
+        $this->actingAs(User::first())->post(route('santri.aksi', ['id' => $calon3->id, 'aksi' => 'tagih-uang-pangkal']), ['nominal' => '5000000', 'nominal_perlengkapan' => '']);
+        $this->assertSame(['uang_pangkal'], TagihanSantri::where('id_santri', $calon3->id)->whereIn('perilaku', ['uang_pangkal', 'perlengkapan'])->pluck('perilaku')->all());
+    }
+
     /** Nol = beasiswa penuh (bukan "kosong"); kosong = kembali ke tarif jenjang. */
     public function test_nol_dan_kosong_dibedakan_pada_nominal_spp_khusus(): void
     {

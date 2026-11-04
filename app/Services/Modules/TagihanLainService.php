@@ -26,8 +26,9 @@ class TagihanLainService
         $jenis = $this->jenisSah($data['kode_jenis']);
 
         $nominal = Money::of($data['nominal']);
-        if (Money::lte($nominal, '0')) {
-            throw new AppException(422, 'Nominal tagihan harus lebih dari nol.');
+        // 0 = gratis 100% (keputusan user 4 Nov 2026): terbit Rp 0, langsung lunas, tanpa jurnal.
+        if (Money::lt($nominal, '0')) {
+            throw new AppException(422, 'Nominal tagihan tidak boleh negatif.');
         }
 
         return $this->terbitkanUntuk($jenis, array_fill_keys($data['id_santri'], $nominal), $data, $idPengguna);
@@ -154,7 +155,8 @@ class TagihanLainService
 
         $hasil = DB::transaction(function () use ($data, $jenis, $nominalPerSantri, $target, $akrual, $total, $idPengguna, $namaDilewati, $tidakAktif, $gugur) {
             $referensi = null;
-            if ($akrual) {
+            // Total nol (semua digratiskan) → tak ada piutang yang diakui, jadi tak ada jurnal.
+            if ($akrual && Money::gtZero($total)) {
                 $base = DocNumber::docBase('TGL', $data['tanggal']);
                 $last = \App\Models\JournalEntry::where('referensi', 'like', $base.'%')->orderByDesc('referensi')->value('referensi');
                 $referensi = DocNumber::nextDocNumber($base, $last);
@@ -175,7 +177,7 @@ class TagihanLainService
                 // satu santri boleh kena beberapa tagihan insidental di tahun sama.
                 'perilaku' => 'lain', 'kode_jenjang' => $s->kode_jenjang, 'tahun_ajaran' => $s->tahun_ajaran,
                 'nominal' => $nominalPerSantri[$s->id], 'sisa' => $nominalPerSantri[$s->id],
-                'sudah_akrual' => $akrual, 'status' => 'belum_bayar',
+                'sudah_akrual' => $akrual, 'status' => Money::isZero($nominalPerSantri[$s->id]) ? 'lunas' : 'belum_bayar',
                 'jatuh_tempo' => $data['jatuh_tempo'] ?? null, 'keterangan' => $data['keterangan'] ?? $jenis->nama,
                 'created_at' => $now, 'updated_at' => $now,
             ])->all());

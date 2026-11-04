@@ -200,8 +200,12 @@ class BatchTagihanService
 
         if ($sumber === 'manual') {
             $nominal = Money::of($p['nominal'] ?? '0');
-            if (Money::lte($nominal, '0')) {
-                throw new AppException(422, 'Nominal tagihan harus lebih dari nol.');
+            // 0 = gratis 100% (keputusan user 4 Nov 2026) — kosong tetap ditolak.
+            if (($p['nominal'] ?? '') === '' || $p['nominal'] === null) {
+                throw new AppException(422, 'Isi nominal tagihan (0 = gratis).');
+            }
+            if (Money::lt($nominal, '0')) {
+                throw new AppException(422, 'Nominal tagihan tidak boleh negatif.');
             }
             $ids = array_map('intval', (array) ($p['id_santri'] ?? []));
             if ($ids === []) {

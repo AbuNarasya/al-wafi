@@ -281,6 +281,25 @@ class DaftarUlangTest extends TestCase
         $this->assertSame(3500000.0, (float) $jurnal->first()->lines->sum('debet'));
     }
 
+    /** Gratis 100% (4 Nov 2026): daftar ulang 0 → terbit Rp 0 lunas; jurnal hanya untuk yang bernominal. */
+    public function test_daftar_ulang_boleh_nol_gratis(): void
+    {
+        $a = $this->santriAktif('A');
+        $b = $this->santriAktif('B');
+        $hasil = (new TagihanMassalService)->terbitkan(self::TA2, [$a->id => '0', $b->id => '1500000'], $this->admin->id_pengguna);
+        $this->assertSame([2, '1500000.00'], [$hasil['terbit'], $hasil['total']]);
+        $ta = TagihanSantri::where('id_santri', $a->id)->where('perilaku', 'daftar_ulang')->sole();
+        $this->assertSame(['0.00', 'lunas'], [(string) $ta->sisa, $ta->status]);
+        $this->assertSame(1500000.0, (float) JournalEntry::where('referensi', 'like', 'DUL%')->sole()->lines->sum('debet'));
+
+        // Seluruh kelompok gratis → tak ada jurnal sama sekali.
+        JournalEntry::query()->delete();
+        $c = $this->santriAktif('C');
+        (new TagihanMassalService)->terbitkan(self::TA2, [$c->id => '0'], $this->admin->id_pengguna);
+        $this->assertSame(0, JournalEntry::count());
+        $this->assertSame('lunas', TagihanSantri::where('id_santri', $c->id)->where('perilaku', 'daftar_ulang')->value('status'));
+    }
+
     public function test_daftar_ulang_hanya_sekali_per_tahun_ajaran(): void
     {
         $santri = $this->santriAktif();

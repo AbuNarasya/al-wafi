@@ -114,7 +114,8 @@ class TagihanLainController extends Controller
             'kode_jenis' => ['required', 'string', 'exists:jenis_biaya,kode'],
             'id_santri' => ['required', 'array', 'min:1'],
             'id_santri.*' => ['integer', 'exists:santri,id'],
-            'nominal' => ['required', 'numeric', 'gt:0'],
+            // 0 = gratis 100% (terbit Rp 0, langsung lunas); alasannya wajib di keterangan.
+            'nominal' => ['required', 'numeric', 'min:0'],
             'periode' => ['nullable', 'string', 'max:255'],
             'tanggal' => ['required', 'date'],
             // Keduanya sudah lama dibaca service, tapi tak pernah dikirim dari
@@ -122,8 +123,8 @@ class TagihanLainController extends Controller
             // Reminder Tagihan — yang menyaring lewat jatuh tempo — tak pernah
             // menjaring satu pun tagihan lain-lain.
             'jatuh_tempo' => ['nullable', 'date', 'after_or_equal:tanggal'],
-            'keterangan' => ['nullable', 'string', 'max:500'],
-        ]);
+            'keterangan' => [\Illuminate\Validation\Rule::requiredIf(fn () => $request->filled('nominal') && (float) $request->input('nominal') == 0), 'nullable', 'string', 'max:500'],
+        ], ['keterangan.required' => 'Tulis alasannya bila tagihan digratiskan (nominal 0).']);
         $data['id_santri'] = array_map('intval', $data['id_santri']);
 
         try {

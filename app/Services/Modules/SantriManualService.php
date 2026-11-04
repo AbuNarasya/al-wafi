@@ -245,8 +245,12 @@ class SantriManualService
             }
 
             $nominal = Money::of($b['nominal'] ?? 0);
-            if (! Money::gtZero($nominal)) {
-                throw new AppException(422, "Baris tagihan {$nomor}: nominal harus lebih besar dari nol.");
+            // 0 = gratis 100% (keputusan user 4 Nov 2026): terbit Rp 0 lunas; alasannya wajib.
+            if (Money::lt($nominal, '0')) {
+                throw new AppException(422, "Baris tagihan {$nomor}: nominal tidak boleh negatif.");
+            }
+            if (Money::isZero($nominal) && trim((string) ($b['keterangan'] ?? '')) === '') {
+                throw new AppException(422, "Baris tagihan {$nomor}: tulis alasannya di keterangan bila tagihan digratiskan (nominal 0).");
             }
 
             // Dua perlakuan yang membuat pembayarannya kelak mengkredit PIUTANG
@@ -290,7 +294,7 @@ class SantriManualService
             'tahun_ajaran' => $b['tahun_ajaran'] ?: $santri->tahun_ajaran,
             'nominal' => $b['nominal'],
             'sisa' => $b['nominal'],
-            'status' => 'belum_bayar',
+            'status' => Money::isZero($b['nominal']) ? 'lunas' : 'belum_bayar',
             // `saldo_awal` ditulis dulu sebagai false untuk perlakuan `akrual`:
             // jurnalnya terbit di bawah, dan barisnya memang BUKAN saldo awal.
             'sudah_akrual' => $b['posting'] === 'saldo_awal',

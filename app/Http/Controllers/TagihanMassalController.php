@@ -53,7 +53,7 @@ class TagihanMassalController extends Controller
             'tahun_ajaran' => ['required', 'string', 'exists:tahun_ajaran,kode'],
             'jatuh_tempo' => ['nullable', 'date'],
             'nominal' => ['required', 'array'],
-            'nominal.*' => ['nullable', 'numeric', 'gt:0'],
+            'nominal.*' => ['nullable', 'numeric', 'min:0'],   // 0 = gratis 100%
         ]);
 
         // Hanya baris yang dicentang yang ikut. Baris tak tercentang tidak dikirim

@@ -336,7 +336,8 @@ class PendaftaranLanjutanService
                 'kode_jenjang' => $p->kode_jenjang,
                 'jalur' => $p->kode_jalur ?: $santri->jalur,
                 'nominal' => $data['nominal_uang_pangkal'] ?? null,
-                'nominal_perlengkapan' => $data['nominal_perlengkapan'] ?? '0',
+                // Kosong = tidak dipungut; 0 = gratis (terbit Rp 0, lunas).
+                'nominal_perlengkapan' => $data['nominal_perlengkapan'] ?? null,
                 'jatuh_tempo' => $data['jatuh_tempo'] ?? null,
             ]);
 

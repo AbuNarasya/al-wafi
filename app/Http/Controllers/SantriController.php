@@ -896,13 +896,15 @@ class SantriController extends Controller
             // bisa ditagihkan — tarifnya bebas, atau tagihannya sudah terbit,
             // keduanya membuat isiannya ditiadakan. Mewajibkannya di sini akan
             // menolak kiriman yang formnya sendiri tak menyediakan.
+            // 0 = gratis 100% (keputusan user 4 Nov 2026) — terbit Rp 0 lunas; alasannya wajib di keterangan.
             'nominal' => [
                 $this->bisaTagihUangPangkal($id) ? 'required' : 'nullable',
-                'numeric', 'gt:0',
+                'numeric', 'min:0',
             ],
             'nominal_perlengkapan' => ['nullable', 'numeric', 'min:0'],
             'jatuh_tempo' => ['nullable', 'date'],
-            'keterangan' => ['nullable', 'string', 'max:255'],
+            'keterangan' => [\Illuminate\Validation\Rule::requiredIf(fn () => ($request->filled('nominal') && (float) $request->input('nominal') == 0)
+                || ($request->filled('nominal_perlengkapan') && (float) $request->input('nominal_perlengkapan') == 0)), 'nullable', 'string', 'max:255'],
             // Nol sah (beasiswa penuh), kosong = kembali ke tarif jenjang.
             'ubah_spp' => ['nullable', 'boolean'],
             'nominal_spp' => ['nullable', 'numeric', 'min:0'],
@@ -1006,12 +1008,12 @@ class SantriController extends Controller
                 // SPP-nya ikut di form yang sama tetapi TIDAK menerbitkan apa pun.
                 'tagih-uang-pangkal' => $this->tagihUangPangkal($request, $id),
                 'koreksi-uang-pangkal' => $this->service->koreksiNominalUangPangkal($id, $request->validate([
-                    'nominal' => ['required', 'numeric', 'gt:0'],
+                    'nominal' => ['required', 'numeric', 'min:0'],
                     'jatuh_tempo' => ['nullable', 'date'],
                     'alasan' => ['required', 'string', 'max:255'],
                 ]), $request->user()->id_pengguna),
                 'koreksi-perlengkapan' => $this->service->koreksiNominalPerlengkapan($id, $request->validate([
-                    'nominal' => ['required', 'numeric', 'gt:0'],
+                    'nominal' => ['required', 'numeric', 'min:0'],
                     'jatuh_tempo' => ['nullable', 'date'],
                     'alasan' => ['required', 'string', 'max:255'],
                 ]), $request->user()->id_pengguna),

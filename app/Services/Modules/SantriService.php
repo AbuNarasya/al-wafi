@@ -226,8 +226,11 @@ class SantriService
      *  3. jadwal termin melekat pada tagihan (`rencana_angsuran.id_tagihan`),
      *     sehingga dua tagihan = dua jadwal tanpa mengubah skema apa pun.
      *
-     * Perlengkapan boleh dikosongkan: nominal kosong/nol → tagihannya tidak
-     * terbit sama sekali.
+     * Perlengkapan boleh dikosongkan: nominal KOSONG → tagihannya tidak terbit sama sekali.
+     *
+     * GRATIS 100% (keputusan user 4 Nov 2026): nominal 0 pada uang pangkal / perlengkapan menerbitkan tagihan
+     * Rp 0 yang langsung LUNAS, tanpa potongan & tanpa jurnal — jejak bahwa santri ini dibebaskan. Alasannya
+     * (kolom keterangan) diwajibkan controller.
      *
      * JALUR BEBAS UANG PANGKAL (mis. Anak Karyawan): tagihan uang pangkalnya
      * TIDAK diterbitkan sama sekali — bukan diterbitkan bernominal nol, yang
@@ -290,16 +293,21 @@ class SantriService
             }
         }
         $nominalNormal = $bebas ? '0' : Money::of($data['nominal']);
-        if (! $bebas && Money::lte($nominalNormal, '0')) {
-            throw new AppException(422, 'Nominal uang pangkal harus lebih dari nol.');
+        if (! $bebas && Money::lt($nominalNormal, '0')) {
+            throw new AppException(422, 'Nominal uang pangkal tidak boleh negatif.');
         }
+        $gratisUp = ! $bebas && Money::isZero($nominalNormal);
 
         // Perlengkapan: jenis biayanya baru dicari bila nominalnya benar-benar
         // diisi, supaya pesantren yang tak memungut perlengkapan tidak dipaksa
         // membuat barisnya di master.
-        $nominalPerlengkapan = Money::of($data['nominal_perlengkapan'] ?? '0');
+        $isiPerlengkapan = isset($data['nominal_perlengkapan']) && $data['nominal_perlengkapan'] !== '';
+        $nominalPerlengkapan = Money::of($isiPerlengkapan ? $data['nominal_perlengkapan'] : '0');
+        if (Money::lt($nominalPerlengkapan, '0')) {
+            throw new AppException(422, 'Nominal biaya perlengkapan tidak boleh negatif.');
+        }
         $jenisPerlengkapan = null;
-        if (Money::gtZero($nominalPerlengkapan)) {
+        if ($isiPerlengkapan) {
             if ($this->tagihanBerperilaku($id, 'perlengkapan', $jenjangTagihan, $taTagihan)) {
                 throw new AppException(409, "Biaya perlengkapan {$jenjangTagihan} T.A {$taTagihan} untuk santri ini sudah pernah ditagihkan. Sunting tagihannya, jangan terbitkan yang kedua.");
             }
@@ -319,10 +327,10 @@ class SantriService
         //
         // Jalur bebas: tak ada nominal, jadi tak ada pula potongan yang dihitung.
         $lunasRegistrasi = $this->tanggalLunasRegistrasi($id);
-        $potonganRow = ($bebas || $lunasRegistrasi === null) ? null
+        $potonganRow = ($bebas || $gratisUp || $lunasRegistrasi === null) ? null
             : (new PotonganGelombangService)->potonganAktif($santri->gelombang, $jenjangTagihan, $taTagihan, $lunasRegistrasi);
         $potongan = $potonganRow ? Money::of($potonganRow->potongan) : '0';
-        if (Money::gte($potongan, $nominalNormal) && ! $bebas) {
+        if (Money::gte($potongan, $nominalNormal) && ! $bebas && ! $gratisUp) {
             throw new AppException(422, "Potongan Gelombang {$santri->gelombang} ({$potongan}) tidak boleh ≥ nominal uang pangkal ({$nominalNormal}).");
         }
         $efektif = Money::sub($nominalNormal, $potongan);
@@ -331,7 +339,7 @@ class SantriService
             $tagihan = $jenis === null ? null : TagihanSantri::create([
                 'id_santri' => $id, 'kode_jenis' => $jenis->kode,
                 'perilaku' => 'uang_pangkal', 'kode_jenjang' => $jenjangTagihan, 'tahun_ajaran' => $taTagihan,
-                'nominal' => $efektif, 'sisa' => $efektif,
+                'nominal' => $efektif, 'sisa' => $efektif, 'status' => Money::isZero($efektif) ? 'lunas' : 'belum_bayar',
                 'jatuh_tempo' => $data['jatuh_tempo'] ?? null, 'keterangan' => $data['keterangan'] ?? $jenis->nama,
             ]);
             if ($tagihan && Money::gtZero($potongan)) {
@@ -352,7 +360,7 @@ class SantriService
             $perlengkapan = $jenisPerlengkapan ? TagihanSantri::create([
                 'id_santri' => $id, 'kode_jenis' => $jenisPerlengkapan->kode,
                 'perilaku' => 'perlengkapan', 'kode_jenjang' => $jenjangTagihan, 'tahun_ajaran' => $taTagihan,
-                'nominal' => $nominalPerlengkapan, 'sisa' => $nominalPerlengkapan,
+                'nominal' => $nominalPerlengkapan, 'sisa' => $nominalPerlengkapan, 'status' => Money::isZero($nominalPerlengkapan) ? 'lunas' : 'belum_bayar',
                 'jatuh_tempo' => $data['jatuh_tempo_perlengkapan'] ?? $data['jatuh_tempo'] ?? null,
                 'keterangan' => $data['keterangan_perlengkapan'] ?? $jenisPerlengkapan->nama,
             ]) : null;
@@ -445,16 +453,17 @@ class SantriService
         }
 
         $nominalNormal = Money::of($data['nominal']);
-        if (Money::lte($nominalNormal, '0')) {
-            throw new AppException(422, 'Nominal uang pangkal harus lebih dari nol.');
+        if (Money::lt($nominalNormal, '0')) {
+            throw new AppException(422, 'Nominal uang pangkal tidak boleh negatif.');
         }
 
         // Potongan gelombang yang melekat pada tagihan ini (bukan master, karena
         // master bisa berubah setelah tagihan terbit). "hangus" = potongan sudah
         // dikembalikan ke tagihan, jadi tak dipotong lagi.
         $potonganRow = PotonganUangPangkal::where('id_tagihan', $tagihan->id)->first();
-        $potongan = ($potonganRow && $potonganRow->status !== 'hangus') ? Money::of($potonganRow->potongan) : '0';
-        if (Money::gte($potongan, $nominalNormal)) {
+        // Dikoreksi ke 0 = gratis 100%: potongan gelombang tak lagi bermakna.
+        $potongan = ($potonganRow && $potonganRow->status !== 'hangus' && ! Money::isZero($nominalNormal)) ? Money::of($potonganRow->potongan) : '0';
+        if (Money::gtZero($potongan) && Money::gte($potongan, $nominalNormal)) {
             throw new AppException(422, "Potongan gelombang ({$potongan}) tidak boleh ≥ nominal uang pangkal ({$nominalNormal}).");
         }
         $efektif = Money::sub($nominalNormal, $potongan);
@@ -535,8 +544,8 @@ class SantriService
         }
 
         $nominalBaru = Money::of($data['nominal']);
-        if (Money::lte($nominalBaru, '0')) {
-            throw new AppException(422, 'Nominal biaya perlengkapan harus lebih dari nol. Untuk meniadakannya, batalkan tagihannya.');
+        if (Money::lt($nominalBaru, '0')) {
+            throw new AppException(422, 'Nominal biaya perlengkapan tidak boleh negatif.');
         }
 
         $terbayar = PembayaranSantri::where('id_tagihan', $tagihan->id)->where('status', 'terverifikasi')
@@ -774,7 +783,8 @@ class SantriService
                 throw new AppException(422, "Masih ada {$menunggu} pembayaran \"{$label}\" yang menunggu verifikasi keuangan. "
                     .'Selesaikan dulu agar nilai yang diakrualkan tidak keliru.');
             }
-            if (! $t->jenis?->kode_coa_piutang) {
+            // Sisa nol (mis. digratiskan) tak menjurnal apa pun — akun piutang tak dibutuhkan.
+            if (! $t->jenis?->kode_coa_piutang && Money::gtZero($t->sisa)) {
                 throw new AppException(422, "Jenis biaya \"{$label}\" belum punya akun piutang. Isi dulu di master Jenis Biaya.");
             }
             $garap[] = $t;

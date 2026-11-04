@@ -613,7 +613,7 @@ class IsiDataDummy extends Command
         try {
             $this->santri->tagihkanUangPangkal($santri->id, [
                 'nominal' => $up['nominal'],
-                'nominal_perlengkapan' => $plk['status'] === 'ada' ? $plk['nominal'] : '0',
+                'nominal_perlengkapan' => $plk['status'] === 'ada' ? $plk['nominal'] : null,
                 'jatuh_tempo' => now()->addDays(30)->toDateString(),
             ]);
             $this->hitung['tagihan_uang_pangkal']++;

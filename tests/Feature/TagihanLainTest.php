@@ -153,6 +153,19 @@ class TagihanLainTest extends TestCase
         $this->assertSame(1, TagihanSantri::where('id_santri', $santri->id)->count());
     }
 
+    /** Gratis 100% (4 Nov 2026): nominal 0 → terbit Rp 0 lunas, tanpa jurnal; alasannya wajib di keterangan. */
+    public function test_nominal_nol_gratis_lunas_tanpa_jurnal(): void
+    {
+        $s = $this->santri('9001', 'Gratis');
+        $isi = ['kode_jenis' => 'LDR', 'id_santri' => [$s->id], 'nominal' => '0', 'tanggal' => now()->toDateString()];
+        $this->actingAs($this->petugas)->post(route('tagihan_lain.store'), $isi)->assertSessionHasErrors('keterangan');
+        $this->assertSame(0, TagihanSantri::count());
+        $this->actingAs($this->petugas)->post(route('tagihan_lain.store'), $isi + ['keterangan' => 'Dibebaskan — anak yatim'])->assertSessionHas('status');
+        $t = TagihanSantri::sole();
+        $this->assertSame(['0.00', 'lunas', 'Dibebaskan — anak yatim'], [(string) $t->sisa, $t->status, $t->keterangan]);
+        $this->assertSame(0, \App\Models\JournalEntry::count());
+    }
+
     public function test_tanpa_keterangan_memakai_nama_jenis_biayanya(): void
     {
         $santri = $this->santri('990002', 'Bilal Ramadhan');

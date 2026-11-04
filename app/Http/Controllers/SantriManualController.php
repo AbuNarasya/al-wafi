@@ -88,7 +88,7 @@ class SantriManualController extends Controller
 
             'tagihan' => ['nullable', 'array'],
             'tagihan.*.kode_jenis' => ['required', 'string', 'exists:jenis_biaya,kode'],
-            'tagihan.*.nominal' => ['required', 'numeric', 'gt:0'],
+            'tagihan.*.nominal' => ['required', 'numeric', 'min:0'],   // 0 = gratis 100%
             'tagihan.*.posting' => ['required', Rule::in(SantriManualService::POSTING)],
             'tagihan.*.tahun_ajaran' => ['nullable', 'string', 'exists:tahun_ajaran,kode'],
             'tagihan.*.jatuh_tempo' => ['nullable', 'date'],

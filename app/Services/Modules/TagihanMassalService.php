@@ -318,8 +318,9 @@ class TagihanMassalService
                     .'Daftar ulang diakui akrual saat terbit, jadi akun itu wajib.');
             }
             $nominal = Money::of($nominal);
-            if (Money::lte($nominal, '0')) {
-                throw new AppException(422, "Nominal daftar ulang untuk {$s->nama} harus lebih dari nol.");
+            // 0 = gratis 100% (keputusan user 4 Nov 2026): terbit Rp 0, langsung lunas.
+            if (Money::lt($nominal, '0')) {
+                throw new AppException(422, "Nominal daftar ulang untuk {$s->nama} tidak boleh negatif.");
             }
             $perJenis[$jenis->kode]['jenis'] = $jenis;
             $perJenis[$jenis->kode]['baris'][] = ['santri' => $s, 'nominal' => $nominal, 'di' => $di];
@@ -338,7 +339,8 @@ class TagihanMassalService
             $last = JournalEntry::where('referensi', 'like', $base.'%')->orderByDesc('referensi')->value('referensi');
             $nomor = DocNumber::nextDocNumber($base, $last);
 
-            PostingService::postJournal([
+            // Seluruh kelompok digratiskan → tak ada piutang, tak ada jurnal.
+            if (Money::gtZero($subtotal)) PostingService::postJournal([
                 'referensi' => $nomor, 'tanggal' => $tanggal, 'kode_unit' => $jenis->kode_unit,
                 // Modul sumbernya sengaja disamakan dengan tagihan santri lain
                 // supaya pemetaan unit default & penjaga bagian tetap berlaku.
@@ -354,9 +356,10 @@ class TagihanMassalService
                 'id_santri' => $b['santri']->id, 'kode_jenis' => $kode,
                 'perilaku' => 'daftar_ulang', 'kode_jenjang' => $b['di']['kode_jenjang'], 'tahun_ajaran' => $tahunAjaran,
                 'nominal' => $b['nominal'], 'sisa' => $b['nominal'],
-                'sudah_akrual' => true, 'status' => 'belum_bayar',
+                'sudah_akrual' => true, 'status' => Money::isZero($b['nominal']) ? 'lunas' : 'belum_bayar',
                 'jatuh_tempo' => $opsi['jatuh_tempo'] ?? null,
-                'keterangan' => "{$jenis->nama} T.A {$tahunAjaran} tingkat {$b['di']['tingkat']} · akrual {$nomor}",
+                'keterangan' => Money::isZero($b['nominal']) ? "{$jenis->nama} T.A {$tahunAjaran} tingkat {$b['di']['tingkat']} · gratis"
+                    : "{$jenis->nama} T.A {$tahunAjaran} tingkat {$b['di']['tingkat']} · akrual {$nomor}",
                 'created_at' => $now, 'updated_at' => $now,
             ], $kelompok['baris']));
 

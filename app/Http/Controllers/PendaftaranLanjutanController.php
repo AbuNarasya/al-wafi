@@ -61,7 +61,7 @@ class PendaftaranLanjutanController extends Controller
                     ['medcheck_ok' => $request->boolean('lolos'), 'catatan' => $request->input('catatan')], $idPengguna),
                 'naik' => $this->service->eksekusiKenaikan($idPendaftaran, $request->validate([
                     'tingkat' => ['required', 'integer', 'min:1'],
-                    'nominal_uang_pangkal' => ['nullable', 'numeric', 'gt:0'],
+                    'nominal_uang_pangkal' => ['nullable', 'numeric', 'min:0'],
                     'nominal_perlengkapan' => ['nullable', 'numeric', 'min:0'],
                     'jatuh_tempo' => ['nullable', 'date'],
                 ]), $idPengguna),

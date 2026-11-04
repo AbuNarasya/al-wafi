@@ -84,7 +84,7 @@ class BatchTagihanController extends Controller
             'tingkat' => ['nullable', 'integer', 'min:1'],
             'kode_jenis' => ['nullable', 'string', 'exists:jenis_biaya,kode'],
             'sumber' => ['nullable', 'string', 'in:manual,peserta,pemakaian'],
-            'nominal' => ['nullable', 'numeric', 'gt:0'],
+            'nominal' => ['nullable', 'numeric', 'min:0'],   // 0 = gratis 100%
             'id_santri' => ['nullable', 'array'],
             'id_santri.*' => ['integer'],
             'jatuh_tempo' => ['nullable', 'date'],

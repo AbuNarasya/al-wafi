@@ -353,6 +353,17 @@ class SantriManualTest extends TestCase
         $this->actingAs($staf)->delete(route('santri_manual.destroy', Santri::sole()->id))->assertForbidden();
     }
 
+    /** Gratis 100% (4 Nov 2026): baris tagihan 0 → terbit Rp 0 lunas, tanpa jurnal; keterangan wajib. */
+    public function test_baris_tagihan_nol_gratis(): void
+    {
+        $this->kirim([], [$this->baris('akrual', ['nominal' => '0', 'keterangan' => ''])])->assertSessionHas('error', fn ($m) => str_contains($m, 'digratiskan'));
+        $this->assertSame(0, Santri::count());
+        $this->kirim([], [$this->baris('akrual', ['nominal' => '0', 'keterangan' => 'Beasiswa penuh'])])->assertRedirect()->assertSessionHasNoErrors();
+        $t = TagihanSantri::sole();
+        $this->assertSame(['0.00', 'lunas'], [(string) $t->sisa, $t->status]);
+        $this->assertSame(0, JournalEntry::count());
+    }
+
     public function test_layar_terbuka(): void
     {
         $this->kirim()->assertRedirect();
