@@ -16,12 +16,11 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
- * Input Manual Santri Aktif — KHUSUS ADMIN.
+ * Input Manual Santri Aktif — modul hak `santri-manual` (keputusan user 4 Nov 2026; dulu khusus admin).
  *
- * Wewenangnya `RequireAdmin`, bukan modul hak seperti menu lain. Yang dilakukan
- * di sini melompati seluruh alur PPSB: santri lahir langsung berstatus aktif,
- * tanpa pendaftaran dan tanpa tagihan registrasi, dan tagihannya boleh memilih
- * sendiri apakah menerbitkan jurnal. Itu bukan wewenang petugas kesantrian.
+ * Yang dilakukan di sini melompati seluruh alur PPSB: santri lahir langsung berstatus aktif, tanpa pendaftaran
+ * dan tanpa tagihan registrasi. Perlakuan tagihan TANPA jurnal (saldo awal / kas basis) memutuskan pengakuan
+ * pendapatan — itu tetap KHUSUS ADMIN; pemegang hak non-admin hanya boleh "akrual sekarang" (berjurnal).
  */
 class SantriManualController extends Controller
 {
@@ -95,6 +94,11 @@ class SantriManualController extends Controller
             'tagihan.*.jatuh_tempo' => ['nullable', 'date'],
             'tagihan.*.keterangan' => ['nullable', 'string', 'max:255'],
         ]);
+
+        // Perlakuan tanpa jurnal hanya untuk admin — ditegakkan di sini, bukan cuma disembunyikan di layar.
+        if (! $request->user()->is_admin && collect($data['tagihan'] ?? [])->contains(fn ($b) => ($b['posting'] ?? '') !== 'akrual' && (($b['kode_jenis'] ?? '') !== ''))) {
+            return back()->withInput()->with('error', 'Perlakuan tagihan "Saldo awal" dan "Kas basis" (tanpa jurnal) khusus admin. Pakai "Akrual sekarang", atau minta admin yang mencatatnya.');
+        }
 
         // Baris kosong yang tertinggal dari tombol "+ baris" tidak dianggap
         // kekeliruan — cukup diabaikan.

@@ -320,16 +320,37 @@ class SantriManualTest extends TestCase
         $this->assertSame(1, Santri::count());
     }
 
-    /** Pintunya milik admin — bukan modul hak yang bisa dicentangkan ke siapa pun. */
-    public function test_hanya_admin(): void
+    /**
+     * Modul hak `santri-manual` (keputusan user 4 Nov 2026; dulu khusus admin). Pemegang hak non-admin hanya boleh
+     * perlakuan "akrual" (berjurnal); "saldo awal" & "kas basis" (tanpa jurnal) tetap khusus admin — di server.
+     */
+    public function test_modul_hak_dan_perlakuan_tanpa_jurnal_khusus_admin(): void
     {
         $staf = User::create(['username' => 'zzsm_staf', 'nama' => 'Staf', 'password_hash' => 'x',
-            'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif']);
-
+            'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif'])->fresh();
         $this->actingAs($staf)->get(route('santri_manual.create'))->assertForbidden();
         $this->actingAs($staf)->post(route('santri_manual.store'), ['nis' => '1'])->assertForbidden();
 
+        \App\Models\HakAksesModul::create(['id_pengguna' => $staf->id_pengguna, 'kode_modul' => 'santri-manual',
+            'lihat' => true, 'buat' => true, 'menu' => true]);
+        \App\Support\Akses::lupakan();
+        $this->actingAs($staf)->get(route('santri_manual.create'))->assertOk()
+            ->assertSee('Akrual sekarang')->assertDontSee('<option value="saldo_awal">', false)->assertDontSee('<option value="kas">', false)
+            ->assertSee('khusus admin');
+
+        $isi = fn (array $baris) => ['nis' => '990009', 'nama' => 'Santri Staf', 'jenis_kelamin' => 'L', 'kode_jenjang' => 'SMP', 'tingkat' => 2,
+            'tahun_ajaran' => '2024/2025', 'tahun_ajaran_berjalan' => self::TA, 'jalur' => 'reguler', 'id_wali' => $this->wali->id, 'tagihan' => [$baris]];
+        foreach (['saldo_awal', 'kas'] as $posting) {
+            $this->actingAs($staf)->post(route('santri_manual.store'), $isi($this->baris($posting)))
+                ->assertSessionHas('error', fn ($m) => str_contains($m, 'khusus admin'));
+        }
         $this->assertSame(0, Santri::count());
+        $this->actingAs($staf)->post(route('santri_manual.store'), $isi($this->baris('akrual')))->assertRedirect();
+        $this->assertSame(1, Santri::count());
+        $this->assertSame(1, JournalEntry::count(), 'akrual menerbitkan jurnal');
+
+        // Menghapus butuh hak "hapus" tersendiri.
+        $this->actingAs($staf)->delete(route('santri_manual.destroy', Santri::sole()->id))->assertForbidden();
     }
 
     public function test_layar_terbuka(): void

@@ -39,6 +39,7 @@ final class ModulRegistry
         ['kode' => 'karyawan', 'nama' => 'Karyawan', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
         // Alat pindahan, bukan pemasukan harian. 'buat' = boleh menulis hasil
         // impor; sebaiknya dicabut lagi setelah migrasi selesai.
+        ['kode' => 'santri-manual', 'nama' => 'Input Manual Santri Aktif (tanpa PPSB; tagihan tanpa jurnal khusus admin)', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
         ['kode' => 'impor-data-awal', 'nama' => 'Impor Data Awal (pindahan sistem)', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
 
         ['kode' => 'jenjang', 'nama' => 'Jenjang Pendidikan', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Biaya'],

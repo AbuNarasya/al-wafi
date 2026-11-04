@@ -400,6 +400,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/profil/push', [PushController::class, 'langganan'])->name('profil.push.langganan');
     Route::delete('/profil/push', [PushController::class, 'berhenti'])->name('profil.push.berhenti');
 
+    // Input Manual Santri Aktif — modul hak `santri-manual` (keputusan user 4 Nov 2026; dulu khusus admin).
+    // Santri lahir langsung AKTIF tanpa PPSB; perlakuan tagihan TANPA jurnal (saldo awal / kas basis) tetap
+    // khusus admin — ditegakkan di SantriManualController::store.
+    Route::get('/santri-manual', [SantriManualController::class, 'create'])->name('santri_manual.create')->middleware('hakakses:santri-manual,lihat');
+    Route::post('/santri-manual', [SantriManualController::class, 'store'])->name('santri_manual.store')->middleware('hakakses:santri-manual,buat');
+    Route::delete('/santri-manual/{id}', [SantriManualController::class, 'destroy'])->name('santri_manual.destroy')->middleware('hakakses:santri-manual,hapus')->whereNumber('id');
+
     // Matriks hak akses per pengguna — KHUSUS ADMIN (di luar matriks modul).
     Route::middleware(RequireAdmin::class)->group(function () {
         // Jejak Audit: BACA SAJA, khusus admin. Tak ada rute simpan/ubah/hapus
@@ -410,14 +417,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/hak-akses/{user}', [HakAksesController::class, 'edit'])->name('hak_akses.edit');
         Route::put('/hak-akses/{user}', [HakAksesController::class, 'update'])->name('hak_akses.update');
 
-        // Input Manual Santri Aktif — juga khusus admin, dan bukan kehati-hatian
-        // berlebihan: santri lahir langsung AKTIF tanpa melewati PPSB, dan tiap
-        // tagihannya memilih sendiri apakah menerbitkan jurnal. Dua wewenang yang
-        // di alur biasa dipegang orang yang berbeda.
-        $sm = SantriManualController::class;
-        Route::get('/santri-manual', [$sm, 'create'])->name('santri_manual.create');
-        Route::post('/santri-manual', [$sm, 'store'])->name('santri_manual.store');
-        Route::delete('/santri-manual/{id}', [$sm, 'destroy'])->name('santri_manual.destroy')->whereNumber('id');
     });
 
     // ---- Keuangan: Kontrol / Master ----

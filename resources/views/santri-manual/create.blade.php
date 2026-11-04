@@ -134,6 +134,9 @@
                  ringkas per baris. Salah pilih tak membuat aplikasi gagal — ia
                  membuat laporan laba rugi salah, dan itu baru ketahuan saat
                  rekonsiliasi. --}}
+            @unless (auth()->user()->is_admin)
+                <p class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">Anda hanya bisa memakai perlakuan <b>Akrual sekarang</b>. "Saldo awal" dan "Kas basis" (tanpa jurnal) khusus admin.</p>
+            @endunless
             <div class="overflow-x-auto rounded-lg border border-gray-200 bg-slate-50 p-3">
                 <table class="min-w-full text-xs">
                     <thead class="text-left text-gray-500">
@@ -189,9 +192,10 @@
                         <div class="col-span-6 sm:col-span-4">
                             <label class="mb-1 block text-xs font-medium text-gray-600">Perlakuan Posting</label>
                             <select :name="`tagihan[${i}][posting]`" x-model="row.posting" class="w-full rounded border-gray-300 px-2 py-1.5 text-sm">
-                                <option value="saldo_awal">Saldo awal — tanpa jurnal</option>
+                                {{-- Perlakuan tanpa jurnal khusus admin (keputusan user 4 Nov 2026) — ditegakkan juga di controller. --}}
+                                @if (auth()->user()->is_admin)<option value="saldo_awal">Saldo awal — tanpa jurnal</option>@endif
                                 <option value="akrual">Akrual sekarang — terbitkan jurnal</option>
-                                <option value="kas">Kas basis — diakui saat dibayar</option>
+                                @if (auth()->user()->is_admin)<option value="kas">Kas basis — diakui saat dibayar</option>@endif
                             </select>
                         </div>
                         <div class="col-span-12 text-right sm:col-span-1">
@@ -278,7 +282,7 @@
                 waliBaru: ! adaWali && Object.keys(lama).length === 0 ? false : ! adaWali,
                 rows: Object.values(lama || {}),
                 tambah() {
-                    this.rows.push({ kode_jenis: '', nominal: '', posting: 'saldo_awal', tahun_ajaran: '', jatuh_tempo: '', keterangan: '' });
+                    this.rows.push({ kode_jenis: '', nominal: '', posting: @js(auth()->user()->is_admin ? 'saldo_awal' : 'akrual'), tahun_ajaran: '', jatuh_tempo: '', keterangan: '' });
                 },
                 hapus(i) {
                     this.rows.splice(i, 1);
