@@ -107,16 +107,33 @@ class PemetaSantriLama implements Pemeta
             'tingkat' => ['wajib' => true, 'contoh' => '7A - ABU BAKAR ASH SHIDDIQ', 'ket' => 'Tingkat saja ("7") atau nama kelas yang diawali tingkatnya ("7A - ABU BAKAR…", "9 CHECHNYA"). Kelas yang belum ada dibuat otomatis di master Kelas. Tingkat harus dalam jangkauan jenjangnya.'],
             'tahun_ajaran' => ['wajib' => false, 'contoh' => '2026/2027', 'ket' => 'T.A yang sedang dijalani. Kosong = pakai pilihan "Tahun ajaran" di form impor.'],
             'jalur' => ['wajib' => false, 'contoh' => 'LAMA', 'ket' => 'Kode jalur dari master. Kosong = pakai pilihan "Jalur" di form impor.'],
-            'wali_nama' => ['wajib' => true, 'contoh' => 'Bapak Fauzi', 'ket' => 'Dibuat otomatis bila belum ada.'],
-            'wali_telepon' => ['wajib' => true, 'contoh' => '08123456789', 'ket' => 'NAMA WALI + TELEPON adalah satu kunci: kakak-beradik wajib ditulis dengan nama & telepon wali yang SAMA persis. Telepon sama dengan nama beda, atau nama sama dengan telepon beda, DITOLAK.'],
             // TIDAK ADA `angkatan`: tabel santri tak punya kolom itu, jadi isinya
-            // selalu terbuang. Menawarkannya di templat hanya membuat petugas
-            // mengisi kolom yang tak pernah sampai ke mana-mana.
-            // Tahun masuk sudah terwakili `tahun_ajaran`.
+            // selalu terbuang. Tahun masuk sudah terwakili `tahun_ajaran`.
             'tempat_lahir' => ['wajib' => false, 'contoh' => 'Bogor', 'ket' => ''],
             'tanggal_lahir' => ['wajib' => false, 'contoh' => '2011-05-17', 'ket' => 'YYYY-MM-DD, DD/MM/YYYY, atau "29 April 2019".'],
             'nisn' => ['wajib' => false, 'contoh' => '0071234567', 'ket' => ''],
+            'asal_sekolah' => ['wajib' => false, 'contoh' => 'SDIT Al Hikmah', 'ket' => ''],
+            'alamat_sekolah_asal' => ['wajib' => false, 'contoh' => 'Jl. Merdeka 1, Bogor', 'ket' => ''],
         ];
+
+        // KELUARGA — isian yang sama dengan formulir pendaftaran PPSB (5 Nov 2026). Kontak utama = orang yang
+        // nama + teleponnya menjadi KUNCI keluarga: kakak-beradik wajib ditulis dengan nama & telepon kontak
+        // utama yang SAMA persis; telepon sama dengan nama beda (atau sebaliknya) DITOLAK.
+        $kolom['kontak_utama'] = ['wajib' => false, 'contoh' => 'ayah', 'ket' => 'ayah / ibu / wali. Kosong = orang pertama (ayah → ibu → wali) yang nama & teleponnya terisi.'];
+        foreach (Wali::PERAN as $p => $label) {
+            $kolom["nama_{$p}"] = ['wajib' => false, 'contoh' => ['ayah' => 'Fauzi', 'ibu' => 'Siti Aminah', 'wali' => ''][$p],
+                'ket' => $p === 'wali' ? 'Diisi bila santri diasuh wali selain ayah/ibu.' : 'Nama ayah atau nama ibu — minimal salah satu.'];
+            $kolom["telepon_{$p}"] = ['wajib' => false, 'contoh' => ['ayah' => '08123456789', 'ibu' => '08129876543', 'wali' => ''][$p],
+                'ket' => 'Telepon kontak utama wajib.'];
+            $kolom["email_{$p}"] = ['wajib' => false, 'contoh' => '', 'ket' => 'Dipakai wali untuk masuk portal pertama kali.'];
+            $kolom["pekerjaan_{$p}"] = ['wajib' => false, 'contoh' => $p === 'ayah' ? 'Wiraswasta / Pengusaha' : '', 'ket' => 'Teks bebas; disarankan memakai pilihan formulir: '.implode(', ', Wali::PEKERJAAN).'.'];
+            $kolom["pendapatan_{$p}"] = ['wajib' => false, 'contoh' => '', 'ket' => 'Kode atau label: '.implode(', ', array_map(fn ($k, $l) => "{$k} ({$l})", array_keys(Wali::PENDAPATAN), Wali::PENDAPATAN)).'.'];
+        }
+        $kolom['nik'] = ['wajib' => false, 'contoh' => '', 'ket' => 'NIK kontak utama.'];
+        $kolom['alamat'] = ['wajib' => false, 'contoh' => 'Jl. Melati 5, Bogor', 'ket' => 'Alamat keluarga.'];
+        // Format lama (satu nama + satu telepon wali) tetap diterima: dianggap kontak utama, peran ayah.
+        $kolom['wali_nama'] = ['wajib' => false, 'contoh' => '', 'ket' => 'FORMAT LAMA — kosongkan bila memakai kolom nama_ayah/nama_ibu.'];
+        $kolom['wali_telepon'] = ['wajib' => false, 'contoh' => '', 'ket' => 'FORMAT LAMA — kosongkan bila memakai kolom telepon_ayah/telepon_ibu.'];
 
         // Empat pasang kolom tunggakan — semuanya opsional; yang kosong/0 tidak
         // menerbitkan tagihan apa pun.
@@ -316,16 +333,6 @@ class PemetaSantriLama implements Pemeta
         return $this->waliPerTelepon[self::telp($telepon)] ?? null;
     }
 
-    /** @var array<string,list<Wali>>|null nama ternormalkan → wali */
-    private ?array $waliPerNama = null;
-
-    /** @return list<Wali> */
-    private function waliBerNama(string $nama): array
-    {
-        $this->waliPerNama ??= Wali::get(['id', 'nama', 'telepon'])->groupBy(fn ($w) => self::namaWali((string) $w->nama))->map->all()->all();
-
-        return $this->waliPerNama[self::namaWali($nama)] ?? [];
-    }
 
     /** Telepon ternormalkan: hanya angka, awalan 62/8 → 0 ("+62 813-1745-6467" = "081317456467"). */
     public static function telp(?string $v): string
@@ -345,23 +352,151 @@ class PemetaSantriLama implements Pemeta
     }
 
     /**
-     * KUNCI WALI = NAMA + TELEPON, tak terpisahkan (keputusan user 22 Okt 2026). Di dalam berkas: telepon sama
-     * dengan nama beda, atau nama sama dengan telepon beda, MENOLAK SEMUA baris yang terlibat — sistem tak bisa
-     * menebak mana yang benar (impor 21 Okt menggabungkan anak dari 4 keluarga berbeda karena telepon bersama).
+     * Data keluarga satu baris, dibaca dari kolom per orang (nama_ayah, telepon_ibu, …) — atau dari format
+     * lama (wali_nama + wali_telepon = kontak utama berperan ayah). `nama`/`telepon` = KONTAK UTAMA, yang
+     * menjadi kunci keluarga. `salah` terisi bila kontak_utama berisi peran yang tak dikenal.
+     *
+     * @return array{kontak:string,nama:string,telepon:string,orang:array<string,array{nama:string,telepon:string,email:string,pekerjaan:string,pendapatan:string}>,nik:string,alamat:string,salah:?string}
+     */
+    public static function keluarga(array $b): array
+    {
+        $orang = [];
+        foreach (array_keys(Wali::PERAN) as $p) {
+            $orang[$p] = [
+                'nama' => trim(preg_replace('/\s+/u', ' ', (string) ($b["nama_{$p}"] ?? ''))),
+                'telepon' => self::telp($b["telepon_{$p}"] ?? ''),
+                'email' => mb_strtolower(trim((string) ($b["email_{$p}"] ?? ''))),
+                'pekerjaan' => trim((string) ($b["pekerjaan_{$p}"] ?? '')),
+                'pendapatan' => trim((string) ($b["pendapatan_{$p}"] ?? '')),
+            ];
+        }
+
+        $tulisan = mb_strtolower(trim((string) ($b['kontak_utama'] ?? '')));
+        $salah = $tulisan !== '' && ! isset(Wali::PERAN[$tulisan])
+            ? "Kontak utama \"{$b['kontak_utama']}\" tidak dikenal — isi ayah, ibu, atau wali." : null;
+        $kontak = $salah === null && $tulisan !== '' ? $tulisan : null;
+
+        // Format lama: satu nama + satu telepon, tanpa kolom telepon per orang.
+        $lamaTelp = self::telp($b['wali_telepon'] ?? '');
+        $lamaNama = trim((string) ($b['wali_nama'] ?? ''));
+        $adaTelpOrang = collect($orang)->contains(fn ($o) => $o['telepon'] !== '');
+        if (! $adaTelpOrang && ($lamaTelp !== '' || $lamaNama !== '')) {
+            $kontak ??= 'ayah';
+            $orang[$kontak]['telepon'] = $lamaTelp;
+            $orang[$kontak]['nama'] = $orang[$kontak]['nama'] !== '' ? $orang[$kontak]['nama'] : $lamaNama;
+        }
+
+        // Tanpa pilihan: orang pertama (ayah → ibu → wali) yang nama & teleponnya lengkap, lalu yang bertelepon.
+        $kontak ??= collect($orang)->search(fn ($o) => $o['nama'] !== '' && $o['telepon'] !== '')
+            ?: collect($orang)->search(fn ($o) => $o['telepon'] !== '')
+            ?: 'ayah';
+
+        return [
+            'kontak' => $kontak,
+            'nama' => $orang[$kontak]['nama'],
+            'telepon' => $orang[$kontak]['telepon'],
+            'orang' => $orang,
+            'nik' => trim((string) ($b['nik'] ?? '')),
+            'alamat' => trim((string) ($b['alamat'] ?? '')),
+            'salah' => $salah,
+        ];
+    }
+
+    /**
+     * Baris dengan `wali_nama` & `wali_telepon` diisi dari KONTAK UTAMA — sehingga seluruh pemeriksaan kunci
+     * keluarga (nama + telepon) bekerja sama untuk format lama maupun kolom per orang.
+     */
+    private static function lengkapi(array $b): array
+    {
+        $k = self::keluarga($b);
+        $b['wali_nama'] = $k['nama'];
+        $b['wali_telepon'] = $k['telepon'];
+
+        return $b;
+    }
+
+    /** Kode pendapatan dari kode atau labelnya; '' bila kosong, null bila tak dikenal. */
+    public static function kodePendapatan(string $v): ?string
+    {
+        if ($v === '') {
+            return '';
+        }
+        $kecil = mb_strtolower($v);
+        foreach (Wali::PENDAPATAN as $kode => $label) {
+            if ($kecil === $kode || $kecil === mb_strtolower($label)) {
+                return $kode;
+            }
+        }
+
+        return null;
+    }
+
+    /** @var array<string,string>|null email (huruf kecil) → telepon kontak utama keluarga pemiliknya */
+    private ?array $emailTerpakai = null;
+
+    private function pemilikEmail(string $email): ?string
+    {
+        if ($this->emailTerpakai === null) {
+            $this->emailTerpakai = [];
+            foreach (Wali::get(['telepon', 'email_ayah', 'email_ibu', 'email_wali']) as $w) {
+                foreach (['email_ayah', 'email_ibu', 'email_wali'] as $kol) {
+                    if (($e = mb_strtolower(trim((string) $w->{$kol}))) !== '') {
+                        $this->emailTerpakai[$e] = self::telp($w->telepon);
+                    }
+                }
+            }
+        }
+
+        return $this->emailTerpakai[$email] ?? null;
+    }
+
+    /**
+     * Satu baris tabel `wali` lengkap dari data keluarga — kunci SELALU sama untuk semua baris karena
+     * dipakai `insert()` massal.
+     */
+    private static function barisWali(array $k): array
+    {
+        $baris = ['kontak_utama' => $k['kontak'], 'nama' => $k['nama'], 'telepon' => $k['telepon']];
+        foreach ($k['orang'] as $p => $o) {
+            $baris["nama_{$p}"] = $o['nama'] !== '' ? $o['nama'] : null;
+            $baris["telepon_{$p}"] = $o['telepon'] !== '' ? $o['telepon'] : null;
+            $baris["email_{$p}"] = $o['email'] !== '' ? $o['email'] : null;
+            $baris["pekerjaan_{$p}"] = $o['pekerjaan'] !== '' ? $o['pekerjaan'] : null;
+            $baris["pendapatan_{$p}"] = self::kodePendapatan($o['pendapatan']) ?: null;
+        }
+        $baris['nik'] = $k['nik'] !== '' ? $k['nik'] : null;
+        $baris['alamat'] = $k['alamat'] !== '' ? $k['alamat'] : null;
+
+        return $baris;
+    }
+
+    /**
+     * KUNCI WALI = NAMA + TELEPON (keputusan user 22 Okt 2026). Di dalam berkas: telepon sama dengan nama beda
+     * MENOLAK SEMUA baris yang terlibat — sistem tak bisa menebak mana yang benar (impor 21 Okt menggabungkan anak
+     * dari 4 keluarga berbeda karena telepon bersama). Nama sama dengan telepon beda = dua keluarga berbeda
+     * (keputusan user 5 Nov 2026, nama ayah kembar "HENDRI").
      *
      * @return array<int,string> indeks baris → alasan
      */
     public function masalahLintasBaris(array $rows): array
     {
-        $perTelp = $perNama = [];
+        $perTelp = $perEmail = [];
         foreach ($rows as $i => $b) {
+            $k = self::keluarga($b);
+            // Email dipakai wali untuk MASUK: satu email di dua keluarga berbeda membuat portal tak tahu
+            // keluarga mana yang dibuka.
+            foreach ($k['orang'] as $o) {
+                if ($o['email'] !== '' && $k['telepon'] !== '') {
+                    $perEmail[$o['email']][$k['telepon']][] = $i;
+                }
+            }
+            $b = self::lengkapi($b);
             $t = self::telp($b['wali_telepon'] ?? '');
             $n = self::namaWali($b['wali_nama'] ?? '');
             if ($t === '' || $n === '') {
                 continue;
             }
             $perTelp[$t][$n][] = $i;
-            $perNama[$n][$t][] = $i;
         }
         $masalah = [];
         foreach ($perTelp as $t => $nama) {
@@ -373,11 +508,11 @@ class PemetaSantriLama implements Pemeta
                 }
             }
         }
-        foreach ($perNama as $n => $telp) {
+        foreach ($perEmail as $e => $telp) {
             if (count($telp) > 1) {
                 foreach ($telp as $baris) {
                     foreach ($baris as $i) {
-                        $masalah[$i] ??= 'Wali "'.mb_strtoupper($n).'" ditulis dengan telepon berbeda di berkas ini ('.implode(', ', array_keys($telp)).'). Nama + telepon wali harus satu pasangan yang sama.';
+                        $masalah[$i] ??= "Email {$e} dipakai lebih dari satu keluarga di berkas ini (kontak utama ".implode(', ', array_keys($telp)).'). Satu email hanya untuk satu keluarga.';
                     }
                 }
             }
@@ -540,21 +675,37 @@ class PemetaSantriLama implements Pemeta
             return $this->masalah("Jalur \"{$jalur}\" tidak ada di master Jalur Pendaftaran.");
         }
 
-        $telepon = trim($baris['wali_telepon'] ?? '');
-        $namaWali = trim($baris['wali_nama'] ?? '');
+        $kel = self::keluarga($baris);
+        if ($kel['salah']) {
+            return $this->masalah($kel['salah']);
+        }
+        if ($kel['orang']['ayah']['nama'] === '' && $kel['orang']['ibu']['nama'] === '') {
+            return $this->masalah('Nama ayah dan nama ibu kosong — isi minimal salah satu.');
+        }
+        $telepon = $kel['telepon'];
+        $namaWali = $kel['nama'];
+        $peran = Wali::PERAN[$kel['kontak']];
         if ($telepon === '' || $namaWali === '') {
-            return $this->masalah('Nama atau telepon wali kosong.');
+            return $this->masalah("Nama atau telepon kontak utama ({$peran}) kosong.");
+        }
+        foreach ($kel['orang'] as $p => $o) {
+            if ($o['email'] !== '' && ! filter_var($o['email'], FILTER_VALIDATE_EMAIL)) {
+                return $this->masalah("Email {$p} \"{$o['email']}\" tidak sah.");
+            }
+            if ($o['email'] !== '' && ($pemilik = $this->pemilikEmail($o['email'])) !== null && $pemilik !== $telepon) {
+                return $this->masalah("Email {$o['email']} sudah dipakai keluarga lain (kontak utama {$pemilik}).");
+            }
+            if (self::kodePendapatan($o['pendapatan']) === null) {
+                return $this->masalah("Pendapatan {$p} \"{$o['pendapatan']}\" tidak dikenal. Pakai: ".implode(', ', array_keys(Wali::PENDAPATAN)).'.');
+            }
         }
         // Kunci wali = nama + telepon (keputusan user 22 Okt 2026), dua arah terhadap wali yang sudah ada.
         $waliAda = $this->waliBerTelepon($telepon);
         if ($waliAda && self::namaWali($waliAda->nama) !== self::namaWali($namaWali)) {
             return $this->masalah("Telepon {$telepon} sudah dipakai wali bernama \"{$waliAda->nama}\". Nama + telepon wali harus satu pasangan yang sama.");
         }
-        foreach ($this->waliBerNama($namaWali) as $w) {
-            if (self::telp($w->telepon) !== self::telp($telepon)) {
-                return $this->masalah("Wali bernama \"{$w->nama}\" sudah terdaftar dengan telepon {$w->telepon}, bukan {$telepon}. Nama + telepon wali harus satu pasangan yang sama.");
-            }
-        }
+        // Nama sama dengan telepon beda TIDAK ditolak (keputusan user 5 Nov 2026): nama ayah bisa kembar
+        // antar-keluarga ("HENDRI"), jadi dibedakan lewat teleponnya — wali baru dibuat.
 
         if (($t = trim($baris['tanggal_lahir'] ?? '')) !== '' && self::tanggalNormal($t) === null) {
             return $this->masalah("Tanggal lahir \"{$t}\" tidak terbaca. Pakai YYYY-MM-DD, DD/MM/YYYY, atau \"29 April 2019\".");
@@ -604,6 +755,7 @@ class PemetaSantriLama implements Pemeta
         $dibuat = ['santri' => 0, 'wali' => 0, 'tagihan' => 0];
         $now = now();
         $idBatch = $param['id_batch'] ?? null;
+        $baris = array_map(fn ($b) => self::lengkapi($b), $baris);
 
         $dibuat['wali'] = $this->simpanWali($baris, $idBatch, $now);
         [$idPerNis, $dibuat['santri']] = $this->simpanSantri($baris, $param, $idBatch, $now);
@@ -625,26 +777,19 @@ class PemetaSantriLama implements Pemeta
         foreach ($baris as $b) {
             $telepon = self::telp($b['wali_telepon']);
             if ($telepon !== '' && ! $this->waliBerTelepon($telepon) && ! isset($baru[$telepon])) {
-                $baru[$telepon] = trim($b['wali_nama']);
+                $baru[$telepon] = self::keluarga($b);
             }
         }
         if ($baru === []) {
             return 0;
         }
 
-        Wali::insert(array_map(fn ($telepon, $nama) => [
+        Wali::insert(array_map(fn ($kel) => self::barisWali($kel) + [
             // `nama` & `telepon` di tabel wali adalah SALINAN kontak utama, bukan
-            // isian tersendiri — jadi sumbernya wajib ikut diisi. Sebelumnya hanya
-            // salinannya yang ditulis, sehingga wali hasil impor tak bisa disunting
-            // sama sekali: WaliService::update menuntut kontak utama lengkap dan
-            // menolak dengan "Kontak utama belum lengkap" walau di layar namanya
-            // jelas terbaca. Berkasnya tak menyebut peran, jadi diperlakukan
-            // sebagai ayah — sama dengan bawaan kolom `kontak_utama`.
-            'kontak_utama' => 'ayah',
-            'nama_ayah' => $nama,
-            'telepon_ayah' => $telepon,
-            'nama' => $nama,
-            'telepon' => $telepon,
+            // isian tersendiri — jadi sumbernya (nama_{peran}/telepon_{peran}) wajib
+            // ikut diisi; barisWali() menulis keduanya. Tanpa sumbernya wali hasil
+            // impor tak bisa disunting: WaliService::update menolak dengan "Kontak
+            // utama belum lengkap". Format lama tanpa peran diperlakukan sebagai ayah.
             'status' => 'aktif',
             // HANYA wali yang benar-benar LAHIR dari impor ini yang ditandai. Wali
             // yang teleponnya sudah dikenal dipakai apa adanya dan tak boleh ikut
@@ -652,7 +797,7 @@ class PemetaSantriLama implements Pemeta
             // angkatan sebelumnya.
             'id_batch' => $idBatch,
             'created_at' => $now, 'updated_at' => $now,
-        ], array_keys($baru), $baru));
+        ], array_values($baru)));
 
         // Sekali select untuk memungut id-nya, lalu masuk simpanan supaya baris
         // santri di bawah bisa menunjuknya tanpa bertanya lagi.
@@ -696,6 +841,8 @@ class PemetaSantriLama implements Pemeta
                 'tempat_lahir' => $this->kosongJadiNull($b['tempat_lahir'] ?? ''),
                 'tanggal_lahir' => self::tanggalNormal($b['tanggal_lahir'] ?? ''),
                 'nisn' => $this->kosongJadiNull($b['nisn'] ?? ''),
+                'asal_sekolah' => $this->kosongJadiNull($b['asal_sekolah'] ?? ''),
+                'alamat_sekolah_asal' => $this->kosongJadiNull($b['alamat_sekolah_asal'] ?? ''),
                 'kode_jenjang' => $kodeJenjang,
                 'tingkat' => $tk['tingkat'],
                 'id_kelas' => $idKelas,

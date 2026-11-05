@@ -58,7 +58,7 @@ class ImporKunciWaliTest extends TestCase
         return app(ImporSaldoAwal::class)->pratinjau($this->kunci, $csv, ['tahun_ajaran_bawaan' => '2026/2027', 'jalur_bawaan' => '001']);
     }
 
-    public function test_di_dalam_berkas_telepon_sama_nama_beda_dan_nama_sama_telepon_beda_ditolak_semua(): void
+    public function test_di_dalam_berkas_telepon_sama_nama_beda_ditolak_nama_sama_telepon_beda_dua_keluarga(): void
     {
         $p = $this->pratinjau($this->berkas([
             ['901', 'KAKAK', 'Budi', '081200000001'],
@@ -66,15 +66,21 @@ class ImporKunciWaliTest extends TestCase
             ['903', 'ZAIN', 'Rezi', '081932440560'],
             ['904', 'MALIKA', 'Crys', '081932440560'],      // telepon sama, nama beda → keduanya ditolak
             ['905', 'RAFA', 'Saefudin', '081300000005'],
-            ['906', 'RAFI', 'Saefudin', '081300000006'],    // nama sama, telepon beda → keduanya ditolak
+            ['906', 'RAFI', 'Saefudin', '081300000006'],    // nama sama, telepon beda → dua keluarga (5 Nov 2026)
         ]));
 
-        $this->assertSame([2, 4], [$p['siap'], $p['masalah']], json_encode($p['baris_masalah']));
+        $this->assertSame([4, 2], [$p['siap'], $p['masalah']], json_encode($p['baris_masalah']));
         $alasan = collect($p['baris_masalah'])->pluck('alasan', 'nomor');
         $this->assertStringContainsString('lebih dari satu nama wali', $alasan[4]);
         $this->assertStringContainsString('lebih dari satu nama wali', $alasan[5]);
-        $this->assertStringContainsString('telepon berbeda', $alasan[6]);
-        $this->assertStringContainsString('telepon berbeda', $alasan[7]);
+
+        app(ImporSaldoAwal::class)->jalankan($this->kunci, $this->berkas([['905', 'RAFA', 'Saefudin', '081300000005'], ['906', 'RAFI', 'Saefudin', '081300000006']]),
+            ['tahun_ajaran_bawaan' => '2026/2027', 'jalur_bawaan' => '001'], $this->admin->id_pengguna);
+        $this->assertSame(2, Wali::count(), 'nama ayah kembar, telepon beda = dua keluarga');
+        \App\Models\RiwayatTingkat::query()->delete();
+        \App\Models\NisSantri::query()->delete();
+        Santri::query()->delete();
+        Wali::query()->delete();
 
         app(ImporSaldoAwal::class)->jalankan($this->kunci, $this->berkas([['901', 'KAKAK', 'Budi', '081200000001'], ['902', 'ADIK', 'BUDI', '+62 812-0000-0001']]),
             ['tahun_ajaran_bawaan' => '2026/2027', 'jalur_bawaan' => '001'], $this->admin->id_pengguna);
@@ -89,8 +95,8 @@ class ImporKunciWaliTest extends TestCase
         // Satu berkas per kasus — baris yang bentrok di DALAM berkas ikut menolak pasangannya.
         $telpBeda = $this->pratinjau($this->berkas([['911', 'SULTHAN', 'Harianto', '08127361447']]));  // telepon terdaftar atas nama lain
         $this->assertStringContainsString('sudah dipakai wali bernama', $telpBeda['baris_masalah'][0]['alasan'] ?? '');
-        $namaBeda = $this->pratinjau($this->berkas([['912', 'SUNAN', 'Hariyanto', '08127361448']]));  // nama terdaftar dengan telepon lain
-        $this->assertStringContainsString('sudah terdaftar dengan telepon', $namaBeda['baris_masalah'][0]['alasan'] ?? '');
+        $namaBeda = $this->pratinjau($this->berkas([['912', 'SUNAN', 'Hariyanto', '08127361448']]));  // nama terdaftar dengan telepon lain → keluarga lain
+        $this->assertSame(1, $namaBeda['siap'], json_encode($namaBeda['baris_masalah']));
         $cocok = $this->pratinjau($this->berkas([['913', 'HASAN', 'hariyanto', '+628127361447']]));  // pasangan sama → boleh
         $this->assertSame(1, $cocok['siap'], json_encode($cocok['baris_masalah']));
     }
