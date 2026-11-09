@@ -109,8 +109,9 @@
                         <td class="px-3 py-2">
                             {{-- Dua surat, dua tautan terpisah: hanya begitu sistem bisa
                                  tahu mana yang sudah ada dan mana yang belum. --}}
-                            <a href="{{ route('lampiran.index', ['jenis' => $jenisPermohonan, 'id' => $k->id]) }}" class="text-brand hover:underline">Permohonan wali</a><br>
-                            <a href="{{ route('lampiran.index', ['jenis' => $jenisPersetujuan, 'id' => $k->id]) }}" class="text-brand hover:underline">Persetujuan yayasan</a>
+                            {{-- `kembali` = daftar ini beserta saringannya, supaya sesudah unggah surat tak perlu menyaring ulang. --}}
+                            <a href="{{ route('lampiran.index', ['jenis' => $jenisPermohonan, 'id' => $k->id, 'kembali' => request()->fullUrl()]) }}" class="text-brand hover:underline">Permohonan wali</a><br>
+                            <a href="{{ route('lampiran.index', ['jenis' => $jenisPersetujuan, 'id' => $k->id, 'kembali' => request()->fullUrl()]) }}" class="text-brand hover:underline">Persetujuan yayasan</a>
                             @if ($kurang !== [] && $k->status === 'diajukan')
                                 <div class="mt-0.5 text-[11px] text-amber-700">belum ada: {{ implode(', ', $kurang) }}</div>
                             @endif

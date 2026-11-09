@@ -29,9 +29,10 @@ class LampiranController extends Controller
     public function __construct(private readonly LampiranService $service) {}
 
     /** Daftar lampiran sebuah dokumen + form unggah. */
-    public function index(string $jenis, string $id): View
+    public function index(Request $request, string $jenis, string $id): View
     {
         $dokumen = $this->dokumen($jenis, $id, 'lihat');
+        $urlKembali = self::kembaliAman($request->query('kembali'), SumberLampiran::urlKembali($jenis, $id));
 
         return view('lampiran.index', [
             'jenis' => $jenis,
@@ -41,7 +42,9 @@ class LampiranController extends Controller
             'status' => $dokumen->status,
             'terbuka' => SumberLampiran::terbuka($jenis, $dokumen),
             'rows' => $this->service->daftar($jenis, $id),
-            'urlKembali' => SumberLampiran::urlKembali($jenis, $id),
+            'urlKembali' => $urlKembali,
+            // Dibawa formulir unggah/hapus supaya tombol Kembali tetap ke daftar yang tersaring.
+            'kembali' => $urlKembali !== SumberLampiran::urlKembali($jenis, $id) ? $urlKembali : null,
             'bolehUnggah' => Akses::boleh(SumberLampiran::modul($jenis), 'buat'),
             'bolehHapus' => Akses::boleh(SumberLampiran::modul($jenis), 'hapus'),
             'maksLabel' => Unggahan::maksLabel(),
@@ -66,10 +69,11 @@ class LampiranController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('lampiran.index', [$jenis, $id])->with('status', 'Lampiran berhasil diunggah.');
+        return redirect()->route('lampiran.index', array_filter([$jenis, $id, 'kembali' => $request->input('kembali')]))
+            ->with('status', 'Lampiran berhasil diunggah.');
     }
 
-    public function destroy(int $lampiran): RedirectResponse
+    public function destroy(Request $request, int $lampiran): RedirectResponse
     {
         $row = LampiranDokumen::findOrFail($lampiran);
         $this->pastikanBoleh($row->jenis_dokumen, 'hapus');
@@ -80,8 +84,27 @@ class LampiranController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('lampiran.index', [$row->jenis_dokumen, $row->id_dokumen])
+        return redirect()->route('lampiran.index', array_filter([$row->jenis_dokumen, $row->id_dokumen, 'kembali' => $request->input('kembali')]))
             ->with('status', 'Lampiran dihapus.');
+    }
+
+    /**
+     * Alamat Kembali yang dibawa dari daftar asal (9 Nov 2026: saringan Kebijakan Khusus hilang sesudah unggah).
+     * Hanya diterima bila menunjuk HALAMAN YANG SAMA dengan bawaannya — hanya query string-nya yang boleh beda —
+     * supaya parameter ini tak bisa dipakai mengalihkan ke situs lain.
+     */
+    private static function kembaliAman(mixed $kembali, string $bawaan): string
+    {
+        if (! is_string($kembali) || $kembali === '') {
+            return $bawaan;
+        }
+        $k = parse_url($kembali);
+        $b = parse_url($bawaan);
+        if ($k === false || ($k['path'] ?? '') !== ($b['path'] ?? '') || (isset($k['host']) && $k['host'] !== ($b['host'] ?? null))) {
+            return $bawaan;
+        }
+
+        return isset($k['query']) ? strtok($bawaan, '?').'?'.$k['query'] : $bawaan;
     }
 
     /** Paksa unduh. */

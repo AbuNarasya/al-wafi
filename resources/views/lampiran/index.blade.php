@@ -27,6 +27,7 @@
                 <h3 class="mb-3 text-sm font-semibold text-gray-800">Unggah Lampiran</h3>
                 <form method="POST" action="{{ route('lampiran.store', [$jenis, $idDokumen]) }}" enctype="multipart/form-data" class="space-y-3">
                     @csrf
+                    @if ($kembali)<input type="hidden" name="kembali" value="{{ $kembali }}">@endif
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">
                             Berkas (PDF/JPG/PNG/WEBP, maks {{ $maksLabel }}) <span class="text-red-500">*</span>
@@ -75,6 +76,7 @@
                                     @if ($terbuka && $bolehHapus)
                                         <form method="POST" action="{{ route('lampiran.destroy', $r->id) }}" onsubmit="return confirm('Hapus lampiran ini?')">
                                             @csrf @method('DELETE')
+                                            @if ($kembali)<input type="hidden" name="kembali" value="{{ $kembali }}">@endif
                                             <button class="text-red-600 hover:underline">Hapus</button>
                                         </form>
                                     @endif

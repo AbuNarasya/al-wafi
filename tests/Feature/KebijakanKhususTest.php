@@ -339,6 +339,32 @@ class KebijakanKhususTest extends TestCase
         $this->assertSame(['HASAN', 'BILAL', 'ZAID'], $nama($this->actingAs($admin)->get(route('kebijakan_khusus.index', ['urut' => 'tak-dikenal']))));
     }
 
+    /** 9 Nov 2026: sesudah unggah surat, tombol Kembali tetap ke daftar yang tersaring — tapi tak bisa diarahkan ke situs lain. */
+    public function test_halaman_surat_kembali_ke_daftar_yang_tersaring(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $k = $this->ajukan($this->santri('Zaid'));
+        $admin = User::find($this->admin);
+        $daftar = route('kebijakan_khusus.index', ['status' => 'diajukan', 'urut' => 'nama']);
+        $jenis = SumberLampiran::KEBIJAKAN_PERMOHONAN;
+
+        $this->actingAs($admin)->get(route('kebijakan_khusus.index', ['status' => 'diajukan']))
+            ->assertSee(e(route('lampiran.index', ['jenis' => $jenis, 'id' => $k->id, 'kembali' => route('kebijakan_khusus.index', ['status' => 'diajukan'])])), false);
+
+        $this->actingAs($admin)->get(route('lampiran.index', [$jenis, $k->id, 'kembali' => $daftar]))->assertOk()
+            ->assertSee('href="'.e($daftar).'"', false);
+
+        $this->actingAs($admin)->post(route('lampiran.store', [$jenis, $k->id]), [
+            'berkas' => \Illuminate\Http\UploadedFile::fake()->create('surat.pdf', 50, 'application/pdf'), 'kembali' => $daftar,
+        ])->assertRedirect(route('lampiran.index', [$jenis, $k->id, 'kembali' => $daftar]));
+
+        // Alamat di luar daftar asal (situs lain / halaman lain) diabaikan → kembali ke daftar polos.
+        foreach (['https://jahat.example/kebijakan', route('dashboard')] as $liar) {
+            $this->actingAs($admin)->get(route('lampiran.index', [$jenis, $k->id, 'kembali' => $liar]))
+                ->assertSee('href="'.e(route('kebijakan_khusus.index')).'"', false)->assertDontSee('jahat.example');
+        }
+    }
+
     public function test_sesudah_memutus_kembali_ke_saringan_yang_sama(): void
     {
         $k = $this->ajukan($this->santri('Zaid'));
