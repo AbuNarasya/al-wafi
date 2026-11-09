@@ -292,7 +292,7 @@ class PosController extends Controller
         }
         $total = Money::of($request->query('total', 0));
         $pakai = KasirService::belanjaKartuHariIni($k->santri->id);
-        $batas = \App\Services\Modules\KartuSantriService::batasHarian($k->santri->id);
+        $batas = \App\Services\Modules\DompetBelanja::batas($k->santri->id, 'mart');
 
         return response()->json([
             'nama' => $k->santri->nama,

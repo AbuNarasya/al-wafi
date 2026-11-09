@@ -174,7 +174,7 @@ class TingkatJenjangTest extends TestCase
                 'Wali / Keluarga', 'Calon Santri', 'Calon Santri Siap Aktivasi',
                 'Calon Mengundurkan Diri', 'Santri Aktif', 'Alumni', 'Santri Keluar',
                 // Bukan tahap perjalanan santri — alat (kelas/rombel, kartu RFID belanja), jadi menyusul di ujung.
-                'Pengunduran Diri', 'Kelas', 'Penempatan Kelas', 'Kartu Santri (RFID)',
+                'Pengunduran Diri', 'Kelas', 'Penempatan Kelas', 'Kartu Santri (RFID)', 'Belanja Kartu di Kantin',
             ],
             $menu->pluck('label')->values()->all(),
             'urut menurut perjalanan santri: keluarga → calon → aktif → arsip',
@@ -182,7 +182,7 @@ class TingkatJenjangTest extends TestCase
         $this->assertSame('/kesantrian/santri', $menu->firstWhere('label', 'Santri Aktif')['url']);
         // Selain Wali (dan Kartu Santri, modulnya sendiri), semuanya memakai modul hak akses yang sama.
         $this->assertSame(
-            ['wali', 'santri', 'pengunduran-diri', 'kelas', 'kartu-santri'],
+            ['wali', 'santri', 'pengunduran-diri', 'kelas', 'kartu-santri', 'belanja-kantin'],
             // Daftar santri terbuka bagi `santri` ATAU `santri-data` (4 Nov 2026) — modul utamanya tetap `santri`.
             $menu->map(fn ($n) => $n['modul'] ?? $n['modulAny'][0] ?? null)->unique()->values()->all(),
         );

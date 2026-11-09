@@ -13,7 +13,7 @@ class TransaksiDompetToko extends Model
     protected $table = 'transaksi_dompet_toko';
 
     protected $fillable = [
-        'nomor_toko', 'jenis', 'nomor_asal', 'id_santri', 'uid_kartu', 'nominal', 'kode_toko', 'nama_toko', 'keterangan',
+        'nomor_toko', 'jenis', 'asal', 'nomor_asal', 'id_santri', 'uid_kartu', 'nominal', 'kode_toko', 'nama_toko', 'keterangan',
         'id_mutasi_dompet', 'status', 'tanggal', 'journal_entry_id', 'dijurnal_pada', 'rincian',
     ];
 

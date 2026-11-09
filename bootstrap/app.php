@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'hakakses' => \App\Http\Middleware\HakAksesModul::class,
             'portal.wali' => \App\Http\Middleware\PortalWali::class,
+            'mitra.saja' => \App\Http\Middleware\MitraSaja::class,
         ]);
 
         // Di belakang proxy/tunnel (Render, Cloudflare Tunnel, Nginx) TLS diputus
@@ -26,7 +27,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
 
         // Rute yang tak berlaku di instans ini (Portal Wali di Wafi Mart, dst.) → 404.
-        $middleware->web(append: [\App\Http\Middleware\SaklarInstans::class, \App\Http\Middleware\BahasaPortal::class]);
+        $middleware->web(append: [\App\Http\Middleware\SaklarInstans::class, \App\Http\Middleware\BahasaPortal::class,
+            // Akun mitra kantin Wafi Mart hanya ke /mitra (9 Nov 2026).
+            \App\Http\Middleware\AkunMitra::class]);
 
         // Domain portal wali sendiri (config/portal.php): di sana hanya /wali/…; /wali/… di domain staf dialihkan.
         // Paling depan — pengalihan tak perlu membuka sesi.

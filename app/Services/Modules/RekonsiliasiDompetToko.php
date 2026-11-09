@@ -4,6 +4,7 @@ namespace App\Services\Modules;
 
 use App\Exceptions\AppException;
 use App\Models\Penjualan;
+use App\Models\PenjualanMitra;
 use App\Models\PermintaanKartu;
 use App\Models\RekonsiliasiDompetToko as Rekon;
 use App\Models\ReturPenjualan;
@@ -69,6 +70,10 @@ class RekonsiliasiDompetToko
         $kasir = app(KasirService::class);
         PermintaanKartu::whereIn('status', ['menunggu', 'belum_pasti'])->whereDate('created_at', '<=', $tanggal)->get()
             ->each(fn (PermintaanKartu $p) => $kasir->pastikanPermintaan($p));
+        // Sama untuk kasir mitra kantin (9 Nov 2026): yang berhasil dipastikan bukan potongan yatim.
+        $kasirMitra = app(KasirMitraService::class);
+        PenjualanMitra::whereIn('status', ['menunggu', 'belum_pasti'])->whereDate('waktu', '<=', $tanggal)->get()
+            ->each(fn (PenjualanMitra $j) => $kasirMitra->pastikan($j));
 
         try {
             $daftar = collect($this->klien->daftar($tanggal));
@@ -80,9 +85,11 @@ class RekonsiliasiDompetToko
         $potong = $berhasil->where('jenis', 'potong');
         $kembali = $berhasil->where('jenis', 'kembalikan');
 
-        $adaStruk = Penjualan::whereIn('ref_dompet', $potong->pluck('nomor'))->pluck('ref_dompet')->flip();
+        $adaStruk = Penjualan::whereIn('ref_dompet', $potong->pluck('nomor'))->pluck('ref_dompet')
+            ->merge(PenjualanMitra::whereIn('nomor', $potong->pluck('nomor'))->whereIn('status', ['berhasil', 'batal'])->pluck('nomor'))->flip();
         $adaKembali = Penjualan::whereIn('ref_dompet_batal', $kembali->pluck('nomor'))->pluck('ref_dompet_batal')
-            ->merge(ReturPenjualan::whereIn('ref_dompet', $kembali->pluck('nomor'))->pluck('ref_dompet'))->flip();
+            ->merge(ReturPenjualan::whereIn('ref_dompet', $kembali->pluck('nomor'))->pluck('ref_dompet'))
+            ->merge(PenjualanMitra::whereIn('ref_dompet_batal', $kembali->pluck('nomor'))->pluck('ref_dompet_batal'))->flip();
         $sudahKembali = $kembali->groupBy('nomor_asal')->map(fn (Collection $g) => $g->reduce(fn ($s, $t) => Money::add($s, $t['nominal']), '0'));
 
         $rincian = [];
@@ -109,7 +116,12 @@ class RekonsiliasiDompetToko
                 if ($p?->id_penjualan || Penjualan::where('ref_dompet', $t['nomor'])->exists()) {
                     return false;
                 }
+                $m = PenjualanMitra::where('nomor', $t['nomor'])->lockForUpdate()->first();
+                if ($m && in_array($m->status, ['berhasil', 'batal'], true)) {
+                    return false;
+                }
                 $p?->update(['status' => 'gagal', 'pesan' => "Dikembalikan otomatis oleh rekonsiliasi {$tanggal}."]);
+                $m?->update(['status' => 'gagal', 'pesan' => "Dikembalikan otomatis oleh rekonsiliasi {$tanggal}."]);
 
                 return true;
             });
@@ -196,7 +208,13 @@ class RekonsiliasiDompetToko
         $retur = ReturPenjualan::whereNotNull('ref_dompet')->whereDate('waktu', $tanggal)->get(['ref_dompet', 'total'])
             ->map(fn ($r) => ['nomor' => $r->ref_dompet, 'jenis' => 'kembalikan', 'nominal' => Money::of($r->total)]);
 
-        return $jual->concat($batal)->concat($retur)->values()->all();
+        // Kantin mitra: potongan (termasuk yang kemudian dibatalkan) dan pengembaliannya.
+        $mitra = PenjualanMitra::whereIn('status', ['berhasil', 'batal'])->whereDate('waktu', $tanggal)->get(['nomor', 'total'])
+            ->map(fn ($j) => ['nomor' => $j->nomor, 'jenis' => 'potong', 'nominal' => Money::of($j->total)]);
+        $mitraBatal = PenjualanMitra::whereNotNull('ref_dompet_batal')->whereDate('dibatalkan_pada', $tanggal)->get(['ref_dompet_batal', 'total'])
+            ->map(fn ($j) => ['nomor' => $j->ref_dompet_batal, 'jenis' => 'kembalikan', 'nominal' => Money::of($j->total)]);
+
+        return $jual->concat($batal)->concat($retur)->concat($mitra)->concat($mitraBatal)->values()->all();
     }
 
     private function butir(array $t, string $masalah, string $tindakan, bool $perluDiputus = false): array

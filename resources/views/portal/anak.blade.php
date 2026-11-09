@@ -176,10 +176,27 @@
                             <span class="text-xs text-slate-400">{{ __('Belum ada / diblokir — dipasang di kantor') }}</span>
                         @endif
                     </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-slate-500">{{ __('Batas belanja harian') }}</span>
-                        <span class="font-semibold tabular-nums">{{ $rp($belanja['batas']) }}{{ $belanja['milik'] === null ? ' ('.__('bawaan').')' : '' }}</span>
-                    </div>
+                    @if ($belanja['pisah'])
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-500">{{ __('Batas harian Wafi Mart') }}</span>
+                            <span class="font-semibold tabular-nums">{{ $rp($belanja['batas']) }}{{ $belanja['milik'] === null ? ' ('.__('bawaan').')' : '' }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-500">{{ __('Batas harian kantin') }}</span>
+                            <span class="font-semibold tabular-nums">{{ $rp($belanja['batasKantin']) }}{{ $belanja['milikKantin'] === null ? ' ('.__('bawaan').')' : '' }}</span>
+                        </div>
+                    @else
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-500">{{ __('Batas belanja harian') }}</span>
+                            <span class="font-semibold tabular-nums">{{ $rp($belanja['batas']) }}{{ $belanja['milik'] === null ? ' ('.__('bawaan').')' : '' }}</span>
+                        </div>
+                    @endif
+                    @if ($belanja['saklarKantin'])
+                        <div class="flex items-center justify-between">
+                            <span class="text-slate-500">{{ __('Belanja di kantin') }}</span>
+                            <span class="rounded-full px-2 py-0.5 text-xs font-semibold {{ $belanja['kantinAktif'] ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }}">{{ $belanja['kantinAktif'] ? __('Aktif') : __('Nonaktif') }}</span>
+                        </div>
+                    @endif
                     <div class="flex items-center justify-between">
                         <span class="text-slate-500">{{ __('PIN belanja anak') }}</span>
                         <span class="text-xs {{ $belanja['punyaPin'] ? 'text-emerald-700' : 'text-amber-700' }}">{{ $belanja['punyaPin'] ? __('terpasang') : __('belum — belanja di atas batas akan ditolak') }}</span>
@@ -197,9 +214,18 @@
                     <form x-show="panel ==='batas'" x-cloak method="POST" action="{{ route('portal.kartu.batas', $santri->id) }}" class="space-y-2"
                           data-no-confirm x-data="{ ...pinPad(@js($punyaPinWali), @js(route('portal.pin'))), nilai: @js($belanja['milik'] === null ? '' : (string) (int) $belanja['milik']) }" @submit.prevent="buka()">
                         @csrf
+                        @if ($belanja['pisah'])<label class="block text-xs text-slate-500">{{ __('Batas harian Wafi Mart') }}</label>@endif
                         <input type="text" inputmode="numeric" :value="fmtRupiah(nilai)" @input="nilai = ketikRupiah($event)"
                                placeholder="{{ __('Kosongkan = bawaan :jumlah', ['jumlah' => $rp($belanja['bawaan'])]) }}" class="w-full rounded-2xl border-slate-300 text-end">
                         <input type="hidden" name="batas_harian" :value="nilai">
+                        @if ($belanja['pisah'])
+                            <div x-data="{ nilaiKantin: @js($belanja['milikKantin'] === null ? '' : (string) (int) $belanja['milikKantin']) }" class="space-y-2">
+                                <label class="block text-xs text-slate-500">{{ __('Batas harian kantin') }}</label>
+                                <input type="text" inputmode="numeric" :value="fmtRupiah(nilaiKantin)" @input="nilaiKantin = ketikRupiah($event)"
+                                       placeholder="{{ __('Kosongkan = bawaan :jumlah', ['jumlah' => $rp($belanja['bawaanKantin'])]) }}" class="w-full rounded-2xl border-slate-300 text-end">
+                                <input type="hidden" name="batas_harian_kantin" :value="nilaiKantin">
+                            </div>
+                        @endif
                         <button class="w-full rounded-2xl bg-brand py-2.5 font-semibold text-white">{{ __('Simpan batas') }}</button>
                         @include('portal._pin', ['judul' => __('Ubah batas belanja :nama', ['nama' => $santri->nama])])
                     </form>
@@ -220,6 +246,26 @@
                             <p class="text-xs text-red-700">{{ __('Kartu langsung tak bisa dipakai belanja. Membuka blokir / kartu baru hanya di kantor.') }}</p>
                             <button class="w-full rounded-2xl bg-red-600 py-2.5 font-semibold text-white">{{ __('Blokir kartu sekarang') }}</button>
                             @include('portal._pin', ['judul' => __('Blokir kartu :nama', ['nama' => $santri->nama])])
+                        </form>
+                    @endif
+
+                    {{-- Saklar belanja kantin mitra — tampil hanya bila petugas menyalakan pilihan ini (9 Nov 2026). --}}
+                    @if ($belanja['saklarKantin'])
+                        <button type="button" @click="panel = panel ==='kantin' ? '' : 'kantin'"
+                                class="w-full rounded-2xl py-2 text-xs font-semibold {{ $belanja['kantinAktif'] ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-700' }}">
+                            {{ $belanja['kantinAktif'] ? __('Matikan belanja di kantin') : __('Nyalakan belanja di kantin') }}
+                        </button>
+                        <form x-show="panel ==='kantin'" x-cloak method="POST" action="{{ route('portal.kartu.kantin', $santri->id) }}" class="space-y-2"
+                              data-no-confirm x-data="pinPad(@js($punyaPinWali), @js(route('portal.pin')))" @submit.prevent="buka()">
+                            @csrf
+                            <input type="hidden" name="aktif" value="{{ $belanja['kantinAktif'] ? 0 : 1 }}">
+                            <p class="text-xs text-slate-500">
+                                {{ $belanja['kantinAktif']
+                                    ? __('Kartu tidak bisa dipakai di kantin mitra mana pun. Belanja di Wafi Mart tetap bisa.')
+                                    : __('Kartu bisa dipakai lagi di kantin mitra, mengikuti batas harian.') }}
+                            </p>
+                            <button class="w-full rounded-2xl bg-brand py-2.5 font-semibold text-white">{{ __('Simpan') }}</button>
+                            @include('portal._pin', ['judul' => __('Belanja kantin :nama', ['nama' => $santri->nama])])
                         </form>
                     @endif
                 </div>

@@ -32,11 +32,12 @@ return [
             'portal_wali' => true,
             'grup_mati' => [],
             // Rekonsiliasi kartu berjalan di sisi kasir (instans Wafi Mart) — di sini pemilik dompet, tak dipakai.
-            'modul_mati' => ['rekonsiliasi-kartu', 'penerimaan-al-wafi'],
+            // Mitra kantin (9 Nov 2026) hidup di instans Wafi Mart — dompetnya lewat penghubung.
+            'modul_mati' => ['rekonsiliasi-kartu', 'penerimaan-al-wafi', 'mitra-kantin'],
             // Berlaku hanya bila `wafimart_terpisah` menyala.
             'modul_mati_bila_toko_terpisah' => ['pos', 'shift-kasir', 'laporan-toko', 'kategori-barang', 'merk-barang'],
             'grup_menu_sembunyi_bila_toko_terpisah' => ['WAFI MART'],
-            'alamat_mati' => [],
+            'alamat_mati' => ['mitra'],
             'menu_sembunyi' => [],
             'impor_mati' => [],
             'laporan_unit_toko' => true,
@@ -57,7 +58,7 @@ return [
                 'jenjang', 'tipe-biaya', 'jenis-biaya', 'tarif', 'reminder-tagihan',
                 'koreksi-tagihan', 'pembebasan-registrasi',
                 // Sisi dompet santri tetap milik Al Wafi; di Wafi Mart diganti penghubung API (fase 3).
-                'kartu-santri', 'pencairan-kartu', 'sesi-tarik-tunai', 'pencairan-toko',
+                'kartu-santri', 'belanja-kantin', 'pencairan-kartu', 'sesi-tarik-tunai', 'pencairan-toko',
                 // Dana terikat & pertanggungjawabannya khas yayasan nirlaba, bukan minimarket.
                 'dana',
             ],

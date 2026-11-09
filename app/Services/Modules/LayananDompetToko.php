@@ -6,6 +6,7 @@ use App\Exceptions\AppException;
 use App\Models\Santri;
 use App\Models\TransaksiDompetToko;
 use App\Models\User;
+use App\Support\BelanjaKantin;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -23,19 +24,22 @@ use Illuminate\Support\Facades\Hash;
  */
 class LayananDompetToko
 {
-    /** Info kartu sebelum bayar: nama, sisa batas hari ini, perlu PIN atau tidak. */
-    public function cekKartu(?string $uid, string|int|float $total): array
+    /**
+     * Info kartu sebelum bayar: nama, sisa batas hari ini, perlu PIN atau tidak. `$asal` = `mart` (kasir Wafi
+     * Mart) atau `kantin` (kantin mitra) — menentukan batas yang dihitung (mode pisah) & pilihan kantin wali.
+     */
+    public function cekKartu(?string $uid, string|int|float $total, ?string $asal = null): array
     {
         $santri = $this->santriKartu($uid);
+        $asal = BelanjaKantin::asal($asal);
+        BelanjaKantin::pastikanBoleh($santri->id, $asal);
         $total = Money::of($total);
-        $pakai = DompetBelanja::hariIni($santri->id);
-        $batas = KartuSantriService::batasHarian($santri->id);
 
         return [
             'nama' => $santri->nama,
             'nis' => $santri->nis,
-            'sisa_batas' => Money::of(Money::isNegative(Money::sub($batas, $pakai)) ? '0' : Money::sub($batas, $pakai)),
-            'perlu_pin' => Money::gt(Money::add($pakai, $total), $batas),
+            'sisa_batas' => DompetBelanja::sisaBatas($santri->id, $asal),
+            'perlu_pin' => DompetBelanja::lewatBatas($santri->id, $total, $asal),
             'punya_pin' => KartuSantriService::punyaPin($santri->id),
         ];
     }
@@ -55,9 +59,12 @@ class LayananDompetToko
         }
 
         $santri = $this->santriKartu($d['uid'] ?? null);
+        $asal = BelanjaKantin::asal($d['asal'] ?? null);
+        // Belanja kantin yang dimatikan wali ditolak SEBELUM PIN diminta — tak ada gunanya mengetik PIN.
+        BelanjaKantin::pastikanBoleh($santri->id, $asal);
         // PIN di LUAR transaksi: hitungan salah PIN tak boleh ikut tergulung saat galat dilempar.
         $pinBenar = false;
-        if (DompetBelanja::lewatBatas($santri->id, $nominal)) {
+        if (DompetBelanja::lewatBatas($santri->id, $nominal, $asal)) {
             // PIN belum dikirim ≠ PIN salah: jangan dihitung sebagai percobaan gagal (5× = terkunci).
             if (trim((string) ($d['pin'] ?? '')) === '' && KartuSantriService::punyaPin($santri->id)) {
                 throw new AppException(409, 'Melewati batas belanja harian — minta santri mengetik PIN belanjanya.');
@@ -66,15 +73,15 @@ class LayananDompetToko
             $pinBenar = true;
         }
 
-        return DB::transaction(function () use ($d, $nomor, $nominal, $santri, $pinBenar) {
+        return DB::transaction(function () use ($d, $nomor, $nominal, $santri, $pinBenar, $asal) {
             DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('dompet-toko:'.$nomor)]);
             if ($ada = TransaksiDompetToko::where('nomor_toko', $nomor)->first()) {
                 return $this->ulang($ada, 'potong', $nominal);
             }
-            $toko = trim((string) ($d['nama_toko'] ?? '')) ?: 'Wafi Mart';
-            $mutasi = DompetBelanja::potong($santri->id, $nominal, "Belanja {$toko} {$nomor}", $this->pencatat(), $pinBenar);
+            $toko = trim((string) ($d['nama_toko'] ?? '')) ?: ($asal === 'kantin' ? 'Kantin' : 'Wafi Mart');
+            $mutasi = DompetBelanja::potong($santri->id, $nominal, "Belanja {$toko} {$nomor}", $this->pencatat(), $pinBenar, $asal);
             $t = TransaksiDompetToko::create([
-                'nomor_toko' => $nomor, 'jenis' => 'potong', 'id_santri' => $santri->id,
+                'nomor_toko' => $nomor, 'jenis' => 'potong', 'asal' => $asal, 'id_santri' => $santri->id,
                 'uid_kartu' => KartuSantriService::bersihkanUid($d['uid']), 'nominal' => $nominal,
                 'kode_toko' => $d['kode_toko'] ?? null, 'nama_toko' => $toko, 'keterangan' => $d['keterangan'] ?? null,
                 'id_mutasi_dompet' => $mutasi->id, 'status' => 'berhasil', 'tanggal' => now()->toDateString(),
@@ -117,7 +124,8 @@ class LayananDompetToko
             }
             $mutasi = DompetBelanja::kembalikan($asal->id_santri, $nominal, "Kembali dari {$asal->nama_toko} {$nomor} (asal {$asal->nomor_toko})", $this->pencatat());
             $t = TransaksiDompetToko::create([
-                'nomor_toko' => $nomor, 'jenis' => 'kembalikan', 'nomor_asal' => $asal->nomor_toko, 'id_santri' => $asal->id_santri,
+                // Asal ikut transaksi asalnya — pengembalian belanja kantin mengembalikan jatah batas KANTIN.
+                'nomor_toko' => $nomor, 'jenis' => 'kembalikan', 'asal' => $asal->asal, 'nomor_asal' => $asal->nomor_toko, 'id_santri' => $asal->id_santri,
                 'uid_kartu' => $asal->uid_kartu, 'nominal' => $nominal, 'kode_toko' => $asal->kode_toko, 'nama_toko' => $asal->nama_toko,
                 'keterangan' => $d['keterangan'] ?? null, 'id_mutasi_dompet' => $mutasi->id, 'status' => 'berhasil',
                 'tanggal' => now()->toDateString(), 'rincian' => RincianBelanja::bersihkan($d['rincian'] ?? null),
@@ -165,7 +173,7 @@ class LayananDompetToko
     {
         return TransaksiDompetToko::whereDate('tanggal', $tanggal)->orderBy('id')->get()
             ->map(fn ($t) => ['nomor' => $t->nomor_toko, 'jenis' => $t->jenis, 'nomor_asal' => $t->nomor_asal,
-                'nominal' => Money::of($t->nominal), 'status' => $t->status, 'kode_toko' => $t->kode_toko])->all();
+                'nominal' => Money::of($t->nominal), 'status' => $t->status, 'kode_toko' => $t->kode_toko, 'asal' => $t->asal])->all();
     }
 
     // ---- pembantu ----
@@ -232,7 +240,7 @@ class LayananDompetToko
         return [
             'nomor' => $t->nomor_toko, 'id' => $t->id, 'jenis' => $t->jenis, 'nominal' => Money::of($t->nominal),
             'nama' => $t->santri?->nama, 'sisa_saldo' => $saldoSetelah !== null ? Money::of($saldoSetelah) : null,
-            'sisa_batas' => Money::of(max(0, (float) Money::sub(KartuSantriService::batasHarian($t->id_santri), DompetBelanja::hariIni($t->id_santri)))),
+            'sisa_batas' => DompetBelanja::sisaBatas($t->id_santri, (string) $t->asal),
         ];
     }
 }

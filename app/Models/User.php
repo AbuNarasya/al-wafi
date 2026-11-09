@@ -30,6 +30,8 @@ class User extends Authenticatable
         'peringkat_pengajuan',
         'tim_keuangan',
         'status',
+        // Akun MITRA kantin Wafi Mart (9 Nov 2026): hanya bisa membuka /mitra miliknya — middleware AkunMitra.
+        'id_mitra',
     ];
 
     protected $hidden = [

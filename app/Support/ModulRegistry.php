@@ -95,6 +95,8 @@ final class ModulRegistry
         ['kode' => 'pencairan-toko', 'nama' => 'Pencairan Belanja Kartu ke Wafi Mart (antar-entitas)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Instans Wafi Mart: buat = mencatat uang pencairan dari Al Wafi sudah masuk.
         ['kode' => 'penerimaan-al-wafi', 'nama' => 'Penerimaan Pencairan dari Al Wafi', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
+        // Mitra kantin penyewa lahan (9 Nov 2026): data mitra, menu, akun mitra, laporan, penarikan saldo mitra.
+        ['kode' => 'mitra-kantin', 'nama' => 'Mitra Kantin Wafi Mart (data, menu, akun, laporan, penarikan)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         ['kode' => 'rekonsiliasi-kartu', 'nama' => 'Rekonsiliasi Belanja Kartu Santri (Wafi Mart ↔ Al Wafi)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Keuangan: buat = membuat sesi, ubah = jadwal/peserta/saklar buka + ambil dana, distribusi,
         // selesaikan; hapus = membatalkan sesi / penyerahan yang keliru.
@@ -182,6 +184,8 @@ final class ModulRegistry
         ['kode' => 'clearance-admin', 'nama' => 'Clearance Pengunduran Diri — Admin Sekolah (surat & pengeluaran)', 'grup' => 'DATA SISWA/SANTRI'],
         // Kartu RFID belanja Wafi Mart: buat = pasang/ganti kartu, ubah = blokir & buka blokir.
         ['kode' => 'kartu-santri', 'nama' => 'Kartu Santri (RFID belanja Wafi Mart)', 'grup' => 'DATA SISWA/SANTRI'],
+        // Kantin mitra Wafi Mart (9 Nov 2026): mode batas gabung/pisah, batas kantin bawaan, saklar pilihan wali.
+        ['kode' => 'belanja-kantin', 'nama' => 'Belanja Kartu di Kantin (batas & saklar wali)', 'grup' => 'DATA SISWA/SANTRI'],
 
         // ---- PPSB ----
         ['kode' => 'tahun-ajaran', 'nama' => 'Tahun Ajaran', 'grup' => 'PPSB', 'sub' => 'Setting Awal'],

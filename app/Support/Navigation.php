@@ -173,6 +173,7 @@ final class Navigation
         ['url' => '/pos', 'label' => 'Kasir (POS)', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'pos'],
         ['url' => '/shift-kasir', 'label' => 'Shift Kasir & Setoran', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'shift-kasir'],
         ['url' => '/rekonsiliasi-kartu', 'label' => 'Rekonsiliasi Kartu Santri', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'rekonsiliasi-kartu'],
+        ['url' => '/mitra-kantin', 'label' => 'Mitra Kantin', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'mitra-kantin'],
         ['url' => '/penerimaan-al-wafi', 'label' => 'Penerimaan dari Al Wafi', 'group' => 'WAFI MART', 'sub' => 'Transaksi', 'modul' => 'penerimaan-al-wafi'],
 
         ['url' => '/laporan-toko', 'label' => 'Laporan Toko', 'group' => 'WAFI MART', 'sub' => 'Laporan', 'modul' => 'laporan-toko'],
@@ -221,6 +222,7 @@ final class Navigation
         ['url' => '/kesantrian/kelas', 'label' => 'Kelas', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kelas'],
         ['url' => '/kesantrian/kelas/penempatan', 'label' => 'Penempatan Kelas', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kelas'],
         ['url' => '/kartu-santri', 'label' => 'Kartu Santri (RFID)', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'kartu-santri'],
+        ['url' => '/kartu-santri/belanja-kantin', 'label' => 'Belanja Kartu di Kantin', 'group' => 'DATA SISWA/SANTRI', 'modul' => 'belanja-kantin'],
 
         // ---- 6. PPSB & Kependidikan ----
         // CATATAN: label grupnya "KEPENDIDIKAN", tetapi URL (/kesantrian/…) dan

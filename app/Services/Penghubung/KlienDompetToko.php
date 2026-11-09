@@ -20,14 +20,21 @@ class KlienDompetToko
 {
     public const TIDAK_TERSEDIA = 'Kartu belum bisa diproses (penghubung dompet tak menjawab) — silakan bayar tunai.';
 
-    public function cekKartu(string $uid, string $total): array
+    /** `$asal` = `kantin` untuk kasir mitra (batas kantin & pilihan wali); null = Wafi Mart. */
+    public function cekKartu(string $uid, string $total, ?string $asal = null): array
     {
-        return $this->kirim('POST', '/api/dompet-toko/v1/kartu', ['uid' => $uid, 'total' => $total]);
+        return $this->kirim('POST', '/api/dompet-toko/v1/kartu', array_filter(['uid' => $uid, 'total' => $total, 'asal' => $asal], fn ($v) => $v !== null));
     }
 
-    /** `$rincian` = daftar barang untuk portal wali ([[App\Services\Modules\RincianBelanja]]). */
-    public function potong(string $nomor, string $uid, string $nominal, ?string $pin, ?string $kodeToko, ?string $namaToko, ?array $rincian = null): array
+    /** `$rincian` = daftar barang untuk portal wali ([[App\Services\Modules\RincianBelanja]]). `$asal` lihat cekKartu. */
+    public function potong(string $nomor, string $uid, string $nominal, ?string $pin, ?string $kodeToko, ?string $namaToko, ?array $rincian = null, ?string $asal = null): array
     {
+        if ($asal !== null) {
+            return $this->kirim('POST', '/api/dompet-toko/v1/potong', [
+                'nomor' => $nomor, 'uid' => $uid, 'nominal' => $nominal, 'pin' => $pin, 'asal' => $asal,
+                'kode_toko' => $kodeToko, 'nama_toko' => $namaToko, 'rincian' => $rincian,
+            ], batasDetik: 5);
+        }
         // Batas waktu lebih pendek: panggilan ini terjadi DI DALAM transaksi simpan struk yang memegang kunci nomor
         // struk — selama menunggu, kasir lain ikut tertahan (audit 22 Okt 2026). Waktu habis = "tak pasti", dan
         // niat bayarnya diselesaikan lewat "Cek lagi" / rekonsiliasi malam, bukan dianggap gagal.

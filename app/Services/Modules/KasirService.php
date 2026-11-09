@@ -170,7 +170,7 @@ class KasirService
             }
             // Di atas batas harian → PIN belanja anak. Diperiksa DI LUAR transaksi supaya
             // hitungan salah PIN tak ikut tergulung saat galat dilempar.
-            if (Money::gt(Money::add(self::belanjaKartuHariIni($santri->id), $total), KartuSantriService::batasHarian($santri->id))) {
+            if (DompetBelanja::lewatBatas($santri->id, $total, 'mart')) {
                 (new KartuSantriService)->periksaPin($santri->id, $kartu['pin'] ?? null);
                 $pinBenar = true;
             }
@@ -312,7 +312,8 @@ class KasirService
      */
     public static function belanjaKartuHariIni(int $idSantri): string
     {
-        return DompetBelanja::hariIni($idSantri);
+        // Kasir ini = Wafi Mart: mode pisah hanya menghitung belanja Wafi Mart, mode gabung semua tempat.
+        return DompetBelanja::pemakaian($idSantri, 'mart');
     }
 
     /**

@@ -107,6 +107,20 @@ Artisan::command('toko:rekonsiliasi-dompet {--tanggal= : Satu tanggal tertentu (
 })->purpose('Rekonsiliasi malam belanja kartu santri (Wafi Mart ↔ ERP Al Wafi)');
 Schedule::command('toko:rekonsiliasi-dompet')->dailyAt('00:40')->withoutOverlapping();
 
+// Sisi Wafi Mart (9 Nov 2026): jurnal ringkas penjualan kartu kantin mitra per tanggal, SESUDAH rekonsiliasi
+// (pembayaran yang belum pasti sudah dipastikan). D Piutang ke Al Wafi / K Hutang ke Mitra Kantin.
+Artisan::command('mitra:jurnal-penjualan', function (App\Services\Modules\SaldoMitraService $s) {
+    if (! App\Services\Modules\KasirService::lewatPenghubung()) {
+        $this->info('Bukan instans Wafi Mart — dilewati.');
+
+        return;
+    }
+    foreach ($s->jurnalPenjualan() as $h) {
+        $this->info("{$h['tanggal']}: {$h['transaksi']} transaksi, Rp {$h['total']}".(isset($h['galat']) ? " — GAGAL: {$h['galat']}" : ''));
+    }
+})->purpose('Jurnal ringkas penjualan kartu kantin mitra (Wafi Mart)');
+Schedule::command('mitra:jurnal-penjualan')->dailyAt('00:50')->withoutOverlapping();
+
 // Potongan uang pangkal per gelombang: setelah tenggatnya lewat, putuskan
 // "terkunci" (syarat bayar terpenuhi) atau "hangus" (ditambahkan kembali ke
 // tagihan). Dulu hanya lewat tombol Evaluasi atau saat halaman detail dibuka,

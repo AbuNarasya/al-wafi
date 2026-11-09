@@ -7,6 +7,7 @@ use App\Models\Santri;
 use App\Services\Modules\KartuSantriService;
 use App\Services\PortalWali\PinTransaksi;
 use App\Services\PortalWali\SesiWali;
+use App\Support\BelanjaKantin;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -23,14 +24,40 @@ class PortalKartuController extends Controller
 
     public function batas(Request $request, int $id): RedirectResponse
     {
-        $data = $request->validate(['batas_harian' => ['nullable', 'numeric', 'min:0', 'max:10000000'], 'pin' => ['nullable', 'string']]);
+        $data = $request->validate([
+            'batas_harian' => ['nullable', 'numeric', 'min:0', 'max:10000000'],
+            'batas_harian_kantin' => ['nullable', 'numeric', 'min:0', 'max:10000000'],
+            'pin' => ['nullable', 'string'],
+        ]);
+        // Batas kantin hanya ikut dikirim formulir saat mode batas PISAH (9 Nov 2026).
+        $kantin = $request->has('batas_harian_kantin') && BelanjaKantin::pisah();
 
-        return $this->jalankan($request, $id, function (Santri $s) use ($data) {
+        return $this->jalankan($request, $id, function (Santri $s) use ($data, $kantin) {
             $this->kartu->aturBatas($s, $data['batas_harian'] ?? null);
+            if ($kantin) {
+                $this->kartu->aturBatasKantin($s, $data['batas_harian_kantin'] ?? null);
+
+                return __('Batas belanja harian :nama disimpan.', ['nama' => $s->nama]);
+            }
 
             return ($data['batas_harian'] ?? null) === null
                 ? __('Batas belanja :nama kembali ke batas bawaan.', ['nama' => $s->nama])
                 : __('Batas belanja harian :nama disimpan.', ['nama' => $s->nama]);
+        });
+    }
+
+    /** Nyalakan/matikan belanja di kantin mitra — hanya bila saklar petugas menyala. */
+    public function kantin(Request $request, int $id): RedirectResponse
+    {
+        $data = $request->validate(['aktif' => ['required', 'boolean'], 'pin' => ['nullable', 'string']]);
+
+        return $this->jalankan($request, $id, function (Santri $s) use ($data) {
+            $aktif = (bool) $data['aktif'];
+            $this->kartu->aturKantin($s, $aktif, SesiWali::wali()->id);
+
+            return $aktif
+                ? __('Belanja di kantin untuk :nama dinyalakan.', ['nama' => $s->nama])
+                : __('Belanja di kantin untuk :nama dimatikan — kartunya hanya bisa dipakai di Wafi Mart.', ['nama' => $s->nama]);
         });
     }
 

@@ -1269,5 +1269,18 @@
     "Bayar online lewat Virtual Account.": "Pay online via Virtual Account.",
     "Bayar (dompet / VA)": "Pay (wallet / VA)",
     "Bayar (VA / transfer)": "Pay (VA / transfer)",
-    "Bayar lewat VA": "Pay via VA"
+    "Bayar lewat VA": "Pay via VA",
+    "Batas harian Wafi Mart": "Wafi Mart daily limit",
+    "Batas harian kantin": "Canteen daily limit",
+    "Belanja di kantin": "Canteen purchases",
+    "Nonaktif": "Inactive",
+    "Simpan": "Save",
+    "Matikan belanja di kantin": "Turn off canteen purchases",
+    "Nyalakan belanja di kantin": "Turn on canteen purchases",
+    "Kartu tidak bisa dipakai di kantin mitra mana pun. Belanja di Wafi Mart tetap bisa.": "The card cannot be used at any partner canteen. Shopping at Wafi Mart still works.",
+    "Kartu bisa dipakai lagi di kantin mitra, mengikuti batas harian.": "The card can be used at partner canteens again, within the daily limit.",
+    "Belanja kantin :nama": "Canteen purchases for :nama",
+    "Belanja di kantin untuk :nama dinyalakan.": "Canteen purchases for :nama have been turned on.",
+    "Belanja di kantin untuk :nama dimatikan — kartunya hanya bisa dipakai di Wafi Mart.": "Canteen purchases for :nama have been turned off — the card can only be used at Wafi Mart.",
+    "Pengaturan belanja kantin sedang tidak tersedia.": "Canteen purchase settings are currently unavailable."
 }

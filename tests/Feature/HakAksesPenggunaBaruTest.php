@@ -138,7 +138,7 @@ class HakAksesPenggunaBaruTest extends TestCase
 
         // kartu-santri (19 Okt 2026): kartu RFID belanja Wafi Mart — alat, bukan tahap santri, jadi di ujung.
         // santri-data (4 Nov 2026): ubah biodata saja, di samping `santri`.
-        $this->assertSame(['wali', 'santri', 'santri-data', 'dokumen-santri', 'kelas', 'pengunduran-diri', 'clearance-keuangan', 'clearance-kesantrian', 'clearance-admin', 'kartu-santri'], $grup['DATA SISWA/SANTRI']);
+        $this->assertSame(['wali', 'santri', 'santri-data', 'dokumen-santri', 'kelas', 'pengunduran-diri', 'clearance-keuangan', 'clearance-kesantrian', 'clearance-admin', 'kartu-santri', 'belanja-kantin'], $grup['DATA SISWA/SANTRI']);
         $this->assertNotContains('santri', $grup['PPSB']);
         // Angsuran Uang Pangkal ikut menunya turun ke Transaksi.
         $this->assertSame(

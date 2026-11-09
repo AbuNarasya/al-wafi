@@ -18,9 +18,10 @@ class DompetTokoController extends Controller
 
     public function kartu(Request $request): JsonResponse
     {
-        $d = $request->validate(['uid' => ['required', 'string', 'max:100'], 'total' => ['nullable', 'numeric', 'min:0']]);
+        $d = $request->validate(['uid' => ['required', 'string', 'max:100'], 'total' => ['nullable', 'numeric', 'min:0'],
+            'asal' => ['nullable', 'in:mart,kantin']]);
 
-        return response()->json($this->layanan->cekKartu($d['uid'], $d['total'] ?? 0));
+        return response()->json($this->layanan->cekKartu($d['uid'], $d['total'] ?? 0, $d['asal'] ?? null));
     }
 
     public function potong(Request $request): JsonResponse
@@ -32,6 +33,8 @@ class DompetTokoController extends Controller
             'keterangan' => ['nullable', 'string', 'max:255'],
             // Daftar barang untuk portal wali — dibakukan di RincianBelanja::bersihkan().
             'rincian' => ['nullable', 'array'],
+            // mart = kasir Wafi Mart (bawaan, klien lama) · kantin = kantin mitra (9 Nov 2026).
+            'asal' => ['nullable', 'in:mart,kantin'],
         ]);
 
         return response()->json($this->layanan->potong($d));

@@ -1269,5 +1269,18 @@
     "Bayar online lewat Virtual Account.": "ادفع عبر الإنترنت من خلال الحساب الافتراضي.",
     "Bayar (dompet / VA)": "ادفع (المحفظة / الحساب الافتراضي)",
     "Bayar (VA / transfer)": "ادفع (الحساب الافتراضي / التحويل)",
-    "Bayar lewat VA": "ادفع عبر الحساب الافتراضي"
+    "Bayar lewat VA": "ادفع عبر الحساب الافتراضي",
+    "Batas harian Wafi Mart": "الحد اليومي لوافي مارت",
+    "Batas harian kantin": "الحد اليومي للمقصف",
+    "Belanja di kantin": "الشراء من المقصف",
+    "Nonaktif": "غير مفعّل",
+    "Simpan": "حفظ",
+    "Matikan belanja di kantin": "إيقاف الشراء من المقصف",
+    "Nyalakan belanja di kantin": "تفعيل الشراء من المقصف",
+    "Kartu tidak bisa dipakai di kantin mitra mana pun. Belanja di Wafi Mart tetap bisa.": "لا يمكن استخدام البطاقة في أي مقصف شريك. يبقى الشراء من وافي مارت متاحًا.",
+    "Kartu bisa dipakai lagi di kantin mitra, mengikuti batas harian.": "يمكن استخدام البطاقة مجددًا في المقاصف الشريكة ضمن الحد اليومي.",
+    "Belanja kantin :nama": "الشراء من المقصف لـ :nama",
+    "Belanja di kantin untuk :nama dinyalakan.": "تم تفعيل الشراء من المقصف لـ :nama.",
+    "Belanja di kantin untuk :nama dimatikan — kartunya hanya bisa dipakai di Wafi Mart.": "تم إيقاف الشراء من المقصف لـ :nama — لا يمكن استخدام البطاقة إلا في وافي مارت.",
+    "Pengaturan belanja kantin sedang tidak tersedia.": "إعدادات الشراء من المقصف غير متاحة حاليًا."
 }

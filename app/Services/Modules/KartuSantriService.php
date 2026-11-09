@@ -188,6 +188,46 @@ class KartuSantriService
         return $dompet;
     }
 
+    /** Batas harian KANTIN untuk santri ini (mode pisah) — miliknya sendiri, atau bawaan kantin. */
+    public static function batasHarianKantin(int $idSantri): string
+    {
+        $milik = DompetSantri::where('id_santri', $idSantri)->value('batas_harian_kantin');
+
+        return $milik !== null ? Money::of($milik) : \App\Support\BelanjaKantin::batasKantinBawaan();
+    }
+
+    /** Wali mengatur batas harian kantin anaknya (mode pisah). null = kembali ke bawaan kantin. */
+    public function aturBatasKantin(Santri $santri, string|int|float|null $nominal): DompetSantri
+    {
+        $nominal = ($nominal === null || $nominal === '') ? null : Money::of($nominal);
+        if ($nominal !== null && Money::isNegative($nominal)) {
+            throw new AppException(422, __('Batas harian tidak boleh negatif.'));
+        }
+        $dompet = DompetSantri::firstOrCreate(['id_santri' => $santri->id], ['saldo' => 0]);
+        $dompet->update(['batas_harian_kantin' => $nominal]);
+
+        return $dompet;
+    }
+
+    /** Wali menyalakan/mematikan belanja di kantin mitra untuk anaknya (hanya bila saklar petugas nyala). */
+    public function aturKantin(Santri $santri, bool $aktif, int $idWali): DompetSantri
+    {
+        if (! \App\Support\BelanjaKantin::saklarWali()) {
+            throw new AppException(422, __('Pengaturan belanja kantin sedang tidak tersedia.'));
+        }
+        $dompet = DompetSantri::firstOrCreate(['id_santri' => $santri->id], ['saldo' => 0]);
+        if ((bool) $dompet->kantin_nonaktif === ! $aktif) {
+            return $dompet;
+        }
+        $dompet->update(['kantin_nonaktif' => ! $aktif]);
+        \App\Support\Audit\Jejak::catat('ubah_belanja_kantin_santri', ['modul' => \App\Support\BelanjaKantin::MODUL,
+            'ref_jenis' => 'santri', 'ref_id' => $santri->id,
+            'detail' => "Belanja kantin {$santri->nama} ".($aktif ? 'dinyalakan' : 'dimatikan')." oleh wali (#{$idWali})",
+            'perubahan' => ['kantin_aktif' => ['dari' => ! $aktif, 'ke' => $aktif], 'id_wali' => $idWali]]);
+
+        return $dompet;
+    }
+
     // ---- PIN belanja santri ----
 
     public static function punyaPin(int $idSantri): bool

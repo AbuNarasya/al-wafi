@@ -458,6 +458,13 @@ class PortalKeluargaController extends Controller
                 'batas' => \App\Services\Modules\KartuSantriService::batasHarian($s->id),
                 'bawaan' => \App\Services\Modules\KartuSantriService::batasBawaan(),
                 'punyaPin' => \App\Services\Modules\KartuSantriService::punyaPin($s->id),
+                // Kantin mitra (9 Nov 2026): batas terpisah bila mode PISAH; saklar wali bila petugas menyalakannya.
+                'pisah' => \App\Support\BelanjaKantin::pisah(),
+                'milikKantin' => $s->dompet?->batas_harian_kantin,
+                'batasKantin' => \App\Services\Modules\KartuSantriService::batasHarianKantin($s->id),
+                'bawaanKantin' => \App\Support\BelanjaKantin::batasKantinBawaan(),
+                'saklarKantin' => \App\Support\BelanjaKantin::saklarWali(),
+                'kantinAktif' => ! (bool) $s->dompet?->kantin_nonaktif,
             ] : null,
         ]);
     }

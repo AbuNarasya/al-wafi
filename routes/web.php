@@ -236,6 +236,7 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\A
     Route::post('/anak/{id}/kartu/batas', 'batas')->name('kartu.batas')->middleware('throttle:10,1')->whereNumber('id');
     Route::post('/anak/{id}/kartu/pin', 'pinAnak')->name('kartu.pin')->middleware('throttle:10,1')->whereNumber('id');
     Route::post('/anak/{id}/kartu/blokir', 'blokir')->name('kartu.blokir')->middleware('throttle:10,1')->whereNumber('id');
+    Route::post('/anak/{id}/kartu/kantin', 'kantin')->name('kartu.kantin')->middleware('throttle:10,1')->whereNumber('id');
 });
 // Pengunduran diri santri aktif (21 Okt 2026) — di bawah /wali/anak, BUKAN /wali/data (mode verifikasi).
 Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalPengunduranDiriController::class)->group(function () {
@@ -768,6 +769,43 @@ Route::middleware('auth')->group(function () {
     });
 
     // Saklar metode pembayaran portal wali (9 Nov 2026) — App\Support\MetodeBayar.
+    // Mitra kantin Wafi Mart — layar staf (9 Nov 2026).
+    Route::prefix('mitra-kantin')->name('mitra_kantin.')->controller(\App\Http\Controllers\MitraKantinController::class)->group(function () {
+        Route::get('/', 'index')->name('index')->middleware('hakakses:mitra-kantin,lihat');
+        Route::get('/laporan', 'laporan')->name('laporan')->middleware('hakakses:mitra-kantin,lihat');
+        Route::get('/penarikan', 'penarikan')->name('penarikan')->middleware('hakakses:mitra-kantin,lihat');
+        Route::post('/penarikan/{id}/proses', 'proses')->name('penarikan.proses')->middleware('hakakses:mitra-kantin,ubah')->whereNumber('id');
+        Route::post('/penarikan/{id}/tolak', 'tolak')->name('penarikan.tolak')->middleware('hakakses:mitra-kantin,ubah')->whereNumber('id');
+        Route::get('/penarikan/{id}/bukti', 'bukti')->name('penarikan.bukti')->middleware('hakakses:mitra-kantin,lihat')->whereNumber('id');
+        Route::put('/akun-hutang', 'akunHutang')->name('akun_hutang')->middleware('hakakses:mitra-kantin,ubah');
+        Route::get('/baru', 'create')->name('create')->middleware('hakakses:mitra-kantin,buat');
+        Route::post('/', 'store')->name('store')->middleware('hakakses:mitra-kantin,buat');
+        Route::get('/{mitra}', 'show')->name('show')->middleware('hakakses:mitra-kantin,lihat')->whereNumber('mitra');
+        Route::get('/{mitra}/ubah', 'edit')->name('edit')->middleware('hakakses:mitra-kantin,ubah')->whereNumber('mitra');
+        Route::put('/{mitra}', 'update')->name('update')->middleware('hakakses:mitra-kantin,ubah')->whereNumber('mitra');
+        Route::post('/{mitra}/menu', 'simpanMenu')->name('menu.store')->middleware('hakakses:mitra-kantin,buat')->whereNumber('mitra');
+        Route::put('/{mitra}/menu/{menu}', 'simpanMenu')->name('menu.update')->middleware('hakakses:mitra-kantin,ubah')->whereNumber(['mitra', 'menu']);
+        Route::post('/{mitra}/akun', 'buatAkun')->name('akun.store')->middleware('hakakses:mitra-kantin,buat')->whereNumber('mitra');
+        Route::put('/{mitra}/akun/{akun}', 'ubahAkun')->name('akun.update')->middleware('hakakses:mitra-kantin,ubah')->whereNumber(['mitra', 'akun']);
+    });
+    // Layar akun MITRA sendiri (HP mitra): kasir kartu, riwayat, laporan.
+    Route::prefix('mitra')->name('mitra.')->middleware('mitra.saja')->controller(\App\Http\Controllers\KasirMitraController::class)->group(function () {
+        Route::get('/', 'kasir')->name('kasir');
+        Route::post('/kartu', 'cek')->name('cek')->middleware('throttle:60,1');
+        Route::post('/bayar', 'bayar')->name('bayar')->middleware('throttle:60,1');
+        Route::post('/bayar/{id}/cek', 'cekLagi')->name('cek_lagi')->whereNumber('id');
+        Route::get('/riwayat', 'riwayat')->name('riwayat');
+        Route::post('/riwayat/{id}/batal', 'batal')->name('batal')->middleware('throttle:20,1')->whereNumber('id');
+        Route::get('/laporan', 'laporan')->name('laporan');
+        Route::get('/saldo', 'saldo')->name('saldo');
+        Route::post('/saldo/tarik', 'ajukan')->name('ajukan')->middleware('throttle:10,1');
+        Route::post('/saldo/tarik/{id}/batal', 'batalAjuan')->name('batal_ajuan')->whereNumber('id');
+        Route::get('/saldo/tarik/{id}/bukti', 'bukti')->name('bukti')->whereNumber('id');
+    });
+    Route::prefix('kartu-santri/belanja-kantin')->name('belanja_kantin.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\BelanjaKantinController::class, 'edit'])->name('edit')->middleware('hakakses:belanja-kantin,lihat');
+        Route::put('/', [\App\Http\Controllers\BelanjaKantinController::class, 'update'])->name('update')->middleware('hakakses:belanja-kantin,ubah');
+    });
     Route::prefix('pengaturan/metode-pembayaran')->name('metode_pembayaran.')->group(function () {
         Route::get('/', [\App\Http\Controllers\MetodePembayaranController::class, 'edit'])->name('edit')->middleware('hakakses:metode-pembayaran,lihat');
         Route::put('/', [\App\Http\Controllers\MetodePembayaranController::class, 'update'])->name('update')->middleware('hakakses:metode-pembayaran,ubah');

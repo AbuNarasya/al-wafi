@@ -36,6 +36,7 @@ class CompanySettings extends Model
         'kode_coa_grni',
         'kode_coa_hutang_toko',
         'kode_coa_kartu_santri',
+        'kode_coa_hutang_mitra',
         'batas_jajan_harian',
         'kode_unit_wafimart',
         'keterangan',

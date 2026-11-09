@@ -197,7 +197,7 @@ class PenghubungDompetTokoTest extends TestCase
     {
         $this->potong('WM-1', 20000)->assertOk();
         $r = $this->kirim('GET', '/api/dompet-toko/v1/transaksi', ['tanggal' => now()->toDateString()])->assertOk();
-        $this->assertSame([['nomor' => 'WM-1', 'jenis' => 'potong', 'nomor_asal' => null, 'nominal' => '20000.00', 'status' => 'berhasil', 'kode_toko' => 'L002']],
+        $this->assertSame([['nomor' => 'WM-1', 'jenis' => 'potong', 'nomor_asal' => null, 'nominal' => '20000.00', 'status' => 'berhasil', 'kode_toko' => 'L002', 'asal' => 'mart']],
             $r->json('transaksi'));
     }
 
