@@ -34,16 +34,27 @@ class KebijakanKhususController extends Controller
 
     public function __construct(private KebijakanKhususService $service = new KebijakanKhususService) {}
 
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
+        $urut = array_key_exists((string) $request->query('urut'), KebijakanKhususService::URUTAN) ? (string) $request->query('urut') : 'terbaru';
+        $cari = trim((string) $request->query('q', ''));
         $rows = $this->service->daftar(
             trim((string) $request->query('status', '')) ?: null,
             (int) $request->query('santri') ?: null,
+            $cari !== '' ? $cari : null,
+            $urut,
         );
+        // Baris terakhir sebuah halaman baru saja diputus → halaman itu kosong; pindah ke halaman terakhir yang berisi.
+        if ($rows->isEmpty() && $rows->currentPage() > 1) {
+            return redirect()->route('kebijakan_khusus.index', ['page' => max(1, $rows->lastPage())] + $request->except('page'));
+        }
 
         return view('kebijakan-khusus.index', [
             'rows' => $rows,
             'status' => trim((string) $request->query('status', '')),
+            'cari' => $cari,
+            'urut' => $urut,
+            'urutOptions' => KebijakanKhususService::URUTAN,
             'perilakuOptions' => self::PERILAKU,
             'jenisOptions' => KebijakanKhusus::JENIS,
             'caraOptions' => KebijakanKhusus::CARA,
@@ -97,7 +108,7 @@ class KebijakanKhususController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('kebijakan_khusus.index')->with('status', 'Kebijakan disetujui dan mulai berlaku pada penagihan berikutnya.');
+        return $this->kembaliKeDaftar($request)->with('status', 'Kebijakan disetujui dan mulai berlaku pada penagihan berikutnya.');
     }
 
     public function tolak(Request $request, int $id): RedirectResponse
@@ -110,7 +121,7 @@ class KebijakanKhususController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('kebijakan_khusus.index')->with('status', 'Kebijakan ditolak.');
+        return $this->kembaliKeDaftar($request)->with('status', 'Kebijakan ditolak.');
     }
 
     public function akhiri(Request $request, int $id): RedirectResponse
@@ -123,6 +134,19 @@ class KebijakanKhususController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('kebijakan_khusus.index')->with('status', 'Kebijakan diakhiri; penagihan berikutnya kembali ke tarif normal.');
+        return $this->kembaliKeDaftar($request)->with('status', 'Kebijakan diakhiri; penagihan berikutnya kembali ke tarif normal.');
+    }
+
+    /**
+     * Kembali ke daftar dengan saringan, kata cari, urutan & halaman yang sama (9 Nov 2026) — persetujuan
+     * satu per satu tak lagi memaksa petugas menyaring ulang setiap kali. Formulir keputusan mengirimnya
+     * sebagai isian tersembunyi `daftar[...]`; hanya kunci yang dikenal yang diteruskan.
+     */
+    private function kembaliKeDaftar(Request $request): RedirectResponse
+    {
+        $d = array_filter(array_intersect_key((array) $request->input('daftar', []), array_flip(['status', 'q', 'urut', 'page'])),
+            fn ($v) => is_scalar($v) && (string) $v !== '');
+
+        return redirect()->route('kebijakan_khusus.index', $d);
     }
 }

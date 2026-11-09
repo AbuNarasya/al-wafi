@@ -51,7 +51,20 @@
         </form>
     @endif
 
-    <form method="GET" class="mb-3 flex items-end gap-2">
+    @php
+        // Keadaan daftar yang dibawa formulir keputusan → kembali ke saringan/cari/urutan/halaman yang sama.
+        $keadaanDaftar = array_filter(['status' => $status, 'q' => $cari, 'urut' => $urut !== 'terbaru' ? $urut : '', 'page' => request('page')]);
+    @endphp
+    <form method="GET" class="mb-3 flex flex-wrap items-end gap-2">
+        <div><label for="cari-kebijakan" class="mb-1 block text-xs font-medium text-gray-500">Cari santri</label>
+            <input id="cari-kebijakan" type="search" name="q" value="{{ $cari }}" placeholder="Nama atau NIS"
+                   class="w-56 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"></div>
+        <div><label class="mb-1 block text-xs font-medium text-gray-500">Urutkan</label>
+            <select name="urut" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
+                @foreach ($urutOptions as $k => $v)
+                    <option value="{{ $k }}" @selected($urut === $k)>{{ $v }}</option>
+                @endforeach
+            </select></div>
         <div><label class="mb-1 block text-xs font-medium text-gray-500">Status</label>
             <select name="status" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm">
                 <option value="">Semua</option>
@@ -60,6 +73,9 @@
                 @endforeach
             </select></div>
         <button class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50">Saring</button>
+        @if ($cari !== '' || $status !== '' || $urut !== 'terbaru')
+            <a href="{{ route('kebijakan_khusus.index') }}" class="px-2 py-1.5 text-sm text-gray-500 hover:underline">Hapus saringan</a>
+        @endif
     </form>
 
     <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -124,6 +140,7 @@
                                         <div x-show="buka" x-cloak class="mt-2 w-60 space-y-2 rounded-lg border border-gray-200 p-2">
                                             <form method="POST" action="{{ route('kebijakan_khusus.setujui', $k->id) }}" class="space-y-1">
                                                 @csrf
+                                                @foreach ($keadaanDaftar as $kunci => $nilai)<input type="hidden" name="daftar[{{ $kunci }}]" value="{{ $nilai }}">@endforeach
                                                 <input type="text" name="catatan_keputusan" placeholder="Catatan (opsional)" class="w-full rounded border border-gray-300 px-2 py-1 text-[11px]">
                                                 <button class="w-full rounded bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700" @disabled($kurang !== [])>
                                                     {{ $kurang === [] ? 'Setujui' : 'Surat belum lengkap' }}
@@ -131,6 +148,7 @@
                                             </form>
                                             <form method="POST" action="{{ route('kebijakan_khusus.tolak', $k->id) }}" class="space-y-1">
                                                 @csrf
+                                                @foreach ($keadaanDaftar as $kunci => $nilai)<input type="hidden" name="daftar[{{ $kunci }}]" value="{{ $nilai }}">@endforeach
                                                 <input type="text" name="catatan_keputusan" required placeholder="Alasan penolakan" class="w-full rounded border border-gray-300 px-2 py-1 text-[11px]">
                                                 <button class="w-full rounded border border-red-300 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-50">Tolak</button>
                                             </form>
@@ -139,6 +157,7 @@
                                 @elseif ($k->status === 'disetujui')
                                     <form method="POST" action="{{ route('kebijakan_khusus.akhiri', $k->id) }}" class="space-y-1">
                                         @csrf
+                                        @foreach ($keadaanDaftar as $kunci => $nilai)<input type="hidden" name="daftar[{{ $kunci }}]" value="{{ $nilai }}">@endforeach
                                         <input type="text" name="catatan_keputusan" required placeholder="Alasan diakhiri" class="w-32 rounded border border-gray-300 px-1.5 py-0.5 text-[11px]">
                                         <button class="text-gray-600 hover:underline">Akhiri</button>
                                     </form>

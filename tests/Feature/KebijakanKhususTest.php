@@ -319,4 +319,43 @@ class KebijakanKhususTest extends TestCase
             ->assertSee('AHMAD')
             ->assertSee('surat permohonan wali');
     }
+
+    /**
+     * 9 Nov 2026: cari nama/NIS + urutan, dan sesudah memutus kembali ke saringan yang sama. Nama santri juga
+     * ada di kotak pilih formulir pengajuan, jadi isinya diperiksa lewat data `rows`, bukan teks halaman.
+     */
+    public function test_cari_dan_urutkan_daftar(): void
+    {
+        foreach (['Zaid', 'Bilal', 'Hasan'] as $n) {
+            $this->ajukan($this->santri($n));
+        }
+        $admin = User::find($this->admin);
+        $nama = fn ($res) => collect($res->viewData('rows')->items())->map(fn ($k) => $k->santri->nama)->all();
+
+        $this->assertSame(['BILAL'], $nama($this->actingAs($admin)->get(route('kebijakan_khusus.index', ['q' => 'bil']))->assertOk()));
+        $this->assertSame(['BILAL', 'HASAN', 'ZAID'], $nama($this->actingAs($admin)->get(route('kebijakan_khusus.index', ['urut' => 'nama']))));
+        $this->assertSame(['ZAID', 'HASAN', 'BILAL'], $nama($this->actingAs($admin)->get(route('kebijakan_khusus.index', ['urut' => 'nama_desc']))));
+        $this->assertSame(['HASAN', 'BILAL', 'ZAID'], $nama($this->actingAs($admin)->get(route('kebijakan_khusus.index', ['urut' => 'terbaru']))));
+        $this->assertSame(['HASAN', 'BILAL', 'ZAID'], $nama($this->actingAs($admin)->get(route('kebijakan_khusus.index', ['urut' => 'tak-dikenal']))));
+    }
+
+    public function test_sesudah_memutus_kembali_ke_saringan_yang_sama(): void
+    {
+        $k = $this->ajukan($this->santri('Zaid'));
+        $this->lampirkan($k, SumberLampiran::KEBIJAKAN_PERMOHONAN);
+        $this->lampirkan($k, SumberLampiran::KEBIJAKAN_PERSETUJUAN);
+        $admin = User::find($this->admin);
+
+        $this->actingAs($admin)->get(route('kebijakan_khusus.index', ['status' => 'diajukan', 'urut' => 'nama']))
+            ->assertSee('name="daftar[status]" value="diajukan"', false)->assertSee('name="daftar[urut]" value="nama"', false);
+
+        $this->actingAs($admin)->post(route('kebijakan_khusus.setujui', $k->id), [
+            'daftar' => ['status' => 'diajukan', 'urut' => 'nama', 'q' => 'za', 'liar' => 'x'],
+        ])->assertRedirect(route('kebijakan_khusus.index', ['status' => 'diajukan', 'urut' => 'nama', 'q' => 'za']));
+        $this->assertSame('disetujui', $k->fresh()->status);
+
+        // Halaman yang kosong sesudah baris terakhirnya diputus → pindah ke halaman terakhir yang berisi.
+        $this->actingAs($admin)->get(route('kebijakan_khusus.index', ['status' => 'diajukan', 'page' => 3]))
+            ->assertRedirect(route('kebijakan_khusus.index', ['page' => 1, 'status' => 'diajukan']));
+    }
 }

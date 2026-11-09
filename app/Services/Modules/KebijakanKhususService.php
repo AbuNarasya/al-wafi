@@ -255,13 +255,32 @@ class KebijakanKhususService
         return $kurang;
     }
 
-    public function daftar(?string $status = null, ?int $idSantri = null)
+    /** Pilihan urutan daftar (9 Nov 2026) — kunci dipakai di query string `urut`. */
+    public const URUTAN = [
+        'terbaru' => 'Terbaru diajukan',
+        'terlama' => 'Terlama diajukan',
+        'nama' => 'Nama santri A–Z',
+        'nama_desc' => 'Nama santri Z–A',
+        'nis' => 'NIS',
+    ];
+
+    public function daftar(?string $status = null, ?int $idSantri = null, ?string $cari = null, string $urut = 'terbaru')
     {
-        return KebijakanKhusus::with(['santri:id,nama,nis', 'pemohon:id_pengguna,nama', 'pemutus:id_pengguna,nama'])
+        $kolomSantri = fn (string $kol) => \App\Models\Santri::select($kol)->whereColumn('santri.id', 'kebijakan_khusus.id_santri');
+        $q = KebijakanKhusus::with(['santri:id,nama,nis', 'pemohon:id_pengguna,nama', 'pemutus:id_pengguna,nama'])
             ->when($status, fn ($q) => $q->where('status', $status))
             ->when($idSantri, fn ($q) => $q->where('id_santri', $idSantri))
-            ->orderByDesc('id')
-            ->paginate(25)->withQueryString();
+            ->when($cari, fn ($q) => $q->whereHas('santri', fn ($s) => $s->where('nama', 'ilike', "%{$cari}%")->orWhere('nis', 'ilike', "%{$cari}%")));
+
+        match ($urut) {
+            'terlama' => $q->orderBy('id'),
+            'nama' => $q->orderBy($kolomSantri('nama'))->orderBy('id'),
+            'nama_desc' => $q->orderByDesc($kolomSantri('nama'))->orderBy('id'),
+            'nis' => $q->orderBy($kolomSantri('nis'))->orderBy('id'),
+            default => $q->orderByDesc('id'),
+        };
+
+        return $q->paginate(25)->withQueryString();
     }
 
     private function siapDiputus(int $id): KebijakanKhusus
