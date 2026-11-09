@@ -15,6 +15,7 @@
   <div x-data="{ cara: @js($caraAwal), nominal: @js($awal), biaya: @js((int) $biaya), saldo: @js((float) $saldo),
                 get total() { return Object.values(this.nominal).reduce((a, b) => a + (Number(b) || 0), 0) },
                 rp(n) { return 'Rp ' + (Number(n) || 0).toLocaleString('id-ID') } }">
+    @include('portal._pengumuman-bayar')
 
     <div class="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
         <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">{{ __('Bayar :jumlah tagihan sekaligus', ['jumlah' => $tagihan->count()]) }}</p>

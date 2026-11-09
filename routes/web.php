@@ -767,6 +767,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/tutup', [$p, 'tutup'])->name('tutup')->middleware('hakakses:perintah-pembayaran,lihat')->whereNumber('id');
     });
 
+    // Saklar metode pembayaran portal wali (9 Nov 2026) — App\Support\MetodeBayar.
+    Route::prefix('pengaturan/metode-pembayaran')->name('metode_pembayaran.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\MetodePembayaranController::class, 'edit'])->name('edit')->middleware('hakakses:metode-pembayaran,lihat');
+        Route::put('/', [\App\Http\Controllers\MetodePembayaranController::class, 'update'])->name('update')->middleware('hakakses:metode-pembayaran,ubah');
+    });
+
     Route::prefix('pengaturan/dana-bebas')->name('pengaturan_dana_bebas.')->group(function () {
         $d = PengaturanDanaBebasController::class;
         Route::get('/', [$d, 'index'])->name('index')->middleware('hakakses:pengaturan-dana-bebas,lihat');

@@ -325,6 +325,80 @@ class MidtransTest extends TestCase
         $this->assertSame(0, TransaksiMidtrans::count());
     }
 
+    // ---- Saklar metode pembayaran (MetodeBayar, 9 Nov 2026) ----
+
+    private function saklar(bool $midtrans, bool $transfer, ?string $pengumuman = null): void
+    {
+        \Illuminate\Support\Facades\DB::table('pengaturan_metode_bayar')->update(['midtrans' => $midtrans, 'transfer' => $transfer, 'pengumuman' => $pengumuman]);
+    }
+
+    public function test_va_dimatikan_pesanan_baru_ditolak_tapi_va_lama_tetap_bisa_dibuka_dan_dibatalkan(): void
+    {
+        $this->santri('Ahmad', 'aktif');
+        $this->sebagaiIbu()->post(route('portal.online.dompet'), ['nominal' => 100000]);
+        $lama = TransaksiMidtrans::sole();
+
+        $this->saklar(false, true, 'VA sedang gangguan, pakai transfer dulu.');
+
+        $this->sebagaiIbu()->get(route('portal.dompet.isi'))->assertOk()
+            ->assertDontSee('Bayar online (VA)')->assertSee('Kirim bukti transfer')
+            ->assertSee('Pengumuman pembayaran')->assertSee('VA sedang gangguan, pakai transfer dulu.');
+        $this->sebagaiIbu()->post(route('portal.online.dompet'), ['nominal' => 50000])
+            ->assertSessionHas('error', 'Metode pembayaran ini sedang tidak tersedia. Silakan pilih cara bayar lain.');
+        $this->assertSame(1, TransaksiMidtrans::count());
+
+        // VA yang sudah terbit tak terganggu saklar.
+        $this->sebagaiIbu()->get(route('portal.online.lihat', $lama->order_id))->assertOk();
+        $this->sebagaiIbu()->post(route('portal.online.batal', $lama->order_id))->assertSessionHasNoErrors();
+        $this->assertSame('batal', $lama->fresh()->status);
+    }
+
+    public function test_transfer_dimatikan_formulir_bukti_hilang_dan_kiriman_ditolak(): void
+    {
+        $this->santri('Ahmad', 'aktif');
+        BankAccount::whereKey(self::REK)->update(['tampil_di_portal' => true, 'no_rekening' => '123']);
+        $this->saklar(true, false);
+
+        $this->sebagaiIbu()->get(route('portal.dompet.isi'))->assertOk()
+            ->assertSee('Bayar online lewat Virtual Account.')->assertDontSee('Kirim bukti transfer');
+        $this->sebagaiIbu()->post(route('portal.dompet.isi'), ['kode_rekening' => self::REK, 'nominal' => 100000,
+            'tanggal' => now()->toDateString(), 'bukti' => \Illuminate\Http\UploadedFile::fake()->image('bukti.jpg')])
+            ->assertSessionHas('error', 'Metode pembayaran ini sedang tidak tersedia. Silakan pilih cara bayar lain.');
+        $this->assertSame(0, MutasiDompet::count());
+    }
+
+    public function test_layar_admin_menyimpan_saklar_dengan_jejak_dan_menolak_semua_mati(): void
+    {
+        $admin = User::where('username', 'zzmt_keu')->sole();
+
+        $this->actingAs($admin)->get(route('metode_pembayaran.edit'))->assertOk()->assertSee('Selalu nyala');
+        $this->actingAs($admin)->put(route('metode_pembayaran.update'), ['aktif' => ['midtrans' => '0', 'transfer' => '0']])
+            ->assertSessionHas('error');
+        $this->assertTrue(\App\Support\MetodeBayar::aktif('transfer'), 'ditolak: tak boleh semua mati');
+
+        $this->actingAs($admin)->put(route('metode_pembayaran.update'), ['aktif' => ['midtrans' => '1', 'transfer' => '0'], 'pengumuman' => 'Uji'])
+            ->assertRedirect(route('metode_pembayaran.edit'));
+        $this->assertFalse(\App\Support\MetodeBayar::aktif('transfer'));
+        $this->assertSame('Uji', \App\Support\MetodeBayar::pengumuman());
+        $this->assertSame(1, \App\Models\ActivityLog::where('aksi', 'ubah_metode_pembayaran')->count());
+
+        // VA Midtrans yang belum terpasang tak dihitung "bisa dipakai": transfer jadi satu-satunya → tak boleh dimatikan.
+        config(['services.midtrans.server_key' => null]);
+        $this->actingAs($admin)->put(route('metode_pembayaran.update'), ['aktif' => ['midtrans' => '1', 'transfer' => '0']])
+            ->assertSessionHas('error');
+    }
+
+    public function test_tanpa_hak_metode_pembayaran_tak_bisa_membuka_layar(): void
+    {
+        $staf = User::create(['username' => 'zzmt_staf', 'nama' => 'Staf', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif']);
+        $this->actingAs($staf)->get(route('metode_pembayaran.edit'))->assertForbidden();
+
+        \App\Models\HakAksesModul::create(['id_pengguna' => $staf->id_pengguna, 'kode_modul' => 'metode-pembayaran',
+            'lihat' => true, 'buat' => false, 'ubah' => false, 'hapus' => false, 'menu' => true]);
+        $this->actingAs($staf)->get(route('metode_pembayaran.edit'))->assertOk()->assertDontSee('>Simpan<', false);
+        $this->actingAs($staf)->put(route('metode_pembayaran.update'), ['aktif' => ['midtrans' => '1', 'transfer' => '1']])->assertForbidden();
+    }
+
     // ---- Tagihan calon ----
 
     public function test_calon_bayar_registrasi_online_lunas_dan_maju_tahap(): void

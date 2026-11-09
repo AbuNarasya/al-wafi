@@ -234,8 +234,8 @@ class PembayaranPortal
 
         $cara = array_values(array_filter([
             $semuaDompet ? 'dompet' : null,
-            $semuaTransfer && \App\Services\Midtrans\PembayaranMidtrans::siap() ? 'online' : null,
-            $semuaTransfer ? 'transfer' : null,
+            $semuaTransfer && \App\Services\Midtrans\PembayaranMidtrans::tersedia() ? 'online' : null,
+            $semuaTransfer && \App\Support\MetodeBayar::aktif('transfer') ? 'transfer' : null,
         ]));
         if ($cara === []) {
             throw new AppException(422, __('Tagihan santri aktif dan tagihan pendaftaran calon tidak bisa dibayar bersamaan kecuali dari Dompet Wali. Bayar terpisah, atau isi Dompet Wali dulu.'));
@@ -315,6 +315,7 @@ class PembayaranPortal
      */
     public function bayarKelompokTransfer(array $isian, array $data): \Illuminate\Support\Collection
     {
+        \App\Support\MetodeBayar::pastikan('transfer');
         $k = $this->keranjang($isian);
         if (! in_array('transfer', $k['cara'], true)) {
             throw new AppException(422, __('Tagihan-tagihan ini tidak bisa dibayar lewat transfer.'));
@@ -403,6 +404,7 @@ class PembayaranPortal
 
     public function isiDompet(array $data): MutasiDompet
     {
+        \App\Support\MetodeBayar::pastikan('transfer');
         $this->pastikanRekeningPortal($data['kode_rekening']);
         $nama = $this->wali->{'nama_'.$this->pencatat['peran']} ?: $this->wali->nama;
 
@@ -417,6 +419,7 @@ class PembayaranPortal
 
     public function bayarTransfer(int $idTagihan, array $data): PembayaranSantri
     {
+        \App\Support\MetodeBayar::pastikan('transfer');
         $t = $this->tagihan($idTagihan);
         [$alur, $alasan] = self::alur($t);
         if (! self::bisaTransfer($alur)) {

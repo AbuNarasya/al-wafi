@@ -1262,5 +1262,12 @@
     ":nama belum dapat kembali ke pondok sebelum tunggakan diselesaikan (:tunggakan). Mohon diselesaikan sebelum jadwal kembali.": ":nama cannot return to the boarding school until the arrears are settled (:tunggakan). Please settle them before the return time.",
     ":jumlah tagihan lewat jatuh tempo (Rp :sisa)": ":jumlah overdue bill(s) (Rp :sisa)",
     "Penjengukan": "Visit",
-    "Kepulangan": "Home leave"
+    "Kepulangan": "Home leave",
+    "Metode pembayaran ini sedang tidak tersedia. Silakan pilih cara bayar lain.": "This payment method is currently unavailable. Please choose another payment method.",
+    "Pengumuman pembayaran": "Payment announcement",
+    "Cara pembayaran sedang tidak tersedia. Silakan coba lagi nanti atau hubungi bagian keuangan.": "Payment methods are currently unavailable. Please try again later or contact the finance office.",
+    "Bayar online lewat Virtual Account.": "Pay online via Virtual Account.",
+    "Bayar (dompet / VA)": "Pay (wallet / VA)",
+    "Bayar (VA / transfer)": "Pay (VA / transfer)",
+    "Bayar lewat VA": "Pay via VA"
 }

@@ -30,6 +30,8 @@ final class ModulRegistry
         // Sub-nya mengikuti sidebar (lihat Navigation::SUB_ORDER): Setting Umum =
         // lembaga & orangnya, Setting Biaya = besaran yang ditagihkan.
         ['kode' => 'company-settings', 'nama' => 'Pengaturan Perusahaan', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
+        // Saklar cara bayar portal wali (VA, transfer + bukti) — 9 Nov 2026.
+        ['kode' => 'metode-pembayaran', 'nama' => 'Metode Pembayaran Portal', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
         ['kode' => 'bagian', 'nama' => 'Bagian / Struktur Organisasi', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
         ['kode' => 'users', 'nama' => 'Pengguna', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
         ['kode' => 'levels', 'nama' => 'Level Otorisasi Keuangan', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],

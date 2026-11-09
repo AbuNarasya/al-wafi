@@ -62,6 +62,12 @@ class PembayaranMidtrans
         return $rek && $rek->status === 'aktif' && CoaDetail::whereKey(config('services.midtrans.akun_biaya'))->exists();
     }
 
+    /** Siap DAN dinyalakan admin (MetodeBayar) — yang menentukan tombol VA tampil untuk wali. */
+    public static function tersedia(): bool
+    {
+        return self::siap() && \App\Support\MetodeBayar::aktif('midtrans');
+    }
+
     // ---- 1. Pesanan ----
 
     /** @param  array{id:int,peran:string}  $pencatat */
@@ -494,6 +500,8 @@ class PembayaranMidtrans
         if (! self::siap()) {
             throw new AppException(422, __('Pembayaran online belum tersedia. Silakan pakai transfer bank.'));
         }
+        // Saklar admin (MetodeBayar) — hanya menahan pesanan BARU; VA yang sudah terbit tetap bisa dibayar/dibatalkan.
+        \App\Support\MetodeBayar::pastikan('midtrans');
     }
 
     private function rupiahBulat(string $nominal): string

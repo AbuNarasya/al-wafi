@@ -1262,5 +1262,12 @@
     ":nama belum dapat kembali ke pondok sebelum tunggakan diselesaikan (:tunggakan). Mohon diselesaikan sebelum jadwal kembali.": "لا يمكن لـ :nama العودة إلى المعهد قبل تسوية المتأخرات (:tunggakan). يرجى تسويتها قبل موعد العودة.",
     ":jumlah tagihan lewat jatuh tempo (Rp :sisa)": ":jumlah فاتورة متأخرة (Rp :sisa)",
     "Penjengukan": "الزيارة",
-    "Kepulangan": "العودة إلى المنزل"
+    "Kepulangan": "العودة إلى المنزل",
+    "Metode pembayaran ini sedang tidak tersedia. Silakan pilih cara bayar lain.": "طريقة الدفع هذه غير متاحة حاليًا. يرجى اختيار طريقة دفع أخرى.",
+    "Pengumuman pembayaran": "إعلان بخصوص الدفع",
+    "Cara pembayaran sedang tidak tersedia. Silakan coba lagi nanti atau hubungi bagian keuangan.": "طرق الدفع غير متاحة حاليًا. يرجى المحاولة لاحقًا أو التواصل مع قسم المالية.",
+    "Bayar online lewat Virtual Account.": "ادفع عبر الإنترنت من خلال الحساب الافتراضي.",
+    "Bayar (dompet / VA)": "ادفع (المحفظة / الحساب الافتراضي)",
+    "Bayar (VA / transfer)": "ادفع (الحساب الافتراضي / التحويل)",
+    "Bayar lewat VA": "ادفع عبر الحساب الافتراضي"
 }

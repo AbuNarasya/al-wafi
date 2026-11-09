@@ -31,6 +31,7 @@ final class Navigation
         // menyetel BIAYA (Setting Biaya). Urutan di dalam Setting Biaya = urutan
         // pengisiannya: jenjang → tipe → jenis → tarif.
         ['url' => '/company-settings', 'label' => 'Pengaturan Perusahaan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'company-settings'],
+        ['url' => '/pengaturan/metode-pembayaran', 'label' => 'Metode Pembayaran Portal', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'metode-pembayaran'],
         ['url' => '/bagian', 'label' => 'Bagian / Struktur Organisasi', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'bagian'],
         ['url' => '/users', 'label' => 'Pengguna', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'users'],
         ['url' => '/levels', 'label' => 'Level Otorisasi Keuangan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'levels'],

@@ -9,6 +9,7 @@ use App\Models\TransaksiMidtrans;
 use App\Services\Midtrans\PembayaranMidtrans;
 use App\Services\PortalWali\PembayaranPortal;
 use App\Services\PortalWali\SesiWali;
+use App\Support\MetodeBayar;
 use App\Support\Unggahan;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -61,9 +62,11 @@ class PortalBayarController extends Controller
             'tagihan' => $t, 'alur' => $alur, 'ruang' => PembayaranPortal::ruang($t),
             'penuh' => in_array($t->perilaku, PembayaranPortal::PENUH, true), // berlaku di dompet, VA & transfer
             'saldo' => DompetWali::where('id_wali', SesiWali::wali()->id)->value('saldo') ?? '0',
-            'rekening' => PembayaranPortal::bisaTransfer($alur) ? $this->rekening() : [],
+            // Transfer + bukti & VA masing-masing bisa dimatikan admin (MetodeBayar) — Dompet Wali selalu ada.
+            'transfer' => PembayaranPortal::bisaTransfer($alur) && MetodeBayar::aktif('transfer'),
+            'rekening' => PembayaranPortal::bisaTransfer($alur) && MetodeBayar::aktif('transfer') ? $this->rekening() : [],
             // Bayar online ikut alur transfer (calon santri) — tagihan santri aktif tetap dari dompet.
-            'online' => PembayaranPortal::bisaTransfer($alur) && PembayaranMidtrans::siap(),
+            'online' => PembayaranPortal::bisaTransfer($alur) && PembayaranMidtrans::tersedia(),
             'biaya' => PembayaranMidtrans::biaya(),
             // VA yang belum dibayar — satuan MAUPUN gabungan — dan bukti transfer yang menunggu diperiksa:
             // keduanya mengurangi ruang, jadi keduanya disebut terpisah di layar.
@@ -112,8 +115,9 @@ class PortalBayarController extends Controller
         }
 
         return view('portal.isi-dompet', [
-            'rekening' => $this->rekening(),
-            'online' => PembayaranMidtrans::siap(), 'biaya' => PembayaranMidtrans::biaya(),
+            'transfer' => MetodeBayar::aktif('transfer'),
+            'rekening' => MetodeBayar::aktif('transfer') ? $this->rekening() : [],
+            'online' => PembayaranMidtrans::tersedia(), 'biaya' => PembayaranMidtrans::biaya(),
             'pesanan' => TransaksiMidtrans::where('id_wali', SesiWali::wali()->id)->where('jenis', 'isi_dompet')
                 ->where('status', 'menunggu')->latest('id')->get(),
         ]);

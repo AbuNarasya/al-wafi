@@ -28,7 +28,8 @@
 
     @php
         $bisaDompet = \App\Services\PortalWali\PembayaranPortal::bisaDompet($alur);
-        $bisaTransfer = \App\Services\PortalWali\PembayaranPortal::bisaTransfer($alur);
+        // Transfer + bukti bisa dimatikan admin (MetodeBayar) — controller sudah memperhitungkannya.
+        $bisaTransfer = $transfer;
         // Kembali dari galat isian transfer → tetap di pilihan transfer.
         $caraAwal = match (true) {
             $bisaTransfer && old('kode_rekening') !== null => 'transfer',
@@ -44,6 +45,7 @@
     @endphp
 
     @include('portal._va-menunggu', ['daftar' => $va, 'idTagihan' => $tagihan->id])
+    @include('portal._pengumuman-bayar', ['kosong' => $pilihan === []])
 
     @if ((float) $ruang <= 0)
         {{-- Seluruh sisa sudah tertutup VA / bukti transfer yang menunggu: formulir nominal 0 hanya membingungkan. --}}

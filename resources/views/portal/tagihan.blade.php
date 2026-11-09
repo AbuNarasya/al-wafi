@@ -5,6 +5,23 @@
 
 @php
     $rp = fn ($n) => 'Rp '.number_format((float) $n, 0, ',', '.');
+    // Label tombol bayar mengikuti metode yang sedang nyala (MetodeBayar) — Dompet Wali selalu ada.
+    $vaNyala = \App\Services\Midtrans\PembayaranMidtrans::tersedia();
+    $trfNyala = \App\Support\MetodeBayar::aktif('transfer');
+    $labelBayar = [
+        'dompet' => __('Bayar dari Dompet'),
+        'keduanya' => match (true) {
+            $vaNyala && $trfNyala => __('Bayar (dompet / VA / transfer)'),
+            $vaNyala => __('Bayar (dompet / VA)'),
+            $trfNyala => __('Bayar (dompet / transfer)'),
+            default => __('Bayar dari Dompet'),
+        },
+        'transfer' => match (true) {
+            $vaNyala && $trfNyala => __('Bayar (VA / transfer)'),
+            $vaNyala => __('Bayar lewat VA'),
+            default => __('Bayar lewat transfer'),
+        },
+    ];
     $periode = function (?string $p) {
         if (! $p || ! preg_match('/^\d{4}-\d{2}$/', $p)) {
             return null;
@@ -107,7 +124,7 @@
                         </div>
                         @if ($t['bisa_bayar'])
                             <a href="{{ route('portal.bayar', $t['id']) }}" class="mt-3 block rounded-2xl bg-brand py-2.5 text-center text-sm font-semibold text-white">
-                                {{ match ($t['alur']) { 'dompet' => __('Bayar dari Dompet'), 'keduanya' => \App\Services\Midtrans\PembayaranMidtrans::siap() ? __('Bayar (dompet / VA / transfer)') : __('Bayar (dompet / transfer)'), default => __('Bayar lewat transfer') } }}
+                                {{ $labelBayar[$t['alur']] ?? $labelBayar['transfer'] }}
                             </a>
                         @endif
                     </div>
