@@ -40,7 +40,7 @@
          Manifest sendiri → terpasang sebagai aplikasi "SANAD Wali". --}}
     {{-- Portal Wali = aplikasi "SANAD Wali" (10 Nov 2026): ikon & nama sendiri, terpisah dari ERP staf. --}}
     <x-kepala-pwa manifest="/manifest-wali.json" judul="SANAD Wali" ikon-apple="/ikon/wali-apple-touch-icon.png?v=1" />
-    <link rel="icon" type="image/png" href="/ikon/wali-any-192.png?v=1">
+    <link rel="icon" type="image/png" href="/ikon/wali-any-192.png?v=2">
 
     {{-- Mode gelap per perangkat (pilihan di Akun; kosong = ikut setelan HP). Dipasang
          SEBELUM halaman tampil supaya tidak berkedip putih lalu gelap. --}}
@@ -134,6 +134,30 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-full bg-slate-100 text-slate-800 antialiased">
+    {{-- LAYAR PEMBUKA SANAD Wali (10 Nov 2026). Layar pembuka bawaan Android hanya memuat warna, ikon & nama —
+         keterangan kepanjangan SANAD ditampilkan di sini, tepat sesudahnya, dengan latar biru yang sama.
+         Hanya saat dibuka sebagai APLIKASI dari layar utama HP (standalone), sekali per pembukaan; di peramban biasa
+         langsung dibuang oleh skrip di bawahnya SEBELUM tergambar. iPhone (tanpa layar pembuka bawaan) ikut terbantu. --}}
+    <div id="pembuka-sanad" aria-hidden="true"
+         style="position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#164a9e;color:#fff;text-align:center;padding:24px;transition:opacity .4s ease">
+        <img src="/ikon/wali-any-512.png?v=2" alt="" style="width:112px;height:112px">
+        <div style="font-size:24px;font-weight:700;margin-top:6px">SANAD Wali</div>
+        <div style="font-size:13px;opacity:.85;max-width:280px;line-height:1.4;text-wrap:balance">Sistem Administrasi, Neraca, dan Akademik Digital</div>
+        <div style="position:absolute;bottom:calc(28px + env(safe-area-inset-bottom));font-size:12px;opacity:.7">AL Wafi Islamic Boarding School</div>
+    </div>
+    <script>
+        (function () {
+            var el = document.getElementById('pembuka-sanad');
+            var aplikasi = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+            var sudah = false;
+            try { sudah = sessionStorage.getItem('pembuka-sanad') === '1'; sessionStorage.setItem('pembuka-sanad', '1'); } catch (e) {}
+            if (! aplikasi || sudah) { el.remove(); return; }
+            var mulai = Date.now();
+            var tutup = function () { if (! el.isConnected) return; el.style.opacity = '0'; setTimeout(function () { el.remove(); }, 450); };
+            window.addEventListener('load', function () { setTimeout(tutup, Math.max(0, 1200 - (Date.now() - mulai))); });
+            setTimeout(tutup, 4000);   // pengaman: halaman yang lambat dimuat tak tertahan di layar pembuka
+        })();
+    </script>
     <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur" style="padding-top: env(safe-area-inset-top)">
         <div class="mx-auto flex h-14 max-w-lg items-center gap-2 px-3">
             @if ($masuk && ! $diBeranda)

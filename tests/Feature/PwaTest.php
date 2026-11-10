@@ -130,7 +130,7 @@ class PwaTest extends TestCase
         $this->assertSame(['/wali/', '/wali/', '/wali/', 'standalone', 'SANAD Wali'],
             [$m['id'], $m['start_url'], $m['scope'], $m['display'], $m['name']]);
         $this->assertSame(
-            ['/ikon/wali-any-192.png?v=1 any', '/ikon/wali-any-512.png?v=1 any', '/ikon/wali-192.png?v=1 maskable', '/ikon/wali-512.png?v=1 maskable'],
+            ['/ikon/wali-any-192.png?v=2 any', '/ikon/wali-any-512.png?v=2 any', '/ikon/wali-192.png?v=1 maskable', '/ikon/wali-512.png?v=1 maskable'],
             array_map(fn ($i) => $i['src'].' '.$i['purpose'], $m['icons']));
         foreach ($m['icons'] as $i) {
             $this->assertFileExists(public_path(strtok(ltrim($i['src'], '/'), '?')));
