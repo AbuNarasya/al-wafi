@@ -15,8 +15,8 @@
 
     {{-- Paket 1 (3 Nov 2026): kantong dibuka di meja pemeriksaan — timbang ulang + jenis & jumlah pakaian. --}}
     <form method="GET" action="{{ route('laundry.pemeriksaan') }}" class="mt-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <label class="block text-sm font-semibold text-gray-900" for="nomor">Pindai label kantong — atau cari nama santri</label>
-        <p class="text-xs text-gray-500">Arahkan pemindai ke QR label, ketik nomor kantong, atau — bila tak ada pemindai / label tak tercetak — ketik <b>nama atau NIS santri</b>, lalu Enter.</p>
+        <label class="block text-sm font-semibold text-gray-900" for="nomor">Ketik nomor kantong — atau cari nama santri</label>
+        <p class="text-xs text-gray-500">Ketik <b>nomor kantong</b> yang tertulis di label, atau <b>nama / NIS santri</b>, lalu Enter.</p>
         <div class="mt-2 flex flex-wrap gap-2">
             <input id="nomor" name="nomor" value="{{ $cari ?? '' }}" autofocus autocomplete="off" placeholder="LDI-2611-0001 / nama / NIS"
                    class="w-80 rounded-lg border-gray-300 text-lg">

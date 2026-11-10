@@ -78,7 +78,8 @@ class LaundryTest extends TestCase
             ->assertSee('Cetak label')->assertDontSee('<iframe', false);
         $l = Laundry::sole();
         $this->assertSame(['diterima', 'kartu', 0, '3.40'], [$l->status, $l->cara_terima, $l->jumlahPotong(), (string) $l->berat_terima]);
-        $this->actingAs($this->petugas)->get(route('laundry.label', $l->id))->assertOk()->assertSee($l->nomor)->assertSee('data-qr="'.$l->nomor.'"', false)
+        // Label tanpa QR (10 Nov 2026): nomor kantong, data santri, rincian cucian.
+        $this->actingAs($this->petugas)->get(route('laundry.label', $l->id))->assertOk()->assertSee($l->nomor)->assertDontSee('data-qr', false)
             ->assertSee('Daftar cucian diisi di meja Pemeriksaan');   // sebelum diperiksa: belum ada daftar
 
         // Tak bisa dimajukan dari papan sebelum diperiksa.

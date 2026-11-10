@@ -42,14 +42,15 @@
                                 else { this.galat = true; this.pesan = n + ' BUKAN kantong santri ini — jangan diserahkan.' } } }">
                 @csrf
                 @if ($cara === 'kartu')<input type="hidden" name="kartu" value="{{ $uid }}">@else<input type="hidden" name="santri" value="{{ $santri->id }}">@endif
-                {{-- Paket 1 (3 Nov 2026): pindai QR label kantong untuk memastikan kantong yang diserahkan benar milik santri ini. --}}
+                {{-- Paket 1 (3 Nov 2026): cocokkan label kantong dengan santri ini. Label tanpa QR sejak 10 Nov 2026 —
+                     ketik nomor kantong (pemindai tetap bisa dipakai bila kelak label ber-barcode lagi) atau ketuk Cocok. --}}
                 <div class="rounded-xl border border-gray-200 bg-white p-4 text-sm shadow-sm">
-                    <label class="block font-semibold text-gray-900" for="pindai">Pindai label kantong <span class="text-xs font-normal text-gray-500">(tidak wajib)</span></label>
-                    <p class="text-xs text-gray-500">Tanpa pemindai / label tak tercetak: cocokkan nomor &amp; nama di kantong dengan daftar di bawah, lalu ketuk <b>Cocok</b>. Kantong tetap bisa diserahkan tanpa dipindai.</p>
-                    <input id="pindai" autofocus autocomplete="off" placeholder="pindai QR / ketik nomor lalu Enter" @keydown.enter.prevent="pindai($event)"
+                    <label class="block font-semibold text-gray-900" for="pindai">Cocokkan label kantong <span class="text-xs font-normal text-gray-500">(tidak wajib)</span></label>
+                    <p class="text-xs text-gray-500">Ketik nomor kantong di label lalu Enter, atau cocokkan nomor &amp; nama di kantong dengan daftar di bawah, lalu ketuk <b>Cocok</b>. Kantong tetap bisa diserahkan tanpa dicocokkan.</p>
+                    <input id="pindai" autofocus autocomplete="off" placeholder="ketik nomor kantong lalu Enter" @keydown.enter.prevent="pindai($event)"
                            class="mt-1 w-72 rounded-lg border-gray-300 font-mono uppercase">
                     <p x-show="pesan" x-cloak x-text="pesan" class="mt-1 text-sm font-semibold" :class="galat ? 'text-red-700' : 'text-emerald-700'"></p>
-                    <p class="mt-1 text-xs text-gray-500"><span x-text="cocok.length"></span> dari {{ $siap->count() }} kantong sudah dipindai.</p>
+                    <p class="mt-1 text-xs text-gray-500"><span x-text="cocok.length"></span> dari {{ $siap->count() }} kantong sudah dicocokkan.</p>
                 </div>
                 @foreach ($siap as $l)
                     <div class="rounded-xl border bg-white p-4 text-sm shadow-sm" :class="cocok.includes(@js($l->nomor)) ? 'border-emerald-400 ring-1 ring-emerald-300' : 'border-gray-200'">
