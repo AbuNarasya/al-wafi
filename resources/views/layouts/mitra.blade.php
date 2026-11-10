@@ -15,7 +15,7 @@
   tiga layar (kasir, riwayat, laporan). Navigasi di bawah supaya terjangkau ibu jari.
 --}}
 <body class="h-full bg-slate-100 text-gray-800 antialiased">
-<div class="mx-auto flex min-h-full max-w-xl flex-col pb-20">
+<div id="bingkai-mitra" class="mx-auto flex min-h-full max-w-xl flex-col pb-[calc(3.25rem+env(safe-area-inset-bottom))]">
     <header class="flex items-center justify-between gap-2 bg-brand-dark px-4 py-3 text-white">
         <div class="min-w-0 leading-tight">
             <div class="truncate font-semibold">{{ $mitra->nama }}</div>

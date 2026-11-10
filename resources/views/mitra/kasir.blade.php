@@ -5,20 +5,24 @@
 @section('content')
 {{--
   Kasir mitra (disusun ulang 10 Nov 2026 untuk menu yang banyak):
-   • Kotak cari menempel di atas; menu berupa BARIS ringkas (±15 per layar HP), terlaris 30 hari di atas.
-   • Keranjang ringkas menempel di bawah (jumlah item, total, Bayar); bayar di lembar layar penuh tersendiri.
+   • Halaman PAS SATU LAYAR — tak ada gulir halaman. Tingginya diukur di peramban (ukur()) karena tinggi kepala
+     & navigasi bawah berbeda-beda per HP.
+   • Kotak cari di atas; daftar menu (baris ringkas, terlaris 30 hari di atas) menggulir di BINGKAINYA SENDIRI.
+   • Rekap pesanan selalu terlihat di bawah; daftar itemnya juga menggulir sendiri bila panjang, sedangkan
+     total + tombol Hapus/Bayar selalu tampil. Bayar di lembar layar penuh tersendiri.
   Alur bayar: tempel kartu (pembaca RFID USB mengetik UID + Enter ke isian yang fokus) → PIN bila diminta → selesai.
   Kunci klien dibuat per pembayaran: kiriman ulang karena sinyal putus tak memotong dua kali.
   Status "belum pasti" = JANGAN terima tunai, tekan Cek lagi.
 --}}
-<div x-data="kasirMitra(@js($menu), @js(['cek' => route('mitra.cek'), 'bayar' => route('mitra.bayar'), 'cekLagi' => url('mitra/bayar')]))" x-cloak>
+<div x-data="kasirMitra(@js($menu), @js(['cek' => route('mitra.cek'), 'bayar' => route('mitra.bayar'), 'cekLagi' => url('mitra/bayar')]))" x-cloak
+     x-init="$nextTick(() => setTimeout(() => ukur(), 0))" @resize.window.debounce.100ms="ukur()" class="flex flex-col" :style="tinggi ? 'height:' + tinggi + 'px' : ''">
     @if ($menu->isEmpty())
         <div class="rounded-xl bg-white p-6 text-center text-sm text-gray-500 shadow-sm">
             Belum ada menu. Setorkan daftar menu &amp; harga ke kepala Wafi Mart untuk dimasukkan ke sistem.
         </div>
     @else
         {{-- Cari --}}
-        <div class="sticky top-0 z-10 -mx-3 -mt-3 bg-slate-100 px-3 pb-2 pt-3">
+        <div class="shrink-0 pb-2">
             <div class="relative">
                 <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-3.5-3.5"/></svg>
                 <input type="search" x-model="cari" placeholder="Cari menu…" autocomplete="off" enterkeyhint="search"
@@ -28,8 +32,8 @@
             <div class="mt-1 px-1 text-[11px] text-gray-500" x-text="cari ? tersaring().length + ' dari ' + menu.length + ' menu' : menu.length + ' menu · terlaris di atas'"></div>
         </div>
 
-        {{-- Daftar menu: baris ringkas. Ketuk baris = tambah satu. --}}
-        <div class="divide-y divide-gray-100 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
+        {{-- Daftar menu: baris ringkas, menggulir di bingkainya sendiri. Ketuk baris = tambah satu. --}}
+        <div class="min-h-0 flex-1 divide-y divide-gray-100 overflow-y-auto overscroll-contain rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
             <template x-for="m in tersaring()" :key="m.id">
                 {{-- Tanpa padding vertikal di baris: tombol sudah ber-tinggi minimal 44px (sasaran sentuh, app.css). --}}
                 <div class="flex items-center gap-2 px-3" :class="jumlah(m.id) > 0 ? 'bg-brand/5' : ''">
@@ -54,38 +58,34 @@
             </div>
         </div>
 
-        {{-- Rekap pesanan di bawah daftar menu (permintaan user 10 Nov 2026) — bisa diubah jumlahnya di sini juga. --}}
-        <div x-show="keranjang.length" class="mt-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-200" :class="keranjang.length ? 'mb-24' : ''">
-            <div class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Pesanan</div>
-            <template x-for="b in keranjang" :key="b.id">
-                <div class="flex items-center justify-between gap-2 py-1 text-sm">
-                    <div class="min-w-0 flex-1 truncate" x-text="b.nama"></div>
-                    <div class="flex items-center gap-1.5">
-                        <button type="button" @click="kurang(b.id)" class="h-8 w-8 rounded-full bg-gray-100 font-bold" aria-label="Kurangi">−</button>
-                        <span class="w-5 text-center tabular-nums" x-text="b.jumlah"></span>
-                        <button type="button" @click="tambah(b)" class="h-8 w-8 rounded-full bg-gray-100 font-bold" aria-label="Tambah">+</button>
+        {{-- Rekap pesanan: selalu terlihat di bawah daftar menu (permintaan user 10 Nov 2026). Daftar itemnya
+             menggulir sendiri bila panjang; total & tombol selalu tampil. --}}
+        <div x-show="keranjang.length" class="mt-2 shrink-0 rounded-xl bg-white p-3 shadow-sm ring-1 ring-brand/30">
+            <div class="mb-1 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <span>Pesanan</span><span class="normal-case" x-text="totalItem() + ' item'"></span>
+            </div>
+            <div class="max-h-[22vh] overflow-y-auto overscroll-contain">
+                <template x-for="b in keranjang" :key="b.id">
+                    <div class="flex items-center justify-between gap-2 text-sm">
+                        <div class="min-w-0 flex-1 truncate" x-text="b.nama"></div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" @click="kurang(b.id)" class="h-8 w-8 rounded-full bg-gray-100 font-bold" aria-label="Kurangi">−</button>
+                            <span class="w-5 text-center tabular-nums" x-text="b.jumlah"></span>
+                            <button type="button" @click="tambah(b)" class="h-8 w-8 rounded-full bg-gray-100 font-bold" aria-label="Tambah">+</button>
+                        </div>
+                        <div class="w-20 text-right tabular-nums" x-text="rp(b.harga * b.jumlah)"></div>
                     </div>
-                    <div class="w-20 text-right tabular-nums" x-text="rp(b.harga * b.jumlah)"></div>
-                </div>
-            </template>
-            <div class="mt-2 flex items-center justify-between border-t border-gray-100 pt-2 font-semibold">
+                </template>
+            </div>
+            <div class="mt-1 flex items-center justify-between border-t border-gray-100 pt-2 font-semibold">
                 <span>Total</span><span class="text-lg tabular-nums" x-text="rp(total())"></span>
+            </div>
+            <div class="mt-2 grid grid-cols-3 gap-2">
+                <button type="button" @click="kosongkan()" class="rounded-lg bg-gray-100 py-2.5 text-sm font-semibold text-gray-700">Hapus</button>
+                <button type="button" @click="mulaiKartu()" class="col-span-2 rounded-lg bg-brand py-2.5 text-sm font-bold text-white">Bayar kartu</button>
             </div>
         </div>
     @endif
-
-    {{-- Keranjang ringkas, menempel di atas navigasi bawah --}}
-    <div x-show="keranjang.length && tahap === 'pilih'" x-transition.opacity
-         class="fixed inset-x-0 bottom-[calc(2.75rem+env(safe-area-inset-bottom))] z-20 px-3 pb-2">
-        <div class="mx-auto flex max-w-xl items-center gap-2 rounded-2xl bg-brand-dark p-2 pl-4 text-white shadow-lg">
-            <button type="button" @click="kosongkan()" class="text-xs text-white/70 underline">Hapus</button>
-            <div class="min-w-0 flex-1 text-right leading-tight">
-                <div class="text-[11px] text-white/70" x-text="totalItem() + ' item'"></div>
-                <div class="text-lg font-bold tabular-nums" x-text="rp(total())"></div>
-            </div>
-            <button type="button" @click="mulaiKartu()" class="rounded-xl bg-white px-4 py-3 text-sm font-bold text-brand-dark">Bayar kartu</button>
-        </div>
-    </div>
 
     {{-- Lembar bayar: layar penuh, fokus pada satu pembayaran --}}
     <div x-show="tahap !== 'pilih'" class="fixed inset-0 z-30 overflow-y-auto bg-slate-100">
@@ -165,6 +165,14 @@
         const bersih = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ');
 
         return {
+            tinggi: null,
+            // Tinggi halaman kasir = sisa layar di bawah kepala, di atas navigasi bawah (ruang pb di bingkai layout).
+            ukur() {
+                const bingkai = document.getElementById('bingkai-mitra');
+                const bawah = (bingkai ? parseFloat(getComputedStyle(bingkai).paddingBottom) : 80) + 12;   // + p-3 milik <main>
+                const atas = this.$el.getBoundingClientRect().top + window.scrollY;
+                this.tinggi = Math.max(360, Math.floor(window.innerHeight - atas - bawah));
+            },
             menu, cari: '', keranjang: [], tahap: 'pilih', uid: '', pin: '', kartu: null, perluPin: false, galat: '', sibuk: false, hasil: null, kunci: kunciBaru(),
             rp(v) { return 'Rp ' + Number(v || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 }); },
             tersaring() {
