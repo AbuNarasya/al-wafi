@@ -30,11 +30,10 @@
      }"
      x-show="tampil" x-cloak class="mb-5 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
     <div class="flex items-center gap-3">
-        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand text-white">
-            <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>
-        </span>
+        {{-- Ikon yang sama dengan yang akan muncul di layar utama HP (SANAD Wali, 10 Nov 2026). --}}
+        <x-portal.logo class="h-12 w-12 shrink-0 rounded-2xl ring-1 ring-slate-200" />
         <div class="min-w-0 flex-1">
-            <p class="font-semibold text-slate-900">{{ __('Pasang Al Wafi Wali di HP') }}</p>
+            <p class="font-semibold text-slate-900">{{ __('Pasang SANAD Wali di HP') }}</p>
             <p class="text-sm text-slate-500">{{ __('Buka seperti aplikasi, langsung dari layar utama.') }}</p>
         </div>
         <button type="button" @click="pasang()" class="shrink-0 rounded-2xl bg-brand px-4 py-2 text-sm font-bold text-white">{{ __('Pasang') }}</button>

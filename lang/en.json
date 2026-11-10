@@ -720,7 +720,6 @@
     "PNS": "Civil servant",
     "Paling banyak :jumlah tagihan sekali bayar.": "At most :jumlah bills per payment.",
     "Pasang": "Install",
-    "Pasang Al Wafi Wali di HP": "Install Al Wafi Wali on your phone",
     "Pasang PIN": "Set PIN",
     "Password": "Password",
     "Password (minimal :min karakter)": "Password (at least :min characters)",
@@ -1282,5 +1281,6 @@
     "Belanja kantin :nama": "Canteen purchases for :nama",
     "Belanja di kantin untuk :nama dinyalakan.": "Canteen purchases for :nama have been turned on.",
     "Belanja di kantin untuk :nama dimatikan — kartunya hanya bisa dipakai di Wafi Mart.": "Canteen purchases for :nama have been turned off — the card can only be used at Wafi Mart.",
-    "Pengaturan belanja kantin sedang tidak tersedia.": "Canteen purchase settings are currently unavailable."
+    "Pengaturan belanja kantin sedang tidak tersedia.": "Canteen purchase settings are currently unavailable.",
+    "Pasang SANAD Wali di HP": "Install SANAD Wali on your phone"
 }

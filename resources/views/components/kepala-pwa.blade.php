@@ -15,8 +15,8 @@
   di ponsel staf.
 --}}
 {{-- Portal Wali memakai manifest SENDIRI (/manifest-wali.json, lingkup /wali/) supaya terpasang
-     sebagai aplikasi terpisah "Al Wafi Wali" yang langsung membuka beranda wali — bukan dasbor staf. --}}
-@props(['manifest' => null, 'judul' => null])
+     sebagai aplikasi terpisah "SANAD Wali" (ikon & nama sendiri, ikonApple) yang langsung membuka beranda wali — bukan dasbor staf. --}}
+@props(['manifest' => null, 'judul' => null, 'ikonApple' => '/ikon/apple-touch-icon.png?v=6'])
 @php
     // Bawaan per instans (config/instans.php); Portal Wali tetap mengoper manifest & judulnya sendiri.
     $manifest ??= \App\Support\Instans::manifest();
@@ -27,7 +27,7 @@
 <link rel="manifest" href="{{ $manifest }}">
 {{-- `?v=` = versi ikon: server mengirim /ikon/ dengan max-age 7 hari, jadi nama yang sama
      membuat HP memakai gambar lama. Naikkan bersama manifest*.json tiap ikon diganti. --}}
-<link rel="apple-touch-icon" href="/ikon/apple-touch-icon.png?v=6">
+<link rel="apple-touch-icon" href="{{ $ikonApple }}">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="{{ $judul }}">

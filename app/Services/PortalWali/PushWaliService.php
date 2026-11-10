@@ -172,6 +172,8 @@ class PushWaliService
             'pesan' => mb_strimwidth((string) $n->pesan, 0, 180, '…'),
             'tautan' => route('portal.kabar', [], false),
             'tag' => 'wali:'.$n->jenis.':'.($n->ref_id ?? $n->id),
+            // Notifikasi wali berikon SANAD Wali, bukan ikon ERP staf (10 Nov 2026).
+            'ikon' => '/ikon/wali-any-192.png?v=1',
         ];
     }
 }

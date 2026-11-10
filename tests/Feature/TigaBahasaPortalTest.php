@@ -106,10 +106,12 @@ class TigaBahasaPortalTest extends TestCase
 
         $this->post(route('portal.bahasa'), ['bahasa' => 'ar'])->assertRedirect();
         $this->get(route('portal.masuk'))->assertSee('dir="rtl"', false)->assertSee('lang="ar"', false)
-            ->assertSee(__('Portal Wali', locale: 'ar'));
+            ->assertSee(__('Masuk dengan email dan password Anda.', locale: 'ar'));
 
+        // Nama aplikasi "SANAD Wali" = merek, tidak diterjemahkan (10 Nov 2026).
         $this->post(route('portal.bahasa'), ['bahasa' => 'en']);
-        $this->get(route('portal.masuk'))->assertSee('dir="ltr"', false)->assertSee('lang="en"', false)->assertSee('Parent Portal');
+        $this->get(route('portal.masuk'))->assertSee('dir="ltr"', false)->assertSee('lang="en"', false)
+            ->assertSee(__('Masuk dengan email dan password Anda.', locale: 'en'))->assertSee('SANAD Wali');
 
         // Locale portal tak bocor ke layar staf.
         $this->get('/login')->assertOk()->assertDontSee('Parent Portal');

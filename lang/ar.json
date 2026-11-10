@@ -720,7 +720,6 @@
     "PNS": "موظف حكومي",
     "Paling banyak :jumlah tagihan sekali bayar.": "الحد الأقصى :jumlah من الفواتير في الدفعة الواحدة.",
     "Pasang": "تثبيت",
-    "Pasang Al Wafi Wali di HP": "ثبّتوا تطبيق Al Wafi Wali على الهاتف",
     "Pasang PIN": "تعيين الرقم السري",
     "Password": "كلمة المرور",
     "Password (minimal :min karakter)": "كلمة المرور (:min أحرف على الأقل)",
@@ -1282,5 +1281,6 @@
     "Belanja kantin :nama": "الشراء من المقصف لـ :nama",
     "Belanja di kantin untuk :nama dinyalakan.": "تم تفعيل الشراء من المقصف لـ :nama.",
     "Belanja di kantin untuk :nama dimatikan — kartunya hanya bisa dipakai di Wafi Mart.": "تم إيقاف الشراء من المقصف لـ :nama — لا يمكن استخدام البطاقة إلا في وافي مارت.",
-    "Pengaturan belanja kantin sedang tidak tersedia.": "إعدادات الشراء من المقصف غير متاحة حاليًا."
+    "Pengaturan belanja kantin sedang tidak tersedia.": "إعدادات الشراء من المقصف غير متاحة حاليًا.",
+    "Pasang SANAD Wali di HP": "ثبّتوا تطبيق SANAD Wali على الهاتف"
 }

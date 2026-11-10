@@ -120,21 +120,30 @@ class PwaTest extends TestCase
     }
 
     /**
-     * Portal Wali = aplikasi TERPISAH "Al Wafi Wali" (13 Okt 2026): manifest sendiri, sementara
-     * halaman staf tetap memakai manifest staf. Alamat awalnya HALAMAN DEPAN (15 Okt 2026) —
-     * tamu melihat pilihan Masuk / Buat Akun, yang sudah masuk atau diingat langsung ke beranda.
+     * Portal Wali = aplikasi TERPISAH "SANAD Wali" (nama & ikon sendiri sejak 10 Nov 2026; dulu "Al Wafi Wali"):
+     * manifest sendiri, sementara halaman staf tetap memakai manifest & ikon staf. Alamat awalnya HALAMAN DEPAN
+     * (15 Okt 2026) — tamu melihat pilihan Masuk / Buat Akun, yang sudah masuk atau diingat langsung ke beranda.
      */
     public function test_portal_wali_punya_manifest_sendiri(): void
     {
         $m = json_decode(file_get_contents(public_path('manifest-wali.json')), true, flags: JSON_THROW_ON_ERROR);
-        $this->assertSame(['/wali/', '/wali/', '/wali/', 'standalone', 'Al Wafi Wali'],
+        $this->assertSame(['/wali/', '/wali/', '/wali/', 'standalone', 'SANAD Wali'],
             [$m['id'], $m['start_url'], $m['scope'], $m['display'], $m['name']]);
-        $this->assertSusunanIkon($m);
+        $this->assertSame(
+            ['/ikon/wali-any-192.png?v=1 any', '/ikon/wali-any-512.png?v=1 any', '/ikon/wali-192.png?v=1 maskable', '/ikon/wali-512.png?v=1 maskable'],
+            array_map(fn ($i) => $i['src'].' '.$i['purpose'], $m['icons']));
+        foreach ($m['icons'] as $i) {
+            $this->assertFileExists(public_path(strtok(ltrim($i['src'], '/'), '?')));
+        }
 
         $this->get(route('portal.masuk'))->assertOk()
             ->assertSee('<link rel="manifest" href="/manifest-wali.json">', false)
-            ->assertSee('<meta name="apple-mobile-web-app-title" content="Al Wafi Wali">', false)
+            ->assertSee('<meta name="apple-mobile-web-app-title" content="SANAD Wali">', false)
+            ->assertSee('<link rel="apple-touch-icon" href="/ikon/wali-apple-touch-icon.png?v=1">', false)
+            ->assertSee('ikon/wali-logo.png', false)
             ->assertSee('<meta name="pwa" content="aktif">', false);
+        // Staf tetap ikon ERP.
+        $this->get(route('login'))->assertOk()->assertSee('<link rel="apple-touch-icon" href="/ikon/apple-touch-icon.png?v=6">', false);
         $this->get(route('login'))->assertOk()->assertSee('<link rel="manifest" href="/manifest.json">', false);
     }
 

@@ -41,7 +41,7 @@
 // puluh orang yang notifikasinya tertinggal sampai aplikasinya ditutup total.
 // Jadi kumpulkan perubahan `sw.js` dan naikkan nomornya sekali, bukan sekali
 // per perubahan kecil.
-const VERSI = 'alwafi-v7';
+const VERSI = 'alwafi-v8';
 const LURING = '/luring.html';
 
 self.addEventListener('install', (e) => {
@@ -151,8 +151,9 @@ self.addEventListener('push', (e) => {
 
     e.waitUntil(self.registration.showNotification(d.judul, {
         body: d.pesan,
-        icon: '/ikon/ikon-192.png',
-        badge: '/ikon/ikon-192.png',
+        // Ikon dari muatan bila ada — push wali membawa ikon SANAD Wali (10 Nov 2026); staf tetap ikon ERP.
+        icon: d.ikon || '/ikon/ikon-192.png',
+        badge: d.ikon || '/ikon/ikon-192.png',
         // Notifikasi untuk dokumen yang sama saling MENGGANTI, tidak menumpuk:
         // dokumen yang statusnya berubah tiga kali tak perlu jadi tiga baris.
         tag: d.tag,

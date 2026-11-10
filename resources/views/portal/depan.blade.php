@@ -4,9 +4,10 @@
 
 @section('content')
     <div class="mb-6 mt-6 text-center">
-        <x-logo class="mx-auto mb-3 h-16 w-16 rounded-2xl text-2xl" />
-        <h1 class="text-2xl font-bold text-slate-900">{{ __('Portal Wali') }}</h1>
-        <p class="mt-1 text-sm text-slate-500">AL Wafi Islamic Boarding School</p>
+        <x-portal.logo varian="lengkap" class="mx-auto mb-3 h-28 w-28 rounded-3xl" />
+        <h1 class="text-2xl font-bold text-slate-900">SANAD Wali</h1>
+        <p class="mt-1 text-xs text-slate-500">Sistem Administrasi, Neraca, dan Akademik Digital</p>
+        <p class="mt-1 text-sm font-medium text-slate-600">AL Wafi Islamic Boarding School</p>
     </div>
 
     {{-- Dua pintu (permintaan user 15 Okt 2026): wali yang belum punya akun langsung tahu harus ke mana. --}}

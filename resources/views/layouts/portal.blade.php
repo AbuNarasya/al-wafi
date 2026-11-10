@@ -27,7 +27,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', __('Portal Wali')) · {{ __('Portal Wali') }} Al Wafi</title>
+    <title>@yield('title', __('Portal Wali')) · SANAD Wali</title>
     {{-- Huruf Arab dari perangkat sendiri (tanpa unduhan). Nominal rupiah, nomor VA & PIN tetap ditulis
          kiri-ke-kanan supaya tak terbaca terbalik saat ditransfer. --}}
     <style>
@@ -37,8 +37,10 @@
 
     {{-- WAJIB ada: tanpa meta `pwa`, app.js membacanya sebagai "mati" dan MENCABUT
          pekerja layanan di perangkat yang sama (lihat komentar di komponennya).
-         Manifest sendiri → terpasang sebagai aplikasi "Al Wafi Wali". --}}
-    <x-kepala-pwa manifest="/manifest-wali.json" judul="Al Wafi Wali" />
+         Manifest sendiri → terpasang sebagai aplikasi "SANAD Wali". --}}
+    {{-- Portal Wali = aplikasi "SANAD Wali" (10 Nov 2026): ikon & nama sendiri, terpisah dari ERP staf. --}}
+    <x-kepala-pwa manifest="/manifest-wali.json" judul="SANAD Wali" ikon-apple="/ikon/wali-apple-touch-icon.png?v=1" />
+    <link rel="icon" type="image/png" href="/ikon/wali-any-192.png?v=1">
 
     {{-- Mode gelap per perangkat (pilihan di Akun; kosong = ikut setelan HP). Dipasang
          SEBELUM halaman tampil supaya tidak berkedip putih lalu gelap. --}}
@@ -145,10 +147,10 @@
                 <p class="min-w-0 flex-1 truncate text-center font-semibold text-slate-900">@yield('title', __('Portal Wali'))</p>
             @else
                 <a href="{{ $verifikasi ? route('portal.verifikasi.ringkasan') : ($masuk ? route('portal.beranda') : route('portal.depan')) }}" class="flex min-w-0 flex-1 items-center gap-2">
-                    <x-logo class="h-9 w-9 shrink-0 rounded-xl text-sm" />
+                    <x-portal.logo class="h-9 w-9 shrink-0 rounded-xl" />
                     <span class="min-w-0 leading-tight">
-                        <span class="block truncate text-sm font-semibold text-slate-900">AL Wafi Islamic Boarding School</span>
-                        <span class="block text-xs text-slate-500">{{ __('Portal Wali') }}</span>
+                        <span class="block truncate text-sm font-semibold text-slate-900">SANAD Wali</span>
+                        <span class="block truncate text-xs text-slate-500">AL Wafi Islamic Boarding School</span>
                     </span>
                 </a>
             @endif
@@ -183,7 +185,7 @@
 
         @yield('content')
 
-        <p class="mt-8 text-center text-xs text-slate-400">{{ __('Portal Wali') }} · AL Wafi Islamic Boarding School</p>
+        <p class="mt-8 text-center text-xs text-slate-400">SANAD Wali · AL Wafi Islamic Boarding School</p>
     </main>
 
     @if ($masuk)

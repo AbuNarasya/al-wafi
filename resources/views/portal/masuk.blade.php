@@ -10,8 +10,8 @@
     <a href="{{ route('portal.depan') }}" class="mt-2 inline-block text-sm font-semibold text-brand"><span class="inline-block rtl:-scale-x-100">&larr;</span> {{ __('Kembali') }}</a>
 
     <div class="mb-6 mt-4 text-center">
-        <x-logo class="mx-auto mb-3 h-16 w-16 rounded-2xl text-2xl" />
-        <h1 class="text-2xl font-bold text-slate-900">{{ __('Portal Wali') }}</h1>
+        <x-portal.logo varian="lengkap" class="mx-auto mb-3 h-24 w-24 rounded-3xl" />
+        <h1 class="text-2xl font-bold text-slate-900">SANAD Wali</h1>
         <p class="mt-1 text-sm text-slate-500">{{ __('Masuk dengan email dan password Anda.') }}</p>
     </div>
 
