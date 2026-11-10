@@ -247,7 +247,7 @@ class LaundryController extends Controller
             ->with('cetak_label', $l->id);
     }
 
-    /** Label kantong 58 mm: nomor, nama, kelas, QR nomor. `?cetak=1` langsung membuka dialog cetak. */
+    /** Label kantong (kertas termal 80 mm): nomor, nama, kelas, daftar cucian. `?cetak=1` langsung membuka dialog cetak. */
     public function label(Laundry $laundry): View
     {
         $this->pastikanBagian($laundry, 'lihat');

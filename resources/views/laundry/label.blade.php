@@ -1,4 +1,4 @@
-{{-- Label kantong laundry 58 mm (paket 1, 3 Nov 2026) — ditempel/diikat di kantong sejak diterima sampai diserahkan.
+{{-- Label kantong laundry — kertas termal 80 mm sejak 10 Nov 2026 (dulu 58 mm; paket 1, 3 Nov 2026) — ditempel/diikat di kantong sejak diterima sampai diserahkan.
      TANPA QR sejak 10 Nov 2026 (permintaan user): cukup nomor kantong, data santri, dan rincian cucian. Pemeriksaan &
      penyerahan memakai ketik nomor/nama/NIS dan tombol Cocok manual. ?cetak=1 → dialog cetak terbuka sendiri. --}}
 @php
@@ -12,23 +12,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Label {{ $l->nomor }}</title>
     <style>
-        @page { size: 58mm auto; margin: 2mm; }
+        /* Kertas termal 80 mm (10 Nov 2026): area cetak printer 80 mm ±72 mm. */
+        @page { size: 80mm auto; margin: 2mm 4mm; }
         * { box-sizing: border-box; }
         body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #000; background: #fff; }
-        .label { width: 54mm; padding: 1mm; text-align: center; }
-        .bagian { font-size: 8pt; font-weight: 700; letter-spacing: 1px; border: 1px solid #000; display: inline-block; padding: 0 2mm; }
-        .nomor { font-size: 15pt; font-weight: 700; margin-top: 1mm; letter-spacing: .3px; }
-        .nama { font-size: 11pt; font-weight: 700; line-height: 1.15; }
-        .kecil { font-size: 8pt; margin-top: .8mm; }
-        .daftar { margin-top: 2mm; border-top: 1px dashed #000; padding-top: 1.5mm; text-align: left; }
-        .daftar .judul { font-size: 8pt; font-weight: 700; text-align: center; margin-bottom: 1mm; }
-        .daftar table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
-        .daftar td { padding: .6mm .5mm; border-bottom: 1px dotted #888; vertical-align: top; }
-        .daftar td.jml { width: 7mm; text-align: right; font-weight: 700; padding-right: 1.5mm; }
-        .daftar td.cek { width: 5mm; text-align: center; }
-        .kotak { display: inline-block; width: 3mm; height: 3mm; border: 1px solid #000; }
-        .daftar .total { font-size: 8.5pt; font-weight: 700; margin-top: 1mm; display: flex; justify-content: space-between; }
-        .daftar .kosong { font-size: 8pt; text-align: center; font-style: italic; }
+        .label { width: 72mm; padding: 1mm; text-align: center; }
+        .bagian { font-size: 10pt; font-weight: 700; letter-spacing: 1px; border: 1px solid #000; display: inline-block; padding: 0 3mm; }
+        .nomor { font-size: 20pt; font-weight: 700; margin-top: 1mm; letter-spacing: .3px; }
+        .nama { font-size: 14pt; font-weight: 700; line-height: 1.15; }
+        .kecil { font-size: 10pt; margin-top: 1mm; }
+        .daftar { margin-top: 2.5mm; border-top: 1px dashed #000; padding-top: 2mm; text-align: left; }
+        .daftar .judul { font-size: 10pt; font-weight: 700; text-align: center; margin-bottom: 1.5mm; }
+        .daftar table { width: 100%; border-collapse: collapse; font-size: 11pt; }
+        .daftar td { padding: 1mm .5mm; border-bottom: 1px dotted #888; vertical-align: top; }
+        .daftar td.jml { width: 10mm; text-align: right; font-weight: 700; padding-right: 2mm; }
+        .daftar td.cek { width: 7mm; text-align: center; }
+        .kotak { display: inline-block; width: 4mm; height: 4mm; border: 1px solid #000; }
+        .daftar .total { font-size: 11pt; font-weight: 700; margin-top: 1.5mm; display: flex; justify-content: space-between; }
+        .daftar .kosong { font-size: 10pt; text-align: center; font-style: italic; }
         .alat { margin: 12px; font-size: 14px; }
         @media print { .alat { display: none; } }
     </style>
