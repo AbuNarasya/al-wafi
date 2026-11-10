@@ -22,7 +22,8 @@ use Illuminate\Support\Facades\DB;
  *
  * Setiap pergerakan bersumber_ref nomor transfer, dan pengambilan dari TRANSIT dibatasi
  * ke lapisan milik transfer itu sendiri — barang beberapa transfer yang sedang di jalan
- * tak saling memakan harga pokok. Pindah lokasi tak berjurnal: barang & akunnya sama.
+ * tak saling memakan harga pokok. Pindah lokasi dalam SATU unit bisnis tak berjurnal (barang & akunnya sama);
+ * pindah ke lokasi unit lain dijurnal saat diterima (jurnalPindahUnit, 10 Nov 2026).
  * POS lama mencatat transfer ganda tanpa ketahuan; di sini nomor dokumen & status
  * membuat satu kiriman hanya bisa diterima sekali.
  */
@@ -123,6 +124,7 @@ class TransferPersediaanService
         return DB::transaction(function () use ($doc, $tanggal, $diterima, $catatan, $idPengguna) {
             $this->kunciStatus($doc, 'dikirim');
             $adaSelisih = false;
+            $pindahUnit = [];   // akun persediaan => nilai yang berpindah unit bisnis
             foreach ($doc->details as $d) {
                 $input = $diterima[$d->id] ?? null;
                 $qty = ($input === null || $input === '') ? Money::of($d->kuantiti, 4) : Money::of($input, 4);
@@ -133,12 +135,15 @@ class TransferPersediaanService
                 }
 
                 if (Money::gtZero($qty, 4)) {
-                    $this->pindah($d->kode_persediaan, $qty, LokasiPersediaan::TRANSIT, $doc->kode_lokasi_tujuan,
+                    $nilai = $this->pindah($d->kode_persediaan, $qty, LokasiPersediaan::TRANSIT, $doc->kode_lokasi_tujuan,
                         $tanggal, $doc->nomor, "Terima dari {$doc->asal->nama}", $idPengguna);
+                    $akun = $d->persediaan->kode_coa;
+                    $pindahUnit[$akun] = Money::add($pindahUnit[$akun] ?? '0', $nilai);
                 }
                 $d->update(['kuantiti_diterima' => $qty]);
                 $adaSelisih = $adaSelisih || Money::gtZero($d->selisih(), 4);
             }
+            $this->jurnalPindahUnit($doc, $tanggal, $pindahUnit, $idPengguna);
 
             $doc->update([
                 'status' => $adaSelisih ? 'selisih' : 'selesai',
@@ -254,6 +259,37 @@ class TransferPersediaanService
         InventoryMovement::masuk([...$umum, 'kode_lokasi' => $ke, 'nilai' => $keluar->nilai]);
 
         return Money::of($keluar->nilai);
+    }
+
+    /**
+     * TRANSFER BEDA UNIT BISNIS DIJURNAL (keputusan user 10 Nov 2026, audit): persediaan di lokasi asal tercatat di
+     * unit asal; tanpa jurnal, HPP penjualan di tujuan mengkredit persediaan unit tujuan yang tak pernah didebit →
+     * saldo persediaan per unit salah. Saat barang DITERIMA: D Persediaan (unit tujuan) / K Persediaan (unit asal),
+     * akun persediaan tiap barang, sebesar harga pokok yang tiba. Barang di TRANSIT tetap milik unit asal (selisih
+     * "hilang" pun dibebankan ke unit asal). Lokasi tanpa unit → tak dijurnal (unitnya tak diketahui).
+     *
+     * @param  array<string,string>  $perAkun
+     */
+    private function jurnalPindahUnit(TransferPersediaan $doc, string $tanggal, array $perAkun, ?int $idPengguna): void
+    {
+        $dari = $doc->asal->kode_unit;
+        $ke = $doc->tujuan->kode_unit;
+        $perAkun = array_filter($perAkun, fn ($v) => Money::gtZero($v));
+        if (! $dari || ! $ke || $dari === $ke || ! $perAkun) {
+            return;
+        }
+        $ket = "Pindah unit persediaan {$doc->nomor}: {$doc->asal->nama} → {$doc->tujuan->nama}";
+        $lines = [];
+        foreach ($perAkun as $akun => $nilai) {
+            $lines[] = ['kode_coa' => $akun, 'debet' => $nilai, 'kredit' => '0', 'keterangan' => $ket, 'kode_unit' => $ke];
+            $lines[] = ['kode_coa' => $akun, 'debet' => '0', 'kredit' => $nilai, 'keterangan' => $ket, 'kode_unit' => $dari];
+        }
+        $entry = \App\Services\Ledger\PostingService::postJournal([
+            'referensi' => $doc->nomor, 'tanggal' => $tanggal, 'keterangan' => $ket,
+            'sumber_modul' => TransferPersediaan::SUMBER, 'id_sumber' => $doc->nomor, 'id_pengguna' => $idPengguna, 'lines' => $lines,
+        ]);
+        \App\Models\MutasiPersediaan::where('sumber_modul', TransferPersediaan::SUMBER)->where('sumber_ref', $doc->nomor)
+            ->where('kode_lokasi', $doc->kode_lokasi_tujuan)->whereNull('journal_entry_id')->update(['journal_entry_id' => $entry->id]);
     }
 
     private function lokasiPilihan(string $kode, string $peran): LokasiPersediaan

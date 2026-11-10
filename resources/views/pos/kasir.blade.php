@@ -377,6 +377,8 @@
                         this.pin = ''; this.pinSantri = '';   // PIN tak disimpan di layar, berhasil atau gagal
                         if (!r.ok) {
                             if (data.tertunda) this.tertunda = data.tertunda;
+                            // 409 = kiriman lama sudah jadi struk dengan isi lain: keranjang ini dibayar dengan kunci BARU.
+                            if (data.kode === 409 && (data.message || '').includes('isi keranjang kini berbeda')) this.kunci = null;
                             if (opsi.kartu) this.kartuGalat = data.message || 'Gagal menyimpan.';
                             else this.beri(data.message || 'Gagal menyimpan.');
                             return false;

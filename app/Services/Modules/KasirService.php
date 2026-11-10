@@ -47,7 +47,33 @@ use Illuminate\Support\Str;
  */
 class KasirService
 {
-    public function bukaShift(string $kodeLokasi, string|int|float $modal, int $idKasir): ShiftKasir
+    /**
+     * Uang yang SEHARUSNYA ada di laci toko menurut shift terakhirnya: belum diserahkan → seluruh uang dihitung;
+     * sudah diserahkan → tinggal modalnya (setoran = dihitung − modal). Null = toko belum pernah punya shift.
+     *
+     * @return array{sisa:string, shift:string}|null
+     */
+    public function sisaLaci(string $kodeLokasi): ?array
+    {
+        $s = ShiftKasir::where('kode_lokasi', $kodeLokasi)->whereIn('status', ['tutup', 'diserahkan'])->latest('ditutup_pada')->first();
+        if (! $s) {
+            return null;
+        }
+        $sisa = $s->status === 'tutup' ? Money::of($s->uang_dihitung)
+            : (Money::lt($s->uang_dihitung, $s->modal_awal) ? Money::of($s->uang_dihitung) : Money::of($s->modal_awal));
+
+        return ['sisa' => $sisa, 'shift' => $s->nomor];
+    }
+
+    /**
+     * MODAL WAJIB SAMA dengan sisa laci (keputusan user 10 Nov 2026, audit): dulu modal diketik bebas sehingga
+     * kekurangan laci shift lalu terbaca sebagai "lebih/kurang kas" kasir berikutnya, dan buku Kas Laci tak sama
+     * dengan fisiknya. Beda → wajib alasan + PIN pengawas (bukan kasirnya), dan bedanya langsung dijurnal
+     * Kas Laci ↔ Selisih Kas toko, sehingga selisih saat tutup shift hanya milik kasir shift itu.
+     *
+     * @param  array{id_pengawas?:int|null, pin?:string|null, alasan?:string|null}  $setuju
+     */
+    public function bukaShift(string $kodeLokasi, string|int|float $modal, int $idKasir, array $setuju = []): ShiftKasir
     {
         $lokasi = LokasiPersediaan::find($kodeLokasi);
         if (! $lokasi || $lokasi->status !== 'aktif' || $lokasi->jenis !== 'toko') {
@@ -64,12 +90,27 @@ class KasirService
             throw new AppException(409, "Anda masih punya shift terbuka ({$buka->nomor}). Tutup dulu sebelum membuka yang baru.");
         }
 
-        try {
-            return DB::transaction(function () use ($lokasi, $modal, $idKasir) {
-                $base = DocNumber::docBase('SK', now());
-                $last = ShiftKasir::where('nomor', 'like', $base.'%')->lockForUpdate()->orderByDesc('nomor')->value('nomor');
+        $sisa = $this->sisaLaci($lokasi->kode);
+        $beda = $sisa ? Money::sub($modal, $sisa['sisa']) : '0';
+        $pengawas = null;
+        if (! Money::isZero($beda)) {
+            $rp = fn ($v) => 'Rp '.number_format((float) $v, 0, ',', '.');
+            if (trim((string) ($setuju['alasan'] ?? '')) === '') {
+                throw new AppException(428, "Modal {$rp($modal)} berbeda dari sisa laci shift {$sisa['shift']} ({$rp($sisa['sisa'])}). "
+                    .'Pakai angka sisa laci, atau tulis alasannya dan minta PIN pengawas.');
+            }
+            $pengawas = (new PinPengawasService)->verifikasi($setuju['id_pengawas'] ?? null, $setuju['pin'] ?? null, $idKasir);
+        }
 
-                return ShiftKasir::create([
+        try {
+            return DB::transaction(function () use ($lokasi, $modal, $idKasir, $sisa, $beda, $pengawas, $setuju) {
+                // Kunci advisory (audit 10 Nov 2026): lockForUpdate atas baris nomor terakhir tak mencegah dua kasir
+                // membaca nomor yang sama → kasir kedua dulu ditolak dengan pesan "sudah punya shift" yang keliru.
+                DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32('shift-kasir-nomor')]);
+                $base = DocNumber::docBase('SK', now());
+                $last = ShiftKasir::where('nomor', 'like', $base.'%')->orderByDesc('nomor')->value('nomor');
+
+                $shift = ShiftKasir::create([
                     'nomor' => DocNumber::nextDocNumber($base, $last),
                     'kode_lokasi' => $lokasi->kode,
                     'id_kasir' => $idKasir,
@@ -77,11 +118,44 @@ class KasirService
                     'modal_awal' => $modal,
                     'status' => 'buka',
                 ]);
+                if ($pengawas) {
+                    $this->jurnalBedaModal($shift, $lokasi, $sisa, $beda, $pengawas, trim((string) $setuju['alasan']), $idKasir);
+                }
+
+                return $shift;
             });
         } catch (\Illuminate\Database\UniqueConstraintViolationException) {
             // Dua kiriman "buka shift" bersamaan: indeks unik `shift_kasir_satu_terbuka` menolak yang kedua.
             throw new AppException(409, 'Anda sudah punya shift terbuka — muat ulang halaman.');
         }
+    }
+
+    /**
+     * Beda modal awal vs sisa laci yang disetujui pengawas: kurang → D Selisih Kas / K Kas Laci; lebih → sebaliknya.
+     * Tercatat juga di jejak audit (siapa menyetujui & alasannya).
+     */
+    private function jurnalBedaModal(ShiftKasir $shift, LokasiPersediaan $l, array $sisa, string $beda, User $pengawas, string $alasan, int $idKasir): void
+    {
+        $kurang = Money::isNegative($beda);
+        $nilai = $kurang ? Money::sub('0', $beda) : $beda;
+        $ket = ($kurang ? 'Kurang' : 'Lebih')." modal laci saat buka {$shift->nomor} (sisa {$sisa['shift']}) — disetujui {$pengawas->nama}: {$alasan}";
+        $kas = ['kode_coa' => $l->kode_coa_kas, 'keterangan' => $ket];
+        $sel = ['kode_coa' => $l->kode_coa_selisih_kas, 'keterangan' => $ket, 'kode_bagian' => $l->kode_bagian];
+        PostingService::postJournal([
+            'referensi' => DocNumber::nextJournalRef('KSM', now()),
+            'tanggal' => now()->toDateString(),
+            'kode_unit' => $l->kode_unit,
+            'keterangan' => $ket,
+            'sumber_modul' => 'ModalKasir',
+            'id_sumber' => (string) $shift->id_shift,
+            'id_pengguna' => $idKasir,
+            'lines' => $kurang
+                ? [[...$sel, 'debet' => $nilai, 'kredit' => '0'], [...$kas, 'debet' => '0', 'kredit' => $nilai]]
+                : [[...$kas, 'debet' => $nilai, 'kredit' => '0'], [...$sel, 'debet' => '0', 'kredit' => $nilai]],
+        ]);
+        \App\Support\Audit\Jejak::catat('beda_modal_shift', ['modul' => 'pos', 'ref_jenis' => 'ShiftKasir', 'ref_id' => $shift->id_shift,
+            'id_pengguna' => $idKasir, 'detail' => ['shift' => $shift->nomor, 'sisa_laci' => $sisa['sisa'], 'modal' => $shift->modal_awal,
+                'beda' => $beda, 'pengawas' => $pengawas->nama, 'alasan' => $alasan]]);
     }
 
     /**
@@ -99,7 +173,20 @@ class KasirService
         // menyimpan — mengembalikan struk yang sudah ada, bukan struk/potongan kartu kedua.
         $kunci = ($kunci = trim((string) $kunci)) !== '' ? mb_substr($kunci, 0, 64) : null;
         if ($kunci && ($ada = Penjualan::where('kunci_klien', $kunci)->where('id_kasir', $idKasir)->first())) {
-            return $ada->load('details');
+            $ada->load('details');
+            // Audit 10 Nov 2026: keranjang DIUBAH sesudah kiriman yang putus → jangan pura-pura struk lama adalah
+            // keranjang ini (barang tambahan dulu keluar tanpa tercatat). Struk lama tetap sah; keranjang ini belum.
+            // Sidik = barang + jumlah ketikan per baris (satuan tak ikut: kiriman boleh kosong/lewat barcode).
+            $sidik = fn ($xs) => collect($xs)->map(fn ($x) => $x[0].'|'.Money::of($x[1], 4))->sort()->values()->all();
+            $kirim = $sidik(array_map(fn ($l) => [($l['kode_persediaan'] ?? '') !== '' ? $l['kode_persediaan']
+                : (BarcodePersediaan::find(trim((string) ($l['barcode'] ?? '')))?->kode_persediaan ?? ''), $l['kuantiti'] ?? 0], $baris));
+            $simpan = $sidik($ada->details->map(fn ($d) => [$d->kode_persediaan, $d->kuantiti_input])->all());
+            if ($kirim !== $simpan) {
+                throw new AppException(409, "Kiriman sebelumnya SUDAH tersimpan sebagai struk {$ada->nomor}, tetapi isi keranjang kini berbeda. "
+                    .'Keranjang ini BELUM disimpan — kurangi barang yang sudah ada di struk itu (lihat Riwayat Struk), lalu tekan bayar lagi.');
+            }
+
+            return $ada;
         }
         $bayarAwal = $bayar;
         $shift = $this->shiftKasir($idShift, $idKasir);
@@ -548,6 +635,10 @@ class KasirService
                 $lembar = (int) $lembar;
                 if ($lembar < 0) {
                     throw new AppException(422, 'Jumlah lembar/keping tidak boleh negatif.');
+                }
+                // Hanya pecahan rupiah yang dikenal (audit 10 Nov 2026: kunci kiriman dulu bebas — negatif/bukan angka).
+                if ($lembar > 0 && ! in_array((int) $nominal, ShiftKasir::PECAHAN, true)) {
+                    throw new AppException(422, "Pecahan {$nominal} tidak dikenal.");
                 }
                 if ($lembar > 0) {
                     $rincian[(string) (int) $nominal] = $lembar;

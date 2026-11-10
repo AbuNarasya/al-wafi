@@ -392,8 +392,11 @@ final class InventoryMovement
             return;
         }
 
-        $masuk = Money::of(MutasiPersediaan::where('kode_persediaan', $kodePersediaan)->where('arah', 'masuk')->sum('kuantiti'), 4);
-        $keluar = Money::of(MutasiPersediaan::where('kode_persediaan', $kodePersediaan)->where('arah', 'keluar')->sum('kuantiti'), 4);
+        // Pindah lokasi (`transfer`, termasuk lewat TRANSIT) tak dihitung (audit 10 Nov 2026): untuk satu barang ia
+        // selalu masuk = keluar, jadi saldo bersihnya tetap, tetapi dulu satu transfer 100 pcs tampil Masuk +200 / Keluar +200.
+        $dasar = fn () => MutasiPersediaan::where('kode_persediaan', $kodePersediaan)->where('alasan', '!=', 'transfer');
+        $masuk = Money::of($dasar()->where('arah', 'masuk')->sum('kuantiti'), 4);
+        $keluar = Money::of($dasar()->where('arah', 'keluar')->sum('kuantiti'), 4);
         $stok = self::stok($kodePersediaan);
         $nilai = self::nilai($kodePersediaan);
 

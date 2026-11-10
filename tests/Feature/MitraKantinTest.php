@@ -269,6 +269,44 @@ class MitraKantinTest extends TestCase
         $this->actingAs($this->staf)->get(route('mitra_kantin.penarikan', ['status' => 'semua']))->assertOk()->assertSee('Rekening salah');
     }
 
+    /** Audit 10 Nov 2026 (Paket B): pelunasan mitra nonaktif, Cek lagi tak menimpa klaim rekonsiliasi, jurnal susulan. */
+    public function test_temuan_audit_paket_b(): void
+    {
+        Storage::fake('local');
+        $buat = fn ($waktu, $total, $status = 'berhasil') => PenjualanMitra::create(['nomor' => 'KM-'.uniqid(), 'id_mitra' => $this->mitra->id,
+            'id_kasir' => $this->akunMitra->id_pengguna, 'waktu' => $waktu, 'total' => $total, 'uid_kartu' => 'X1234', 'status' => $status]);
+
+        // Jurnal susulan: penjualan Oktober baru pasti sesudah Oktober ditutup → dijurnal hari ini, bukan ditolak selamanya.
+        $buat(now()->subMonthNoOverflow()->startOfMonth()->addDays(3), 30000);
+        $okt = now()->subMonthNoOverflow();
+        \App\Models\AccountingPeriod::create(['tahun' => $okt->year, 'bulan' => $okt->month, 'status' => 'closed']);
+        $hasil = app(SaldoMitraService::class)->jurnalPenjualan();
+        $this->assertNotNull($hasil[0]['jurnal'], $hasil[0]['galat'] ?? '');
+        $e = \App\Models\JournalEntry::find($hasil[0]['jurnal']);
+        $this->assertSame(now()->toDateString(), $e->tanggal->toDateString());
+        $this->assertStringContainsString('SUSULAN', $e->keterangan);
+
+        // Cek lagi: baris yang sudah diklaim rekonsiliasi (gagal) tak ditimpa jadi berhasil.
+        $j = $buat(now(), 15000, 'gagal');
+        $this->penghubung(fn (Request $r) => Http::response(['status' => 'berhasil', 'nomor' => $r['nomor'], 'nama' => 'AHMAD', 'sisa_saldo' => '9.00']));
+        $j->status = 'belum_pasti';   // keadaan lama yang dibaca layar sebelum rekonsiliasi mengklaimnya
+        app(\App\Services\Modules\KasirMitraService::class)->pastikan($j);
+        $this->assertSame('gagal', $j->fresh()->status);
+
+        // Pelunasan: hanya untuk mitra nonaktif.
+        $this->actingAs($this->staf)->post(route('mitra_kantin.pelunasan', $this->mitra), ['nominal' => 30000])->assertSessionHas('error');
+        $this->mitra->update(['status' => 'nonaktif']);
+        $this->actingAs($this->staf)->get(route('mitra_kantin.show', $this->mitra))->assertOk()->assertSee('Ajukan pelunasan');
+        $this->actingAs($this->staf)->post(route('mitra_kantin.pelunasan', $this->mitra), ['nominal' => 30001])->assertSessionHas('error');
+        $this->actingAs($this->staf)->post(route('mitra_kantin.pelunasan', $this->mitra), ['nominal' => 30000])->assertRedirect(route('mitra_kantin.penarikan'));
+        $p = PenarikanMitra::sole();
+        $this->actingAs($this->staf)->post(route('mitra_kantin.penarikan.proses', $p->id), [
+            'biaya_transfer' => 0, 'kode_coa_bank' => self::BANK, 'tanggal_transfer' => now()->toDateString(),
+            'bukti' => UploadedFile::fake()->create('bukti.pdf', 50, 'application/pdf'),
+        ])->assertSessionHas('status');
+        $this->assertSame(['selesai', '0.00'], [$p->fresh()->status, app(SaldoMitraService::class)->saldo($this->mitra->id)['saldo']]);
+    }
+
     public function test_tak_tersedia_di_instans_al_wafi(): void
     {
         config(['instans.kode' => 'alwafi']);

@@ -486,6 +486,12 @@ class KasirLewatPenghubungTest extends TestCase
         $t1 = $kirim(['bayar' => 10000, 'kunci' => 'keranjang-2'])->assertOk()->json('nomor');
         $this->assertSame($t1, $kirim(['bayar' => 10000, 'kunci' => 'keranjang-2'])->assertOk()->json('nomor'));
         $this->assertSame(2, Penjualan::count());
+
+        // Audit 10 Nov 2026: keranjang DIUBAH sesudah kiriman putus → ditolak, bukan struk lama pura-pura cocok.
+        $beda = $kirim(['bayar' => 10000, 'kunci' => 'keranjang-2', 'baris' => [['kode_persediaan' => 'BRG0001', 'kuantiti' => 3]]]);
+        $beda->assertStatus(422);
+        $this->assertStringContainsString("SUDAH tersimpan sebagai struk {$t1}", $beda->json('message'));
+        $this->assertSame(2, Penjualan::count());
     }
 
     public function test_retur_kartu_yang_jawabannya_hilang_aman_diulang_dengan_nomor_sama(): void

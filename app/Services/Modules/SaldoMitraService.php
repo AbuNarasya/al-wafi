@@ -57,9 +57,17 @@ class SaldoMitraService
         return Mitra::pluck('id')->mapWithKeys(fn ($id) => [$id => $this->saldo($id)])->all();
     }
 
-    public function ajukan(Mitra $mitra, string|int|float $nominal, ?string $catatan, int $idPengguna): PenarikanMitra
+    /**
+     * `$pelunasan` (audit 10 Nov 2026): petugas mengajukan PELUNASAN SALDO AKHIR atas nama mitra yang sudah
+     * dinonaktifkan (sewa berakhir) — akun mitranya tak bisa masuk lagi, jadi dulu sisa saldonya tertahan selamanya.
+     * Hanya untuk mitra nonaktif; mitra aktif tetap mengajukan sendiri. Diproses lewat alur penarikan biasa.
+     */
+    public function ajukan(Mitra $mitra, string|int|float $nominal, ?string $catatan, int $idPengguna, bool $pelunasan = false): PenarikanMitra
     {
-        if (! $mitra->aktif()) {
+        if ($pelunasan && $mitra->aktif()) {
+            throw new AppException(422, 'Pelunasan oleh petugas hanya untuk mitra yang sudah nonaktif — mitra aktif mengajukan sendiri dari HP-nya.');
+        }
+        if (! $pelunasan && ! $mitra->aktif()) {
             throw new AppException(403, 'Mitra ini sedang nonaktif — hubungi petugas Wafi Mart.');
         }
         if (! $mitra->bank_rekening) {
@@ -222,9 +230,16 @@ class SaldoMitraService
                     array_unshift($lines, ['kode_coa' => $piutang, 'debet' => Money::of($total), 'kredit' => '0',
                         'keterangan' => "Belanja kartu santri di kantin mitra {$tgl}"]);
                     $ref = 'PKM-'.str_replace('-', '', $tgl);
+                    // Penjualan yang baru PASTI sesudah periodenya ditutup (audit 10 Nov 2026): dulu ditolak tiap malam
+                    // selamanya, padahal saldonya sudah bisa ditarik mitra → Hutang Mitra terdebit tanpa kreditnya.
+                    // Kini dijurnal SUSULAN bertanggal hari ini (periode berjalan) dengan keterangan tanggal asalnya.
+                    ['tahun' => $th, 'bulan' => $bl] = \App\Services\Ledger\PeriodService::periodOf($tgl);
+                    $tutup = \App\Models\AccountingPeriod::where('tahun', $th)->where('bulan', $bl)->where('status', 'closed')->exists();
+                    $tglJurnal = $tutup ? now()->toDateString() : $tgl;
                     $entry = PostingService::postJournal([
-                        'referensi' => $ref, 'tanggal' => $tgl, 'sumber_modul' => self::SUMBER_JUAL, 'id_sumber' => $ref,
-                        'keterangan' => "Penjualan kartu santri di kantin mitra {$tgl} ({$baris->count()} transaksi)", 'lines' => $lines,
+                        'referensi' => $ref, 'tanggal' => $tglJurnal, 'sumber_modul' => self::SUMBER_JUAL, 'id_sumber' => $ref,
+                        'keterangan' => ($tutup ? "SUSULAN (periode {$bl}/{$th} sudah ditutup) — " : '')
+                            ."Penjualan kartu santri di kantin mitra {$tgl} ({$baris->count()} transaksi)", 'lines' => $lines,
                     ]);
                     PenjualanMitra::whereIn('id', $baris->pluck('id'))->update(['dijurnal_pada' => now(), 'journal_entry_id' => $entry->id]);
 

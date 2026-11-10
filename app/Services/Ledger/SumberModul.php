@@ -57,6 +57,10 @@ final class SumberModul
         'PenerimaanBarang',
         'Penjualan',
         'SetoranKasir',
+        // Audit 10 Nov 2026: beda modal awal vs sisa laci (disetujui pengawas, Kas Laci ↔ Selisih Kas) dan transfer
+        // persediaan ke lokasi BEDA unit bisnis (D Persediaan unit tujuan / K Persediaan unit asal).
+        'ModalKasir',
+        'TransferPersediaan',
         // Stok awal barang dari Impor Data Awal (D Persediaan / K akun perantara).
         'ImporDataAwal',
         // Kantin mitra Wafi Mart (9 Nov 2026): penjualan kartu (D Piutang ke Al Wafi / K Hutang ke Mitra) & penarikan.

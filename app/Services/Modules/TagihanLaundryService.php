@@ -186,10 +186,31 @@ class TagihanLaundryService
      */
     public function terbitkan(string $periode, int $idPengguna): array
     {
+        // Satu kunci untuk seluruh penerbitan (audit 10 Nov 2026): jadwal 01.15 & tombol Terbitkan yang bersamaan
+        // dulu bisa membaca draf yang sama lalu menerbitkan tagihan + jurnal ganda. Kunci sama dengan susunDraf
+        // (advisory lock dalam satu sesi bersifat reentrant).
+        return DB::transaction(function () use ($periode, $idPengguna) {
+            DB::statement('SELECT pg_advisory_xact_lock(?)', [crc32("tagihan-laundry:{$periode}")]);
+
+            return $this->terbitkanTerkunci($periode, $idPengguna);
+        });
+    }
+
+    /** @return array{terbit:int, total:string, ditunda:int} */
+    private function terbitkanTerkunci(string $periode, int $idPengguna): array
+    {
         $this->susunDraf($periode);
         $draf = TagihanLaundry::with('santri:id,nama,status')->where('periode', $periode)->where('status', 'draf')->get();
+        // Santri yang masih punya kantong BELUM DIPERIKSA di bulan itu DITUNDA (audit 10 Nov 2026): beratnya baru
+        // berat penerimaan (formalitas), dan sesudah terbit kantongnya terkunci sehingga tak bisa diperiksa dengan
+        // berat ulang. Drafnya tetap; jadwal harian menerbitkannya begitu semua kantongnya diperiksa.
+        [$awal, $akhir] = self::batas($periode);
+        $belumPeriksa = Laundry::where('status', 'diterima')->whereBetween('diterima_pada', [$awal, $akhir])
+            ->whereIn('id_santri', $draf->pluck('id_santri'))->distinct()->pluck('id_santri')->flip();
+        $ditunda = $draf->filter(fn ($t) => isset($belumPeriksa[$t->id_santri]))->count();
+        $draf = $draf->reject(fn ($t) => isset($belumPeriksa[$t->id_santri]));
         if ($draf->isEmpty()) {
-            return ['terbit' => 0, 'total' => '0.00'];
+            return ['terbit' => 0, 'total' => '0.00', 'ditunda' => $ditunda];
         }
         if ($tanpa = $draf->whereNull('kode_jenis')->first()) {
             throw new AppException(422, 'Jenis biaya penagihan laundry belum diatur (mis. untuk jenjang santri '.$tanpa->santri?->nama.') — atur di Pengaturan Laundry.');
@@ -219,7 +240,7 @@ class TagihanLaundryService
             }
         });
 
-        return ['terbit' => $terbit, 'total' => Money::of($total)];
+        return ['terbit' => $terbit, 'total' => Money::of($total), 'ditunda' => $ditunda];
     }
 
     /**

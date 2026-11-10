@@ -292,6 +292,44 @@ class KasirTest extends TestCase
         $this->layanan()->serahTerima($shift->id_shift, self::KAS_PUSAT, $this->spv->id_pengguna);
     }
 
+    /** Keputusan user 10 Nov 2026: modal awal WAJIB sama dengan sisa laci; beda → alasan + PIN pengawas + jurnal selisih. */
+    public function test_modal_awal_wajib_sama_dengan_sisa_laci(): void
+    {
+        $shift = $this->layanan()->bukaShift('L002', 100000, $this->kasir->id_pengguna);   // toko belum pernah punya shift → bebas
+        $this->layanan()->tutupShift($shift->id_shift, null, 150000, null, $this->kasir->id_pengguna);
+        $this->layanan()->serahTerima($shift->id_shift, self::KAS_PUSAT, $this->spv->id_pengguna);   // sisa laci = modal 100.000
+        $this->assertSame(['sisa' => '100000.00', 'shift' => $shift->nomor], $this->layanan()->sisaLaci('L002'));
+
+        // Beda tanpa persetujuan → ditolak; sama → langsung buka.
+        try {
+            $this->layanan()->bukaShift('L002', 80000, $this->kasir->id_pengguna);
+            $this->fail('Modal yang beda dari sisa laci harus ditolak.');
+        } catch (AppException $e) {
+            $this->assertSame(428, $e->status);
+            $this->assertStringContainsString('berbeda dari sisa laci', $e->getMessage());
+        }
+        $kedua = $this->layanan()->bukaShift('L002', 100000, $this->kasir->id_pengguna);
+        $this->assertSame(0, \App\Models\JournalEntry::where('sumber_modul', 'ModalKasir')->count());
+        $this->layanan()->tutupShift($kedua->id_shift, null, 100000, null, $this->kasir->id_pengguna);   // tak ada penjualan
+
+        // Uang laci memang kurang 20.000 → alasan + PIN pengawas; kasir sendiri tak bisa menyetujui.
+        \App\Models\HakAksesModul::create(['id_pengguna' => $this->spv->id_pengguna, 'kode_modul' => 'shift-kasir', 'lihat' => true, 'ubah' => true, 'menu' => true]);
+        \App\Support\Akses::lupakan();
+        (new \App\Services\Modules\PinPengawasService)->setel($this->spv, '284713');
+        $ketiga = $this->layanan()->bukaShift('L002', 80000, $this->kasir->id_pengguna,
+            ['alasan' => 'dipakai beli plastik', 'id_pengawas' => $this->spv->id_pengguna, 'pin' => '284713']);
+        $e = \App\Models\JournalEntry::where('sumber_modul', 'ModalKasir')->sole();
+        $this->assertSame((string) $ketiga->id_shift, $e->id_sumber);
+        $this->assertSame('-20000.00', $this->saldo(self::KAS_LACI));
+        // Shift pertama lebih kas 50.000 (kredit), kini kurang modal 20.000 (debet) → saldo −30.000.
+        $this->assertSame('-30000.00', $this->saldo(self::SELISIH_KAS));
+        $this->assertSame('20000.00', (string) JournalLine::where('entry_id', $e->id)->where('kode_coa', self::SELISIH_KAS)->value('debet'));
+        $this->assertTrue(\Illuminate\Support\Facades\DB::table('activity_log')->where('aksi', 'beda_modal_shift')->exists());
+
+        // Tutup tanpa penjualan dengan uang = modal → selisih shift ini nol (beda modal tak terbawa ke kasir).
+        $this->assertSame('0.00', $this->layanan()->tutupShift($ketiga->id_shift, null, 80000, null, $this->kasir->id_pengguna)->selisih);
+    }
+
     // ---- Master lokasi ----
 
     public function test_akun_kasir_diisi_di_master_lokasi(): void

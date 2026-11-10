@@ -107,7 +107,8 @@ class ReturPenjualanTest extends TestCase
     public function test_retur_uang_sesuai_yang_dibayar_stok_layak_kembali_dan_jurnal_shift_baru(): void
     {
         $jual = $this->strukKemarin();
-        $hari = $this->k->bukaShift('L002', 50000, $this->kasir->id_pengguna);
+        // Modal = sisa laci shift kemarin yang belum disetor (wajib sama sejak 10 Nov 2026).
+        $hari = $this->k->bukaShift('L002', 14400, $this->kasir->id_pengguna);
         $d = $jual->details[0];
 
         // 1 layak + 1 rusak dari 4 pcs dibayar 14.400 → 3.600 per pcs.
@@ -130,8 +131,8 @@ class ReturPenjualanTest extends TestCase
             $this->assertStringContainsString('melebihi yang dibeli', $e->getMessage());
         }
 
-        // Tutup shift hari ini: laci = 50.000 − 14.400 retur.
-        $tutup = $this->k->tutupShift($hari->id_shift, null, 35600, null, $this->kasir->id_pengguna);
+        // Tutup shift hari ini: laci = modal 14.400 − 14.400 retur.
+        $tutup = $this->k->tutupShift($hari->id_shift, null, 0, null, $this->kasir->id_pengguna);
         $this->assertSame(['14400.00', '0.00'], [$tutup->total_retur, $tutup->selisih]);
 
         $saldo = fn ($coa) => Money::sub(JournalLine::where('kode_coa', $coa)->sum('debet'), JournalLine::where('kode_coa', $coa)->sum('kredit'));
@@ -145,9 +146,9 @@ class ReturPenjualanTest extends TestCase
     public function test_aturan_retur(): void
     {
         $jual = $this->strukKemarin();
-        $hari = $this->k->bukaShift('L002', 0, $this->kasir->id_pengguna);
+        $hari = $this->k->bukaShift('L002', 14400, $this->kasir->id_pengguna);
         $d = $jual->details[0];
-        $baris = [['id_penjualan_detail' => $d->id, 'kuantiti' => 1, 'kondisi' => 'layak']];
+        $baris =[['id_penjualan_detail' => $d->id, 'kuantiti' => 1, 'kondisi' => 'layak']];
 
         foreach ([
             'PIN pengawas salah' => fn () => $this->retur($hari, $jual, $baris, '000000'),
@@ -182,7 +183,7 @@ class ReturPenjualanTest extends TestCase
     public function test_layar_retur(): void
     {
         $jual = $this->strukKemarin();
-        $this->k->bukaShift('L002', 50000, $this->kasir->id_pengguna);
+        $this->k->bukaShift('L002', 14400, $this->kasir->id_pengguna);
 
         $this->actingAs($this->kasir)->get(route('pos.retur', ['struk' => $jual->nomor]))->assertOk()
             ->assertSee('Teh Kotak')->assertSee('Bisa diretur')->assertSee('<option value="'.$this->pengawas->id_pengguna.'"', false);

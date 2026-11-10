@@ -77,9 +77,32 @@ class TagihanLaundryTest extends TestCase
         parent::tearDown();
     }
 
-    private function setor(Santri $s, string $kg): Laundry
+    /**
+     * Setor + (bawaan) langsung diperiksa dengan berat yang sama — alur sebenarnya. Sejak audit 10 Nov 2026 santri
+     * yang kantongnya belum diperiksa DITUNDA penagihannya, jadi fixture tak boleh berhenti di "diterima".
+     */
+    private function setor(Santri $s, string $kg, bool $periksa = true): Laundry
     {
-        return (new LaundryService)->terima($s, $kg, [['id_jenis_pakaian' => JenisPakaianLaundry::value('id'), 'jumlah' => 5]], null, 'kartu', $this->keu->id_pengguna);
+        $svc = new LaundryService;
+        $l = $svc->terima($s, $kg, [['id_jenis_pakaian' => JenisPakaianLaundry::value('id'), 'jumlah' => 5]], null, 'kartu', $this->keu->id_pengguna);
+
+        return $periksa ? $svc->periksa($l, $kg, [['id_jenis_pakaian' => JenisPakaianLaundry::value('id'), 'jumlah' => 5]], null, $this->keu->id_pengguna) : $l;
+    }
+
+    public function test_santri_dengan_kantong_belum_diperiksa_ditunda_penagihannya(): void
+    {
+        $l = $this->setor($this->smp, '25', periksa: false);
+        $this->setor($this->sma, '20');
+        Carbon::setTestNow('2026-11-05 01:15:00');
+        $h = (new TagihanLaundryService)->jalankanJadwal();
+        $this->assertSame([1, 1], [$h['diterbitkan']['terbit'], $h['diterbitkan']['ditunda']]);
+        $this->assertSame([$this->sma->id], TagihanSantri::pluck('id_santri')->all());
+
+        // Diperiksa dengan berat ulang yang BERBEDA — tidak terkunci, lalu terbit esok harinya dengan berat final.
+        (new LaundryService)->periksa($l, '24', [['id_jenis_pakaian' => JenisPakaianLaundry::value('id'), 'jumlah' => 5]], null, $this->keu->id_pengguna);
+        Carbon::setTestNow('2026-11-06 01:15:00');
+        (new TagihanLaundryService)->jalankanJadwal();
+        $this->assertSame('28000.00', (string) TagihanSantri::where('id_santri', $this->smp->id)->sole()->nominal);   // (24 − 20) × 7.000
     }
 
     public function test_kuota_per_jenjang_dan_perkiraan_saat_menimbang(): void
@@ -180,7 +203,7 @@ class TagihanLaundryTest extends TestCase
 
     public function test_dashboard_12_bulan_pemakaian_penyerahan_dan_tagihan(): void
     {
-        $a = $this->setor($this->smp, '12');
+        $a = $this->setor($this->smp, '12', periksa: false);
         $this->setor($this->smp, '11.5');   // Oktober: Ahmad 23,5 kg → lebih 3,5 kg = Rp 24.500
         $this->setor($this->sma, '14');
         $svc = new LaundryService;
@@ -255,7 +278,7 @@ class TagihanLaundryTest extends TestCase
 
         // Setor tetap boleh; selesai → kabar "tertahan", bukan "siap diambil".
         $svc = new LaundryService;
-        $l = $this->setor($this->smp, '3');
+        $l = $this->setor($this->smp, '3', periksa: false);
         $svc->periksa($l, '3', [['id_jenis_pakaian' => JenisPakaianLaundry::value('id'), 'jumlah' => 5]], null, $this->keu->id_pengguna);
         $svc->majukan([$l->id], 'diperiksa', $this->keu->id_pengguna);
         $svc->majukan([$l->id], 'diproses', $this->keu->id_pengguna);
@@ -279,7 +302,7 @@ class TagihanLaundryTest extends TestCase
         $this->assertStringContainsString('Pulang darurat', $jejak->detail);
 
         // Izin tak hanya sekali: kantong berikutnya bisa diizinkan lagi.
-        $l2 = $this->setor($this->smp, '2');
+        $l2 = $this->setor($this->smp, '2', periksa: false);
         $svc->periksa($l2, '2', [['id_jenis_pakaian' => JenisPakaianLaundry::value('id'), 'jumlah' => 2]], null, $this->keu->id_pengguna);
         $svc->majukan([$l2->id], 'diperiksa', $this->keu->id_pengguna);
         $svc->majukan([$l2->id], 'diproses', $this->keu->id_pengguna);

@@ -786,6 +786,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/{mitra}/menu', 'simpanMenu')->name('menu.store')->middleware('hakakses:mitra-kantin,buat')->whereNumber('mitra');
         Route::put('/{mitra}/menu/{menu}', 'simpanMenu')->name('menu.update')->middleware('hakakses:mitra-kantin,ubah')->whereNumber(['mitra', 'menu']);
         Route::post('/{mitra}/akun', 'buatAkun')->name('akun.store')->middleware('hakakses:mitra-kantin,buat')->whereNumber('mitra');
+        Route::post('/{mitra}/pelunasan', 'pelunasan')->name('pelunasan')->middleware('hakakses:mitra-kantin,ubah')->whereNumber('mitra');
         Route::put('/{mitra}/akun/{akun}', 'ubahAkun')->name('akun.update')->middleware('hakakses:mitra-kantin,ubah')->whereNumber(['mitra', 'akun']);
     });
     // Layar akun MITRA sendiri (HP mitra): kasir kartu, riwayat, laporan.

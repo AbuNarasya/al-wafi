@@ -251,7 +251,7 @@ class LaundryService
     public function periksa(Laundry $l, string $berat, array $item, ?string $catatan, int $idPengguna): Laundry
     {
         $baru = $this->beratSah($berat);
-        $baris = $this->rapikanItem($item);
+        $baris = $this->rapikanItem($item, sudahDipakai: $l->item()->pluck('id_jenis_pakaian')->filter()->all());
         $kuota = new TagihanLaundryService;
 
         return DB::transaction(function () use ($l, $baru, $baris, $catatan, $idPengguna, $kuota) {
@@ -262,7 +262,9 @@ class LaundryService
             if (round((float) $kini->berat, 2) !== $baru) {
                 $this->assertBelumDitagih($kini);
             }
-            $sebelum = $kuota->ringkas($kini->santri, hanyaDiperiksa: true);
+            // Bulan kuota = bulan kantong DITERIMA (audit 10 Nov 2026: dulu bulan hari ini → kabar bulan lalu tak terkirim).
+            $periode = $kini->diterima_pada->format('Y-m');
+            $sebelum = $kuota->ringkas($kini->santri, $periode, hanyaDiperiksa: true);
             $kini->item()->delete();
             foreach ($baris as $b) {
                 $kini->item()->create($b);
@@ -270,7 +272,7 @@ class LaundryService
             $tambahan = trim((string) $catatan);
             $kini->update(['berat' => $baru, 'status' => 'diperiksa', 'diperiksa_pada' => now(), 'diperiksa_oleh' => $idPengguna,
                 'catatan' => $tambahan === '' ? $kini->catatan : trim(($kini->catatan ? $kini->catatan."\n" : '').$tambahan)]);
-            $this->kabariKuota($kini->santri, $sebelum, $kuota->ringkas($kini->santri, hanyaDiperiksa: true));
+            $this->kabariKuota($kini->santri, $sebelum, $kuota->ringkas($kini->santri, $periode, hanyaDiperiksa: true));
 
             return $kini->load('item');
         });
@@ -294,7 +296,7 @@ class LaundryService
             if (! in_array($kini->status, Laundry::BERJALAN, true)) {
                 throw new AppException(422, "{$kini->nomor} sudah {$kini->labelStatus()} — datanya tak bisa diubah lagi.");
             }
-            $baris = $this->rapikanItem($item, wajib: $kini->status !== 'diterima');
+            $baris = $this->rapikanItem($item, wajib: $kini->status !== 'diterima', sudahDipakai: $kini->item->pluck('id_jenis_pakaian')->filter()->all());
             $daftar = fn ($rows) => collect($rows)->map(fn ($b) => "{$b['nama_pakaian']} {$b['jumlah']}")->implode(', ');
             $lama = ['berat' => (string) $kini->berat, 'pakaian' => $daftar($kini->item->map->only(['nama_pakaian', 'jumlah'])), 'catatan' => (string) $kini->catatan];
             $sesudah = ['berat' => number_format($baru, 2, '.', ''), 'pakaian' => $daftar($baris), 'catatan' => trim((string) $catatan)];
@@ -311,7 +313,10 @@ class LaundryService
                     $kini->item()->create($b);
                 }
             }
-            $kini->update(['berat' => $baru, 'catatan' => $sesudah['catatan'] ?: null]);
+            // Masih "diterima" = belum ada timbang ulang: koreksi berat juga membetulkan berat penerimaan (audit 10 Nov 2026,
+            // dulu label & layar detail tetap memakai angka salah timbang).
+            $kini->update(['berat' => $baru, 'catatan' => $sesudah['catatan'] ?: null]
+                + ($kini->status === 'diterima' ? ['berat_terima' => $baru] : []));
             \App\Support\Audit\Jejak::catat('ubah_laundry', ['modul' => 'laundry', 'ref_jenis' => 'Laundry', 'ref_id' => $kini->id,
                 'id_pengguna' => $idPengguna, 'detail' => ['nomor' => $kini->nomor, 'alasan' => trim($alasan)]
                     + collect($berubah)->mapWithKeys(fn ($k) => [$k => ['lama' => $lama[$k], 'baru' => $sesudah[$k]]])->all()]);
@@ -341,7 +346,7 @@ class LaundryService
      *
      * @return list<array{id_jenis_pakaian:int, nama_pakaian:string, jumlah:int}>
      */
-    private function rapikanItem(array $item, bool $wajib = true): array
+    private function rapikanItem(array $item, bool $wajib = true, array $sudahDipakai = []): array
     {
         $gabung = [];
         foreach ($item as $b) {
@@ -361,7 +366,9 @@ class LaundryService
             }
             throw new AppException(422, 'Daftar pakaian wajib diisi — catat jenis dan jumlah tiap pakaian.');
         }
-        $jenis = JenisPakaianLaundry::whereIn('id', array_keys($gabung))->where('aktif', true)->pluck('nama', 'id');
+        // Jenis nonaktif tetap sah bila memang sudah ada di kantong ini (audit 10 Nov 2026).
+        $jenis = JenisPakaianLaundry::whereIn('id', array_keys($gabung))
+            ->where(fn ($q) => $q->where('aktif', true)->orWhereIn('id', $sudahDipakai ?: [0]))->pluck('nama', 'id');
         if ($jenis->count() !== count($gabung)) {
             throw new AppException(422, 'Ada jenis pakaian yang tidak dikenal atau sudah nonaktif.');
         }

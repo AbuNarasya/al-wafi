@@ -209,6 +209,13 @@ class InvoiceService
                 if ($d->id_penerimaan_detail) {
                     // Stoknya sudah masuk saat diterima — yang bergerak di sini hanya
                     // catatan "sudah ditagih" pada baris penerimaannya.
+                    // Kepala penerimaannya dikunci & status diperiksa ULANG (audit 10 Nov 2026): pembatalan penerimaan
+                    // yang berjalan bersamaan dulu bisa lolos → GRNI dibalik, tapi invoice tetap mendebit GRNI.
+                    // Urutan kunci sama dengan PenerimaanBarangService::batal (kepala dulu).
+                    $idTerima = PenerimaanBarangDetail::whereKey($d->id_penerimaan_detail)->value('id_penerimaan');
+                    if (\App\Models\PenerimaanBarang::lockForUpdate()->find($idTerima)?->status !== 'aktif') {
+                        throw new AppException(409, 'Penerimaan barang yang dirujuk baru saja dibatalkan — muat ulang lalu ulangi.');
+                    }
                     $pd = PenerimaanBarangDetail::lockForUpdate()->find($d->id_penerimaan_detail);
                     $ditagihBaru = Money::add($pd->qty_ditagih, $d->kuantiti, 4);
                     // Diperiksa ULANG di bawah kunci (audit 21 Okt 2026): dua invoice bersamaan dulu bisa menagih

@@ -43,6 +43,9 @@ class PemetaStokAwalBarang implements Pemeta, PemetaBisaDibatalkan
     /** Pasangan barang|lokasi yang sudah muncul di baris sebelumnya (satu kali baca). */
     private array $terlihat = [];
 
+    /** sumber_ref batch stok awal yang sudah dibatalkan (dibaca sekali). */
+    private ?array $batchBatal = null;
+
     public static function kunci(): string
     {
         return 'stok-awal-barang';
@@ -122,16 +125,21 @@ class PemetaStokAwalBarang implements Pemeta, PemetaBisaDibatalkan
             return $this->masalah('Lokasi "'.trim($baris['lokasi'] ?? '').'" tidak ditemukan atau tidak aktif.');
         }
 
-        if ($this->angkaPositif($baris['jumlah'] ?? '') === null) {
-            return $this->masalah('Jumlah harus angka lebih dari nol.');
+        if ($this->angkaPositif($baris['jumlah'] ?? '', 4) === null) {
+            return $this->masalah('Jumlah harus angka lebih dari nol, ditulis gaya Indonesia (1.500 atau 0,125 — bukan 1.5).');
         }
         if ($this->angka($baris['harga_pokok'] ?? '') === null) {
-            return $this->masalah('Harga pokok bukan angka yang sah.');
+            return $this->masalah('Harga pokok bukan angka yang sah — tulis gaya Indonesia (2.916,67 — bukan 2916.67).');
         }
 
         $kunci = "{$item->kode_persediaan}|{$lokasi->kode}";
+        // Stok awal dari batch yang SUDAH DIBATALKAN tak dihitung (audit 10 Nov 2026): alur "harga pokok salah →
+        // batalkan → unggah ulang" dulu membuat semua baris dilewati karena mutasi saldo_awal lamanya tetap ada.
+        $this->batchBatal ??= ImporBatch::where('kunci', self::kunci())->whereNotNull('dibatalkan_pada')
+            ->pluck('id')->map(fn ($id) => "STOK-{$id}")->all();
         if (MutasiPersediaan::where('sumber_modul', self::SUMBER)->where('kode_persediaan', $item->kode_persediaan)
-            ->where('kode_lokasi', $lokasi->kode)->where('alasan', 'saldo_awal')->exists()) {
+            ->where('kode_lokasi', $lokasi->kode)->where('alasan', 'saldo_awal')
+            ->whereNotIn('sumber_ref', $this->batchBatal ?: ['-'])->exists()) {
             return $this->lewati();
         }
         if (isset($this->terlihat[$kunci])) {
@@ -156,9 +164,12 @@ class PemetaStokAwalBarang implements Pemeta, PemetaBisaDibatalkan
         foreach ($baris as $b) {
             [$item] = $this->barang($b);
             $lokasi = $this->lokasi($b['lokasi']);
-            $qty = Money::of($this->angkaPositif($b['jumlah']), 4);
+            // Jumlah skala 4 & nilai DIBULATKAN (audit 10 Nov 2026): dulu jumlah dibaca skala 2 (0,125 kg → 0,12) dan
+            // nilai dipotong — pola yang sudah diperbaiki di Penerimaan Barang.
+            $qty = $this->angkaPositif($b['jumlah'], 4);
             $harga = trim($b['harga_pokok'] ?? '') === '' ? Money::of($item->harga_perolehan) : $this->angka($b['harga_pokok']);
-            $nilai = Money::mul($qty, $harga);
+            $kali = bcmul($qty, Money::of($harga), 6);
+            $nilai = bcadd($kali, '0.005', 2);
 
             $m = InventoryMovement::masuk([
                 'kode_persediaan' => $item->kode_persediaan,

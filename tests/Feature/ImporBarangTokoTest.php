@@ -225,6 +225,39 @@ class ImporBarangTokoTest extends TestCase
         $this->assertSame(0, Inventory::count());
     }
 
+    public function test_stok_awal_yang_dibatalkan_bisa_diimpor_ulang(): void
+    {
+        $this->siapkanBarang();
+        $batch = $this->impor->jalankan('stok-awal-barang', $this->berkasStok(), $this->paramStok(), $this->admin)['id_batch'];
+        $this->impor->batalkanBatch($batch, 'harga pokok salah', $this->admin);
+
+        // Audit 10 Nov 2026: dulu semua baris "lewati" karena mutasi saldo_awal batch lama tetap ada.
+        $this->assertSame(2, $this->impor->pratinjau('stok-awal-barang', $this->berkasStok(), $this->paramStok())['siap']);
+        $this->impor->jalankan('stok-awal-barang', $this->berkasStok(), $this->paramStok(), $this->admin);
+        $this->assertSame('48.0000', InventoryMovement::stok('BRG0001', 'L002'));
+        // Batch baru yang masih hidup tetap mencegah impor ganda.
+        $this->assertSame(0, $this->impor->pratinjau('stok-awal-barang', $this->berkasStok(), $this->paramStok())['siap']);
+    }
+
+    /** Audit 10 Nov 2026: angka gaya Inggris ditolak; jumlah pecahan skala 4 & nilai dibulatkan. */
+    public function test_angka_impor_gaya_inggris_ditolak_dan_pecahan_utuh(): void
+    {
+        $this->siapkanBarang();
+        $berkas = $this->berkas([
+            ['kode_barang', 'barcode', 'lokasi', 'jumlah', 'harga_pokok'],
+            ['BRG0001', '', 'Koperasi Banat', '1.5', ''],             // gaya Inggris → ditolak, bukan 15
+            ['BRG0002', '', 'Koperasi Banat', '2', '2916.67'],        // gaya Inggris → ditolak, bukan 291.667
+            ['BRG0002', '', 'L001', '0,125', '20.000'],               // 0,125 × 20.000 = 2.500 (dulu 0,12 → 2.400)
+        ]);
+        $p = $this->impor->pratinjau('stok-awal-barang', $berkas, $this->paramStok());
+        $this->assertSame([1, 2], [$p['siap'], $p['masalah']]);
+        $this->assertStringContainsString('bukan 1.5', implode(' | ', array_column($p['baris_masalah'], 'alasan')));
+
+        $hasil = $this->impor->jalankan('stok-awal-barang', $berkas, $this->paramStok(), $this->admin);
+        $this->assertSame(2500, $hasil['tersimpan']['nilai_rupiah']);
+        $this->assertSame('0.1250', InventoryMovement::stok('BRG0002', 'L001'));
+    }
+
     public function test_batal_batch_barang_yang_belum_dipakai(): void
     {
         KategoriBarang::create(['kode' => 'MKN', 'nama' => 'Makanan']);

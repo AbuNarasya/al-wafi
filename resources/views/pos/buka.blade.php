@@ -38,8 +38,22 @@
                             <button type="button" @click="modal = String(Math.round(sisa[lokasi].sisa))" class="font-semibold underline">Pakai angka ini</button>
                         </div>
                     </template>
-                    <p x-show="sisa[lokasi] && modal !== '' && Math.round(Number(modal)) !== Math.round(sisa[lokasi].sisa)" x-cloak
-                       class="mt-1 text-xs font-medium text-amber-700">Berbeda dari sisa laci shift terakhir — laporkan ke pengawas bila uang di laci memang kurang/lebih.</p>
+                    {{-- Modal WAJIB sama dengan sisa laci (10 Nov 2026). Beda → alasan + PIN pengawas; bedanya dijurnal ke Selisih Kas. --}}
+                    <div x-show="sisa[lokasi] && modal !== '' && Math.round(Number(modal)) !== Math.round(sisa[lokasi].sisa)" x-cloak
+                         class="mt-2 space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                        <p class="font-semibold">Berbeda <span x-text="'Rp ' + Math.round(Number(modal) - sisa[lokasi]?.sisa).toLocaleString('id-ID')"></span> dari sisa laci shift terakhir.
+                            Bila uang di laci memang kurang/lebih, tulis alasannya dan minta pengawas mengetik PIN. Bedanya dicatat sebagai selisih kas.</p>
+                        <input type="text" name="alasan_beda" maxlength="255" value="{{ old('alasan_beda') }}" placeholder="Alasan (mis. uang Rp 50.000 dipakai beli plastik)"
+                               class="w-full rounded-lg border-amber-300 text-sm">
+                        <div class="flex gap-2">
+                            <select name="id_pengawas" class="flex-1 rounded-lg border-amber-300 text-sm">
+                                <option value="">— pilih pengawas —</option>
+                                @foreach ($pengawas as $p)<option value="{{ $p['id'] }}" @selected((int) old('id_pengawas') === $p['id'])>{{ $p['nama'] }}</option>@endforeach
+                            </select>
+                            <input type="password" name="pin" inputmode="numeric" maxlength="6" placeholder="PIN pengawas" autocomplete="off"
+                                   class="w-32 rounded-lg border-amber-300 text-center text-sm tracking-widest">
+                        </div>
+                    </div>
                 </div>
                 <button class="w-full rounded-lg bg-brand py-3 text-base font-semibold text-white hover:bg-brand-dark">Buka Shift</button>
             </form>

@@ -36,23 +36,29 @@ trait BantuanPemeta
      * Angka bersih dari isian Excel: "1.500.000", "1500000,50", " 2 000 ".
      * Kosong dianggap 0. Mengembalikan null bila tidak sah.
      */
-    protected function angka(?string $v): ?string
+    protected function angka(?string $v, int $skala = 2): ?string
     {
         $v = trim((string) $v);
         if ($v === '') {
             return '0';
         }
+        // Angka gaya Inggris (titik desimal) DITOLAK, bukan ditebak (audit 10 Nov 2026): "2916.67" dulu terbaca
+        // 291.667 dan "1.5" terbaca 15. Pemisah ribuan selalu diikuti tepat 3 angka, jadi titik yang diikuti 1–2
+        // angka di akhir — tanpa koma — pasti bukan pemisah ribuan.
+        if (! str_contains($v, ',') && preg_match('/\.\d{1,2}$/', $v)) {
+            return null;
+        }
         // Titik dibuang sebagai pemisah ribuan, koma dijadikan pemisah desimal —
         // itu cara Excel berbahasa Indonesia menulis angka.
         $bersih = str_replace(',', '.', str_replace([' ', '.'], '', $v));
 
-        return is_numeric($bersih) && (float) $bersih >= 0 ? Money::of($bersih) : null;
+        return is_numeric($bersih) && (float) $bersih >= 0 ? Money::of($bersih, $skala) : null;
     }
 
     /** Angka yang WAJIB lebih dari nol; null bila tak sah atau ≤ 0. */
-    protected function angkaPositif(?string $v): ?string
+    protected function angkaPositif(?string $v, int $skala = 2): ?string
     {
-        $n = $this->angka($v);
+        $n = $this->angka($v, $skala);
 
         return $n !== null && Money::gtZero($n) ? $n : null;
     }

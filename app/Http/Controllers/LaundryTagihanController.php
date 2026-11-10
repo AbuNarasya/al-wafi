@@ -62,7 +62,8 @@ class LaundryTagihanController extends Controller
         $periode = $request->validate(['periode' => ['required', 'regex:/^\d{4}-\d{2}$/']])['periode'];
 
         return $this->coba(fn () => $this->svc->terbitkan($periode, $request->user()->id_pengguna),
-            fn ($h) => $h['terbit'] ? "{$h['terbit']} tagihan kelebihan laundry terbit — total Rp ".number_format((float) $h['total'], 0, ',', '.').'.' : 'Tidak ada draf untuk diterbitkan.');
+            fn ($h) => ($h['terbit'] ? "{$h['terbit']} tagihan kelebihan laundry terbit — total Rp ".number_format((float) $h['total'], 0, ',', '.').'.' : 'Tidak ada draf yang bisa diterbitkan.')
+                .(($h['ditunda'] ?? 0) ? " {$h['ditunda']} santri DITUNDA karena masih punya kantong bulan itu yang belum diperiksa — terbit otomatis sesudah diperiksa." : ''));
     }
 
     public function kecualikan(Request $request, TagihanLaundry $tagihan): RedirectResponse

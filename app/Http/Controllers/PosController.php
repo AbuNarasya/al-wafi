@@ -38,19 +38,11 @@ class PosController extends Controller
 
             return view('pos.buka', [
                 'tokoOptions' => $toko,
-                // Uang yang SEHARUSNYA masih di laci tiap toko menurut shift terakhirnya (audit 21 Okt 2026) — dulu
-                // modal diketik bebas, sehingga kekurangan laci shift lalu terbaca sebagai selisih kasir berikutnya.
-                'sisaLaci' => $toko->mapWithKeys(function ($t) {
-                    $s = \App\Models\ShiftKasir::where('kode_lokasi', $t->kode)->whereIn('status', ['tutup', 'diserahkan'])
-                        ->latest('ditutup_pada')->first();
-                    if (! $s) {
-                        return [];
-                    }
-                    // Belum diserahkan → seluruh uang dihitung masih di laci; sudah → tinggal modalnya (setoran = dihitung − modal).
-                    $sisa = $s->status === 'tutup' ? (float) $s->uang_dihitung : min((float) $s->uang_dihitung, (float) $s->modal_awal);
-
-                    return [$t->kode => ['sisa' => $sisa, 'shift' => $s->nomor]];
-                })->all(),
+                // Uang yang SEHARUSNYA masih di laci tiap toko menurut shift terakhirnya. Sejak 10 Nov 2026 modal WAJIB
+                // sama; beda → alasan + PIN pengawas + jurnal Kas Laci ↔ Selisih Kas (KasirService::bukaShift).
+                'sisaLaci' => $toko->mapWithKeys(fn ($t) => ($s = $this->kasir->sisaLaci($t->kode))
+                    ? [$t->kode => ['sisa' => (float) $s['sisa'], 'shift' => $s['shift']]] : [])->all(),
+                'pengawas' => $this->pengawas($request),
             ]);
         }
 
@@ -66,12 +58,17 @@ class PosController extends Controller
         $data = $request->validate([
             'kode_lokasi' => ['required', 'string', 'exists:lokasi_persediaan,kode'],
             'modal_awal' => ['required', 'numeric', 'min:0'],
+            'alasan_beda' => ['nullable', 'string', 'max:255'],
+            'id_pengawas' => ['nullable', 'integer'],
+            'pin' => ['nullable', 'string', 'max:12'],
         ]);
 
         try {
-            $shift = $this->kasir->bukaShift($data['kode_lokasi'], $data['modal_awal'], $request->user()->id_pengguna);
+            $shift = $this->kasir->bukaShift($data['kode_lokasi'], $data['modal_awal'], $request->user()->id_pengguna, [
+                'alasan' => $data['alasan_beda'] ?? null, 'id_pengawas' => $data['id_pengawas'] ?? null, 'pin' => $data['pin'] ?? null,
+            ]);
         } catch (AppException $e) {
-            return back()->withInput()->with('error', $e->getMessage());
+            return back()->withInput($request->except('pin'))->with('error', $e->getMessage());   // PIN tak ikut disimpan di sesi
         }
 
         return redirect()->route('pos.index')->with('status', "Shift {$shift->nomor} dibuka. Selamat bertugas.");

@@ -77,8 +77,8 @@ class LaundryController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        // Label kantong langsung dicetak (layar penerimaan membuka dialog cetak lewat `cetak_label`).
-        return redirect()->route('laundry.terima')->with('status', "{$l->nomor} — cucian {$santri->nama} ({$l->berat} kg) diterima. Tempel labelnya di kantong.")
+        // Label kantong dicetak lewat tombol "Cetak label" (`cetak_label`) — tidak otomatis sejak 10 Nov 2026.
+        return redirect()->route('laundry.terima')->with('status', "{$l->nomor} — cucian {$santri->nama} ({$l->berat} kg) diterima. Tulis nomor kantong atau cetak labelnya.")
             ->with('cetak_label', $l->id);
     }
 
@@ -117,7 +117,7 @@ class LaundryController extends Controller
     public function simpanSerahkan(Request $request): RedirectResponse
     {
         $d = $request->validate(['id' => ['required', 'array', 'min:1'], 'id.*' => ['integer'], 'kembali' => ['nullable', 'array'],
-            'kembali.*' => ['integer', 'min:0'], 'catatan_serah' => ['nullable', 'string', 'max:1000'], 'izin' => ['nullable', 'string', 'max:500']],
+            'kembali.*' => ['nullable', 'integer', 'min:0'], /* dikosongkan = 0 dikembalikan */ 'catatan_serah' => ['nullable', 'string', 'max:1000'], 'izin' => ['nullable', 'string', 'max:500']],
             ['id.required' => 'Pilih kantong yang diserahkan.']);
         abort_if(filled($d['izin'] ?? null) && ! \App\Support\Akses::boleh('laundry-izin', 'ubah'), 403, 'Izin mengambil cucian tertahan hanya untuk pemegang hak Laundry — Izin.');
         [$santri, $cara, $galat] = $this->kenali($request, 'ubah');
@@ -148,7 +148,7 @@ class LaundryController extends Controller
         $this->pastikanBagian($laundry, 'lihat');
         $laundry->load(['santri.kelas', 'santri.jenjang', 'item']);
 
-        return view('laundry.show', ['l' => $laundry, 'jenis' => $this->jenisAktif(),
+        return view('laundry.show', ['l' => $laundry, 'jenis' => $this->jenisAktif($laundry),
             'terkunci' => (new \App\Services\Modules\TagihanLaundryService)->terkunci($laundry->id_santri, $laundry->diterima_pada->format('Y-m')),
             'petugas' => \App\Models\User::whereIn('id_pengguna', array_filter(array_map(fn ($s) => $laundry->{"{$s}_oleh"}, [...array_keys(Laundry::LANGKAH), 'dibatalkan'])))
                 ->pluck('nama', 'id_pengguna')]);
@@ -225,8 +225,9 @@ class LaundryController extends Controller
         }
         $laundry->load(['santri.kelas', 'santri.jenjang', 'item']);
 
-        return view('laundry.periksa', ['l' => $laundry, 'jenis' => $this->jenisAktif(),
-            'kuota' => (new \App\Services\Modules\TagihanLaundryService)->ringkas($laundry->santri)]);
+        // Kuota bulan kantong DITERIMA, bukan bulan hari ini (audit 10 Nov 2026: kantong akhir bulan diperiksa awal bulan).
+        return view('laundry.periksa', ['l' => $laundry, 'jenis' => $this->jenisAktif($laundry),
+            'kuota' => (new \App\Services\Modules\TagihanLaundryService)->ringkas($laundry->santri, $laundry->diterima_pada->format('Y-m'))]);
     }
 
     public function simpanPeriksa(Request $request, Laundry $laundry): RedirectResponse
@@ -242,7 +243,7 @@ class LaundryController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('laundry.pemeriksaan')->with('status', "{$l->nomor} diperiksa — {$l->berat} kg, {$l->jumlahPotong()} potong. Pindai kantong berikutnya.")
+        return redirect()->route('laundry.pemeriksaan')->with('status', "{$l->nomor} diperiksa — {$l->berat} kg, {$l->jumlahPotong()} potong. Lanjut ke kantong berikutnya.")
             // Tombol Cetak label (berisi daftar cucian untuk cek packing, 10 Nov 2026) — tidak dicetak otomatis.
             ->with('cetak_label', $l->id);
     }
@@ -256,15 +257,28 @@ class LaundryController extends Controller
     }
 
     /** @return \Illuminate\Support\Collection<int,JenisPakaianLaundry> */
-    private function jenisAktif()
+    private function jenisAktif(?Laundry $l = null)
     {
-        return JenisPakaianLaundry::where('aktif', true)->orderBy('nama')->get(['id', 'nama']);
+        // Jenis yang sudah dipakai kantong ini ikut walau kini nonaktif (audit 10 Nov 2026): dulu barisnya tampil
+        // kosong sehingga kantong lama tak bisa diubah tanpa menghapus daftar pakaiannya.
+        $dipakai = $l ? $l->item->pluck('id_jenis_pakaian')->filter()->all() : [];
+
+        return JenisPakaianLaundry::where(fn ($q) => $q->where('aktif', true)->orWhereIn('id', $dipakai ?: [0]))
+            ->orderBy('nama')->get(['id', 'nama']);
     }
 
     public function riwayat(Request $request): View
     {
-        $dari = Carbon::parse($request->query('dari', now()->startOfMonth()->toDateString()))->startOfDay();
-        $sampai = Carbon::parse($request->query('sampai', now()->toDateString()))->endOfDay();
+        // Tanggal ngawur di alamat → kembali ke bawaan, bukan halaman galat (audit 10 Nov 2026).
+        $tgl = function (string $kunci, string $bawaan) use ($request) {
+            try {
+                return Carbon::createFromFormat('!Y-m-d', (string) $request->query($kunci, $bawaan)) ?: Carbon::parse($bawaan);
+            } catch (\Throwable) {
+                return Carbon::parse($bawaan);
+            }
+        };
+        $dari = $tgl('dari', now()->startOfMonth()->toDateString())->startOfDay();
+        $sampai = $tgl('sampai', now()->toDateString())->endOfDay();
         $status = $request->query('status');
         $cari = trim((string) $request->query('cari', ''));
         // Hanya bagian yang berhak dilihat; ?bagian= menyempitkan lagi bila petugas memegang keduanya.

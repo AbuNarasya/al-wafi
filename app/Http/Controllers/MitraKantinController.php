@@ -58,6 +58,20 @@ class MitraKantinController extends Controller
         return back()->with('status', "Penarikan {$p->nomor} selesai — diterima mitra Rp ".number_format((float) $p->diterima(), 0, ',', '.').'.');
     }
 
+    /** Pelunasan saldo akhir mitra NONAKTIF oleh petugas (audit 10 Nov 2026) → masuk antrean penarikan biasa. */
+    public function pelunasan(Request $request, Mitra $mitra): RedirectResponse
+    {
+        $d = $request->validate(['nominal' => ['required', 'numeric', 'gt:0'], 'catatan' => ['nullable', 'string', 'max:255']]);
+        try {
+            $p = $this->saldo->ajukan($mitra, $d['nominal'], 'Pelunasan saldo akhir oleh petugas'.(filled($d['catatan'] ?? null) ? ': '.$d['catatan'] : ''),
+                $request->user()->id_pengguna, pelunasan: true);
+        } catch (AppException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('mitra_kantin.penarikan')->with('status', "Pelunasan {$p->nomor} untuk {$mitra->nama} diajukan — proses transfernya di daftar ini.");
+    }
+
     public function tolak(Request $request, int $id): RedirectResponse
     {
         $d = $request->validate(['alasan' => ['required', 'string', 'max:255']]);

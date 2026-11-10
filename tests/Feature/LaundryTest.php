@@ -244,4 +244,34 @@ class LaundryTest extends TestCase
         $this->actingAs($this->petugas)->post(route('laundry.batal', $l->id), ['alasan' => 'Salah santri'])->assertSessionHas('status');
         $this->actingAs($this->petugas)->put(route('laundry.ubah', $l->id), $isi + ['alasan' => 'x'])->assertSessionHas('error');
     }
+
+    /** Audit 10 Nov 2026: bulan kuota, jenis pakaian nonaktif, koreksi berat penerimaan, tanggal riwayat ngawur. */
+    public function test_temuan_audit_10_nov(): void
+    {
+        // Diterima 31 Okt malam, diperiksa 1 Nov: kuota yang dipakai = Oktober (bulan kantong diterima).
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-31 20:00'));
+        $this->terima(['kartu' => 'KARTU001']);
+        $l = Laundry::sole();
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-11-01 08:00'));
+        $this->actingAs($this->petugas)->get(route('laundry.periksa', $l->id))->assertOk()
+            ->assertViewHas('kuota', fn ($k) => $k['periode'] === '2026-10');
+
+        // Masih "diterima": koreksi berat ikut membetulkan berat penerimaan (label memakai angka itu).
+        $this->actingAs($this->petugas)->put(route('laundry.ubah', $l->id), ['berat' => '2.9', 'alasan' => 'salah timbang',
+            'item' => [['id_jenis_pakaian' => $this->gamis, 'jumlah' => 3]]])->assertSessionHas('status');
+        $this->assertSame(['2.90', '2.90'], [(string) $l->fresh()->berat, (string) $l->fresh()->berat_terima]);
+
+        // Jenis pakaian dinonaktifkan sesudah dipakai: kantongnya tetap bisa diubah tanpa membuang barisnya.
+        JenisPakaianLaundry::whereKey($this->gamis)->update(['aktif' => false]);
+        $this->actingAs($this->petugas)->get(route('laundry.show', $l->id))->assertOk()->assertSee('<option value="Gamis">', false);
+        $this->actingAs($this->petugas)->put(route('laundry.ubah', $l->id), ['berat' => '2.9', 'catatan' => 'noda', 'alasan' => 'catatan',
+            'item' => [['id_jenis_pakaian' => $this->gamis, 'jumlah' => 3]]])->assertSessionHas('status');
+        $this->assertSame('noda', $l->fresh()->catatan);
+        // Kantong LAIN tetap tak boleh memakai jenis yang nonaktif.
+        $this->actingAs($this->petugas)->post(route('laundry.simpan_terima'), ['kartu' => 'KARTU001', 'berat' => '1',
+            'item' => [['id_jenis_pakaian' => $this->gamis, 'jumlah' => 1]]])->assertSessionHas('error', fn ($m) => str_contains($m, 'nonaktif'));
+
+        // Tanggal ngawur di Riwayat → bawaan, bukan halaman galat.
+        $this->actingAs($this->petugas)->get(route('laundry.riwayat', ['dari' => 'kemarin-lusa', 'sampai' => '2026-13-45']))->assertOk();
+    }
 }

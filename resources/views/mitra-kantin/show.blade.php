@@ -36,6 +36,23 @@
         <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"><div class="text-xs text-gray-500">Penarikan sedang diajukan</div><div class="text-lg font-bold tabular-nums">@rp($saldo['diajukan'])</div></div>
     </div>
 
+    {{-- Mitra NONAKTIF (sewa selesai): akunnya tak bisa masuk, jadi petugas mengajukan pelunasan saldo akhirnya (10 Nov 2026). --}}
+    @if (! $mitra->aktif() && (float) $saldo['bisa_ditarik'] > 0 && \App\Support\Akses::boleh('mitra-kantin', 'ubah'))
+        <form method="POST" action="{{ route('mitra_kantin.pelunasan', $mitra) }}" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm"
+              data-confirm="Ajukan pelunasan saldo akhir {{ $mitra->nama }}? Transfernya diproses di daftar Penarikan Saldo Mitra.">
+            @csrf
+            <p class="font-semibold text-amber-900">Mitra ini nonaktif — sisa saldonya bisa dilunasi oleh petugas.</p>
+            <p class="text-xs text-amber-800">Akun mitra tak bisa masuk lagi. Pelunasan masuk antrean penarikan biasa (transfer ke rekening di atas, biaya transfer dipotong).</p>
+            <div class="mt-2 flex flex-wrap items-end gap-2">
+                <label class="block"><span class="text-xs text-amber-900">Nominal</span>
+                    <input type="number" name="nominal" min="1" step="1" value="{{ old('nominal', (int) $saldo['bisa_ditarik']) }}" max="{{ (int) $saldo['bisa_ditarik'] }}" class="block w-40 rounded-lg border-amber-300 text-sm"></label>
+                <label class="block flex-1"><span class="text-xs text-amber-900">Catatan (tidak wajib)</span>
+                    <input type="text" name="catatan" maxlength="200" value="{{ old('catatan') }}" class="block w-full rounded-lg border-amber-300 text-sm"></label>
+                <button class="rounded-lg bg-amber-600 px-4 py-2 font-semibold text-white">Ajukan pelunasan</button>
+            </div>
+        </form>
+    @endif
+
     {{-- Menu --}}
     <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <h3 class="text-sm font-semibold text-gray-800">Daftar Menu</h3>

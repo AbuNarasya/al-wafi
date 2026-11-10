@@ -124,7 +124,8 @@ class LaundryDashboardController extends Controller
             'santriAktif' => DB::table('santri')->where('status', 'aktif')->whereIn('jenis_kelamin', $jk)->count(),
             'belumLunas' => (float) DB::table('tagihan_laundry as t')->join('santri as s', 's.id', '=', 't.id_santri')
                 ->join('tagihan_santri as ts', 'ts.id', '=', 't.id_tagihan')->where('t.status', 'terbit')
-                ->whereNotIn('ts.status', ['lunas', 'batal'])->whereIn('s.jenis_kelamin', $jk)->sum('t.nominal'),
+                // SISA, bukan nominal penuh (audit 10 Nov 2026) — yang sudah dibayar sebagian tak dihitung ganda.
+                ->whereNotIn('ts.status', ['lunas', 'batal', 'dihapus'])->whereIn('s.jenis_kelamin', $jk)->sum('ts.sisa'),
             'perJenjang' => $dasarIni()->leftJoin('jenjang as j', 'j.kode', '=', 's.kode_jenjang')
                 ->selectRaw('coalesce(j.nama, s.kode_jenjang) as nama, j.urutan, count(*) as kantong, sum(l.berat) as kg, count(distinct l.id_santri) as santri')
                 ->groupBy('j.nama', 's.kode_jenjang', 'j.urutan')->orderBy('j.urutan')->get(),

@@ -42,7 +42,7 @@
             <div class="my-3 border-t border-dashed border-gray-300"></div>
             <dl class="grid grid-cols-2 gap-y-2 tabular-nums">
                 <dt class="font-semibold">Disetor ke keuangan</dt><dd class="text-right font-semibold">{{ $rp(max(0, (float) $shift->uang_dihitung - (float) $shift->modal_awal)) }}</dd>
-                <dt class="text-gray-500">Tetap di laci (modal)</dt><dd class="text-right">{{ $rp($shift->modal_awal) }}</dd>
+                <dt class="text-gray-500">Tetap di laci (modal)</dt><dd class="text-right">{{ $rp(min((float) $shift->uang_dihitung, (float) $shift->modal_awal)) }}</dd>
             </dl>
             @if ($shift->catatan_tutup)<p class="mt-3 text-xs text-gray-500">Catatan: {{ $shift->catatan_tutup }}</p>@endif
         </div>

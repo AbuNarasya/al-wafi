@@ -146,6 +146,20 @@ class TransferOpnamePersediaanTest extends TestCase
         $this->assertSame('30000.00', InventoryMovement::nilai('BRG0001', 'L002'));
         $this->assertSame('0.0000', InventoryMovement::stok('BRG0001', LokasiPersediaan::TRANSIT));
 
+        // Gudang (unit Gudang Pusat) → toko (unit Wafi Mart): BEDA unit → dijurnal saat diterima (keputusan user
+        // 10 Nov 2026): D Persediaan unit toko / K Persediaan unit gudang, sebesar harga pokok yang tiba.
+        $baris = JournalLine::where('kode_coa', self::PERSEDIAAN)->get();
+        $this->assertSame(['30000.00', self::UNIT_TOKO], [\App\Support\Money::of($baris->where('kode_unit', self::UNIT_TOKO)->sum('debet')), $baris->firstWhere('debet', '>', 0)->kode_unit]);
+        $this->assertSame('30000.00', \App\Support\Money::of($baris->where('kode_unit', self::UNIT_GUDANG)->sum('kredit')));
+        $this->assertSame(0, \App\Models\MutasiPersediaan::where('kode_lokasi', 'L002')->whereNull('journal_entry_id')->count());
+
+        // Satu unit → tetap tanpa jurnal.
+        LokasiPersediaan::whereKey('L002')->update(['kode_unit' => self::UNIT_GUDANG]);
+        $this->masuk('L001', '5', '15000', 'G-3');
+        $satu = $this->kirim('5');
+        (new TransferPersediaanService)->terima($satu->id_transfer, '2026-10-11', [], null, $this->admin->id_pengguna);
+        $this->assertSame(2, JournalLine::where('kode_coa', self::PERSEDIAAN)->count());
+
         // Kiriman yang sama tak bisa diterima dua kali (masalah transfer ganda POS lama).
         $this->expectException(AppException::class);
         (new TransferPersediaanService)->terima($doc->id_transfer, '2026-10-11', [], null, $this->admin->id_pengguna);
@@ -190,7 +204,10 @@ class TransferOpnamePersediaanTest extends TestCase
         $this->assertSame(['selesai', 'kembali'], [$doc->fresh()->status, $doc->fresh()->putusan]);
         $this->assertSame('4.0000', InventoryMovement::stok('BRG0001', 'L001'));
         $this->assertSame('0.0000', InventoryMovement::stok('BRG0001', LokasiPersediaan::TRANSIT));
-        $this->assertSame(0, JournalLine::count());
+        // Hanya jurnal pindah unit untuk 20 pcs yang tiba (gudang → toko beda unit, 10 Nov 2026); yang dikembalikan
+        // ke asal tetap milik unit asal → tanpa jurnal.
+        $this->assertSame(2, JournalLine::count());
+        $this->assertSame('60000.00', \App\Support\Money::of(JournalLine::where('kode_unit', self::UNIT_TOKO)->sum('debet')));
     }
 
     public function test_selisih_diputus_hilang_berjurnal_ke_selisih_persediaan_unit_asal(): void
@@ -230,6 +247,20 @@ class TransferOpnamePersediaanTest extends TestCase
         // Lapisan @1.000 tetap TERTUA: keluar berikutnya 10 pcs harus seharga 10.000.
         $k = InventoryMovement::keluar(['kode_persediaan' => 'BRG0001', 'kuantiti' => '10', 'sumber_modul' => 'Persediaan', 'sumber_ref' => 'MP-1']);
         $this->assertSame('10000.00', $k->nilai);
+    }
+
+    /** Audit 10 Nov 2026: "1.200" di <input type="number"> terbaca 1,2 oleh browser — nilai awal wajib format mesin. */
+    public function test_isian_diterima_berformat_mesin_untuk_jumlah_ribuan(): void
+    {
+        $this->masuk('L001', '1200', '1200000', 'G-1');
+        $gudang = $this->pengguna('gudang', false, ['transfer-persediaan' => ['buat', 'ubah']]);
+        $this->actingAs($gudang)->post(route('transfer_persediaan.store'), [
+            'tanggal_kirim' => '2026-10-10', 'kode_lokasi_asal' => 'L001', 'kode_lokasi_tujuan' => 'L002',
+            'details' => [['kode_persediaan' => 'BRG0001', 'satuan' => 'pcs', 'kuantiti' => '1200']],
+        ])->assertSessionHasNoErrors();
+        $toko = $this->pengguna('toko', false, ['transfer-persediaan' => ['ubah']]);
+        $html = $this->actingAs($toko)->get(route('transfer_persediaan.show', TransferPersediaan::sole()->id_transfer))->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('#name="diterima\[\d+\]"\s+value="1200"#', $html);
     }
 
     public function test_alur_layar_transfer_dan_hak_memutus(): void

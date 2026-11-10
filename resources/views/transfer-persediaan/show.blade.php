@@ -3,7 +3,12 @@
 @section('title', 'Transfer ' . $doc->nomor)
 
 @section('content')
-    @php $angka = fn ($v) => rtrim(rtrim(number_format((float) $v, 4, ',', '.'), '0'), ','); @endphp
+    @php
+        $angka = fn ($v) => rtrim(rtrim(number_format((float) $v, 4, ',', '.'), '0'), ',');
+        // Untuk <input type="number">: format MESIN (titik desimal, tanpa pemisah ribuan). Format Indonesia "1.200"
+        // dibaca browser sebagai 1,2 (audit 10 Nov 2026).
+        $mesin = fn ($v) => rtrim(rtrim(number_format((float) $v, 4, '.', ''), '0'), '.');
+    @endphp
     <div class="mx-auto max-w-4xl space-y-4">
         <div class="flex items-center justify-between">
             <a href="{{ route('transfer_persediaan.index') }}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Kembali</a>
@@ -57,7 +62,7 @@
                                 {{-- Diisi dalam satuan DASAR: dari 1 dus bisa tiba 20 pcs. --}}
                                 @if ($bisaTerima)
                                     <input type="number" step="0.0001" min="0" max="{{ (float) $d->kuantiti }}" name="diterima[{{ $d->id }}]"
-                                           value="{{ old('diterima.'.$d->id, $angka($d->kuantiti)) }}" class="w-24 rounded border-gray-300 text-right text-sm"> {{ $d->persediaan?->satuan }}
+                                           value="{{ old('diterima.'.$d->id, $mesin($d->kuantiti)) }}" class="w-24 rounded border-gray-300 text-right text-sm"> {{ $d->persediaan?->satuan }}
                                 @elseif ($d->kuantiti_diterima !== null)
                                     {{ $angka($d->kuantiti_diterima) }} {{ $d->persediaan?->satuan }}
                                 @else

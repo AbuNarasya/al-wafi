@@ -8,7 +8,19 @@
     @unless ($santri)
         @include('laundry._kenali', ['rute' => 'laundry.serahkan', 'judul' => 'Serahkan cucian — tap kartu santri'])
     @else
-        @php $siap = $kantong->where('status', 'selesai'); $belum = $kantong->where('status', '!=', 'selesai'); @endphp
+        @php
+            $siap = $kantong->where('status', 'selesai'); $belum = $kantong->where('status', '!=', 'selesai');
+            // Sesudah galat validasi: tanda "kurang" dihitung dari isian lama, supaya kotak catatan wajib tetap tampak.
+            $kurangAwal = [];
+            foreach ($siap as $l) {
+                foreach ($l->item as $it) {
+                    $o = old('kembali.'.$it->id);
+                    if ($o !== null && (int) $o < $it->jumlah) {
+                        $kurangAwal[$it->id] = true;
+                    }
+                }
+            }
+        @endphp
         <div class="mt-3 flex items-center justify-between">
             <p class="text-base font-semibold text-gray-900">{{ $santri->nama }}
                 <span class="text-sm font-normal text-gray-500">{{ $santri->nis }}{{ $santri->kelas ? ' · '.$santri->kelas->nama : '' }}</span></p>
@@ -35,7 +47,7 @@
             <p class="mt-4 rounded-xl border border-gray-200 bg-white p-6 text-center text-gray-500 shadow-sm">Tidak ada cucian yang siap diambil.</p>
         @else
             <form method="POST" action="{{ route('laundry.simpan_serahkan') }}" class="mt-4 space-y-4"
-                  x-data="{ kurang: {}, get adaKurang() { return Object.values(this.kurang).some(v => v) },
+                  x-data="{ kurang: @js((object) $kurangAwal), get adaKurang() { return Object.values(this.kurang).some(v => v) },
                             milik: @js($siap->pluck('nomor')->values()), cocok: [], pesan: '', galat: false,
                             pindai(e) { const n = e.target.value.trim().toUpperCase(); e.target.value = ''; if (! n) return;
                                 if (this.milik.includes(n)) { if (! this.cocok.includes(n)) this.cocok.push(n); this.galat = false; this.pesan = n + ' cocok.' }

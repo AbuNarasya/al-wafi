@@ -120,17 +120,25 @@ class KasirMitraService
             } catch (AppException) {
                 continue;
             }
-            if (($h['status'] ?? '') === 'berhasil') {
-                $j->update(['status' => 'berhasil', 'nama_santri' => $h['nama'] ?? null, 'sisa_saldo' => $h['sisa_saldo'] ?? null, 'pesan' => null]);
-            } else {
-                $j->update(['status' => 'gagal', 'pesan' => 'Dipastikan tidak terjadi di ERP Al Wafi.']);
-            }
+            // Ditulis BERSYARAT (audit 10 Nov 2026): rekonsiliasi malam bisa mengklaim baris yang sama selagi ERP
+            // ditanya (jadi `gagal` + uang santri dikembalikan). Tulisan tanpa syarat dulu menimpanya jadi `berhasil`
+            // → masuk saldo mitra padahal santri sudah menerima uangnya kembali.
+            $this->tulisJikaMasihTerbuka($j, ($h['status'] ?? '') === 'berhasil'
+                ? ['status' => 'berhasil', 'nama_santri' => $h['nama'] ?? null, 'sisa_saldo' => $h['sisa_saldo'] ?? null, 'pesan' => null]
+                : ['status' => 'gagal', 'pesan' => 'Dipastikan tidak terjadi di ERP Al Wafi.']);
 
             return $j->load('rincian');
         }
-        $j->update(['status' => 'belum_pasti', 'pesan' => self::PESAN_BELUM_PASTI]);
+        $this->tulisJikaMasihTerbuka($j, ['status' => 'belum_pasti', 'pesan' => self::PESAN_BELUM_PASTI]);
 
         return $j->load('rincian');
+    }
+
+    /** Ubah hanya bila statusnya masih menunggu/belum pasti; selalu dimuat ulang supaya layar melihat keadaan sebenarnya. */
+    private function tulisJikaMasihTerbuka(PenjualanMitra $j, array $isi): void
+    {
+        PenjualanMitra::whereKey($j->id)->whereIn('status', ['menunggu', 'belum_pasti'])->update($isi + ['updated_at' => now()]);
+        $j->refresh();
     }
 
     /** Batal (hari yang sama, dengan alasan): seluruh nilainya kembali ke dompet santri. */
