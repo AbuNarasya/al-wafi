@@ -78,7 +78,8 @@ class LaundryTest extends TestCase
             ->assertSee('Cetak label')->assertDontSee('<iframe', false);
         $l = Laundry::sole();
         $this->assertSame(['diterima', 'kartu', 0, '3.40'], [$l->status, $l->cara_terima, $l->jumlahPotong(), (string) $l->berat_terima]);
-        $this->actingAs($this->petugas)->get(route('laundry.label', $l->id))->assertOk()->assertSee($l->nomor)->assertSee('data-qr="'.$l->nomor.'"', false);
+        $this->actingAs($this->petugas)->get(route('laundry.label', $l->id))->assertOk()->assertSee($l->nomor)->assertSee('data-qr="'.$l->nomor.'"', false)
+            ->assertSee('Daftar cucian diisi di meja Pemeriksaan');   // sebelum diperiksa: belum ada daftar
 
         // Tak bisa dimajukan dari papan sebelum diperiksa.
         $this->actingAs($this->petugas)->post(route('laundry.majukan'), ['dari' => 'diterima', 'id' => [$l->id]])->assertSessionHasErrors('dari');
@@ -95,7 +96,11 @@ class LaundryTest extends TestCase
             ->assertSessionHas('error', fn ($m) => str_contains($m, 'wajib'));
         $this->actingAs($this->petugas)->post(route('laundry.simpan_periksa', $l->id), ['berat' => '3.1', 'catatan' => 'Noda di gamis',
             'item' => [['id_jenis_pakaian' => $this->gamis, 'jumlah' => 3], ['id_jenis_pakaian' => $this->handuk, 'jumlah' => 1]]])
-            ->assertRedirect(route('laundry.pemeriksaan'));
+            ->assertRedirect(route('laundry.pemeriksaan'))->assertSessionHas('cetak_label', $l->id);
+        // Label sesudah diperiksa memuat daftar cucian + jumlah + kotak cek untuk packing (10 Nov 2026).
+        $this->actingAs($this->petugas)->get(route('laundry.label', $l->id))->assertOk()
+            ->assertSee('DAFTAR CUCIAN')->assertSeeInOrder(['>3<', 'Gamis', '>1<', 'Handuk'], false)->assertSee('4 potong')
+            ->assertDontSee('Daftar cucian diisi di meja Pemeriksaan');
         $l->refresh();
         $this->assertSame(['diperiksa', '3.10', '3.40', 4, 'Noda di gamis'], [$l->status, (string) $l->berat, (string) $l->berat_terima, $l->jumlahPotong(), $l->catatan]);
         $this->assertSame($this->petugas->id_pengguna, (int) $l->diperiksa_oleh);

@@ -242,7 +242,9 @@ class LaundryController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('laundry.pemeriksaan')->with('status', "{$l->nomor} diperiksa — {$l->berat} kg, {$l->jumlahPotong()} potong. Pindai kantong berikutnya.");
+        return redirect()->route('laundry.pemeriksaan')->with('status', "{$l->nomor} diperiksa — {$l->berat} kg, {$l->jumlahPotong()} potong. Pindai kantong berikutnya.")
+            // Tombol Cetak label (berisi daftar cucian untuk cek packing, 10 Nov 2026) — tidak dicetak otomatis.
+            ->with('cetak_label', $l->id);
     }
 
     /** Label kantong 58 mm: nomor, nama, kelas, QR nomor. `?cetak=1` langsung membuka dialog cetak. */
@@ -250,7 +252,7 @@ class LaundryController extends Controller
     {
         $this->pastikanBagian($laundry, 'lihat');
 
-        return view('laundry.label', ['l' => $laundry->load(['santri.kelas', 'santri.jenjang'])]);
+        return view('laundry.label', ['l' => $laundry->load(['santri.kelas', 'santri.jenjang', 'item'])]);
     }
 
     /** @return \Illuminate\Support\Collection<int,JenisPakaianLaundry> */

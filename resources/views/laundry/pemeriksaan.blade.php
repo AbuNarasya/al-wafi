@@ -3,7 +3,15 @@
 @section('title', 'Pemeriksaan Cucian')
 
 @section('content')
-    <a href="{{ route('laundry.index') }}" class="text-sm text-brand hover:underline">&larr; Papan Laundry</a>
+    {{-- Sesudah memeriksa: label berisi DAFTAR CUCIAN untuk cek saat packing (10 Nov 2026) — dicetak hanya bila ditekan. --}}
+    @if (session('cetak_label'))
+        <a href="{{ route('laundry.label', session('cetak_label')) }}?cetak=1" target="_blank"
+           class="mb-3 inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>
+            Cetak label + daftar cucian
+        </a>
+    @endif
+    <a href="{{ route('laundry.index') }}" class="block text-sm text-brand hover:underline">&larr; Papan Laundry</a>
 
     {{-- Paket 1 (3 Nov 2026): kantong dibuka di meja pemeriksaan — timbang ulang + jenis & jumlah pakaian. --}}
     <form method="GET" action="{{ route('laundry.pemeriksaan') }}" class="mt-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">

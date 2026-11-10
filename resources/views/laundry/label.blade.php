@@ -22,6 +22,15 @@
         .qr svg { width: 100%; height: 100%; }
         .nama { font-size: 11pt; font-weight: 700; line-height: 1.15; }
         .kecil { font-size: 8pt; margin-top: .8mm; }
+        .daftar { margin-top: 2mm; border-top: 1px dashed #000; padding-top: 1.5mm; text-align: left; }
+        .daftar .judul { font-size: 8pt; font-weight: 700; text-align: center; margin-bottom: 1mm; }
+        .daftar table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+        .daftar td { padding: .6mm .5mm; border-bottom: 1px dotted #888; vertical-align: top; }
+        .daftar td.jml { width: 7mm; text-align: right; font-weight: 700; padding-right: 1.5mm; }
+        .daftar td.cek { width: 5mm; text-align: center; }
+        .kotak { display: inline-block; width: 3mm; height: 3mm; border: 1px solid #000; }
+        .daftar .total { font-size: 8.5pt; font-weight: 700; margin-top: 1mm; display: flex; justify-content: space-between; }
+        .daftar .kosong { font-size: 8pt; text-align: center; font-style: italic; }
         .alat { margin: 12px; font-size: 14px; }
         @media print { .alat { display: none; } }
     </style>
@@ -35,6 +44,22 @@
         <div class="nama">{{ $s?->nama }}</div>
         <div class="kecil">{{ $s?->nis }}{{ $s?->kelas ? ' · '.$s->kelas->nama : ($s?->jenjang ? ' · '.$s->jenjang->nama : '') }}</div>
         <div class="kecil">Diterima {{ $l->diterima_pada?->timezone('Asia/Jakarta')->format('d/m/Y H:i') }} · {{ rtrim(rtrim(number_format((float) ($l->berat_terima ?? $l->berat), 2, ',', '.'), '0'), ',') }} kg</div>
+
+        {{-- Daftar cucian (10 Nov 2026): alat cek saat packing cucian yang sudah selesai. Daftarnya baru ada sesudah
+             meja Pemeriksaan — label yang dicetak saat penerimaan memberi tahu hal itu. --}}
+        <div class="daftar">
+            @if ($l->item->isNotEmpty())
+                <div class="judul">DAFTAR CUCIAN{{ $l->diperiksa_pada ? ' · '.rtrim(rtrim(number_format((float) $l->berat, 2, ',', '.'), '0'), ',').' kg' : '' }}</div>
+                <table>
+                    @foreach ($l->item as $it)
+                        <tr><td class="jml">{{ $it->jumlah }}</td><td>{{ $it->nama_pakaian }}</td><td class="cek"><span class="kotak"></span></td></tr>
+                    @endforeach
+                </table>
+                <div class="total"><span>Total</span><span>{{ $l->jumlahPotong() }} potong</span></div>
+            @else
+                <div class="kosong">Daftar cucian diisi di meja Pemeriksaan — cetak ulang label sesudahnya untuk cek packing.</div>
+            @endif
+        </div>
     </div>
     @if (request()->boolean('cetak'))
         {{-- QR digambar asinkron — beri jeda sebelum membuka dialog cetak. --}}
