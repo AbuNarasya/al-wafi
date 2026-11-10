@@ -105,9 +105,15 @@ class KasirMitraController extends Controller
     public function saldo(Request $request, SaldoMitraService $s): View
     {
         $mitra = $this->mitra($request);
+        // Kabar penarikan yang belum dibaca tampil sekali di atas, lalu ditandai dibaca (titik di menu Saldo hilang).
+        $kabar = \App\Models\Notification::where('id_pengguna', $request->user()->id_pengguna)
+            ->where('jenis', \App\Services\Modules\KabarKantin::KABAR_PENARIKAN)->where('dibaca', false)->orderByDesc('id')->get();
+        if ($kabar->isNotEmpty()) {
+            \App\Models\Notification::whereIn('id', $kabar->pluck('id'))->update(['dibaca' => true]);
+        }
 
         return view('mitra.saldo', [
-            'mitra' => $mitra, 'saldo' => $s->saldo($mitra->id),
+            'mitra' => $mitra, 'saldo' => $s->saldo($mitra->id), 'kabar' => $kabar,
             'rows' => PenarikanMitra::where('id_mitra', $mitra->id)->orderByDesc('id')->limit(50)->get(),
         ]);
     }

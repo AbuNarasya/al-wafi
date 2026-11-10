@@ -43,6 +43,29 @@ class PencairanTokoService
         ];
     }
 
+    /**
+     * Pengingat Tugas Saya (10 Nov 2026): belanja kartu yang sudah dijurnal tapi belum dicairkan, bertanggal lebih
+     * dari `company_settings.batas_hari_pencairan_toko` hari lalu (0 = mati). null bila tak ada yang terlambat.
+     *
+     * @return array{total:string, sejak:string, hari:int}|null
+     */
+    public static function terlambat(): ?array
+    {
+        $hari = (int) (CompanySettings::query()->value('batas_hari_pencairan_toko') ?? 7);
+        if ($hari <= 0) {
+            return null;
+        }
+        $batas = now()->subDays($hari)->toDateString();
+        $r = TransaksiDompetToko::where('status', 'berhasil')->whereNotNull('dijurnal_pada')->whereNull('id_pencairan_toko')
+            ->whereDate('tanggal', '<=', $batas)
+            ->selectRaw("min(tanggal) as sejak, coalesce(sum(case when jenis = 'potong' then nominal else -nominal end), 0) as total")->first();
+        if (! $r || ! $r->sejak || ! Money::gtZero(Money::of($r->total))) {
+            return null;
+        }
+
+        return ['total' => Money::of($r->total), 'sejak' => (string) $r->sejak, 'hari' => $hari];
+    }
+
     public function cairkan(string $sampai, string $kodeCoaBank, int $idPengguna): PencairanToko
     {
         if (! BankAccount::where('kode_coa', $kodeCoaBank)->where('status', 'aktif')->exists()) {

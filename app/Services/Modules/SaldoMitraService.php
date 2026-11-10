@@ -70,7 +70,7 @@ class SaldoMitraService
             throw new AppException(422, 'Nominal penarikan harus lebih dari nol.');
         }
 
-        return DB::transaction(function () use ($mitra, $nominal, $catatan, $idPengguna) {
+        $p = DB::transaction(function () use ($mitra, $nominal, $catatan, $idPengguna) {
             Mitra::whereKey($mitra->id)->lockForUpdate()->first();
             if (PenarikanMitra::where('id_mitra', $mitra->id)->where('status', 'diajukan')->exists()) {
                 throw new AppException(422, 'Masih ada pengajuan penarikan yang menunggu diproses.');
@@ -89,6 +89,9 @@ class SaldoMitraService
                 'diajukan_oleh' => $idPengguna,
             ]);
         });
+        (new KabarKantin)->penarikanDiajukan($p);   // sesudah tersimpan — pengajuan tak boleh gugur karena notifikasi
+
+        return $p;
     }
 
     /** Mitra membatalkan pengajuannya sendiri sebelum diproses. */
@@ -119,7 +122,7 @@ class SaldoMitraService
         $path = $bukti ? Storage::disk('local')->putFile('penarikan-mitra', $bukti) : null;
 
         try {
-            return DB::transaction(function () use ($id, $biaya, $kodeCoaBank, $tanggal, $bukti, $path, $hutang, $idPengguna) {
+            $hasil = DB::transaction(function () use ($id, $biaya, $kodeCoaBank, $tanggal, $bukti, $path, $hutang, $idPengguna) {
                 $p = PenarikanMitra::with('mitra')->lockForUpdate()->findOrFail($id);
                 if ($p->status !== 'diajukan') {
                     throw new AppException(422, 'Pengajuan ini sudah diproses.');
@@ -153,6 +156,9 @@ class SaldoMitraService
             }
             throw $e;
         }
+        (new KabarKantin)->penarikanDiproses($hasil);
+
+        return $hasil;
     }
 
     public function tolak(int $id, string $alasan, int $idPengguna): PenarikanMitra
@@ -162,7 +168,7 @@ class SaldoMitraService
             throw new AppException(422, 'Tulis alasan penolakan.');
         }
 
-        return DB::transaction(function () use ($id, $alasan, $idPengguna) {
+        $hasil = DB::transaction(function () use ($id, $alasan, $idPengguna) {
             $p = PenarikanMitra::lockForUpdate()->findOrFail($id);
             if ($p->status !== 'diajukan') {
                 throw new AppException(422, 'Pengajuan ini sudah diproses.');
@@ -173,6 +179,9 @@ class SaldoMitraService
 
             return $p;
         });
+        (new KabarKantin)->penarikanDiproses($hasil);
+
+        return $hasil;
     }
 
     /**

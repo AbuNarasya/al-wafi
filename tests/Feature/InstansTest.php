@@ -68,7 +68,7 @@ class InstansTest extends TestCase
         $this->instans('wafimart');
 
         $this->get('/login')->assertOk()->assertSee('Wafi Mart ERP')->assertDontSee('Al Wafi ERP')->assertSee('/manifest-wafimart.json', false);
-        foreach (['/kesantrian/santri', '/ppsb/calon-santri', '/datawali', '/kartu-santri', '/pencairan-kartu', '/tarik-tunai', '/santri-manual', '/rekening-portal'] as $url) {
+        foreach (['/kesantrian/santri', '/ppsb/calon-santri', '/datawali', '/kartu-santri', '/tarik-tunai', '/santri-manual', '/rekening-portal'] as $url) {
             $this->actingAs($this->admin)->get($url)->assertNotFound();
         }
         $this->get('/wali')->assertNotFound();          // Portal Wali, tanpa login pun
@@ -84,7 +84,7 @@ class InstansTest extends TestCase
         }
         $this->assertContains('WAFI MART', $grup);
         $label = $this->labelMenu();
-        foreach (['Kartu Santri (RFID)', 'Pencairan Belanja Kartu', 'Penarikan Tunai Kegiatan', 'Rekening Portal Wali', 'Input Manual Santri Aktif', 'Jenis Biaya'] as $l) {
+        foreach (['Kartu Santri (RFID)', 'Pencairan ke Wafi Mart', 'Penarikan Tunai Kegiatan', 'Rekening Portal Wali', 'Input Manual Santri Aktif', 'Jenis Biaya'] as $l) {
             $this->assertNotContains($l, $label, $l);
         }
         $this->assertContains('Kasir (POS)', $label);
@@ -141,12 +141,12 @@ class InstansTest extends TestCase
             $this->actingAs($this->admin)->get($url)->assertNotFound();
         }
         // Sisi dompet santri & persediaan pesantren tetap.
-        foreach (['/kartu-santri', '/pencairan-kartu', '/inventory', '/purchase-orders', '/kesantrian/santri'] as $url) {
+        foreach (['/kartu-santri', '/inventory', '/purchase-orders', '/kesantrian/santri'] as $url) {
             $this->actingAs($this->admin)->get($url)->assertOk();
         }
         $this->assertNotContains('WAFI MART', $this->grupMenu());
         $label = $this->labelMenu();
-        foreach (['Kartu Santri (RFID)', 'Pencairan Belanja Kartu', 'Persediaan'] as $l) {
+        foreach (['Kartu Santri (RFID)', 'Pencairan ke Wafi Mart', 'Persediaan'] as $l) {
             $this->assertContains($l, $label, $l);
         }
         $this->assertNotContains('Kasir (POS)', $label);

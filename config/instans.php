@@ -58,7 +58,7 @@ return [
                 'jenjang', 'tipe-biaya', 'jenis-biaya', 'tarif', 'reminder-tagihan',
                 'koreksi-tagihan', 'pembebasan-registrasi',
                 // Sisi dompet santri tetap milik Al Wafi; di Wafi Mart diganti penghubung API (fase 3).
-                'kartu-santri', 'belanja-kantin', 'pencairan-kartu', 'sesi-tarik-tunai', 'pencairan-toko',
+                'kartu-santri', 'belanja-kantin', 'sesi-tarik-tunai', 'pencairan-toko',
                 // Dana terikat & pertanggungjawabannya khas yayasan nirlaba, bukan minimarket.
                 'dana',
             ],

@@ -88,8 +88,6 @@ final class ModulRegistry
         // Pengawas kasir: `lihat` = rekap & rincian shift; `ubah` = batalkan struk,
         // tutup shift kasir yang lupa, terima setoran laci ke kas keuangan.
         ['kode' => 'shift-kasir', 'nama' => 'Shift Kasir & Setoran (rekap, batal struk, terima setoran)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
-        // Keuangan: buat = mencairkan belanja kartu santri ke kas toko, hapus = membatalkan.
-        ['kode' => 'pencairan-kartu', 'nama' => 'Pencairan Belanja Kartu ke Toko (mingguan)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],
         // Instans Wafi Mart: `lihat` = hasil pencocokan malam belanja kartu; `ubah` = jalankan ulang & tandai sudah ditangani.
         // Instans Al Wafi: buat = mencairkan hutang belanja kartu ke Wafi Mart (+ jurnal malam sekarang), hapus = membatalkan.
         ['kode' => 'pencairan-toko', 'nama' => 'Pencairan Belanja Kartu ke Wafi Mart (antar-entitas)', 'grup' => 'KEUANGAN', 'sub' => 'Transaksi'],

@@ -10,7 +10,13 @@
             <p class="mt-1 text-sm text-gray-600">Penyewa lahan di area Wafi Mart yang menerima kartu santri. Penjualan kartunya <b>bukan</b> pendapatan Wafi Mart — menjadi saldo mitra yang ditarik lewat pengajuan penarikan.</p>
         </div>
         <div class="flex gap-2">
-            <a href="{{ route('mitra_kantin.penarikan') }}" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">Penarikan Saldo</a>
+            @php $menungguTarik = \App\Models\PenarikanMitra::where('status', 'diajukan')->count(); @endphp
+            <a href="{{ route('mitra_kantin.penarikan') }}" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                Penarikan Saldo
+                @if ($menungguTarik > 0)
+                    <span class="ml-1 rounded-full bg-red-600 px-1.5 text-xs font-bold text-white">{{ $menungguTarik }}</span>
+                @endif
+            </a>
             <a href="{{ route('mitra_kantin.laporan') }}" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">Laporan</a>
             @if (\App\Support\Akses::boleh('mitra-kantin', 'buat'))
                 <a href="{{ route('mitra_kantin.create') }}" class="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white">+ Mitra</a>

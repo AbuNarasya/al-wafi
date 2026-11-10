@@ -29,7 +29,23 @@ class PencairanTokoController extends Controller
             'rows' => PencairanToko::with('pembuat')->orderByDesc('id')->paginate(25),
             'rekening' => BankAccount::where('status', 'aktif')->orderBy('kode_coa')->get()
                 ->mapWithKeys(fn ($b) => [$b->kode_coa => "{$b->kode_coa} — {$b->nama_rekening}"])->all(),
+            'batasHari' => (int) (\App\Models\CompanySettings::query()->value('batas_hari_pencairan_toko') ?? 7),
+            'terlambat' => PencairanTokoService::terlambat(),
         ]);
+    }
+
+    /** Batas hari pengingat Tugas Saya (0 = tidak diingatkan) — keputusan user 10 Nov 2026: bisa diatur. */
+    public function pengingat(Request $request): RedirectResponse
+    {
+        $d = $request->validate(['batas_hari_pencairan_toko' => ['required', 'integer', 'min:0', 'max:365']]);
+        $lama = \App\Models\CompanySettings::query()->value('batas_hari_pencairan_toko');
+        \App\Models\CompanySettings::query()->update(['batas_hari_pencairan_toko' => $d['batas_hari_pencairan_toko']]);
+        \App\Support\Audit\Jejak::catat('ubah_pengingat_pencairan_toko', ['modul' => 'pencairan-toko', 'id_pengguna' => $request->user()->id_pengguna,
+            'perubahan' => ['batas_hari_pencairan_toko' => ['dari' => $lama, 'ke' => (int) $d['batas_hari_pencairan_toko']]]]);
+
+        return back()->with('status', (int) $d['batas_hari_pencairan_toko'] === 0
+            ? 'Pengingat pencairan dimatikan.'
+            : "Pengingat disimpan: Tugas Saya muncul bila belanja kartu lebih dari {$d['batas_hari_pencairan_toko']} hari belum dicairkan.");
     }
 
     public function store(Request $request): RedirectResponse

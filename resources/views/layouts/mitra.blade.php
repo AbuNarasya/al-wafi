@@ -39,9 +39,16 @@
     </main>
 
     <nav class="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)]">
+        @php $kabarSaldo = \App\Services\Modules\KabarKantin::kabarMitraBelumDibaca(auth()->id()); @endphp
         <div class="mx-auto grid max-w-xl grid-cols-4 text-center text-xs font-semibold">
             @foreach ([['mitra.kasir', 'Kasir'], ['mitra.riwayat', 'Riwayat'], ['mitra.laporan', 'Laporan'], ['mitra.saldo', 'Saldo']] as [$rute, $label])
-                <a href="{{ route($rute) }}" class="py-3 {{ request()->routeIs($rute) ? 'text-brand' : 'text-gray-500' }}">{{ $label }}</a>
+                <a href="{{ route($rute) }}" class="relative py-3 {{ request()->routeIs($rute) ? 'text-brand' : 'text-gray-500' }}">
+                    {{ $label }}
+                    {{-- Titik merah: ada kabar penarikan (sudah ditransfer / ditolak) yang belum dilihat. --}}
+                    @if ($rute === 'mitra.saldo' && $kabarSaldo > 0)
+                        <span class="absolute right-1/4 top-2 h-2 w-2 rounded-full bg-red-500" aria-label="Ada kabar baru"></span>
+                    @endif
+                </a>
             @endforeach
         </div>
     </nav>

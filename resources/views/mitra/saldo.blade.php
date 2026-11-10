@@ -4,6 +4,13 @@
 
 @section('content')
 <div class="space-y-3">
+    @foreach ($kabar as $k)
+        <div class="rounded-xl p-3 text-sm shadow-sm {{ $k->judul === 'Penarikan ditolak' ? 'bg-red-50 text-red-800 ring-1 ring-red-200' : 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' }}">
+            <div class="font-semibold">{{ $k->judul }}</div>
+            <div>{{ $k->pesan }}</div>
+        </div>
+    @endforeach
+
     <div class="rounded-xl bg-white p-4 shadow-sm">
         <div class="text-xs text-gray-500">Saldo bisa ditarik</div>
         <div class="text-2xl font-bold tabular-nums">@rp($saldo['bisa_ditarik'])</div>

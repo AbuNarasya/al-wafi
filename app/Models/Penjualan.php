@@ -23,7 +23,7 @@ class Penjualan extends Model
         'nomor', 'id_shift', 'kode_lokasi', 'waktu', 'metode', 'total', 'bayar', 'kembalian', 'hpp',
         'status', 'id_kasir', 'alasan_batal', 'dibatalkan_oleh', 'dibatalkan_pada',
         'diskon_struk', 'disetujui_oleh', 'alasan_diskon',
-        'id_santri', 'uid_kartu', 'id_mutasi_dompet', 'id_pencairan',
+        'id_santri', 'uid_kartu', 'id_mutasi_dompet',
         // Kartu lewat penghubung (instans Wafi Mart): snapshot dari ERP Al Wafi.
         'nama_kartu', 'ref_dompet', 'sisa_saldo_kartu', 'ref_dompet_batal', 'kunci_klien',
     ];

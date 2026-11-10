@@ -119,8 +119,30 @@ final class TugasSaya
             ['/kesantrian/penagihan-tunggakan', Akses::boleh('penagihan-tunggakan', 'buat')
                 ? \App\Services\Modules\PenagihanTunggakanService::jumlahJanjiLewat() : 0, 'santri janji bayarnya sudah lewat'],
 
+            // ---- Wafi Mart & pencairan antar-entitas (10 Nov 2026) ----
+            // Akses::boleh sudah menyaring per instans: modulnya mati di instans yang tak memakainya.
+            ['/mitra-kantin', Akses::boleh('mitra-kantin', 'ubah')
+                ? \App\Models\PenarikanMitra::where('status', 'diajukan')->count() : 0, 'penarikan saldo mitra menunggu diproses'],
+            ['/penerimaan-al-wafi', Akses::boleh('penerimaan-al-wafi', 'buat')
+                ? count(\App\Services\Modules\KabarKantin::pencairanMenunggu()) : 0, 'pencairan dari Al Wafi belum dicatat diterima'],
+            ['/rekonsiliasi-kartu', Akses::boleh('rekonsiliasi-kartu', 'ubah')
+                ? \App\Models\RekonsiliasiDompetToko::where('status', 'perlu_diputus')->whereNull('ditangani_pada')->count() : 0,
+                'tanggal rekonsiliasi kartu perlu diputus'],
+            ...self::pencairanTerlambat(),
+
             ...self::jatuhTempo(),
         ];
+    }
+
+    /** ERP Al Wafi: belanja kartu yang lewat batas hari belum dicairkan ke Wafi Mart — satu tugas. */
+    private static function pencairanTerlambat(): array
+    {
+        if (! Akses::boleh('pencairan-toko', 'buat') || ! ($t = \App\Services\Modules\PencairanTokoService::terlambat())) {
+            return [];
+        }
+
+        return [['/pencairan-toko', 1, 'belanja kartu Rp '.number_format((float) $t['total'], 0, ',', '.')
+            .' belum dicairkan ke Wafi Mart sejak '.\Illuminate\Support\Carbon::parse($t['sejak'])->format('d/m/Y')]];
     }
 
     /**

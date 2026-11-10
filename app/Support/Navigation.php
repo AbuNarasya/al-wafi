@@ -94,8 +94,8 @@ final class Navigation
         ['url' => '/purchase-orders', 'label' => 'Purchase Order', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'purchase-orders'],
         ['url' => '/tarik-tunai', 'label' => 'Penarikan Tunai Kegiatan', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'sesi-tarik-tunai'],
         // Sisi DOMPET SANTRI (milik Al Wafi): pencairan belanja kartu ke Wafi Mart — tetap di sini walau
-        // fungsi toko sudah dipisah ke instans Wafi Mart (20 Okt 2026).
-        ['url' => '/pencairan-kartu', 'label' => 'Pencairan Belanja Kartu', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'pencairan-kartu'],
+        // fungsi toko sudah dipisah ke instans Wafi Mart (20 Okt 2026). "Pencairan Belanja Kartu" lama (kasir di
+        // instans yang sama) DIHAPUS 10 Nov 2026 — tak terpakai sejak Wafi Mart terpisah.
         ['url' => '/pencairan-toko', 'label' => 'Pencairan ke Wafi Mart', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'pencairan-toko'],
         ['url' => '/penerimaan-barang', 'label' => 'Penerimaan Barang', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'penerimaan-barang'],
         ['url' => '/perintah-pembayaran', 'label' => 'Perintah Pembayaran', 'group' => 'KEUANGAN', 'sub' => 'Transaksi', 'modul' => 'perintah-pembayaran'],

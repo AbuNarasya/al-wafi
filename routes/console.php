@@ -121,6 +121,19 @@ Artisan::command('mitra:jurnal-penjualan', function (App\Services\Modules\SaldoM
 })->purpose('Jurnal ringkas penjualan kartu kantin mitra (Wafi Mart)');
 Schedule::command('mitra:jurnal-penjualan')->dailyAt('00:50')->withoutOverlapping();
 
+// Sisi Wafi Mart (10 Nov 2026): pencairan dari Al Wafi yang belum dicatat diterima → Tugas Saya + notifikasi.
+// Daftarnya milik ERP Al Wafi, jadi ditanyakan berkala; hasilnya disimpan di cache untuk angka Tugas Saya.
+Artisan::command('toko:cek-pencairan', function (App\Services\Modules\KabarKantin $k, App\Services\Penghubung\KlienDompetToko $klien) {
+    if (! App\Services\Modules\KasirService::lewatPenghubung()) {
+        $this->info('Bukan instans Wafi Mart — dilewati.');
+
+        return;
+    }
+    $h = $k->cekPencairan($klien);
+    $this->info("{$h['menunggu']} pencairan menunggu diterima, {$h['dikabarkan']} baru dikabarkan.");
+})->purpose('Periksa pencairan dari ERP Al Wafi yang belum dicatat diterima (Wafi Mart)');
+Schedule::command('toko:cek-pencairan')->everyFifteenMinutes()->withoutOverlapping();
+
 // Potongan uang pangkal per gelombang: setelah tenggatnya lewat, putuskan
 // "terkunci" (syarat bayar terpenuhi) atau "hangus" (ditambahkan kembali ke
 // tagihan). Dulu hanya lewat tombol Evaluasi atau saat halaman detail dibuka,

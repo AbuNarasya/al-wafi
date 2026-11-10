@@ -67,9 +67,11 @@ class MenuWafiMartTest extends TestCase
         foreach (['Kasir (POS)', 'Shift Kasir & Setoran', 'Kategori Barang', 'Merk Barang'] as $label) {
             $this->assertNotContains($label, $pohon['KEUANGAN'], $label);
         }
-        // Pencairan belanja kartu = sisi dompet santri (milik Al Wafi), bukan layar toko.
-        $this->assertContains('Pencairan Belanja Kartu', $pohon['KEUANGAN']);
-        $this->assertNotContains('Pencairan Belanja Kartu', $pohon['WAFI MART']);
+        // Pencairan belanja kartu = sisi dompet santri (milik Al Wafi), bukan layar toko. Menu lama
+        // "Pencairan Belanja Kartu" dihapus 10 Nov 2026; penggantinya Pencairan ke Wafi Mart.
+        $this->assertContains('Pencairan ke Wafi Mart', $pohon['KEUANGAN']);
+        $this->assertNotContains('Pencairan ke Wafi Mart', $pohon['WAFI MART']);
+        $this->assertNotContains('Pencairan Belanja Kartu', $pohon['KEUANGAN']);
         $this->assertContains('Persediaan', $pohon['KEUANGAN']);
         $this->assertContains('Kartu Santri (RFID)', $pohon['DATA SISWA/SANTRI']);
     }

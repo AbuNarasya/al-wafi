@@ -59,8 +59,9 @@ final class SumberModul
         'SetoranKasir',
         // Stok awal barang dari Impor Data Awal (D Persediaan / K akun perantara).
         'ImporDataAwal',
-        // Pindah buku belanja kartu santri dari rekening penampung titipan ke kas toko.
-        'PencairanKartu',
+        // Kantin mitra Wafi Mart (9 Nov 2026): penjualan kartu (D Piutang ke Al Wafi / K Hutang ke Mitra) & penarikan.
+        'PenjualanMitra',
+        'PenarikanMitra',
         // Penarikan tunai kegiatan: ambil dana (D Kas Kegiatan / K Bank) & penutup sesi.
         'SesiTarikTunai',
         // Belanja kartu santri di Wafi Mart lewat penghubung (instans lain): jurnal ringkas tiap malam,

@@ -959,20 +959,13 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{kartu}', [$c, 'hapus'])->name('hapus')->middleware('hakakses:kartu-santri,hapus')->whereNumber('kartu');
     });
 
-    // Pencairan belanja kartu santri ke kas toko (mingguan).
-    Route::prefix('pencairan-kartu')->name('pencairan_kartu.')->group(function () {
-        $c = \App\Http\Controllers\PencairanKartuController::class;
-        Route::get('/', [$c, 'index'])->name('index')->middleware('hakakses:pencairan-kartu,lihat');
-        Route::post('/', [$c, 'store'])->name('store')->middleware('hakakses:pencairan-kartu,buat');
-        Route::post('/{pencairan}/batal', [$c, 'batal'])->name('batal')->middleware('hakakses:pencairan-kartu,hapus')->whereNumber('pencairan');
-    });
-
     // Pencairan antar-entitas belanja kartu (Fase 3c-3): Al Wafi membayar, Wafi Mart menerima.
     Route::prefix('pencairan-toko')->name('pencairan_toko.')->group(function () {
         $c = \App\Http\Controllers\PencairanTokoController::class;
         Route::get('/', [$c, 'index'])->name('index')->middleware('hakakses:pencairan-toko,lihat');
         Route::post('/', [$c, 'store'])->name('store')->middleware('hakakses:pencairan-toko,buat');
         Route::post('/jurnal', [$c, 'jurnal'])->name('jurnal')->middleware(['hakakses:pencairan-toko,buat', 'throttle:10,1']);
+        Route::put('/pengingat', [$c, 'pengingat'])->name('pengingat')->middleware('hakakses:pencairan-toko,buat');
         Route::post('/{pencairan}/batal', [$c, 'batal'])->name('batal')->middleware('hakakses:pencairan-toko,hapus')->whereNumber('pencairan');
     });
     Route::prefix('penerimaan-al-wafi')->name('penerimaan_al_wafi.')->group(function () {

@@ -30,6 +30,9 @@ class NotificationService
         // redanya bisa dinyatakan MANUSIA ("sudah saya kerjakan"), bukan semata
         // disimpulkan dari keadaan dokumen — memang begitu permintaannya.
         PengingatTerbitService::JENIS_NOTIF,
+        // Wafi Mart (10 Nov 2026): penarikan saldo mitra & pencairan dari Al Wafi yang belum dicatat.
+        KabarKantin::TUGAS_PENARIKAN,
+        KabarKantin::TUGAS_PENCAIRAN,
     ];
 
     /**
@@ -185,6 +188,9 @@ class NotificationService
             // Wali mengunggah berkas PSB lewat portal — ref_id = id santri.
             'BerkasSantri' => '/santri/'.$n->ref_id.'/dokumen',
             'Perizinan' => '/kesantrian/perizinan/'.$n->ref_id,
+            'PenarikanMitra' => '/mitra-kantin/penarikan',
+            'PenarikanMitraHasil' => '/mitra/saldo',
+            'PencairanAlWafi' => '/penerimaan-al-wafi',
             PengajuanPembayaranService::SUMBER => $n->jenis === 'approval_menunggu'
                 ? '/approvals' : '/pengajuan-pembayaran/'.$n->ref_id,
             default => $n->jenis === 'approval_menunggu' ? '/approvals' : null,
@@ -237,6 +243,10 @@ class NotificationService
             // tak ada urusannya dengan notifikasi (konfirmasi petugas & batch
             // yang sudah diotorisasi), dan berkas ini tak perlu tahu keduanya.
             PengingatTerbitService::JENIS_NOTIF => (new PengingatTerbitService)->masihMenunggu((string) $n->ref_id),
+
+            KabarKantin::TUGAS_PENARIKAN => \App\Models\PenarikanMitra::where('id', (int) $n->ref_id)->where('status', 'diajukan')->exists(),
+            // Daftar terakhir dari ERP Al Wafi (dikurangi yang sudah diterima) — pencairan yang dibatalkan di sana ikut reda.
+            KabarKantin::TUGAS_PENCAIRAN => array_key_exists((string) $n->ref_id, KabarKantin::pencairanMenunggu()),
 
             default => true,
         };

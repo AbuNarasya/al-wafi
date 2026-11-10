@@ -11,6 +11,23 @@
         sesudah itu pencairan tak bisa dibatalkan di sini.
     </p>
 
+    @if ($terlambat)
+        <div class="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            Belanja kartu <b>{{ $rp($terlambat['total']) }}</b> sudah lebih dari {{ $terlambat['hari'] }} hari belum dicairkan
+            (sejak {{ \Illuminate\Support\Carbon::parse($terlambat['sejak'])->format('d/m/Y') }}). Wafi Mart memakai dana ini untuk membayar mitra kantin.
+        </div>
+    @endif
+
+    {{-- Pengingat Tugas Saya — batas harinya bisa diatur (keputusan user 10 Nov 2026). --}}
+    @if (\App\Support\Akses::boleh('pencairan-toko', 'buat'))
+        <form method="POST" action="{{ route('pencairan_toko.pengingat') }}" class="mb-3 flex flex-wrap items-end gap-2 text-sm">
+            @csrf @method('PUT')
+            <div><label class="mb-1 block text-xs text-gray-500">Ingatkan di Tugas Saya bila belum dicairkan lebih dari (hari, 0 = tidak)</label>
+                <input type="number" name="batas_hari_pencairan_toko" value="{{ $batasHari }}" min="0" max="365" required class="w-24 rounded-lg border-gray-300 text-sm"></div>
+            <button class="rounded-lg border border-gray-300 px-3 py-2 hover:bg-gray-50">Simpan</button>
+        </form>
+    @endif
+
     <form method="GET" class="mb-3 flex items-end gap-2 text-sm">
         <div><label class="mb-1 block text-xs text-gray-500">Sampai tanggal</label>
             <input type="date" name="sampai" value="{{ $sampai }}" max="{{ now()->toDateString() }}" class="rounded-lg border-gray-300 text-sm"></div>
