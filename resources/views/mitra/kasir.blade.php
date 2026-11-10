@@ -29,7 +29,7 @@
         </div>
 
         {{-- Daftar menu: baris ringkas. Ketuk baris = tambah satu. --}}
-        <div class="divide-y divide-gray-100 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200" :class="keranjang.length ? 'mb-20' : ''">
+        <div class="divide-y divide-gray-100 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
             <template x-for="m in tersaring()" :key="m.id">
                 {{-- Tanpa padding vertikal di baris: tombol sudah ber-tinggi minimal 44px (sasaran sentuh, app.css). --}}
                 <div class="flex items-center gap-2 px-3" :class="jumlah(m.id) > 0 ? 'bg-brand/5' : ''">
@@ -51,6 +51,25 @@
             </template>
             <div x-show="tersaring().length === 0" class="px-3 py-8 text-center text-sm text-gray-400">
                 Tidak ada menu yang cocok dengan "<span x-text="cari"></span>".
+            </div>
+        </div>
+
+        {{-- Rekap pesanan di bawah daftar menu (permintaan user 10 Nov 2026) — bisa diubah jumlahnya di sini juga. --}}
+        <div x-show="keranjang.length" class="mt-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-200" :class="keranjang.length ? 'mb-24' : ''">
+            <div class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Pesanan</div>
+            <template x-for="b in keranjang" :key="b.id">
+                <div class="flex items-center justify-between gap-2 py-1 text-sm">
+                    <div class="min-w-0 flex-1 truncate" x-text="b.nama"></div>
+                    <div class="flex items-center gap-1.5">
+                        <button type="button" @click="kurang(b.id)" class="h-8 w-8 rounded-full bg-gray-100 font-bold" aria-label="Kurangi">−</button>
+                        <span class="w-5 text-center tabular-nums" x-text="b.jumlah"></span>
+                        <button type="button" @click="tambah(b)" class="h-8 w-8 rounded-full bg-gray-100 font-bold" aria-label="Tambah">+</button>
+                    </div>
+                    <div class="w-20 text-right tabular-nums" x-text="rp(b.harga * b.jumlah)"></div>
+                </div>
+            </template>
+            <div class="mt-2 flex items-center justify-between border-t border-gray-100 pt-2 font-semibold">
+                <span>Total</span><span class="text-lg tabular-nums" x-text="rp(total())"></span>
             </div>
         </div>
     @endif
