@@ -64,10 +64,18 @@ class LaundryTest extends TestCase
         $this->actingAs($this->petugas)->get(route('laundry.terima', ['kartu' => 'SALAH']))->assertSee('Kartu tidak dikenal');
         $this->actingAs($this->petugas)->get(route('laundry.terima', ['kartu' => 'KARTU001']))->assertOk()->assertSee('AHMAD FAUZI');
 
-        // Penerimaan cukup ditimbang (paket 1) — label kantong langsung dicetak.
+        // Layar awal Terima (10 Nov 2026): kotak cari nama/NIS di ATAS dan langsung terbuka; tap kartu tetap fokus.
+        $awal = $this->actingAs($this->petugas)->get(route('laundry.terima'))->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('#<details\s+open#', $awal);
+        $this->assertStringContainsString('order-1 rounded-xl', $awal);
+        $this->assertMatchesRegularExpression('#name="kartu" autofocus#', $awal);
+
+        // Penerimaan cukup ditimbang (paket 1). Label kantong TIDAK lagi dicetak otomatis — tombol Cetak label (10 Nov 2026).
         $this->actingAs($this->petugas)->get(route('laundry.terima', ['kartu' => 'KARTU001']))->assertDontSee('+ pakaian');
         $this->actingAs($this->petugas)->post(route('laundry.simpan_terima'), ['kartu' => 'KARTU001', 'berat' => '3.4'])
             ->assertSessionHas('status')->assertSessionHas('cetak_label');
+        $this->actingAs($this->petugas)->withSession(['cetak_label' => Laundry::sole()->id])->get(route('laundry.terima'))
+            ->assertSee('Cetak label')->assertDontSee('<iframe', false);
         $l = Laundry::sole();
         $this->assertSame(['diterima', 'kartu', 0, '3.40'], [$l->status, $l->cara_terima, $l->jumlahPotong(), (string) $l->berat_terima]);
         $this->actingAs($this->petugas)->get(route('laundry.label', $l->id))->assertOk()->assertSee($l->nomor)->assertSee('data-qr="'.$l->nomor.'"', false);

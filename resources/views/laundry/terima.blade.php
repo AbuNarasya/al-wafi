@@ -3,15 +3,19 @@
 @section('title', 'Terima Cucian')
 
 @section('content')
-    {{-- Label kantong baru: dicetak lewat iframe tersembunyi (dialog cetak muncul sendiri). --}}
+    {{-- Label kantong baru: TIDAK lagi dicetak otomatis (permintaan user 10 Nov 2026) — petugas menekan tombol
+         Cetak label bila perlu. Halaman label membuka dialog cetaknya sendiri (?cetak=1) di tab baru. --}}
     @if (session('cetak_label'))
-        <iframe src="{{ route('laundry.label', session('cetak_label')) }}?cetak=1" style="position:absolute;width:0;height:0;border:0" title="Label kantong"></iframe>
-        <p class="mb-2 text-sm"><a href="{{ route('laundry.label', session('cetak_label')) }}?cetak=1" target="_blank" class="text-brand hover:underline">Cetak ulang label kantong</a></p>
+        <a href="{{ route('laundry.label', session('cetak_label')) }}?cetak=1" target="_blank"
+           class="mb-3 inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>
+            Cetak label
+        </a>
     @endif
-    <a href="{{ route('laundry.index') }}" class="text-sm text-brand hover:underline">&larr; Papan Laundry</a>
+    <a href="{{ route('laundry.index') }}" class="block text-sm text-brand hover:underline">&larr; Papan Laundry</a>
 
     @unless ($santri)
-        @include('laundry._kenali', ['rute' => 'laundry.terima', 'judul' => 'Terima cucian — tap kartu santri'])
+        @include('laundry._kenali', ['rute' => 'laundry.terima', 'judul' => 'Terima cucian — tap kartu santri', 'cariDulu' => true])
     @else
         <div class="mt-3 grid gap-4 lg:grid-cols-3">
             <form method="POST" action="{{ route('laundry.simpan_terima') }}" data-no-confirm class="space-y-4 rounded-xl border border-gray-200 bg-white p-4 text-sm shadow-sm lg:col-span-2"
