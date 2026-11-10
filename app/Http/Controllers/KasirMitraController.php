@@ -31,11 +31,16 @@ class KasirMitraController extends Controller
     public function kasir(Request $request): View
     {
         $mitra = $this->mitra($request);
+        // Terlaris 30 hari terakhir di atas (10 Nov 2026): menu yang sering dipesan tak perlu dicari. Sisanya A–Z.
+        $laku = \Illuminate\Support\Facades\DB::table('penjualan_mitra_rincian as r')->join('penjualan_mitra as p', 'p.id', '=', 'r.id_penjualan_mitra')
+            ->where('p.id_mitra', $mitra->id)->where('p.status', 'berhasil')->where('p.waktu', '>=', now()->subDays(30))
+            ->whereNotNull('r.id_menu')->groupBy('r.id_menu')->selectRaw('r.id_menu, sum(r.jumlah) as n')->pluck('n', 'id_menu');
 
         return view('mitra.kasir', [
             'mitra' => $mitra,
             'menu' => $mitra->menu()->where('aktif', true)->get(['id', 'nama', 'harga'])
-                ->map(fn ($m) => ['id' => $m->id, 'nama' => $m->nama, 'harga' => (int) $m->harga])->values(),
+                ->sortBy(fn ($m) => [-(int) ($laku[$m->id] ?? 0), mb_strtolower($m->nama)])
+                ->map(fn ($m) => ['id' => $m->id, 'nama' => $m->nama, 'harga' => (int) $m->harga, 'laku' => (int) ($laku[$m->id] ?? 0)])->values(),
         ]);
     }
 

@@ -45,27 +45,37 @@
 
             <template x-if="d && d.rincian">
                 <div class="mt-2">
-                    <p class="text-sm font-semibold text-slate-800" x-text="d.rincian.toko || @js(__('Toko'))"></p>
-                    <p class="text-xs text-slate-500">
-                        <span x-text="d.rincian.struk"></span><span x-show="d.rincian.waktu" x-text="' · ' + jam(d.rincian.waktu)"></span>
-                    </p>
-                    <p x-show="d.rincian.struk_asal" class="text-xs text-slate-500" x-text="@js(__('Dari struk :struk')).replace(':struk', d.rincian.struk_asal)"></p>
+                    {{-- Kepala toko: blok berwarna, lebih besar — beda jelas dari daftar barang di bawahnya (10 Nov 2026). --}}
+                    <div class="flex items-center gap-3 rounded-2xl bg-brand/10 px-3 py-2.5">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand text-white" aria-hidden="true">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9l1.5-5h15L21 9M3 9h18M3 9v1a3 3 0 006 0 3 3 0 006 0 3 3 0 006 0V9M5 13v7h14v-7"/></svg>
+                        </span>
+                        <div class="min-w-0">
+                            <p class="truncate text-base font-bold text-brand-dark" x-text="d.rincian.toko || @js(__('Toko'))"></p>
+                            <p class="truncate text-[11px] text-slate-500">
+                                <span class="font-mono" x-text="d.rincian.struk"></span><span x-show="d.rincian.waktu" x-text="' · ' + jam(d.rincian.waktu)"></span>
+                            </p>
+                        </div>
+                    </div>
+                    <p x-show="d.rincian.struk_asal" class="mt-1 text-xs text-slate-500" x-text="@js(__('Dari struk :struk')).replace(':struk', d.rincian.struk_asal)"></p>
                     <p x-show="d.rincian.jenis === 'batal'" class="mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
                         {{ __('Seluruh struk ini dibatalkan — uangnya sudah kembali ke uang saku.') }}
                     </p>
 
-                    <div class="mt-3 divide-y divide-slate-100 border-y border-slate-100">
+                    {{-- Daftar barang: menjorok ke dalam dengan garis pandu di kiri, huruf lebih ringan dari nama toko. --}}
+                    <div class="ms-4 mt-3 divide-y divide-slate-100 border-s-2 border-brand/20 ps-3">
                         <template x-for="(b, i) in d.rincian.barang" :key="i">
-                            <div class="flex items-start justify-between gap-3 py-2.5">
+                            <div class="flex items-start justify-between gap-3 py-2">
                                 <div class="min-w-0">
-                                    <p class="text-sm font-medium text-slate-900" x-text="b.nama"></p>
-                                    <p class="text-xs text-slate-500" x-text="angka(b.jumlah) + ' ' + b.satuan + ' × ' + rp(b.harga)"></p>
+                                    <p class="text-sm text-slate-700" x-text="b.nama"></p>
+                                    <p class="text-xs text-slate-400" x-text="angka(b.jumlah) + ' ' + b.satuan + ' × ' + rp(b.harga)"></p>
                                     <p x-show="Number(b.diskon) > 0" class="text-xs text-emerald-700" x-text="@js(__('Diskon :jumlah')).replace(':jumlah', rp(b.diskon))"></p>
                                 </div>
-                                <p class="shrink-0 text-sm font-semibold tabular-nums text-slate-900" x-text="rp(b.subtotal)"></p>
+                                <p class="shrink-0 text-sm tabular-nums text-slate-700" x-text="rp(b.subtotal)"></p>
                             </div>
                         </template>
                     </div>
+                    <div class="mt-3 border-t border-slate-200"></div>
 
                     <div x-show="Number(d.rincian.diskon_struk) > 0" class="mt-2 flex justify-between text-sm text-emerald-700">
                         <span>{{ __('Diskon struk') }}</span><span class="rp tabular-nums" x-text="'−' + rp(d.rincian.diskon_struk)"></span>
