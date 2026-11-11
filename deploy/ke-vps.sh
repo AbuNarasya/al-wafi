@@ -21,11 +21,17 @@ cd "/var/www/$NAMA"
 SEBELUM=$(git rev-parse --short HEAD)
 git fetch --quiet origin
 git reset --quiet --hard "origin/$CABANG"
+# MODE PEMELIHARAAN selama rilis (12 Nov 2026): tanpa ini, permintaan yang datang saat tampilan & aset sedang
+# dibangun ulang mendapat layar 500. Diturunkan SESUDAH kode baru masuk (halaman errors::503 ada di kode baru),
+# dan SELALU dinaikkan lagi — juga bila langkah mana pun gagal — lewat trap, supaya aplikasi tak terkunci.
+php artisan down --refresh=15 --retry=15 --render="errors::503" >/dev/null 2>&1 || true
+trap 'php artisan up >/dev/null 2>&1 || true' EXIT
 composer install --no-dev --optimize-autoloader --no-interaction --quiet
 npm ci --no-audit --no-fund --loglevel=error >/dev/null
 npm run build --silent >/dev/null 2>&1
 php artisan migrate --force --no-interaction | grep -E "DONE|Nothing to migrate" || true
 php artisan optimize --no-interaction >/dev/null
+php artisan up >/dev/null
 echo "Server: $SEBELUM -> $(git log -1 --format='%h %s' | cut -c1-90)"
 EOF
 echo "[$(date +%H:%M:%S)] Selesai."
