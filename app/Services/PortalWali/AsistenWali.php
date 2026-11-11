@@ -58,8 +58,8 @@ final class AsistenWali
     {
         $b = Schema::hasTable('pengaturan_asisten_wali') ? DB::table('pengaturan_asisten_wali')->orderBy('id')->first() : null;
 
-        return $b ?? (object) ['aktif' => false, 'aktif_staf' => false, 'penyedia' => 'groq', 'model_groq' => 'llama-3.3-70b-versatile',
-            'model_gemini' => 'gemini-2.5-flash-lite', 'batas_harian' => 20, 'batas_harian_staf' => 30, 'diubah_oleh' => null, 'updated_at' => null];
+        return $b ?? (object) ['aktif' => false, 'aktif_staf' => false, 'penyedia' => 'groq', 'model_groq' => 'openai/gpt-oss-120b',
+            'model_gemini' => 'gemini-3.5-flash-lite', 'batas_harian' => 20, 'batas_harian_staf' => 30, 'diubah_oleh' => null, 'updated_at' => null];
     }
 
     /** Asisten portal wali menyala (dan instans ini memang punya portal wali). */
@@ -387,9 +387,12 @@ final class AsistenWali
                 $pesan[] = ['role' => 'assistant', 'content' => $j];
             }
             $pesan[] = ['role' => 'user', 'content' => $pertanyaan];
-            $r = $http->withToken($kunci)->post('https://api.groq.com/openai/v1/chat/completions', [
-                'model' => $model, 'messages' => $pesan, 'temperature' => 0.2, 'max_tokens' => 500,
-            ]);
+            $badan = ['model' => $model, 'messages' => $pesan, 'temperature' => 0.2, 'max_tokens' => 1500];
+            // gpt-oss "berpikir" dulu dan pikirannya ikut memakan max_tokens — cukup sedikit untuk menjawab panduan.
+            if (str_starts_with($model, 'openai/gpt-oss')) {
+                $badan['reasoning_effort'] = 'low';
+            }
+            $r = $http->withToken($kunci)->post('https://api.groq.com/openai/v1/chat/completions', $badan);
             $this->pastikanBerhasil($r, 'Groq');
             $teks = (string) data_get($r->json(), 'choices.0.message.content', '');
         } else {
@@ -403,7 +406,8 @@ final class AsistenWali
                 ->post('https://generativelanguage.googleapis.com/v1beta/models/'.rawurlencode($model).':generateContent', [
                     'systemInstruction' => ['parts' => [['text' => $sistem]]],
                     'contents' => $isi,
-                    'generationConfig' => ['temperature' => 0.2, 'maxOutputTokens' => 500],
+                    // Model Gemini 3.x ikut "berpikir" dalam jatah ini — beri ruang supaya jawabannya tak terpotong.
+                    'generationConfig' => ['temperature' => 0.2, 'maxOutputTokens' => 1500],
                 ]);
             $this->pastikanBerhasil($r, 'Gemini');
             $teks = collect(data_get($r->json(), 'candidates.0.content.parts', []))->pluck('text')->implode('');

@@ -108,7 +108,8 @@ class AsistenWaliTest extends TestCase
 
             return $k->url() === 'https://api.groq.com/openai/v1/chat/completions'
                 && $k->hasHeader('Authorization', 'Bearer kunci-uji-groq')
-                && $isi['model'] === 'llama-3.3-70b-versatile'
+                && $isi['model'] === 'openai/gpt-oss-120b'
+                && $isi['reasoning_effort'] === 'low'
                 && str_contains($sistem, 'Menu Lengkap › Keuangan › Tagihan')            // artikel cocok dikirim utuh
                 && str_contains($sistem, '- Bagaimana cara mengajukan izin pulang?')     // artikel lain hanya judul
                 && ! str_contains($sistem, 'Artikel lama yang disembunyikan')
@@ -131,7 +132,7 @@ class AsistenWaliTest extends TestCase
         $this->sebagaiWali()->postJson('/wali/bantuan/tanya', ['pertanyaan' => 'cara izin pulang'])->assertJsonPath('sumber', 'gemini');
         $this->sebagaiWali()->postJson('/wali/bantuan/tanya', ['pertanyaan' => 'lalu?'])->assertJsonPath('jawaban', 'Lalu tekan Ajukan.');
 
-        Http::assertSent(fn (KirimanHttp $k) => str_contains($k->url(), 'models/gemini-2.5-flash-lite:generateContent')
+        Http::assertSent(fn (KirimanHttp $k) => str_contains($k->url(), 'models/gemini-3.5-flash-lite:generateContent')
             && $k->hasHeader('x-goog-api-key', 'kunci-uji-gemini')
             && count($k->data()['contents']) === 3
             && $k->data()['contents'][1] === ['role' => 'model', 'parts' => [['text' => 'Buka Perizinan Insidental.']]]);
