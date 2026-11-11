@@ -199,6 +199,10 @@
     </div>
 </div>
 @auth
+    {{-- Angka di ikon aplikasi = angka lonceng (12 Nov 2026); disegarkan tiap halaman dibuka. Push memperbaruinya
+         saat aplikasi tertutup (public/sw.js). Hanya aplikasi terpasang di peramban yang mendukung Badging API. --}}
+    @php $angkaIkon = \App\Support\TugasSaya::total() + (new \App\Services\Modules\NotificationService)->hitungKabarBelumDibaca(auth()->user()->id_pengguna); @endphp
+    <script>if ('setAppBadge' in navigator) { ({{ (int) $angkaIkon }} > 0 ? navigator.setAppBadge({{ (int) $angkaIkon }}) : navigator.clearAppBadge()).catch(() => {}); }</script>
     @if (\App\Services\PortalWali\AsistenWali::aktifStaf())
         @include('partials.bantuan-staf', ['judulHalaman' => trim($__env->yieldContent('title'))])
     @endif

@@ -41,7 +41,7 @@
 // puluh orang yang notifikasinya tertinggal sampai aplikasinya ditutup total.
 // Jadi kumpulkan perubahan `sw.js` dan naikkan nomornya sekali, bukan sekali
 // per perubahan kecil.
-const VERSI = 'alwafi-v8';
+const VERSI = 'alwafi-v9';
 const LURING = '/luring.html';
 
 self.addEventListener('install', (e) => {
@@ -149,7 +149,14 @@ self.addEventListener('push', (e) => {
         if (e.data) d = Object.assign(d, e.data.json());
     } catch (_) { /* biarkan nilai bawaan */ }
 
-    e.waitUntil(self.registration.showNotification(d.judul, {
+    // ANGKA DI IKON APLIKASI (12 Nov 2026): muatan membawa `angka` = angka lonceng (staf) / kabar belum dibaca
+    // (wali). Hanya peramban yang mendukung Badging API & aplikasi terpasang; selain itu diabaikan diam-diam.
+    const angka = Number.isInteger(d.angka) ? d.angka : null;
+    const lencana = angka === null || ! ('setAppBadge' in self.navigator)
+        ? Promise.resolve()
+        : (angka > 0 ? self.navigator.setAppBadge(angka) : self.navigator.clearAppBadge()).catch(() => {});
+
+    e.waitUntil(Promise.all([lencana, self.registration.showNotification(d.judul, {
         body: d.pesan,
         // Ikon dari muatan bila ada — push wali membawa ikon SANAD Wali (10 Nov 2026); staf tetap ikon ERP.
         icon: d.ikon || '/ikon/ikon-192.png',
@@ -171,7 +178,7 @@ self.addEventListener('push', (e) => {
         // peramban yang menebak lain.
         silent: false,
         data: { tautan: d.tautan },
-    }));
+    })]));
 });
 
 self.addEventListener('notificationclick', (e) => {

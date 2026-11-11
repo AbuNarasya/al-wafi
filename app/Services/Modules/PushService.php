@@ -188,10 +188,14 @@ class PushService
         $antreanKirim = [];
         $perEndpoint = [];
 
+        $angka = []; // angka lonceng per penerima — dihitung sekali per sapuan
         foreach ($segar as $n) {
             foreach ($langganan->get($n->id_pengguna, collect()) as $l) {
                 $perEndpoint[$l->endpoint] = $l;
-                $antreanKirim[] = [$l, json_encode($this->muatan($n), JSON_UNESCAPED_UNICODE)];
+                if (! array_key_exists($n->id_pengguna, $angka)) {
+                    $angka[$n->id_pengguna] = self::angkaLonceng((int) $n->id_pengguna);
+                }
+                $antreanKirim[] = [$l, json_encode($this->muatan($n) + ['angka' => $angka[$n->id_pengguna]], JSON_UNESCAPED_UNICODE)];
             }
         }
 
@@ -295,6 +299,8 @@ class PushService
             'pesan' => 'Kalau ini muncul, notifikasi di perangkat ini sudah berfungsi. ('.now()->format('H:i:s').')',
             'tautan' => '/profil',
             'tag' => 'uji-'.now()->timestamp,
+            // Angka di ikon ikut diuji — sama dengan angka lonceng orang itu saat ini (12 Nov 2026).
+            'angka' => self::angkaLonceng((int) $langganan->first()?->id_pengguna),
         ], JSON_UNESCAPED_UNICODE);
 
         $peta = [];
@@ -346,6 +352,36 @@ class PushService
             'tautan' => (new NotificationService)->tautan($n) ?? '/',
             'tag' => $n->jenis.':'.($n->ref_id ?? $n->id),
         ];
+    }
+
+    /**
+     * ANGKA DI IKON APLIKASI (12 Nov 2026) = angka lonceng: tugas (TugasSaya, keadaan nyata) + kabar belum dibaca.
+     * TugasSaya membaca pengguna yang sedang masuk, jadi di jadwal (tanpa sesi) penerima "dipinjam" sebentar lalu
+     * dikembalikan. Gagal apa pun → null: pekerja layanan cukup tak menyentuh angkanya.
+     */
+    public static function angkaLonceng(int $idPengguna): ?int
+    {
+        $user = \App\Models\User::find($idPengguna);
+        if (! $user) {
+            return null;
+        }
+        $guard = \Illuminate\Support\Facades\Auth::guard();
+        $lama = $guard->user();
+        try {
+            $guard->setUser($user);
+            \App\Support\TugasSaya::lupakan();
+            \App\Support\Akses::lupakan();
+
+            return \App\Support\TugasSaya::total() + (new NotificationService)->hitungKabarBelumDibaca($idPengguna);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        } finally {
+            \App\Support\TugasSaya::lupakan();
+            \App\Support\Akses::lupakan();
+            $lama ? $guard->setUser($lama) : $guard->forgetUser();
+        }
     }
 
     /** Juga dipakai pengirim push wali ([[App\Services\PortalWali\PushWaliService]]). */

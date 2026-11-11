@@ -209,4 +209,28 @@ class PushNotifikasiTest extends TestCase
 
         $this->assertSame(0, PushLangganan::count());
     }
+
+    /** Angka di ikon aplikasi (12 Nov 2026) = angka lonceng; dihitung untuk penerima tanpa mengubah siapa yang masuk. */
+    public function test_angka_ikon_sama_dengan_lonceng_dan_identitas_dikembalikan(): void
+    {
+        $this->notifikasi('info');
+        $this->notifikasi('info', ['dibaca' => true]);
+        $lain = User::create(['username' => 'zzpn_lain', 'nama' => 'Lain', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif'])->fresh();
+
+        $this->assertGuest();
+        $angka = \App\Services\Modules\PushService::angkaLonceng($this->staf->id_pengguna);
+        $this->assertGreaterThanOrEqual(1, $angka);
+        $this->assertGuest(); // jadwal tanpa sesi tetap tanpa sesi
+
+        $this->actingAs($lain);
+        \App\Services\Modules\PushService::angkaLonceng($this->staf->id_pengguna);
+        $this->assertSame($lain->id_pengguna, auth()->user()->id_pengguna, 'pengguna yang masuk dikembalikan');
+        $this->assertNull(\App\Services\Modules\PushService::angkaLonceng(999999));
+
+        // Halaman staf menyetel angka ikon = angka lonceng.
+        $html = $this->actingAs($this->staf)->get('/beranda')->assertOk()->getContent();
+        $this->assertMatchesRegularExpression("/navigator\.setAppBadge\((\d+)\)/", $html);
+        preg_match("/navigator\.setAppBadge\((\d+)\)/", $html, $m);
+        $this->assertSame($angka, (int) $m[1]);
+    }
 }

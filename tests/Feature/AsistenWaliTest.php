@@ -271,6 +271,17 @@ class AsistenWaliTest extends TestCase
         $this->sebagaiWali()->get('/wali/bantuan')->assertOk()->assertDontSee('Bagaimana cara menerbitkan SPP bulanan?');
     }
 
+    /** Angka di ikon aplikasi portal (12 Nov 2026) = kabar belum dibaca orang yang masuk. */
+    public function test_angka_ikon_portal_sama_dengan_kabar_belum_dibaca(): void
+    {
+        foreach (['ibu', 'ibu', 'ayah'] as $p) {
+            \App\Models\NotifikasiWali::create(['id_wali' => $this->wali->id, 'peran' => $p, 'judul' => 'x', 'pesan' => 'x', 'jenis' => 'pin_terkunci']);
+        }
+        $this->sebagaiWali()->get('/wali/akun')->assertOk()->assertSee('navigator.setAppBadge(2)', false);
+        $this->sebagaiWali()->get('/wali/kabar')->assertOk(); // dibuka = dibaca
+        $this->sebagaiWali()->get('/wali/akun')->assertOk()->assertSee('0 > 0 ? navigator.setAppBadge(0) : navigator.clearAppBadge()', false);
+    }
+
     public function test_urai_berkas_artikel(): void
     {
         $md = "Pengantar singkat.\n\n## Bagaimana cara masuk portal?\nkata kunci: masuk, login, otp\n\n1. Buka portal.\n2. Masukkan email.\n\n---\n\n## Cara ganti PIN?\nIsi tanpa kata kunci. [PERLU DICEK: jalur menu]\n";

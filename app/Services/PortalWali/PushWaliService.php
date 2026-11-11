@@ -95,9 +95,12 @@ class PushWaliService
 
         $antreanKirim = [];
         $perEndpoint = [];
+        $angka = []; // memo per orang (keluarga + peran) dalam satu sapuan
         foreach ($this->sasaran($segar) as [$l, $n]) {
             $perEndpoint[$l->endpoint] = $l;
-            $antreanKirim[] = [$l, json_encode($this->muatan($n), JSON_UNESCAPED_UNICODE)];
+            $kunciOrang = $n->id_wali.':'.$n->peran;
+            $angka[$kunciOrang] ??= NotifikasiWali::where('id_wali', $n->id_wali)->where('peran', $n->peran)->whereNull('dibaca_pada')->count();
+            $antreanKirim[] = [$l, json_encode($this->muatan($n) + ['angka' => $angka[$kunciOrang]], JSON_UNESCAPED_UNICODE)];
         }
         $tandai($segar);
         if ($antreanKirim === []) {

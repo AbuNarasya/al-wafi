@@ -226,6 +226,11 @@
             </div>
         </nav>
 
+        {{-- Angka di ikon aplikasi = kabar belum dibaca (12 Nov 2026); disegarkan tiap halaman. Mode verifikasi tak menyentuhnya. --}}
+        @unless ($verifikasi)
+            <script>if ('setAppBadge' in navigator) { ({{ (int) $belumDibaca }} > 0 ? navigator.setAppBadge({{ (int) $belumDibaca }}) : navigator.clearAppBadge()).catch(() => {}); }</script>
+        @endunless
+
         {{-- Tombol Bantuan melayang (11 Nov 2026): ikon Bantuan tak ada di 7 ikon Beranda bawaan, wali tak menemukannya
              di Menu Lengkap. Tampil hanya bila asisten wali menyala & bukan mode verifikasi link WA. --}}
         @if (\App\Services\PortalWali\AsistenWali::aktif() && ! \App\Services\PortalWali\SesiWali::modeVerifikasi(request()) && ! request()->routeIs('portal.bantuan'))
