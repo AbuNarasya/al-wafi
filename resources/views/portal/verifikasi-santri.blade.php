@@ -14,10 +14,15 @@
         @csrf
         @method('PUT')
 
+        @if ($anak->count() > 1)
+            {{-- Banyak anak (permintaan user 11 Nov 2026): semua panel tertutup dulu supaya wali langsung melihat
+                 SEMUA anaknya — dulu panel pertama terbuka dan anak kedua tersembunyi jauh di bawah. --}}
+            <p class="rounded-2xl bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800 ring-1 ring-blue-100">{{ __('Ada :n santri terdaftar. Ketuk Periksa pada setiap nama untuk memeriksa datanya.', ['n' => $anak->count()]) }}</p>
+        @endif
         @forelse ($anak as $s)
-            {{-- Banyak anak: satu panel per anak, yang pertama terbuka. --}}
-            <div x-data="{ buka: @js($loop->first || $errors->has('santri.'.$s->id.'.*')) }" class="rounded-3xl p-2 ring-1 ring-slate-200">
-                <button type="button" @click="buka = ! buka" class="flex w-full items-center justify-between gap-2 px-2 py-2 text-start">
+            {{-- Satu panel per anak. Satu anak: langsung terbuka. Panel yang isiannya bermasalah ikut terbuka. --}}
+            <div x-data="{ buka: @js($anak->count() === 1 || $errors->has('santri.'.$s->id.'.*')) }" class="rounded-3xl p-2 ring-1 ring-slate-200">
+                <button type="button" @click="buka = ! buka; if (buka) $nextTick(() => $el.scrollIntoView({ behavior: 'smooth', block: 'start' }))" class="flex w-full items-center justify-between gap-2 px-2 py-2 text-start">
                     <span class="min-w-0">
                         <span class="block truncate font-semibold text-slate-900">{{ $s->nama }}</span>
                         <span class="block text-xs text-slate-500">{{ $s->jenjang?->nama ?? $s->kode_jenjang }}{{ $s->nis ? ' · '.__('NIS :nis', ['nis' => $s->nis]) : '' }}</span>

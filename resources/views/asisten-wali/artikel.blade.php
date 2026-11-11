@@ -5,7 +5,7 @@
 @section('content')
 <div class="mx-auto max-w-3xl space-y-4">
     <div>
-        <a href="{{ route('asisten_wali.edit') }}" class="text-sm text-brand hover:underline">&larr; Asisten Bantuan Portal</a>
+        <a href="{{ route('asisten_wali.edit', ['audiens' => $audiens]) }}" class="text-sm text-brand hover:underline">&larr; Asisten Bantuan</a>
         <h2 class="mt-1 text-xl font-semibold text-gray-900">{{ $a ? 'Ubah artikel' : 'Artikel baru' }}</h2>
     </div>
 
@@ -13,9 +13,21 @@
           class="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         @csrf
         @if ($a) @method('PUT') @endif
+        @if ($portalWali)
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Pembaca</label>
+                <select name="audiens" class="mt-1 rounded-lg border-gray-300 text-sm">
+                    @foreach (\App\Services\PortalWali\AsistenWali::AUDIENS as $k => $label)
+                        <option value="{{ $k }}" @selected(old('audiens', $audiens) === $k)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+        @else
+            <input type="hidden" name="audiens" value="staf">
+        @endif
         <div>
             <label class="block text-sm font-medium text-gray-700">Judul <span class="font-normal text-gray-400">— tulis sebagai pertanyaan wali</span></label>
-            <input name="judul" value="{{ old('judul', $a->judul ?? '') }}" required maxlength="200" placeholder="Bagaimana cara membayar tagihan SPP?" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+            <input name="judul" value="{{ old('judul', $a->judul ?? '') }}" required maxlength="200" placeholder="{{ $audiens === 'wali' ? 'Bagaimana cara membayar tagihan SPP?' : 'Bagaimana cara menerbitkan tagihan SPP bulanan?' }}" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
         </div>
         <div>
             <label class="block text-sm font-medium text-gray-700">Isi</label>

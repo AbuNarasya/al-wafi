@@ -34,6 +34,16 @@ class CompanySettingsController extends Controller
             ] : null,
             'opsiGrni' => CoaDetail::where('status', 'aktif')->where('kode_coa', 'like', '2%')->orderBy('kode_coa')->get()
                 ->mapWithKeys(fn ($c) => [$c->kode_coa => "{$c->kode_coa} — {$c->nama_coa}"])->all(),
+            // Al Wafi saja: Hutang ke Wafi Mart (akun liabilitas, kelompok 2) — 11 Nov 2026.
+            'opsiHutangWafiMart' => \App\Support\Instans::adalah('alwafi')
+                ? CoaDetail::where('status', 'aktif')->where('kode_coa', 'like', '2%')->orderBy('kode_coa')->get()
+                    ->mapWithKeys(fn ($c) => [$c->kode_coa => "{$c->kode_coa} — {$c->nama_coa}"])->all()
+                : null,
+            // Wafi Mart saja: Piutang ke Al Wafi (akun aset, kelompok 1) — 11 Nov 2026.
+            'opsiPiutangAlWafi' => \App\Support\Instans::adalah('wafimart')
+                ? CoaDetail::where('status', 'aktif')->where('kode_coa', 'like', '1%')->orderBy('kode_coa')->get()
+                    ->mapWithKeys(fn ($c) => [$c->kode_coa => "{$c->kode_coa} — {$c->nama_coa}"])->all()
+                : null,
         ]);
     }
 
@@ -52,6 +62,8 @@ class CompanySettingsController extends Controller
             'topup_tunai_dompet_santri' => ['nullable', 'boolean'],
             'kode_unit_neraca' => ['nullable', 'string', 'exists:business_units,kode_unit'],
             'kode_coa_grni' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
+            'kode_coa_kartu_santri' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
+            'kode_coa_hutang_toko' => ['nullable', 'string', 'exists:coa_detail,kode_coa'],
             'batas_jajan_harian' => ['nullable', 'numeric', 'min:0'],
             'kode_unit_wafimart' => ['nullable', 'string', 'exists:business_units,kode_unit'],
             'keterangan' => ['nullable', 'string'],
@@ -61,6 +73,18 @@ class CompanySettingsController extends Controller
             $data['kode_unit_wafimart'] = ($data['kode_unit_wafimart'] ?? null) ?: null;
         }
         $data['kode_coa_grni'] = ($data['kode_coa_grni'] ?? null) ?: null;
+        // Isiannya hanya tampil di instans Wafi Mart — tak terkirim = biarkan nilai tersimpan (di Al Wafi akun ini
+        // dipasang migrasi untuk kasir yang belum dipisah).
+        if (\App\Support\Instans::adalah('wafimart') && $request->has('kode_coa_kartu_santri')) {
+            $data['kode_coa_kartu_santri'] = ($data['kode_coa_kartu_santri'] ?? null) ?: null;
+        } else {
+            unset($data['kode_coa_kartu_santri']);
+        }
+        if (\App\Support\Instans::adalah('alwafi') && $request->has('kode_coa_hutang_toko')) {
+            $data['kode_coa_hutang_toko'] = ($data['kode_coa_hutang_toko'] ?? null) ?: null;
+        } else {
+            unset($data['kode_coa_hutang_toko']);
+        }
         // Tak terkirim (formulir lama) = biarkan nilai tersimpan; jangan diam-diam jadi nol.
         if (($data['batas_jajan_harian'] ?? null) === null) {
             unset($data['batas_jajan_harian']);

@@ -208,7 +208,7 @@ class SaldoMitraService
             return [];
         }
         $piutang = CompanySettings::query()->value('kode_coa_kartu_santri')
-            ?? throw new AppException(422, 'Akun "Piutang ke Al Wafi" (kode_coa_kartu_santri) belum ditetapkan.');
+            ?? throw new AppException(422, 'Akun "Piutang ke Al Wafi" belum ditetapkan di Pengaturan Perusahaan.');
         $hutang = self::akunHutang();
 
         return $tanggal->map(function (string $tgl) use ($piutang, $hutang) {

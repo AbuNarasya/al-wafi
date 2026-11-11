@@ -222,6 +222,24 @@ class VerifikasiWaliTest extends TestCase
         Notification::assertSentOnDemandTimes(KodeMasukWali::class, 0);
     }
 
+    /** Dua anak (11 Nov 2026): semua panel tertutup dulu + petunjuk jumlah anak; satu anak tetap langsung terbuka. */
+    public function test_dua_santri_ditampilkan_sebagai_daftar_tertutup_dulu(): void
+    {
+        $v = $this->link();
+        $this->masukLewatLink($v);
+        $this->put(route('portal.verifikasi.wali'), $this->isianKeluarga(['alamat' => 'Jl. Baru 9']))->assertRedirect(route('portal.verifikasi.santri'));
+
+        $satu = $this->get(route('portal.verifikasi.santri'))->assertOk()->assertDontSee('Ada 1 santri terdaftar')->getContent();
+        $this->assertStringContainsString('{ buka: true }', $satu);
+
+        Santri::create(['no_pendaftaran' => 'ZZVW-2', 'nis' => '2425002', 'nama' => 'Fatimah', 'jenis_kelamin' => 'P',
+            'tanggal_lahir' => '2015-01-01', 'kode_jenjang' => 'SMP', 'jalur' => 'reguler', 'status' => 'aktif', 'id_wali' => $this->wali->id]);
+        $dua = $this->get(route('portal.verifikasi.santri'))->assertOk()
+            ->assertSee('Ada 2 santri terdaftar. Ketuk Periksa pada setiap nama untuk memeriksa datanya.')
+            ->assertSee('AHMAD')->assertSee('FATIMAH')->getContent();
+        $this->assertStringNotContainsString('{ buka: true }', $dua, 'tak ada panel anak yang terbuka lebih dulu');
+    }
+
     public function test_email_sendiri_wajib_diisi(): void
     {
         $this->masukLewatLink($this->link(), 'ayah');

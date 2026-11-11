@@ -342,6 +342,11 @@ Route::middleware('auth')->group(function () {
     // Beranda (4 Nov 2026): pendaratan SEMUA login, tanpa hak khusus — Dashboard ber-hak sendiri.
     Route::get('/', fn () => redirect()->route('beranda'));
     Route::get('/beranda', [\App\Http\Controllers\BerandaController::class, 'index'])->name('beranda');
+    // Asisten bantuan staf (11 Nov 2026) — semua staf yang login, tanpa hak; saklarnya di Asisten Bantuan.
+    Route::prefix('bantuan')->name('bantuan_staf.')->controller(\App\Http\Controllers\AsistenStafController::class)->group(function () {
+        Route::get('/percakapan', 'percakapan')->name('percakapan');
+        Route::post('/tanya', 'tanya')->name('tanya')->middleware('throttle:10,1');
+    });
 
     // Tanpa middleware hakakses: satu rute melayani dua tab (keuangan & PPSB)
     // dengan hak berbeda — gerbangnya di DashboardController::index().

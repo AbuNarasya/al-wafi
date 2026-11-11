@@ -235,6 +235,14 @@ input.border-gray-300, select.border-gray-300, textarea.border-gray-300 {
         min-height: 44px;
     }
 
+    /* Tautan berbentuk PIL (tombol saring "Semua · 632", dst.) ikut setinggi 44px — tanpa ini tulisannya
+       menempel di atas pil yang memanjang (keluhan user 11 Nov 2026). Tulisan ditengahkan. */
+    a[href].rounded-full:not(.tanpa-sentuh) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
     /* Yang di dalam kalimat dikecualikan: menaikkan tautan di tengah paragraf
        akan merenggangkan barisnya, bukan mempermudah menekannya. */
     p a[href],

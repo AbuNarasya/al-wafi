@@ -28,7 +28,7 @@
             <h2 class="text-xl font-semibold text-gray-900">Ajukan Anggaran</h2>
             <p class="mt-1 max-w-3xl text-sm text-gray-500">
                 Susun anggaran <b>akun Beban</b> untuk 12 bulan Tahun Anggaran, lalu ajukan ke rantai persetujuan
-                (Mudir Bagian → Mudir Umum → Ketua Yayasan). Anggaran baru berlaku setelah rantai tuntas.
+                (tahapnya mengikuti pengaturan Level Pengajuan). Anggaran baru berlaku setelah rantai tuntas.
             </p>
         </div>
 

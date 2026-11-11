@@ -15,11 +15,11 @@
                 </div>
             @endif
         </div>
-        {{-- Tarif SPP kini terpusat di master Jenis Biaya (tipe `spp`), bukan lagi di halaman ini. --}}
+        {{-- Besaran SPP diisi di layar Tarif (per tahun ajaran & jenjang), bukan di halaman ini. --}}
         <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
-            Tarif SPP per jenjang diatur di
-            <a href="{{ route('jenis_biaya.index') }}" class="font-semibold underline">PPSB → Jenis Biaya</a>
-            (jenis bertipe <b>SPP</b>). Nominal khusus per santri di bawah tetap mengalahkan tarif jenjang.
+            Besaran SPP per tahun ajaran & jenjang diisi di
+            <a href="{{ route('tarif.index') }}" class="font-semibold underline">Setting Awal → Setting Biaya → Tarif</a>.
+            Nominal khusus per santri dan Kebijakan Khusus tetap mengalahkan tarif jenjang.
         </div>
 
         <div>

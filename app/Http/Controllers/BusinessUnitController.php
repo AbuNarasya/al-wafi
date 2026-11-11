@@ -59,7 +59,7 @@ class BusinessUnitController extends Controller
             $business_unit->delete();
         } catch (QueryException $e) {
             return redirect()->route('business_units.index')
-                ->with('error', 'Unit bisnis tidak bisa dihapus karena masih dipakai jurnal / default unit.');
+                ->with('error', 'Unit bisnis tidak bisa dihapus karena masih dipakai data lain (jurnal, Default Unit Bisnis, jenis biaya, rekening, aset, dll.). Pindahkan rujukannya ke unit lain, atau nonaktifkan unit ini.');
         }
 
         return redirect()->route('business_units.index')->with('status', 'Unit bisnis berhasil dihapus.');

@@ -19,12 +19,18 @@ use Illuminate\Support\Facades\DB;
  */
 class ImporArtikelBantuan extends Command
 {
-    protected $signature = 'bantuan:impor-artikel {berkas=docs/bantuan-wali/panduan-portal-wali.md} {--jalankan : benar-benar menyimpan} {--paksa : tetap impor artikel bertanda [PERLU DICEK]}';
+    protected $signature = 'bantuan:impor-artikel {berkas=docs/bantuan-wali/panduan-portal-wali.md} {--audiens=wali : pembaca artikel: wali | staf} {--jalankan : benar-benar menyimpan} {--paksa : tetap impor artikel bertanda [PERLU DICEK]}';
 
     protected $description = 'Impor artikel panduan asisten bantuan portal wali dari berkas markdown';
 
     public function handle(): int
     {
+        $audiens = (string) $this->option('audiens');
+        if (! array_key_exists($audiens, \App\Services\PortalWali\AsistenWali::AUDIENS)) {
+            $this->error('--audiens harus wali atau staf.');
+
+            return self::FAILURE;
+        }
         $berkas = $this->argument('berkas');
         $jalur = is_file($berkas) ? $berkas : base_path($berkas);
         if (! is_file($jalur)) {
@@ -50,12 +56,12 @@ class ImporArtikelBantuan extends Command
             return self::FAILURE;
         }
 
-        $ada = DB::table('artikel_bantuan')->pluck('id', 'judul');
+        $ada = DB::table('artikel_bantuan')->where('audiens', $audiens)->pluck('id', 'judul');
         $baru = $ubah = 0;
         foreach ($artikel as $a) {
             $ada->has($a['judul']) ? $ubah++ : $baru++;
         }
-        $this->info(count($artikel)." artikel di berkas: {$baru} baru, {$ubah} diperbarui.");
+        $this->info(count($artikel)." artikel ({$audiens}) di berkas: {$baru} baru, {$ubah} diperbarui.");
 
         if (! $this->option('jalankan')) {
             $this->warn('Uji-kering — tidak ada yang disimpan. Tambahkan --jalankan untuk menyimpan.');
@@ -63,11 +69,18 @@ class ImporArtikelBantuan extends Command
             return self::SUCCESS;
         }
 
-        DB::transaction(function () use ($artikel) {
+        // Urutan menyambung artikel yang sudah ada di pembaca yang sama — beberapa berkas staf (umum, erp-*)
+        // diimpor berurutan tanpa saling menimpa urutannya.
+        $mulai = $ubah > 0 ? 0 : (int) DB::table('artikel_bantuan')->where('audiens', $audiens)->max('urutan');
+        DB::transaction(function () use ($artikel, $audiens, $ada, $mulai) {
             foreach ($artikel as $i => $a) {
-                DB::table('artikel_bantuan')->updateOrInsert(['judul' => $a['judul']],
-                    ['isi' => $a['isi'], 'kata_kunci' => $a['kata_kunci'], 'urutan' => ($i + 1) * 10, 'aktif' => true, 'updated_at' => now()]
-                    + (DB::table('artikel_bantuan')->where('judul', $a['judul'])->exists() ? [] : ['created_at' => now()]));
+                $kunci = ['audiens' => $audiens, 'judul' => $a['judul']];
+                $nilai = ['isi' => $a['isi'], 'kata_kunci' => $a['kata_kunci'], 'aktif' => true, 'updated_at' => now()];
+                if ($ada->has($a['judul'])) {
+                    DB::table('artikel_bantuan')->where($kunci)->update($nilai);
+                } else {
+                    DB::table('artikel_bantuan')->insert($kunci + $nilai + ['urutan' => $mulai + ($i + 1) * 10, 'created_at' => now()]);
+                }
             }
         });
         $this->info('Tersimpan.');

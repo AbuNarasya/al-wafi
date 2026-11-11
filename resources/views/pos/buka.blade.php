@@ -8,7 +8,7 @@
         @if ($tokoOptions->isEmpty())
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
                 Belum ada lokasi berjenis <b>toko</b>. Bagian keuangan perlu menambahkannya di
-                <b>Keuangan → Aset &amp; Persediaan → Lokasi Persediaan</b>, lengkap dengan akun kasirnya.
+                <b>{{ \App\Support\Instans::adalah('wafimart') ? 'WAFI MART → Toko & Gudang (Lokasi)' : 'Keuangan → Aset & Persediaan → Lokasi Persediaan' }}</b>, lengkap dengan akun kasirnya.
             </div>
         @else
             <form method="POST" action="{{ route('pos.buka_shift') }}" class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm"

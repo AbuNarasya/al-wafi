@@ -32,8 +32,9 @@ final class ModulRegistry
         ['kode' => 'company-settings', 'nama' => 'Pengaturan Perusahaan', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
         // Saklar cara bayar portal wali (VA, transfer + bukti) — 9 Nov 2026.
         ['kode' => 'metode-pembayaran', 'nama' => 'Metode Pembayaran Portal', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
-        // Asisten bantuan AI portal wali + artikel panduan — 11 Nov 2026.
-        ['kode' => 'asisten-wali', 'nama' => 'Asisten Bantuan Portal', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
+        // Asisten bantuan AI (portal wali + staf) & artikel panduannya — 11 Nov 2026. Bertanya tak butuh hak;
+        // hak ini untuk MENGELOLA saklar, penyedia, dan artikel.
+        ['kode' => 'asisten-wali', 'nama' => 'Asisten Bantuan', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
         ['kode' => 'bagian', 'nama' => 'Bagian / Struktur Organisasi', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
         ['kode' => 'users', 'nama' => 'Pengguna', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],
         ['kode' => 'levels', 'nama' => 'Level Otorisasi Keuangan', 'grup' => 'SETTING AWAL', 'sub' => 'Setting Umum'],

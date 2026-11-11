@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="mb-4">
-        <h1 class="text-lg font-semibold text-gray-800">Pengajuan Belum Dibayar (Saldo Awal)</h1>
+        <h1 class="text-lg font-semibold text-gray-800">Hutang Belum Dibayar (Saldo Awal)</h1>
         <p class="mt-1 text-sm text-gray-500">
             Hutang yang sudah disetujui di pembukuan lama tetapi belum dicairkan saat pindah sistem.
         </p>

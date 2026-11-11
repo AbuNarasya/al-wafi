@@ -198,5 +198,10 @@
         </main>
     </div>
 </div>
+@auth
+    @if (\App\Services\PortalWali\AsistenWali::aktifStaf())
+        @include('partials.bantuan-staf', ['judulHalaman' => trim($__env->yieldContent('title'))])
+    @endif
+@endauth
 </body>
 </html>

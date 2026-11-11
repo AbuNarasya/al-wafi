@@ -109,7 +109,8 @@
 
             {{-- Meniru form pendaftaran: isian teks bebas muncul untuk sumber yang
                  ditandai "minta keterangan" di masternya. --}}
-            @php $sumberMaster = \App\Models\SumberInformasi::where('status', 'aktif')->orderBy('urutan')->orderBy('kode')->get(); @endphp
+            {{-- Sumber milik santri ini tetap ikut walau kini nonaktif — tanpa itu dropdown kosong dan menyimpan biodata menghapusnya (11 Nov 2026). --}}
+            @php $sumberMaster = \App\Models\SumberInformasi::where(fn ($q) => $q->where('status', 'aktif')->when($santri->sumber_informasi, fn ($w) => $w->orWhere('kode', $santri->sumber_informasi)))->orderBy('urutan')->orderBy('kode')->get(); @endphp
             <div x-data="{ sumber: @js(old('sumber_informasi', $santri->sumber_informasi ?? '')) }">
                 <label class="mb-1 block text-sm font-medium text-gray-700">Sumber Informasi</label>
                 <select name="sumber_informasi" x-model="sumber"

@@ -90,7 +90,7 @@ class JournalService
                         throw new AppException(422,
                             "Baris persediaan {$l['kode_persediaan']}: harga pokok FIFO untuk {$l['kuantiti']} unit "
                             ."adalah {$mutasi->nilai}, sedangkan kredit yang diisi {$l['kredit']}. "
-                            .'Samakan nominalnya, atau catat pengeluaran ini lewat menu Persediaan → Mutasi Stok.');
+                            .'Samakan nominalnya, atau catat pengeluaran ini lewat tombol Mutasi di menu Persediaan.');
                     }
                 }
             }

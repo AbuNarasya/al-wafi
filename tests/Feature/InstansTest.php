@@ -117,6 +117,39 @@ class InstansTest extends TestCase
             ->assertDontSee('Dompet Santri')->assertDontSee('Batas belanja kartu')->assertDontSee('Unit Bisnis Wafi Mart');
     }
 
+    /** Akun Piutang ke Al Wafi (11 Nov 2026) — dulu hanya dipasang migrasi; kini bisa diatur di Pengaturan Perusahaan Wafi Mart. */
+    public function test_akun_piutang_ke_al_wafi_diatur_di_pengaturan_perusahaan_wafi_mart(): void
+    {
+        \App\Models\CoaGroup::create(['kode_grup' => 'ZZPA', 'nama_grup' => 'Piutang']);
+        foreach (['1.ZZPA.01' => 'Piutang ke Al Wafi', '1.ZZPA.02' => 'Piutang Lama'] as $kd => $n) {
+            \App\Models\CoaDetail::create(['kode_coa' => $kd, 'nama_coa' => $n, 'kode_grup' => 'ZZPA', 'jenis_saldo' => 'debet']);
+        }
+        \App\Models\CompanySettings::updateOrCreate(['id' => 1], ['nama_perusahaan' => 'X', 'jenis_perusahaan' => 'Y', 'mata_uang' => 'IDR',
+            'periode_awal_pembukuan' => '2026-01-01', 'bulan_awal_anggaran' => 1, 'kode_coa_kartu_santri' => '1.ZZPA.02']);
+        $isian = ['nama_perusahaan' => 'X', 'jenis_perusahaan' => 'Y', 'mata_uang' => 'IDR', 'periode_awal_pembukuan' => '2026-01-01', 'bulan_awal_anggaran' => 1];
+
+        \App\Models\CoaGroup::create(['kode_grup' => 'ZZHT', 'nama_grup' => 'Hutang']);
+        \App\Models\CoaDetail::create(['kode_coa' => '2.ZZHT.01', 'nama_coa' => 'Hutang ke Wafi Mart', 'kode_grup' => 'ZZHT', 'jenis_saldo' => 'kredit']);
+
+        // Al Wafi: isian Piutang tak tampil & kiriman tak mengubahnya; isian Hutang ke Wafi Mart ada & tersimpan.
+        $this->actingAs($this->admin)->get('/company-settings')->assertOk()->assertDontSee('Akun Piutang ke Al Wafi')
+            ->assertSee('Akun Hutang ke Wafi Mart');
+        $this->actingAs($this->admin)->put('/company-settings', $isian + ['kode_coa_kartu_santri' => '1.ZZPA.01', 'kode_coa_hutang_toko' => '2.ZZHT.01'])->assertRedirect();
+        $this->assertSame('1.ZZPA.02', \App\Models\CompanySettings::find(1)->kode_coa_kartu_santri);
+        $this->assertSame('2.ZZHT.01', \App\Models\CompanySettings::find(1)->kode_coa_hutang_toko);
+
+        $this->instans('wafimart');
+        $this->actingAs($this->admin)->get('/company-settings')->assertOk()->assertSee('Akun Piutang ke Al Wafi')
+            ->assertSee('1.ZZPA.01') // pilihan akun aset tersedia (dropdown cari, datanya JSON)
+            ->assertDontSee('Akun Hutang ke Wafi Mart');
+        $this->actingAs($this->admin)->put('/company-settings', $isian + ['kode_coa_kartu_santri' => '1.ZZPA.01', 'kode_coa_hutang_toko' => ''])->assertRedirect();
+        $this->assertSame('1.ZZPA.01', \App\Models\CompanySettings::find(1)->kode_coa_kartu_santri);
+        $this->assertSame('2.ZZHT.01', \App\Models\CompanySettings::find(1)->kode_coa_hutang_toko, 'Wafi Mart tak menyentuh akun milik Al Wafi');
+        // Formulir tanpa isian ini (lama) tak mengosongkannya.
+        $this->actingAs($this->admin)->put('/company-settings', $isian)->assertRedirect();
+        $this->assertSame('1.ZZPA.01', \App\Models\CompanySettings::find(1)->kode_coa_kartu_santri);
+    }
+
     public function test_matriks_hak_akses_tanpa_modul_mati_dan_haknya_tak_terhapus(): void
     {
         $u = User::create(['username' => 'kas', 'nama' => 'Kas', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif'])->fresh();

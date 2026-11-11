@@ -326,7 +326,7 @@
         </div>
         @if (collect($plan['baris'])->contains(fn ($r) => $r['target_l'] === null && $r['target'] > 0))
             <p class="px-4 py-2 text-[11px] text-gray-400">
-                Jenjang bertanda &ldquo;—&rdquo; targetnya belum dirinci per jenis kelamin. Lengkapi di menu PPSB → Target Santri.
+                Jenjang bertanda &ldquo;—&rdquo; targetnya belum dirinci per jenis kelamin. Lengkapi di menu PPSB → Setting Awal → Target Santri.
             </p>
         @endif
     </div>

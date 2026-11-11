@@ -48,7 +48,7 @@
                 </div>
 
                 {{-- Paket 1 (3 Nov 2026): di penerimaan cukup DITIMBANG — jenis & jumlah pakaian dicatat di meja pemeriksaan. --}}
-                <p class="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">Cukup ditimbang. Jenis &amp; jumlah pakaian dicatat di meja <b>Pemeriksaan</b>, sekaligus timbang ulang. Label kantong tercetak otomatis sesudah disimpan.</p>
+                <p class="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">Cukup ditimbang. Jenis &amp; jumlah pakaian dicatat di meja <b>Pemeriksaan</b>, sekaligus timbang ulang. Sesudah disimpan, tekan <b>Cetak label</b> untuk mencetak label kantong.</p>
 
                 <label class="block"><span class="text-xs text-gray-500">Catatan (noda, sobek, pakaian khusus, …)</span>
                     <textarea name="catatan" rows="2" class="w-full rounded-lg border-gray-300 text-sm">{{ old('catatan') }}</textarea></label>

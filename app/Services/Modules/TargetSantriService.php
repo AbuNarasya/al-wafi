@@ -17,7 +17,8 @@ class TargetSantriService
     {
         $bentrok = TargetSantri::where('tahun_ajaran', $data['tahun_ajaran'])->where('kode_jenjang', $data['kode_jenjang'])->first();
         if ($bentrok) {
-            throw new AppException(409, "Target jenjang \"{$data['kode_jenjang']}\" untuk T.A {$data['tahun_ajaran']} sudah ada. Sunting baris itu.");
+            $namaJenjang = \App\Models\Jenjang::where('kode', $data['kode_jenjang'])->value('nama') ?? $data['kode_jenjang'];
+            throw new AppException(409, "Target jenjang \"{$namaJenjang}\" untuk T.A {$data['tahun_ajaran']} sudah ada. Sunting baris itu.");
         }
 
         return TargetSantri::create($this->rapikan($data));

@@ -67,6 +67,32 @@
                 </p>
             </div>
 
+            @if ($opsiHutangWafiMart !== null)
+                {{-- ERP Al Wafi (11 Nov 2026): dulu hanya dipasang migrasi, tak ada isiannya di layar mana pun. --}}
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <x-field name="kode_coa_hutang_toko" label="Akun Hutang ke Wafi Mart (belanja kartu santri)"
+                             :value="$s->kode_coa_hutang_toko"
+                             :options="['' => '— belum ditetapkan —'] + $opsiHutangWafiMart" />
+                    <p class="mt-2 text-xs text-gray-500">
+                        Dikredit saat belanja kartu santri di Wafi Mart dijurnal (jurnal malam), lalu didebet saat dicairkan lewat
+                        <b>Pencairan Belanja Kartu ke Wafi Mart</b>. Wajib diisi sebelum pencairan pertama.
+                    </p>
+                </div>
+            @endif
+
+            @if ($opsiPiutangAlWafi !== null)
+                {{-- Wafi Mart (11 Nov 2026): dulu hanya dipasang migrasi, tak ada isiannya di layar mana pun. --}}
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <x-field name="kode_coa_kartu_santri" label="Akun Piutang ke Al Wafi (belanja kartu santri)"
+                             :value="$s->kode_coa_kartu_santri"
+                             :options="['' => '— belum ditetapkan —'] + $opsiPiutangAlWafi" />
+                    <p class="mt-2 text-xs text-gray-500">
+                        Didebet saat shift kasir & penjualan kantin mitra memakai kartu santri, lalu dikredit saat pencairan dari Al Wafi
+                        diterima (<b>Penerimaan dari Al Wafi</b>). Wajib diisi sebelum menerima pembayaran kartu.
+                    </p>
+                </div>
+            @endif
+
             @if ($isianSantri)
             <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <label class="mb-1 block text-sm font-medium text-gray-700">Batas belanja kartu harian (bawaan)</label>

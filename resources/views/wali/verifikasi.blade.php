@@ -68,11 +68,12 @@
         </div>
         <div class="mt-3 h-2 overflow-hidden rounded-full bg-gray-100"><div class="h-full rounded-full bg-emerald-500" style="width: {{ $persen }}%"></div></div>
         <div class="mt-3 flex flex-wrap gap-2 text-xs">
-            <a href="{{ route('wali.verifikasi') }}" @class(['rounded-full px-2.5 py-1', 'bg-gray-800 text-white' => $status === '', 'bg-gray-100 text-gray-700 hover:bg-gray-200' => $status !== ''])>Semua · {{ $total }}</a>
+            {{-- inline-flex items-center: di layar sentuh tautan dipaksa ≥44px (app.css) — tulisannya tetap di tengah. --}}
+            <a href="{{ route('wali.verifikasi') }}" @class(['inline-flex items-center rounded-full px-2.5 py-1', 'bg-gray-800 text-white' => $status === '', 'bg-gray-100 text-gray-700 hover:bg-gray-200' => $status !== ''])>Semua · {{ $total }}</a>
             @foreach ($label as $kode => $teks)
                 @if (($hitung[$kode] ?? 0) > 0)
                     <a href="{{ route('wali.verifikasi', ['status' => $kode]) }}"
-                       @class(['rounded-full px-2.5 py-1', 'ring-2 ring-gray-800' => $status === $kode, $warna[$kode]])>{{ $teks }} · {{ $hitung[$kode] }}</a>
+                       @class(['inline-flex items-center rounded-full px-2.5 py-1', 'ring-2 ring-gray-800' => $status === $kode, $warna[$kode]])>{{ $teks }} · {{ $hitung[$kode] }}</a>
                 @endif
             @endforeach
         </div>

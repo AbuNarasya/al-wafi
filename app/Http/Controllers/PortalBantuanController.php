@@ -23,9 +23,9 @@ class PortalBantuanController extends Controller
         $wali = SesiWali::wali();
 
         return view('portal.bantuan', [
-            'artikel' => DB::table('artikel_bantuan')->where('aktif', true)->orderBy('urutan')->orderBy('id')->get(['id', 'judul', 'isi', 'kata_kunci']),
+            'artikel' => DB::table('artikel_bantuan')->where('aktif', true)->where('audiens', 'wali')->orderBy('urutan')->orderBy('id')->get(['id', 'judul', 'isi', 'kata_kunci']),
             // Percakapan hari ini tetap tampil saat halaman dibuka ulang.
-            'percakapan' => DB::table('percakapan_asisten')->where('id_wali', $wali->id)
+            'percakapan' => DB::table('percakapan_asisten')->where('id_wali', $wali->id)->where('audiens', 'wali')
                 ->where('created_at', '>=', now('Asia/Jakarta')->startOfDay()->utc())
                 ->orderBy('id')->get(['pertanyaan', 'jawaban']),
             'sisa' => AsistenWali::sisaHariIni($wali),

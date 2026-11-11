@@ -185,12 +185,14 @@ class AsistenWaliTest extends TestCase
 
         DB::table('hak_akses_modul')->where('id_pengguna', $lihat->id_pengguna)->update(['ubah' => true, 'buat' => true, 'hapus' => true]);
         Akses::lupakan();
-        $this->actingAs($lihat)->put('/pengaturan/asisten-wali', ['aktif' => 1, 'penyedia' => 'gemini', 'model_groq' => 'llama-3.1-8b-instant', 'model_gemini' => 'gemini-2.5-flash', 'batas_harian' => 5])
+        $this->actingAs($lihat)->put('/pengaturan/asisten-wali', ['aktif' => 1, 'penyedia' => 'gemini', 'model_groq' => 'llama-3.1-8b-instant', 'model_gemini' => 'gemini-2.5-flash', 'batas_harian' => 5, 'batas_harian_staf' => 40, 'aktif_staf' => 1])
             ->assertRedirect('/pengaturan/asisten-wali');
         $atur = AsistenWali::pengaturan();
         $this->assertTrue((bool) $atur->aktif);
         $this->assertSame('gemini', $atur->penyedia);
         $this->assertSame(5, (int) $atur->batas_harian);
+        $this->assertSame(40, (int) $atur->batas_harian_staf);
+        $this->assertTrue((bool) $atur->aktif_staf);
         $this->assertDatabaseHas('activity_log', ['aksi' => 'ubah_asisten_wali']);
 
         $this->actingAs($lihat)->post('/pengaturan/asisten-wali/artikel', ['judul' => 'Cara pasang aplikasi?', 'isi' => 'Ketuk Pasang.', 'kata_kunci' => 'pasang, hp', 'aktif' => 1])->assertRedirect();
@@ -198,6 +200,50 @@ class AsistenWaliTest extends TestCase
         $id = DB::table('artikel_bantuan')->where('judul', 'Cara pasang aplikasi?')->value('id');
         $this->actingAs($lihat)->delete("/pengaturan/asisten-wali/artikel/{$id}")->assertRedirect();
         $this->assertDatabaseMissing('artikel_bantuan', ['id' => $id]);
+    }
+
+    public function test_asisten_staf_untuk_semua_yang_login_dan_artikel_terpisah_dari_wali(): void
+    {
+        $staf = User::create(['username' => 'kasir', 'nama' => 'Kasir Satu', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif'])->fresh();
+        DB::table('artikel_bantuan')->insert(['audiens' => 'staf', 'judul' => 'Bagaimana cara menerbitkan SPP bulanan?',
+            'isi' => 'Buka KEPENDIDIKAN › Administrasi › SPP, pilih periode, lalu Terbitkan.', 'kata_kunci' => 'spp, terbitkan, tagihan',
+            'urutan' => 10, 'aktif' => true, 'created_at' => now(), 'updated_at' => now()]);
+
+        // Mati: tombol tak ada, alamat 404.
+        $this->actingAs($staf)->get('/beranda')->assertDontSee('bantuanStaf(', false);
+        $this->actingAs($staf)->postJson('/bantuan/tanya', ['pertanyaan' => 'spp'])->assertNotFound();
+
+        $this->atur(['aktif_staf' => true, 'batas_harian_staf' => 2]);
+        $this->actingAs($staf)->get('/beranda')->assertSee('bantuanStaf(', false);
+        $this->assertFalse(AsistenWali::aktif(), 'saklar staf tak menyalakan portal wali');
+
+        Http::fake(['api.groq.com/*' => Http::response(['choices' => [['message' => ['content' => 'Buka menu SPP.']]]])]);
+        $this->actingAs($staf)->postJson('/bantuan/tanya', ['pertanyaan' => 'cara terbitkan spp bayar?', 'layar' => 'KEPENDIDIKAN › Administrasi › SPP'])
+            ->assertOk()->assertJsonPath('sumber', 'groq')->assertJsonPath('sisa', 1)
+            ->assertJsonPath('artikel.0.judul', 'Bagaimana cara menerbitkan SPP bulanan?');
+        Http::assertSent(function (KirimanHttp $k) {
+            $sistem = $k->data()['messages'][0]['content'];
+
+            return str_contains($sistem, 'STAF aplikasi')
+                && str_contains($sistem, 'sedang membuka layar: KEPENDIDIKAN › Administrasi › SPP')
+                && str_contains($sistem, 'Buka KEPENDIDIKAN › Administrasi › SPP')
+                && ! str_contains($sistem, 'Bagaimana cara membayar tagihan SPP?'); // artikel wali tak ikut
+        });
+        $log = DB::table('percakapan_asisten')->first();
+        $this->assertSame([null, $staf->id_pengguna, 'staf', 'KEPENDIDIKAN › Administrasi › SPP'], [$log->id_wali, $log->id_pengguna, $log->audiens, $log->layar]);
+
+        $this->actingAs($staf)->getJson('/bantuan/percakapan')->assertOk()->assertJsonPath('sisa', 1)
+            ->assertJsonPath('percakapan.0.teks', 'cara terbitkan spp bayar?');
+
+        // Batas staf terpisah dari batas wali & per orang.
+        $this->actingAs($staf)->postJson('/bantuan/tanya', ['pertanyaan' => 'lagi'])->assertJsonPath('sisa', 0);
+        $this->actingAs($staf)->postJson('/bantuan/tanya', ['pertanyaan' => 'lagi'])->assertStatus(429);
+        $this->assertSame(20, AsistenWali::sisaHariIni($this->wali));
+
+        // Artikel wali tetap hanya untuk wali.
+        $this->assertCount(0, AsistenWali::cariArtikel('menerbitkan spp', 5, 'wali')->where('audiens', 'staf'));
+        $this->atur(['aktif' => true]);
+        $this->sebagaiWali()->get('/wali/bantuan')->assertOk()->assertDontSee('Bagaimana cara menerbitkan SPP bulanan?');
     }
 
     public function test_urai_berkas_artikel(): void
@@ -214,7 +260,11 @@ class AsistenWaliTest extends TestCase
         $this->artisan('bantuan:impor-artikel', ['berkas' => $berkas, '--paksa' => true])->assertSuccessful();
         $this->assertDatabaseMissing('artikel_bantuan', ['judul' => 'Cara ganti PIN?']);
         $this->artisan('bantuan:impor-artikel', ['berkas' => $berkas, '--paksa' => true, '--jalankan' => true])->assertSuccessful();
-        $this->assertDatabaseHas('artikel_bantuan', ['judul' => 'Bagaimana cara masuk portal?', 'kata_kunci' => 'masuk, login, otp']);
+        $this->assertDatabaseHas('artikel_bantuan', ['audiens' => 'wali', 'judul' => 'Bagaimana cara masuk portal?', 'kata_kunci' => 'masuk, login, otp']);
+        // Judul sama untuk pembaca lain = artikel lain.
+        $this->artisan('bantuan:impor-artikel', ['berkas' => $berkas, '--paksa' => true, '--jalankan' => true, '--audiens' => 'staf'])->assertSuccessful();
+        $this->assertSame(2, DB::table('artikel_bantuan')->where('judul', 'Bagaimana cara masuk portal?')->count());
+        $this->artisan('bantuan:impor-artikel', ['berkas' => $berkas, '--audiens' => 'tamu'])->assertFailed();
         unlink($berkas);
     }
 }

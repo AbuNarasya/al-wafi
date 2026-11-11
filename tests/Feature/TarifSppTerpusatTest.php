@@ -215,7 +215,7 @@ class TarifSppTerpusatTest extends TestCase
             ->assertOk()
             ->assertDontSee('Tarif SPP per Jenjang')
             ->assertSee('Terbitkan Tagihan SPP')
-            ->assertSee('diatur di'); // penunjuk ke master Jenis Biaya
+            ->assertSee(route('tarif.index'), false); // penunjuk ke layar Tarif (besarannya diisi di sana)
     }
 
     /**

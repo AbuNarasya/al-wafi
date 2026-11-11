@@ -82,7 +82,7 @@ class JenjangService
         ]);
         if ($dipakai !== []) {
             $rincian = implode(', ', array_map(fn ($n, $t) => "{$n} {$t}", $dipakai, array_keys($dipakai)));
-            throw new AppException(409, "Jenjang {$kode} masih dipakai ({$rincian}). Nonaktifkan saja bila sudah tidak dipakai lagi.");
+            throw new AppException(409, "Jenjang {$row->nama} masih dipakai ({$rincian}). Nonaktifkan saja bila sudah tidak dipakai lagi.");
         }
         $row->delete();
     }

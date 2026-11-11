@@ -32,7 +32,7 @@
             </div>
         @else
             <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
-                Hanya <strong>Staff</strong> yang boleh mengajukan. Pengajuan otomatis masuk rantai persetujuan (Mudir Bagian → Mudir Umum → eskalasi bila overbudget).
+                Hanya pengguna yang levelnya berperan <strong>boleh mengajukan pembayaran</strong> yang bisa mengajukan. Pengajuan otomatis masuk rantai persetujuan sesuai Level Pengajuan, termasuk tahap eskalasi bila overbudget.
             </div>
         @endif
 

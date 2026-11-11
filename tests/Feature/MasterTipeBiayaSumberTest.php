@@ -216,6 +216,22 @@ class MasterTipeBiayaSumberTest extends TestCase
         }
     }
 
+    /** Sumber yang kini nonaktif tetap jadi pilihan di formulir ubah santri pemakainya — kalau tidak, menyimpan biodata menghapusnya. */
+    public function test_sumber_nonaktif_milik_santri_tetap_ada_di_formulir_ubah(): void
+    {
+        (new SumberInformasiService)->create(['kode' => 'brosur', 'nama' => 'Brosur Lama', 'status' => 'aktif']);
+        $wali = (new WaliService)->create(['kontak_utama' => 'ayah', 'nama_ayah' => 'Budi', 'telepon_ayah' => '08126']);
+        $santri = (new \App\Services\Modules\SantriService)->create([
+            'id_wali' => $wali->id, 'nama' => 'Ahmad', 'jenis_kelamin' => 'L', 'kode_jenjang' => 'SMP',
+            'tahun_ajaran' => self::TA, 'jalur' => 'reguler', 'sumber_informasi' => 'brosur',
+        ]);
+        SumberInformasi::where('kode', 'brosur')->update(['status' => 'nonaktif']);
+
+        $this->actingAs($this->admin)->get(route('santri.edit', $santri->id))->assertOk()
+            ->assertSee('<option value="brosur" selected', false);
+        $this->actingAs($this->admin)->get(route('santri.create'))->assertOk()->assertDontSee('Brosur Lama');
+    }
+
     /**
      * Form Tambah memakai objek TipeBiaya yang BELUM tersimpan. Dulu halamannya
      * gagal dibuka (500) karena model punya method statis bernama `kode` —

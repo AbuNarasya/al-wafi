@@ -32,7 +32,7 @@ final class Navigation
         // pengisiannya: jenjang → tipe → jenis → tarif.
         ['url' => '/company-settings', 'label' => 'Pengaturan Perusahaan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'company-settings'],
         ['url' => '/pengaturan/metode-pembayaran', 'label' => 'Metode Pembayaran Portal', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'metode-pembayaran'],
-        ['url' => '/pengaturan/asisten-wali', 'label' => 'Asisten Bantuan Portal', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'asisten-wali'],
+        ['url' => '/pengaturan/asisten-wali', 'label' => 'Asisten Bantuan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'asisten-wali'],
         ['url' => '/bagian', 'label' => 'Bagian / Struktur Organisasi', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'bagian'],
         ['url' => '/users', 'label' => 'Pengguna', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'users'],
         ['url' => '/levels', 'label' => 'Level Otorisasi Keuangan', 'group' => 'SETTING AWAL', 'sub' => 'Setting Umum', 'modul' => 'levels'],
