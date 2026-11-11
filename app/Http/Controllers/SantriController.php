@@ -656,6 +656,12 @@ class SantriController extends Controller
                 ->whereIn('status', \App\Models\PengajuanKeluar::BERJALAN)->latest('id')->first(),
         ] : null;
 
+        // Riwayat pengunduran diri + clearance + dokumennya (permintaan user 11 Nov 2026) — terutama untuk santri
+        // keluar, sebagai arsip. Hanya bagi yang berhak melihat modul Pengunduran Diri (dokumennya pun dijaga hak itu).
+        $riwayatKeluar = Akses::boleh('pengunduran-diri', 'lihat')
+            ? \App\Models\PengajuanKeluar::with('dokumen')->where('id_santri', $santri->id)->orderByDesc('id')->get()
+            : collect();
+
         // Tunggakan awal (pintu manual saldo awal). Halangannya dihitung PER
         // TAGIHAN dari sumber yang sama dengan yang dipakai service menolak,
         // supaya tombol yang terlihat dan tindakan yang diterima tak pernah
@@ -693,6 +699,7 @@ class SantriController extends Controller
             'koreksiUangPangkal' => $koreksiUangPangkal,
             'koreksiPerlengkapan' => $koreksiPerlengkapan,
             'keluarAktif' => $keluarAktif,
+            'riwayatKeluar' => $riwayatKeluar,
             'menungguPerTagihan' => $menungguPerTagihan,
             'bolehTunggakanAwal' => $bolehTunggakanAwal,
             'halanganTunggakanAwal' => $halanganTunggakanAwal,

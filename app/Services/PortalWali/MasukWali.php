@@ -131,7 +131,7 @@ class MasukWali
     /**
      * Keluarga pemilik email ini.
      *
-     * @return array{status:'satu', wali:Wali, peran:string}|array{status:'baru'|'kembar'|'nonaktif'}
+     * @return array{status:'satu', wali:Wali, peran:string}|array{status:'baru'|'kembar'|'nonaktif'}|array{status:'tutup', wali:Wali}
      */
     public function cariKeluarga(string $email): array
     {
@@ -153,6 +153,10 @@ class MasukWali
         $wali = $cocok->first();
         if ($wali->status !== 'aktif') {
             return ['status' => 'nonaktif'];
+        }
+        // Seluruh anak berakhir & tak ada lagi tagihan/saldo — portal tertutup (AksesPortal, 11 Nov 2026).
+        if (! AksesPortal::terbuka($wali)) {
+            return ['status' => 'tutup', 'wali' => $wali];
         }
 
         return ['status' => 'satu', 'wali' => $wali, 'peran' => self::peranDariEmail($wali, $email)];

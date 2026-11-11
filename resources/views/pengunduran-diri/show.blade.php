@@ -16,7 +16,13 @@
             <h1 class="mt-1 text-lg font-bold text-gray-900">{{ $s->nama }} <span class="font-mono text-sm font-normal text-gray-500">{{ $p->nomor }}</span></h1>
             <p class="text-sm text-gray-600">{{ $s->nis }} · {{ $s->jenjang?->nama }} · kelas {{ $s->kelas?->nama ?? '—' }} · wali kelas {{ $s->kelas?->waliKelas?->nama ?? 'belum ditetapkan' }}</p>
         </div>
-        <span class="rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-brand">{{ $p->labelStatus() }}</span>
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-brand">{{ $p->labelStatus() }}</span>
+            @if (\App\Services\Modules\BeritaAcaraClearance::tersedia($p))
+                <a href="{{ route('pengunduran_diri.berita_acara', $p->id) }}" data-tanpa-muat
+                   class="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">Unduh Berita Acara (PDF)</a>
+            @endif
+        </div>
     </div>
 
     <div class="grid gap-4 lg:grid-cols-2">

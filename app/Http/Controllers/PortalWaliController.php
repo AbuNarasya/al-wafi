@@ -171,6 +171,7 @@ class PortalWaliController extends Controller
             'baru' => $this->mulaiPendaftaran($email, $request),
             'kembar' => view('portal.ditolak', ['pesan' => __('Email ini tercatat di lebih dari satu keluarga, jadi kami tak bisa '
                 .'menentukan keluarga yang mana. Silakan hubungi panitia untuk membetulkan data email Anda.')]),
+            'tutup' => view('portal.ditolak', ['pesan' => \App\Services\PortalWali\AksesPortal::pesan($keluarga['wali'])]),
             default => view('portal.ditolak', ['pesan' => __('Akun keluarga ini sedang dinonaktifkan. Silakan hubungi panitia.')]),
         };
     }

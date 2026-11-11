@@ -89,6 +89,7 @@ class PortalVerifikasiController extends Controller
             ! LinkVerifikasi::aktif() => __(self::TUTUP),
             $v === null => __('Link ini tidak dikenal atau sudah diganti dengan link baru. Silakan hubungi bagian kesantrian.'),
             $v->wali?->status !== 'aktif' => __('Data keluarga ini sedang dinonaktifkan. Silakan hubungi bagian kesantrian.'),
+            ! \App\Services\PortalWali\AksesPortal::terbuka($v->wali) => \App\Services\PortalWali\AksesPortal::pesan($v->wali),
             $v->selesai_pada !== null => __('Verifikasi data keluarga ini sudah selesai. Silakan masuk Portal Wali dengan email yang sudah diverifikasi.'),
             now()->lessThan($v->berlaku_mulai) => __('Link ini baru bisa dibuka mulai :tanggal.',
                 ['tanggal' => $v->berlaku_mulai->locale(app()->getLocale())->translatedFormat('j F Y')]),

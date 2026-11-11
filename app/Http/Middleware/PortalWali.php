@@ -32,6 +32,13 @@ class PortalWali
         if (! $wali && $sesi->pulihkan($request)) {
             $wali = SesiWali::wali();
         }
+        // Seluruh anak sudah berakhir & tak ada lagi tagihan/saldo (11 Nov 2026) — ditutup seketika juga.
+        if ($wali && ! \App\Services\PortalWali\AksesPortal::terbuka($wali)) {
+            $pesan = \App\Services\PortalWali\AksesPortal::pesan($wali);
+            $sesi->keluar($request);
+
+            return redirect()->route('portal.masuk')->with('error', $pesan);
+        }
 
         if ($wali && ($idLink = SesiWali::modeVerifikasi($request))) {
             return $this->modeVerifikasi($request, $next, $idLink, $sesi);

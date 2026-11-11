@@ -194,4 +194,115 @@ class PengunduranDiriTest extends TestCase
         $this->sebagaiIbu()->post(route('portal.mundur.batal', $this->ahmad->id), ['pin' => self::PIN])->assertSessionHas('status');
         $this->assertSame('dibatalkan', PengajuanKeluar::latest('id')->first()->status);
     }
+
+    /** Pengajuan yang seluruh tahapnya sudah lewat — fixture berita acara (11 Nov 2026). */
+    private function pengajuanTuntas(string $status = 'siap_dikeluarkan'): PengajuanKeluar
+    {
+        $p = new PengajuanKeluar;
+        $p->forceFill(['nomor' => 'PKD-2611-0009', 'id_santri' => $this->ahmad->id, 'id_wali' => $this->wali->id, 'diajukan_peran' => 'ibu',
+            'alasan' => 'Pindah kota', 'status' => $status]);
+        $t = now()->subDays(3);
+        foreach (['wali_kelas' => 'walikelas', 'kepala_sekolah' => 'kepsek', 'keuangan' => 'keu', 'kesantrian' => 'asrama', 'admin' => 'tu'] as $tahap => $u) {
+            $p->forceFill(["{$tahap}_oleh" => $this->u[$u]->id_pengguna, "{$tahap}_pada" => $t->addHour()->copy(), "{$tahap}_catatan" => $tahap === 'keuangan' ? 'Tunggakan disepakati dicicil' : null]);
+        }
+        $p->save();
+
+        return $p;
+    }
+
+    public function test_berita_acara_clearance_pdf_dan_cek_keaslian(): void
+    {
+        $p = $this->pengajuanTuntas('clearance');
+        $this->actingAs($this->u['lain'])->get(route('pengunduran_diri.show', $p->id))->assertOk()->assertDontSee('Unduh Berita Acara');
+        $this->actingAs($this->u['lain'])->from(route('pengunduran_diri.show', $p->id))->get(route('pengunduran_diri.berita_acara', $p->id))
+            ->assertRedirect()->assertSessionHas('error', 'Berita acara baru tersedia setelah seluruh clearance selesai.');
+
+        $p->update(['status' => 'siap_dikeluarkan']);
+        $this->actingAs($this->u['lain'])->get(route('pengunduran_diri.show', $p->id))->assertSee('Unduh Berita Acara (PDF)');
+        $pdf = $this->actingAs($this->u['lain'])->get(route('pengunduran_diri.berita_acara', $p->id))->assertOk();
+        $this->assertSame('application/pdf', $pdf->headers->get('Content-Type'));
+        $this->assertStringStartsWith('%PDF', $pdf->getContent());
+        $this->assertStringContainsString('Berita-Acara-Clearance-PKD-2611-0009.pdf', $pdf->headers->get('Content-Disposition'));
+        $this->assertDatabaseHas('activity_log', ['aksi' => 'unduh_berita_acara_clearance']);
+
+        // Isi berita acara (dirender sebelum jadi PDF).
+        $data = (new \App\Services\Modules\BeritaAcaraClearance)->data($p);
+        $html = view('pengunduran-diri.berita-acara', $data)->render();
+        foreach (['AHMAD', '242507001', 'Kepsek', 'Tunggakan disepakati dicicil', 'disahkan secara elektronik', $data['kode']] as $isi) {
+            $this->assertStringContainsString($isi, $html);
+        }
+        $this->assertStringStartsWith('data:image/png;base64,', $data['qr']);
+
+        // Cek keaslian (publik, tanpa login).
+        $kode = \App\Services\Modules\BeritaAcaraClearance::kode($p);
+        auth()->logout();
+        $this->get(route('verifikasi_dokumen.clearance', ['nomor' => $p->nomor, 'kode' => $kode]))->assertOk()
+            ->assertSee('Dokumen ASLI')->assertSee('AHMAD')->assertDontSee('Pindah kota')->assertDontSee('Tunggakan disepakati');
+        $this->get(route('verifikasi_dokumen.clearance', ['nomor' => $p->nomor, 'kode' => 'AAAABBBBCCCC']))->assertOk()->assertSee('Tidak dapat diverifikasi');
+        $this->post(route('verifikasi_dokumen.cari'), ['nomor' => strtolower($p->nomor), 'kode' => $data['kode']])
+            ->assertRedirect(route('verifikasi_dokumen.clearance', ['nomor' => $p->nomor, 'kode' => $kode]));
+
+        // Isi pokok berubah (tahap dicatat ulang) → kode lama tak berlaku.
+        $p->update(['keuangan_pada' => now()]);
+        $this->get(route('verifikasi_dokumen.clearance', ['nomor' => $p->nomor, 'kode' => $kode]))->assertSee('Tidak dapat diverifikasi');
+    }
+
+    public function test_riwayat_clearance_dan_dokumen_tampil_di_halaman_santri_keluar(): void
+    {
+        $p = $this->pengajuanTuntas('selesai');
+        $p->update(['dikeluarkan_oleh' => $this->u['tu']->id_pengguna, 'dikeluarkan_pada' => now()]);
+        $p->dokumen()->create(['jenis' => 'surat_mutasi', 'keterangan' => 'Mutasi ke SMP Negeri 1', 'nama_asli' => 'mutasi.pdf',
+            'path' => 'x/mutasi.pdf', 'mime' => 'application/pdf', 'ukuran' => 100, 'diunggah_oleh' => $this->u['tu']->id_pengguna]);
+        $this->ahmad->update(['status' => 'keluar']);
+        HakAksesModul::create(['id_pengguna' => $this->u['lain']->id_pengguna, 'kode_modul' => 'santri', 'lihat' => true, 'buat' => false, 'ubah' => false, 'hapus' => false, 'menu' => true]);
+        Akses::lupakan();
+
+        $this->actingAs($this->u['lain'])->get(route('santri.show', $this->ahmad->id))->assertOk()
+            ->assertSee('Riwayat pengunduran diri & clearance', false)->assertSee($p->nomor)
+            ->assertSee('Clearance keuangan (tagihan &amp; tunggakan)', false)->assertSee('Tunggakan disepakati dicicil')
+            ->assertSee('Mutasi ke SMP Negeri 1')->assertSee('Unduh Berita Acara (PDF)');
+
+        // Tanpa hak Pengunduran Diri: riwayatnya tak tampil.
+        $admin = User::create(['username' => 'adm', 'nama' => 'Adm', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif'])->fresh();
+        HakAksesModul::create(['id_pengguna' => $admin->id_pengguna, 'kode_modul' => 'santri', 'lihat' => true, 'buat' => false, 'ubah' => false, 'hapus' => false, 'menu' => true]);
+        Akses::lupakan();
+        $this->actingAs($admin)->get(route('santri.show', $this->ahmad->id))->assertOk()->assertDontSee('Riwayat pengunduran diri');
+    }
+
+    /** 11 Nov 2026: portal keluarga tertutup bila seluruh anak berakhir & tak ada lagi tagihan/saldo. */
+    public function test_portal_wali_tertutup_bila_tak_ada_lagi_santri_kecuali_masih_ada_urusan(): void
+    {
+        $this->sebagaiIbu()->get(route('portal.beranda'))->assertOk();
+
+        $this->ahmad->update(['status' => 'keluar']);
+        $this->assertFalse(\App\Services\PortalWali\AksesPortal::terbuka($this->wali));
+        $this->sebagaiIbu()->get(route('portal.beranda'))->assertRedirect(route('portal.masuk'))
+            ->assertSessionHas('error', fn ($p) => str_contains($p, 'tidak ada lagi santri yang terdaftar'));
+
+        // Masih ada saldo Dompet Wali → tetap terbuka sampai ditarik.
+        \App\Models\DompetWali::create(['id_wali' => $this->wali->id, 'saldo' => 5000]);
+        $this->assertTrue(\App\Services\PortalWali\AksesPortal::terbuka($this->wali));
+        \App\Models\DompetWali::where('id_wali', $this->wali->id)->update(['saldo' => 0]);
+        \App\Models\TabunganSantri::create(['id_santri' => $this->ahmad->id, 'saldo' => 1000]);
+        $this->assertTrue(\App\Services\PortalWali\AksesPortal::terbuka($this->wali));
+        \App\Models\TabunganSantri::where('id_santri', $this->ahmad->id)->update(['saldo' => 0]);
+        $this->assertFalse(\App\Services\PortalWali\AksesPortal::terbuka($this->wali));
+
+        // Adik didaftarkan sebagai calon → terbuka lagi dengan sendirinya.
+        Santri::create(['no_pendaftaran' => 'PSB-0002', 'id_wali' => $this->wali->id, 'nama' => 'Fatimah', 'jenis_kelamin' => 'P',
+            'kode_jenjang' => 'J002', 'tahun_ajaran' => '2026/2027', 'jalur' => '001', 'status' => 'calon']);
+        $this->assertTrue(\App\Services\PortalWali\AksesPortal::terbuka($this->wali));
+        $this->sebagaiIbu()->get(route('portal.beranda'))->assertOk();
+    }
+
+    public function test_masuk_dengan_password_keluarga_tertutup_diberi_tahu_alasannya(): void
+    {
+        $this->ahmad->update(['status' => 'alumni']);
+        (new \App\Services\PortalWali\KataSandiWali)->simpan($this->wali, 'ibu', 'rahasia123', 'rahasia123');
+
+        $this->post(route('portal.masuk.sandi'), ['email' => 'aminah@contoh.id', 'sandi' => 'salah-sekali'])->assertSessionHas('error', fn ($e) => str_contains($e, 'salah'));
+        $this->post(route('portal.masuk.sandi'), ['email' => 'aminah@contoh.id', 'sandi' => 'rahasia123'])
+            ->assertSessionHas('error', fn ($e) => str_contains($e, 'tidak ada lagi santri yang terdaftar'));
+        $this->assertGuest('wali');
+    }
 }

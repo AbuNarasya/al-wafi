@@ -75,6 +75,13 @@ class KataSandiWali
         }
 
         $keluarga = (new MasukWali)->cariKeluarga($email);
+        // Portal keluarga tertutup: beri tahu alasannya, tapi HANYA bila password-nya benar (tak membocorkan email terdaftar).
+        if ($keluarga['status'] === 'tutup') {
+            $peran = MasukWali::peranDariEmail($keluarga['wali'], MasukWali::normalEmail($email));
+            if ($this->cocok($keluarga['wali'], $peran, $sandi)) {
+                throw new AppException(403, AksesPortal::pesan($keluarga['wali']));
+            }
+        }
         if ($keluarga['status'] === 'satu' && $this->cocok($keluarga['wali'], $keluarga['peran'], $sandi)) {
             RateLimiter::clear($kunci['email'][0]);
 

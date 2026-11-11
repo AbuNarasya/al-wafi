@@ -131,6 +131,16 @@ Route::get('/login', [LoginController::class, 'showLogin'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:10,1');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
+// ---- Cek keaslian dokumen (publik, tanpa login) — 11 Nov 2026 ----
+// Berita acara clearance pengunduran diri: QR di PDF membuka /cek-dokumen/clearance/{nomor}/{kode}.
+Route::prefix('cek-dokumen')->name('verifikasi_dokumen.')->controller(\App\Http\Controllers\VerifikasiDokumenController::class)
+    ->middleware('throttle:30,1')->group(function () {
+        Route::get('/', 'form')->name('form');
+        Route::post('/', 'cari')->name('cari');
+        Route::get('/clearance/{nomor}/{kode}', 'clearance')->name('clearance')
+            ->where('nomor', '[A-Za-z0-9\-]{3,40}')->where('kode', '[A-Za-z0-9\-]{4,20}');
+    });
+
 // ---- Portal Wali (guard `wali`, terpisah dari staf) ----
 // Di LUAR grup `auth`: sesi wali tak pernah membuka rute staf, dan sebaliknya.
 // Alamat `/wali` milik portal; layar staf Wali / Keluarga pindah ke `/datawali`.
@@ -905,6 +915,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/ajukan/{santri}', 'ajukan')->name('ajukan')->middleware('hakakses:pengunduran-diri,buat')->whereNumber('santri');
             Route::get('/dokumen/{dokumen}', 'dokumen')->name('dokumen')->whereNumber('dokumen');
             Route::get('/{pengajuan}', 'show')->name('show')->whereNumber('pengajuan');
+            Route::get('/{pengajuan}/berita-acara', 'beritaAcara')->name('berita_acara')->whereNumber('pengajuan');
             Route::post('/{pengajuan}/verifikasi', 'verifikasi')->name('verifikasi')->whereNumber('pengajuan');
             Route::post('/{pengajuan}/putuskan', 'putuskan')->name('putuskan')->whereNumber('pengajuan');
             Route::post('/{pengajuan}/clearance/{pihak}', 'clearance')->name('clearance')->whereNumber('pengajuan')->whereIn('pihak', ['keuangan', 'kesantrian', 'admin']);

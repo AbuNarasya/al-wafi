@@ -1078,5 +1078,7 @@
                 @endunless
             </div>
         @endif
+
+        @include('pengunduran-diri._riwayat', ['riwayat' => $riwayatKeluar])
     </div>
 @endsection

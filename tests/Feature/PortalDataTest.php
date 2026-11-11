@@ -147,6 +147,8 @@ class PortalDataTest extends TestCase
     public function test_santri_berstatus_akhir_hanya_bisa_dilihat(): void
     {
         $this->ahmad->update(['status' => 'alumni']);
+        // Keluarga yang SEMUA anaknya berakhir hanya bisa membuka portal selama masih ada urusan (AksesPortal, 11 Nov 2026).
+        \App\Models\DompetWali::create(['id_wali' => $this->ahmad->id_wali, 'saldo' => 1000]);
 
         $this->sebagai()->get(route('portal.data'))->assertOk()
             ->assertDontSee(route('portal.data.santri', $this->ahmad->id), false);

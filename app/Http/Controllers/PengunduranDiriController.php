@@ -52,6 +52,20 @@ class PengunduranDiriController extends Controller
         ]);
     }
 
+    /** Berita acara clearance (PDF, disahkan elektronik) — hanya setelah seluruh clearance selesai. */
+    public function beritaAcara(PengajuanKeluar $pengajuan): \Symfony\Component\HttpFoundation\Response
+    {
+        try {
+            $respons = (new \App\Services\Modules\BeritaAcaraClearance)->unduh($pengajuan);
+        } catch (AppException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+        \App\Support\Audit\Jejak::catat('unduh_berita_acara_clearance', ['modul' => 'pengunduran-diri',
+            'id_pengguna' => request()->user()?->id_pengguna, 'detail' => $pengajuan->nomor]);
+
+        return $respons;
+    }
+
     /** Diajukan staf atas nama wali, dari halaman santri (santri aktif tak lagi bisa dikeluarkan langsung). */
     public function ajukan(Request $request, int $santri): RedirectResponse
     {
