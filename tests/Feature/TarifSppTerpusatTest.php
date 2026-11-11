@@ -345,6 +345,26 @@ class TarifSppTerpusatTest extends TestCase
         $this->assertSame(0.0, (float) $rekap[0]['total']);
     }
 
+    /** Unduh nama + nominal SPP satu periode (11 Nov 2026): yang sudah terbit membawa nominal tagihannya. */
+    public function test_unduh_nama_dan_nominal_spp_periode(): void
+    {
+        $this->buatSpp('SPP-SD', '250000', 'SD');
+        $this->santriAktif('SD')->update(['nis' => '260001', 'nama' => 'AHMAD TERBIT']);
+        (new SppService)->generate(['periode' => '2026-07', 'tanggal' => '2026-07-01'], User::first()->id_pengguna);
+        $this->santriAktif('SD')->update(['nis' => '260002', 'nama' => 'BUDI SIAP']);
+
+        $this->actingAs(User::first())->get(route('spp.index', ['periode' => '2026-07']))
+            ->assertSee('kesantrian\/spp\/unduh?periode=2026-07', false); // alamat di dalam JSON komponen x-unduh
+
+        $csv = $this->actingAs(User::first())->get(route('spp.unduh', ['periode' => '2026-07', 'format' => 'csv']))
+            ->assertOk()->streamedContent();
+        $this->assertStringContainsString('Nominal SPP', $csv);
+        $this->assertMatchesRegularExpression('/260001.*AHMAD TERBIT.*250000.*Tagihan terbit.*Sudah terbit/', $csv);
+        $this->assertMatchesRegularExpression('/260002.*BUDI SIAP.*250000.*Siap terbit/', $csv);
+
+        $this->actingAs(User::first())->get(route('spp.unduh', ['periode' => 'ngawur']))->assertNotFound();
+    }
+
     /**
      * Santri bebas SPP (nominal khusus NOL) tak boleh menggagalkan penerbitan.
      *

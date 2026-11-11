@@ -48,6 +48,13 @@ return [
         'bank_va' => ['bca_va', 'bni_va', 'bri_va', 'echannel', 'permata_va', 'bsi_va', 'cimb_va'],
     ],
 
+    // Asisten bantuan AI portal wali (11 Nov 2026) — kunci API paket gratis; kosong = penyedia itu tak terpakai
+    // (asisten jatuh ke pencarian artikel saja). Penyedia aktif & model dipilih di layar Pengaturan Asisten Wali.
+    'asisten_wali' => [
+        'groq_key' => env('GROQ_API_KEY'),
+        'gemini_key' => env('GEMINI_API_KEY'),
+    ],
+
     // Penerima kiriman ISE (absensi asrama, dst.) — kosong = pintunya mati (404). Lihat docs/integrasi-ise-absensi.md.
     'ise' => [
         'token' => env('ISE_TOKEN'),

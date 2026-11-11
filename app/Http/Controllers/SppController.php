@@ -60,6 +60,45 @@ class SppController extends Controller
     }
 
     /**
+     * Unduh nama santri + nominal SPP satu periode (permintaan user 11 Nov 2026) — barisnya PERSIS pratinjau
+     * di layar (tarif jenjang / nominal khusus / Kebijakan Khusus sudah dihitung). Santri yang tagihannya
+     * sudah terbit membawa nominal tagihan itu, bukan hitungan ulang.
+     */
+    public function unduh(Request $request)
+    {
+        $periode = (string) $request->query('periode', '');
+        abort_unless(preg_match('/^\d{4}-\d{2}$/', $periode), 404);
+        try {
+            $pratinjau = $this->service->pratinjau($periode);
+        } catch (AppException $e) {
+            return redirect()->route('spp.index')->with('error', $e->getMessage());
+        }
+
+        $terbit = \App\Models\TagihanSantri::where('perilaku', 'spp')->where('periode', $periode)
+            ->get(['id_santri', 'nominal', 'sisa', 'status'])->keyBy('id_santri');
+        $status = ['siap' => 'Siap terbit', 'sudah_ada' => 'Sudah terbit', 'tanpa_tarif' => 'Tarif belum diisi'];
+
+        $rows = array_map(function ($p) use ($terbit, $status) {
+            $t = $terbit[$p['id']] ?? null;
+
+            return [
+                'NIS' => $p['nis'] ?? '',
+                'Nama' => $p['nama'],
+                'Jenjang' => $p['jenjang'] ?? '',
+                'Tingkat' => $p['tingkat'] ?? '',
+                'Nominal SPP' => $t ? (float) $t->nominal : ($p['nominal'] !== null ? (float) $p['nominal'] : ''),
+                'Asal Nominal' => $t ? 'Tagihan terbit' : ($p['asal_label'] ?? ''),
+                'Status' => $status[$p['status']] ?? $p['status'],
+                'Sisa Tagihan' => $t ? (float) $t->sisa : '',
+                'Keterangan' => $p['pesan'] ?? '',
+            ];
+        }, $pratinjau);
+
+        return \App\Support\Export\Exporter::download(
+            (string) $request->query('format', 'xlsx'), 'spp_'.$periode, 'SPP Periode '.$periode, $rows);
+    }
+
+    /**
      * Rekap pratinjau per JENJANG — berapa rupiah yang akan terbit di masing-masing.
      *
      * Angka totalnya hanya menjumlahkan baris yang SIAP; yang "tanpa tarif" ikut

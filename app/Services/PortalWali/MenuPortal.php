@@ -39,6 +39,8 @@ final class MenuPortal
         'klinik' => ['portal.klinik', 'Riwayat klinik', 'klinik', '#b91c1c', 'lainnya', null],
         'laundry' => ['portal.laundry', 'Laundry', 'laundry', '#0891b2', 'lainnya', null],
         'kabar' => ['portal.kabar', 'Kabar', 'lonceng', '#c98a5e', 'lainnya', null],
+        // Hanya ada selama asisten bantuan dinyalakan staf (App\Services\PortalWali\AsistenWali).
+        'bantuan' => ['portal.bantuan', 'Bantuan', 'bantuan', '#2563eb', 'lainnya', 'bantuan'],
         'akun' => ['portal.akun', 'Akun', 'profil', '#64748b', 'lainnya', null],
     ];
 
@@ -48,13 +50,14 @@ final class MenuPortal
     public static function tersedia(Wali $wali): array
     {
         $berdompet = \App\Services\PortalWali\PembayaranPortal::keluargaBerdompet((int) $wali->id);
+        $syarat = ['dompet' => $berdompet, 'bantuan' => AsistenWali::aktif()];
 
         // Label diterjemahkan di sini (bahasa portal wali) — semua layar pemakai menerima nama menu siap tampil.
         return array_map(function ($m) {
             $m[1] = __($m[1]);
 
             return $m;
-        }, array_filter(self::KATALOG, fn ($m) => $m[5] !== 'dompet' || $berdompet));
+        }, array_filter(self::KATALOG, fn ($m) => $m[5] === null || ($syarat[$m[5]] ?? false)));
     }
 
     /**

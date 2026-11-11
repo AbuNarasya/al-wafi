@@ -27,6 +27,7 @@
         // Bulan sabit (lambang pertolongan pertama, permintaan user 21 Okt 2026) — digambar PENUH, lihat $penuh.
         'klinik' => 'M16.36 4.52A9.5 9.5 0 1 0 16.36 19.48A7.6 7.6 0 1 1 16.36 4.52Z',
         'menu' => 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
+        'bantuan' => 'M4 5h16v11H10l-5 4v-4H4zM10 9a2 2 0 113 1.7c-.6.4-1 .8-1 1.5M12 14h.01',
     ];
 @endphp
 @php $penuh = in_array($nama, ['klinik'], true); @endphp

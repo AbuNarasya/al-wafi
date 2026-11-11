@@ -121,6 +121,8 @@
                             <span class="rounded-full bg-emerald-100 px-3 py-1 font-medium text-emerald-700">{{ $siap->count() }} siap terbit</span>
                             <span class="rounded-full bg-gray-100 px-3 py-1 text-gray-600">{{ $sudah->count() }} sudah ada</span>
                             <span class="rounded-full bg-amber-100 px-3 py-1 text-amber-700">{{ $tanpa->count() }} tanpa tarif</span>
+                            {{-- Unduh nama santri + nominal SPP periode ini (permintaan user 11 Nov 2026). --}}
+                            <x-unduh :url="route('spp.unduh', ['periode' => $periode])" />
                         </div>
                     </div>
 

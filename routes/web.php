@@ -246,6 +246,11 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\A
     Route::post('/anak/{id}/pengunduran-diri/batal', 'batal')->name('mundur.batal')->middleware('throttle:10,1')->whereNumber('id');
     Route::get('/pengunduran-diri/dokumen/{dokumen}', 'dokumen')->name('mundur.dokumen')->whereNumber('dokumen');
 });
+// Bantuan / asisten AI (11 Nov 2026) — di /wali/bantuan, BUKAN /wali/data (tertutup dalam mode verifikasi).
+Route::prefix('wali/bantuan')->name('portal.bantuan')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalBantuanController::class)->group(function () {
+    Route::get('/', 'index')->name('');
+    Route::post('/tanya', 'tanya')->name('.tanya')->middleware('throttle:10,1');
+});
 // Kehadiran Asrama (4 Nov 2026) — absen kiriman ISE; di /wali/kehadiran, BUKAN /wali/data.
 Route::get('/wali/kehadiran', [\App\Http\Controllers\PortalKehadiranController::class, 'index'])->name('portal.kehadiran')->middleware('portal.wali');
 // Perizinan Insidental (4 Nov 2026) — wali mengajukan izin anak; di /wali/perizinan, BUKAN /wali/data.
@@ -806,6 +811,18 @@ Route::middleware('auth')->group(function () {
     Route::prefix('kartu-santri/belanja-kantin')->name('belanja_kantin.')->group(function () {
         Route::get('/', [\App\Http\Controllers\BelanjaKantinController::class, 'edit'])->name('edit')->middleware('hakakses:belanja-kantin,lihat');
         Route::put('/', [\App\Http\Controllers\BelanjaKantinController::class, 'update'])->name('update')->middleware('hakakses:belanja-kantin,ubah');
+    });
+    // Asisten bantuan AI portal wali (11 Nov 2026) — App\Services\PortalWali\AsistenWali.
+    Route::prefix('pengaturan/asisten-wali')->name('asisten_wali.')->controller(\App\Http\Controllers\AsistenWaliController::class)->group(function () {
+        Route::get('/', 'edit')->name('edit')->middleware('hakakses:asisten-wali,lihat');
+        Route::put('/', 'update')->name('update')->middleware('hakakses:asisten-wali,ubah');
+        Route::post('/uji', 'uji')->name('uji')->middleware(['hakakses:asisten-wali,lihat', 'throttle:10,1']);
+        Route::get('/riwayat', 'riwayat')->name('riwayat')->middleware('hakakses:asisten-wali,lihat');
+        Route::get('/artikel/baru', 'artikelBaru')->name('artikel.create')->middleware('hakakses:asisten-wali,buat');
+        Route::post('/artikel', 'artikelSimpan')->name('artikel.store')->middleware('hakakses:asisten-wali,buat');
+        Route::get('/artikel/{id}', 'artikelUbah')->name('artikel.edit')->middleware('hakakses:asisten-wali,ubah')->whereNumber('id');
+        Route::put('/artikel/{id}', 'artikelPerbarui')->name('artikel.update')->middleware('hakakses:asisten-wali,ubah')->whereNumber('id');
+        Route::delete('/artikel/{id}', 'artikelHapus')->name('artikel.destroy')->middleware('hakakses:asisten-wali,hapus')->whereNumber('id');
     });
     Route::prefix('pengaturan/metode-pembayaran')->name('metode_pembayaran.')->group(function () {
         Route::get('/', [\App\Http\Controllers\MetodePembayaranController::class, 'edit'])->name('edit')->middleware('hakakses:metode-pembayaran,lihat');
@@ -1416,6 +1433,7 @@ Route::middleware('auth')->group(function () {
     // SPP — tarif + generate tagihan per periode.
     Route::prefix('kesantrian/spp')->name('spp.')->controller(SppController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:spp,lihat');
+        Route::get('/unduh', 'unduh')->name('unduh')->middleware('hakakses:spp,lihat');
         Route::post('/generate', 'generate')->name('generate')->middleware('hakakses:spp,ubah');
         // Santri dikirim di BADAN kiriman, bukan di path: dropdown santrinya kini
         // dropdown-yang-bisa-dicari (nilainya di input hidden), sehingga tak ada

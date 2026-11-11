@@ -31,7 +31,7 @@
                 <div class="flex shrink-0 items-center gap-1.5">
                     <button type="button" @click="ubahJumlah(b, -1)" :disabled="(parseInt(b.jumlah) || 0) <= 1"
                             class="h-8 w-8 rounded-full bg-gray-100 font-bold text-gray-700 disabled:opacity-40" aria-label="Kurangi">−</button>
-                    <input :name="`item[${i}][jumlah]`" x-model="b.jumlah" type="number" min="1" max="200" placeholder="0" inputmode="numeric"
+                    <input :name="`item[${i}][jumlah]`" x-model="b.jumlah" type="number" min="1" max="200" placeholder="0" inputmode="numeric" data-bukan-rupiah
                            @focus="$event.target.select()"
                            class="w-12 rounded-lg border-gray-200 px-1 text-center text-sm font-bold tabular-nums text-brand [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none">
                     <button type="button" @click="ubahJumlah(b, 1)" class="h-8 w-8 rounded-full bg-brand font-bold text-white" aria-label="Tambah">+</button>
