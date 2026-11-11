@@ -225,6 +225,16 @@
                 @endforeach
             </div>
         </nav>
+
+        {{-- Tombol Bantuan melayang (11 Nov 2026): ikon Bantuan tak ada di 7 ikon Beranda bawaan, wali tak menemukannya
+             di Menu Lengkap. Tampil hanya bila asisten wali menyala & bukan mode verifikasi link WA. --}}
+        @if (\App\Services\PortalWali\AsistenWali::aktif() && ! \App\Services\PortalWali\SesiWali::modeVerifikasi(request()) && ! request()->routeIs('portal.bantuan'))
+            <a href="{{ route('portal.bantuan') }}" aria-label="{{ __('Bantuan') }}" title="{{ __('Bantuan') }}"
+               class="fixed right-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-brand text-white shadow-lg ring-4 ring-white"
+               style="bottom: calc(4.75rem + env(safe-area-inset-bottom))">
+                <x-portal.ikon nama="bantuan" />
+            </a>
+        @endif
     @endif
 </body>
 </html>

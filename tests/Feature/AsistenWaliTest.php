@@ -82,8 +82,11 @@ class AsistenWaliTest extends TestCase
         $this->sebagaiWali()->get('/wali/bantuan')->assertNotFound();
         $this->sebagaiWali()->postJson('/wali/bantuan/tanya', ['pertanyaan' => 'bayar spp'])->assertNotFound();
 
+        $this->sebagaiWali()->get('/wali/kabar')->assertOk()->assertDontSee('aria-label="Bantuan"', false);
         $this->atur(['aktif' => true]);
         $this->assertArrayHasKey('bantuan', MenuPortal::tersedia($this->wali));
+        // Tombol Bantuan melayang di setiap halaman portal (kecuali halaman Bantuan itu sendiri).
+        $this->sebagaiWali()->get('/wali/kabar')->assertOk()->assertSee('aria-label="Bantuan"', false);
         $this->sebagaiWali()->get('/wali/bantuan')->assertOk()
             ->assertSee('Asisten Bantuan')->assertSee('Bagaimana cara membayar tagihan SPP?')
             ->assertDontSee('Artikel lama yang disembunyikan');
