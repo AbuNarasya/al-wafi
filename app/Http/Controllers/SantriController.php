@@ -260,7 +260,24 @@ class SantriController extends Controller
             'waliOptions' => Wali::where('status', 'aktif')->orderBy('nama')->get()
                 ->mapWithKeys(fn ($w) => [$w->id => "{$w->nama} ({$w->telepon})"])->all(),
             'kembali' => route('santri.show', $santri->id),
+            // Ubah jalur (keputusan user 11 Nov 2026): admin & hak santri-data (Ubah); tagihan bertarif-jalur
+            // yang sudah terbit TIDAK ikut berubah — ditampilkan sebagai peringatan.
+            'bolehUbahJalur' => self::bolehUbahNama(),
+            'opsiJalur' => JalurPendaftaran::where(fn ($q) => $q->where('status', 'aktif')->orWhere('kode', $santri->jalur))
+                ->orderBy('urutan')->orderBy('kode')->pluck('nama', 'kode')->all(),
+            'tagihanBerjalur' => self::tagihanBerjalur($santri->id),
         ]);
+    }
+
+    /** Perilaku tagihan yang tarifnya bergantung pada jalur (spp & daftar_ulang tak mengenal jalur). */
+    public const PERILAKU_BERJALUR = ['registrasi', 'uang_pangkal', 'perlengkapan'];
+
+    /** Tagihan bertarif-jalur yang sudah terbit — tak ikut berubah bila jalur santri diubah. */
+    private static function tagihanBerjalur(int $idSantri): \Illuminate\Support\Collection
+    {
+        return \App\Models\TagihanSantri::with('jenis:kode,nama')->where('id_santri', $idSantri)
+            ->whereIn('perilaku', self::PERILAKU_BERJALUR)->whereNotIn('status', \App\Models\TagihanSantri::TIDAK_BERLAKU)
+            ->orderBy('id')->get(['id', 'kode_jenis', 'perilaku', 'nominal', 'sisa', 'status']);
     }
 
     /**
@@ -269,7 +286,9 @@ class SantriController extends Controller
      * YANG SENGAJA TIDAK BISA DISUNTING DI SINI, beserta alasannya:
      *  • `status` — punya mesin transisi sendiri (Tahap) dengan pemeriksaan
      *    berjenjang; mengubahnya lewat form biasa akan melompati semuanya.
-     *  • `jalur`, `gelombang`, `tahun_ajaran` — ketiganya menentukan tarif yang
+     *  • `jalur` — KINI boleh (11 Nov 2026) bagi admin & hak santri-data (Ubah), dengan alasan wajib & jejak
+     *    `ubah_jalur_santri`; tagihan bertarif-jalur yang sudah terbit tak ikut berubah (koreksi manual).
+     *  • `gelombang`, `tahun_ajaran` — keduanya menentukan tarif yang
      *    dipakai saat tagihan TERBIT. Mengubahnya belakangan tidak menghitung
      *    ulang tagihan yang sudah ada, jadi data santri dan tagihannya akan
      *    saling bertentangan tanpa pesan apa pun. Potongan gelombang bahkan
@@ -315,6 +334,20 @@ class SantriController extends Controller
         }
         $namaLama = $santri->nama;
 
+        // Jalur: hanya admin & hak santri-data (Ubah); berubah = alasan wajib (11 Nov 2026).
+        $jalurLama = (string) $santri->jalur;
+        $jalurBaru = $admin ? trim((string) $request->input('jalur', $jalurLama)) : $jalurLama;
+        $alasanJalur = null;
+        if ($jalurBaru !== '' && $jalurBaru !== $jalurLama) {
+            $request->validate([
+                'jalur' => ['required', 'string', Rule::exists('jalur_pendaftaran', 'kode')->where('status', 'aktif')],
+                'alasan_jalur' => ['required', 'string', 'min:5', 'max:500'],
+            ], ['alasan_jalur.required' => 'Tulis alasan mengubah jalur pendaftaran.', 'alasan_jalur.min' => 'Alasan terlalu pendek.',
+                'jalur.exists' => 'Jalur pendaftaran tidak dikenal atau sudah nonaktif.']);
+            $data['jalur'] = $jalurBaru;
+            $alasanJalur = trim((string) $request->input('alasan_jalur'));
+        }
+
         try {
             $baru = $this->service->update($id, $data);
         } catch (AppException $e) {
@@ -324,8 +357,20 @@ class SantriController extends Controller
             \App\Support\Audit\Jejak::catat('ubah_nama_santri', ['modul' => 'santri-data', 'ref_jenis' => 'Santri', 'ref_id' => $id,
                 'id_pengguna' => $request->user()?->id_pengguna, 'detail' => ['lama' => $namaLama, 'baru' => $baru->nama]]);
         }
+        $pesan = 'Data santri diperbarui.';
+        if ($alasanJalur !== null) {
+            $nama = JalurPendaftaran::whereIn('kode', [$jalurLama, $jalurBaru])->pluck('nama', 'kode');
+            $terdampak = self::tagihanBerjalur($id);
+            \App\Support\Audit\Jejak::catat('ubah_jalur_santri', ['modul' => 'santri-data', 'ref_jenis' => 'Santri', 'ref_id' => $id,
+                'id_pengguna' => $request->user()?->id_pengguna,
+                'detail' => ['lama' => $nama[$jalurLama] ?? $jalurLama, 'baru' => $nama[$jalurBaru] ?? $jalurBaru, 'alasan' => $alasanJalur,
+                    'tagihan_tak_berubah' => $terdampak->map(fn ($t) => "#{$t->id} ".($t->jenis?->nama ?? $t->kode_jenis).' '.$t->nominal)->all()],
+                'perubahan' => ['jalur' => ['dari' => $jalurLama, 'ke' => $jalurBaru]]]);
+            $pesan .= ' Jalur diubah ke '.($nama[$jalurBaru] ?? $jalurBaru).'.'
+                .($terdampak->isNotEmpty() ? ' '.$terdampak->count().' tagihan registrasi/uang pangkal/perlengkapan yang sudah terbit TIDAK ikut berubah — koreksi nominalnya bila perlu.' : '');
+        }
 
-        return redirect()->route('santri.show', $id)->with('status', 'Data santri diperbarui.');
+        return redirect()->route('santri.show', $id)->with('status', $pesan);
     }
 
     /**

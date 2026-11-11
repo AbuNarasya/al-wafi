@@ -42,9 +42,18 @@
             <input type="checkbox" name="aktif_staf" value="1" @checked(old('aktif_staf', $atur->aktif_staf)) class="h-5 w-5 rounded border-gray-300 text-brand focus:ring-brand">
         </label>
 
+        <label class="flex cursor-pointer items-center justify-between gap-4">
+            <div>
+                <div class="font-medium text-gray-900">Pakai penyedia lain sebagai cadangan</div>
+                <div class="text-xs text-gray-500">Bila penyedia utama penuh (kuota per menit paket gratis) atau gangguan, pertanyaan yang sama langsung dicoba ke penyedia lain yang kuncinya terpasang, baru sesudah itu jatuh ke pencarian artikel. Ingat: paket gratis Gemini memakai pertanyaan untuk melatih modelnya.</div>
+            </div>
+            <input type="hidden" name="cadangan" value="0">
+            <input type="checkbox" name="cadangan" value="1" @checked(old('cadangan', $atur->cadangan ?? true)) class="h-5 w-5 rounded border-gray-300 text-brand focus:ring-brand">
+        </label>
+
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
-                <label class="block text-sm font-medium text-gray-700">Penyedia AI</label>
+                <label class="block text-sm font-medium text-gray-700">Penyedia AI utama</label>
                 <select name="penyedia" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
                     @foreach ($A::PENYEDIA as $k => $label)
                         <option value="{{ $k }}" @selected(old('penyedia', $atur->penyedia) === $k)>{{ $label }}{{ $kunci[$k] ? '' : ' — kunci belum dipasang' }}</option>

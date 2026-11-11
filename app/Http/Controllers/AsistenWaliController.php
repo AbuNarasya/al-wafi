@@ -52,6 +52,7 @@ class AsistenWaliController extends Controller
         $data = $request->validate([
             'aktif' => ['boolean'],
             'aktif_staf' => ['boolean'],
+            'cadangan' => ['boolean'],
             'penyedia' => ['required', Rule::in(array_keys(AsistenWali::PENYEDIA))],
             'model_groq' => ['required', 'string', 'max:80', 'regex:/^[A-Za-z0-9._\/:\-]+$/'],
             'model_gemini' => ['required', 'string', 'max:80', 'regex:/^[A-Za-z0-9._\-]+$/'],
@@ -61,6 +62,7 @@ class AsistenWaliController extends Controller
         // Instans tanpa portal wali (Wafi Mart) tak menampilkan saklar wali — nilainya tetap mati.
         $data['aktif'] = \App\Support\Instans::portalWali() && $request->boolean('aktif');
         $data['aktif_staf'] = $request->boolean('aktif_staf');
+        $data['cadangan'] = $request->boolean('cadangan');
 
         $lama = AsistenWali::pengaturan();
         DB::table('pengaturan_asisten_wali')->updateOrInsert(['id' => $lama->id ?? 1],

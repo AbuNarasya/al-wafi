@@ -127,16 +127,49 @@
                 </div>
             </div>
 
+            {{-- Jalur pendaftaran (keputusan user 11 Nov 2026): admin & hak Ubah Data Santri; alasan wajib bila berubah.
+                 Tagihan bertarif-jalur yang sudah terbit TIDAK dihitung ulang — ditampilkan sebagai peringatan. --}}
+            @if ($bolehUbahJalur)
+                <div x-data="{ jalur: @js(old('jalur', $santri->jalur)), asal: @js($santri->jalur) }" class="rounded-lg border border-gray-200 p-4">
+                    <label class="block text-sm font-medium text-gray-700">Jalur pendaftaran</label>
+                    <select name="jalur" x-model="jalur" class="mt-1 w-full rounded-lg border-gray-300 text-sm sm:w-72">
+                        @foreach ($opsiJalur as $kode => $nama)
+                            <option value="{{ $kode }}" @selected(old('jalur', $santri->jalur) === $kode)>{{ $nama }}</option>
+                        @endforeach
+                    </select>
+                    <div x-show="jalur !== asal" x-cloak class="mt-3 space-y-2">
+                        <label class="block text-sm font-medium text-gray-700">Alasan mengubah jalur <span class="text-red-500">*</span></label>
+                        <textarea name="alasan_jalur" rows="2" maxlength="500" class="w-full rounded-lg border-gray-300 text-sm"
+                                  placeholder="mis. salah input saat pendaftaran — seharusnya jalur Prestasi">{{ old('alasan_jalur') }}</textarea>
+                        @error('alasan_jalur')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
+                        @if ($tagihanBerjalur->isNotEmpty())
+                            <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                                <p class="font-semibold">Tagihan berikut sudah terbit dengan tarif jalur lama dan TIDAK ikut berubah:</p>
+                                <ul class="mt-1 list-disc pl-5">
+                                    @foreach ($tagihanBerjalur as $t)
+                                        <li>{{ $t->jenis?->nama ?? $t->kode_jenis }} — Rp {{ number_format((float) $t->nominal, 0, ',', '.') }}
+                                            (sisa Rp {{ number_format((float) $t->sisa, 0, ',', '.') }})</li>
+                                    @endforeach
+                                </ul>
+                                <p class="mt-1">Bila nominalnya harus mengikuti jalur baru, sesuaikan lewat <b>Koreksi Nominal Tagihan</b> sesudah menyimpan.</p>
+                            </div>
+                        @else
+                            <p class="text-xs text-gray-500">Belum ada tagihan registrasi, uang pangkal, atau perlengkapan yang terbit — tagihan berikutnya memakai tarif jalur baru.</p>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
             {{-- Yang PPSB tidak ikut disunting: mengubahnya tak menghitung ulang
                  tagihan yang sudah terbit, jadi datanya akan bertentangan dengan
                  tagihannya sendiri. --}}
             <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500">
                 <b>Tidak disunting di sini:</b>
                 Tahun Ajaran ({{ $santri->tahun_ajaran ?? '—' }}),
-                Jalur ({{ $santri->jalurPendaftaran?->nama ?? $santri->jalur ?? '—' }}),
+                @unless ($bolehUbahJalur)Jalur ({{ $santri->jalurPendaftaran?->nama ?? $santri->jalur ?? '—' }}) — hanya admin & hak Ubah Data Santri, @endunless
                 Gelombang ({{ $santri->gelombang ?? 'tanpa gelombang' }}),
                 dan Status.
-                Ketiganya menentukan tarif saat tagihan terbit — mengubahnya belakangan tidak menghitung ulang
+                Tahun ajaran & gelombang menentukan tarif saat tagihan terbit — mengubahnya belakangan tidak menghitung ulang
                 tagihan yang sudah ada. Status berpindah lewat tombol tahapan di halaman detail.
                 Nominal SPP khusus diatur di menu SPP.
             </div>

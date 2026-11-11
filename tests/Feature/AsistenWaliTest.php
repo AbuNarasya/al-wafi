@@ -138,9 +138,30 @@ class AsistenWaliTest extends TestCase
             && $k->data()['contents'][1] === ['role' => 'model', 'parts' => [['text' => 'Buka Perizinan Insidental.']]]);
     }
 
+    public function test_groq_penuh_dialihkan_ke_gemini_lalu_artikel(): void
+    {
+        $this->atur(['aktif' => true, 'penyedia' => 'groq']);
+        Http::fake([
+            'api.groq.com/*' => Http::response(['error' => ['message' => 'Rate limit reached ... tokens per minute']], 429),
+            'generativelanguage.googleapis.com/*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => 'Jawaban dari Gemini.']]]]]]),
+        ]);
+        $this->sebagaiWali()->postJson('/wali/bantuan/tanya', ['pertanyaan' => 'bayar spp'])->assertOk()
+            ->assertJsonPath('sumber', 'gemini')->assertJsonPath('jawaban', 'Jawaban dari Gemini.');
+        $log = DB::table('percakapan_asisten')->latest('id')->first();
+        $this->assertSame('gemini', $log->sumber);
+        $this->assertStringContainsString('Groq: kuota/batas paket gratis tercapai', $log->galat, 'galat penyedia utama tetap dicatat');
+
+        // Cadangan dimatikan → langsung ke pencarian artikel, Gemini tak disentuh.
+        $this->atur(['cadangan' => false]);
+        Http::fake(['api.groq.com/*' => Http::response(['error' => ['message' => 'Rate limit']], 429), 'generativelanguage.googleapis.com/*' => Http::response([], 500)]);
+        $this->sebagaiWali()->postJson('/wali/bantuan/tanya', ['pertanyaan' => 'bayar spp'])->assertJsonPath('sumber', 'artikel');
+        Http::assertNotSent(fn (KirimanHttp $k) => str_contains($k->url(), 'generativelanguage'));
+    }
+
     public function test_ai_gagal_jatuh_ke_artikel(): void
     {
         $this->atur(['aktif' => true, 'penyedia' => 'groq']);
+        config(['services.asisten_wali.gemini_key' => '']); // tanpa cadangan
         Http::fake(['api.groq.com/*' => Http::response(['error' => ['message' => 'Rate limit reached']], 429)]);
 
         $this->sebagaiWali()->postJson('/wali/bantuan/tanya', ['pertanyaan' => 'bayar spp'])->assertOk()

@@ -131,13 +131,48 @@ class EditSantriTest extends TestCase
         $this->assertSame('ZAID BIN UMAR', $this->santri->fresh()->nama);
     }
 
+    /** Jalur boleh diubah admin & hak santri-data (11 Nov 2026): alasan wajib, jejak, tagihan terbit tak berubah. */
+    public function test_jalur_bisa_diubah_dengan_alasan_dan_tagihan_lama_tetap(): void
+    {
+        JalurPendaftaran::create(['kode' => 'prestasi', 'nama' => 'Prestasi', 'status' => 'aktif']);
+        JalurPendaftaran::create(['kode' => 'lama', 'nama' => 'Jalur Lama', 'status' => 'nonaktif']);
+        // Registrasi sudah terbit otomatis saat santri didaftarkan (fixture).
+        $tagihan = \App\Models\TagihanSantri::where('id_santri', $this->santri->id)->where('perilaku', 'registrasi')->sole();
+
+        $this->actingAs($this->admin)->get(route('santri.edit', $this->santri->id))->assertOk()
+            ->assertSee('Jalur pendaftaran')->assertSee('<option value="prestasi"', false)->assertDontSee('<option value="lama"', false)
+            ->assertSee('TIDAK ikut berubah')->assertSee('Rp 500.000');
+
+        // Tanpa alasan → ditolak; jalur nonaktif → ditolak.
+        $this->simpan(['jalur' => 'prestasi'])->assertSessionHasErrors('alasan_jalur');
+        $this->simpan(['jalur' => 'lama', 'alasan_jalur' => 'coba jalur lama'])->assertSessionHasErrors('jalur');
+        $this->assertSame('reguler', $this->santri->fresh()->jalur);
+
+        $this->simpan(['jalur' => 'prestasi', 'alasan_jalur' => 'Salah input saat pendaftaran'])
+            ->assertRedirect(route('santri.show', $this->santri->id))
+            ->assertSessionHas('status', fn ($s) => str_contains($s, 'Jalur diubah ke Prestasi') && str_contains($s, '1 tagihan'));
+        $this->assertSame('prestasi', $this->santri->fresh()->jalur);
+        $this->assertSame('500000.00', (string) $tagihan->fresh()->nominal, 'tagihan yang sudah terbit tak dihitung ulang');
+        $jejak = \App\Models\ActivityLog::where('aksi', 'ubah_jalur_santri')->sole();
+        $this->assertStringContainsString('Salah input saat pendaftaran', json_encode($jejak->detail));
+
+        // Staf tanpa hak santri-data (Ubah): jalur tak tampil & kiriman diabaikan.
+        $staf = User::create(['username' => 'zzed_staf', 'nama' => 'Staf', 'password_hash' => 'x', 'kode_level' => 'L1', 'is_admin' => false, 'status' => 'aktif'])->fresh();
+        \App\Models\HakAksesModul::create(['id_pengguna' => $staf->id_pengguna, 'kode_modul' => 'santri', 'lihat' => true, 'buat' => false, 'ubah' => true, 'hapus' => false, 'menu' => true]);
+        \App\Support\Akses::lupakan();
+        $this->actingAs($staf)->get(route('santri.edit', $this->santri->id))->assertOk()->assertDontSee('name="jalur"', false);
+        $this->actingAs($staf)->put(route('santri.update', $this->santri->id), $this->isian(['jalur' => 'reguler', 'alasan_jalur' => 'ganti']))
+            ->assertRedirect(route('santri.show', $this->santri->id));
+        $this->assertSame('prestasi', $this->santri->fresh()->jalur);
+    }
+
     /** Inti penjagaannya: kolom penentu tarif & status tak tersentuh form ini. */
     public function test_kolom_penentu_tarif_dan_status_tak_ikut_berubah(): void
     {
         $this->simpan([
-            'tahun_ajaran' => '2099/2100', 'jalur' => 'ngawur',
+            'tahun_ajaran' => '2099/2100',
             'gelombang' => 9, 'status' => 'alumni', 'no_pendaftaran' => 'PALSU-1',
-        ])->assertRedirect();
+        ])->assertRedirect(route('santri.show', $this->santri->id));
 
         $this->santri->refresh();
         $this->assertSame(self::TA, $this->santri->tahun_ajaran);

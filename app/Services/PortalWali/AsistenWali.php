@@ -37,11 +37,18 @@ final class AsistenWali
     /** Panjang pertanyaan maksimal (huruf). */
     public const MAKS_PERTANYAAN = 500;
 
-    /** Artikel yang isinya dikirim utuh ke AI. Sisanya hanya judul — menjaga token di bawah batas paket gratis. */
-    private const ARTIKEL_UTUH = 5;
+    /**
+     * HEMAT TOKEN (keputusan user 11 Nov 2026): paket gratis Groq hanya 8.000 token/menit untuk SEMUA pengguna,
+     * dan yang dihitung = petunjuk + jatah jawaban maksimum. Dulu 5 artikel + 80 judul + jatah 1.500 ≈ 3.000
+     * token/tanya (±2 tanya/menit); kini ±1.500 (±5 tanya/menit).
+     */
+    private const ARTIKEL_UTUH = 3;
 
     /** Judul artikel lain yang ikut dikirim paling banyak (artikel staf bisa ratusan). */
-    private const JUDUL_LAIN = 80;
+    private const JUDUL_LAIN = 25;
+
+    /** Jatah token jawaban (termasuk "berpikir" model). Jawaban panduan ±120 kata ≈ 250 token. */
+    private const JATAH_JAWABAN = 700;
 
     /** Percakapan sebelumnya yang ikut dikirim (supaya "lalu bagaimana?" dipahami), dalam rentang menit ini. */
     private const RIWAYAT = 2;
@@ -58,7 +65,7 @@ final class AsistenWali
     {
         $b = Schema::hasTable('pengaturan_asisten_wali') ? DB::table('pengaturan_asisten_wali')->orderBy('id')->first() : null;
 
-        return $b ?? (object) ['aktif' => false, 'aktif_staf' => false, 'penyedia' => 'groq', 'model_groq' => 'openai/gpt-oss-120b',
+        return $b ?? (object) ['aktif' => false, 'aktif_staf' => false, 'cadangan' => true, 'penyedia' => 'groq', 'model_groq' => 'openai/gpt-oss-120b',
             'model_gemini' => 'gemini-3.5-flash-lite', 'batas_harian' => 20, 'batas_harian_staf' => 30, 'diubah_oleh' => null, 'updated_at' => null];
     }
 
@@ -239,19 +246,34 @@ final class AsistenWali
             $sumber = 'artikel';
             $jawaban = null;
 
-            $kunci = self::kunci($atur->penyedia);
-            if ($kunci === null) {
-                $galat = 'Kunci API '.self::PENYEDIA[$atur->penyedia].' belum dipasang.';
-            } else {
+            // Penyedia utama dulu; bila gagal & cadangan nyala, penyedia lain (11 Nov 2026); terakhir pencarian artikel.
+            $urutan = [$atur->penyedia];
+            if ($atur->cadangan ?? true) {
+                $urutan = [...$urutan, ...array_diff(array_keys(self::PENYEDIA), $urutan)];
+            }
+            $galatList = [];
+            $petunjuk = null;
+            foreach ($urutan as $p) {
+                $kunci = self::kunci($p);
+                if ($kunci === null) {
+                    if ($p === $atur->penyedia) {
+                        $galatList[] = 'Kunci API '.self::PENYEDIA[$p].' belum dipasang.';
+                    }
+
+                    continue;
+                }
                 try {
-                    $jawaban = $this->mintaAi($atur->penyedia, $kunci, $this->model($atur), $this->petunjuk($rujukan, $penanya['audiens'], $layar),
-                        $this->riwayat($penanya), $bersih);
-                    $sumber = $atur->penyedia;
+                    $petunjuk ??= $this->petunjuk($rujukan, $penanya['audiens'], $layar);
+                    $jawaban = $this->mintaAi($p, $kunci, $p === 'groq' ? $atur->model_groq : $atur->model_gemini, $petunjuk, $this->riwayat($penanya), $bersih);
+                    $sumber = $p;
+                    break;
                 } catch (\Throwable $e) {
-                    $galat = Str::limit($e->getMessage(), 290);
+                    $galatList[] = $e->getMessage();
                     report($e);
                 }
             }
+            // Galat tetap dicatat walau cadangan berhasil — supaya terlihat seberapa sering penyedia utama penuh.
+            $galat = $galatList !== [] ? Str::limit(implode(' | ', $galatList), 290) : null;
             $jawaban ??= $this->jawabanArtikel($rujukan, $penanya['audiens']);
 
             DB::table('percakapan_asisten')->insert([
@@ -299,11 +321,6 @@ final class AsistenWali
         }
 
         return $hasil;
-    }
-
-    private function model(object $atur): string
-    {
-        return $atur->penyedia === 'groq' ? $atur->model_groq : $atur->model_gemini;
     }
 
     /** Petunjuk sistem: aturan + artikel rujukan utuh + judul artikel lain (+ layar yang dibuka staf). */
@@ -387,7 +404,7 @@ final class AsistenWali
                 $pesan[] = ['role' => 'assistant', 'content' => $j];
             }
             $pesan[] = ['role' => 'user', 'content' => $pertanyaan];
-            $badan = ['model' => $model, 'messages' => $pesan, 'temperature' => 0.2, 'max_tokens' => 1500];
+            $badan = ['model' => $model, 'messages' => $pesan, 'temperature' => 0.2, 'max_tokens' => self::JATAH_JAWABAN];
             // gpt-oss "berpikir" dulu dan pikirannya ikut memakan max_tokens — cukup sedikit untuk menjawab panduan.
             if (str_starts_with($model, 'openai/gpt-oss')) {
                 $badan['reasoning_effort'] = 'low';
@@ -407,7 +424,7 @@ final class AsistenWali
                     'systemInstruction' => ['parts' => [['text' => $sistem]]],
                     'contents' => $isi,
                     // Model Gemini 3.x ikut "berpikir" dalam jatah ini — beri ruang supaya jawabannya tak terpotong.
-                    'generationConfig' => ['temperature' => 0.2, 'maxOutputTokens' => 1500],
+                    'generationConfig' => ['temperature' => 0.2, 'maxOutputTokens' => self::JATAH_JAWABAN * 2],
                 ]);
             $this->pastikanBerhasil($r, 'Gemini');
             $teks = collect(data_get($r->json(), 'candidates.0.content.parts', []))->pluck('text')->implode('');

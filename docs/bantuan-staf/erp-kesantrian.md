@@ -128,7 +128,7 @@ kata kunci: ubah data santri, edit santri, ganti nama santri, salah nama, perbai
 1. Buka detail santri, tekan **✏️ Ubah Data**.
 2. Perbaiki isiannya, lalu simpan.
 
-Yang **tidak** bisa diubah di sini: status (punya tahapnya sendiri), jalur, gelombang, tahun ajaran masuk, dan nomor pendaftaran — karena ketiganya menentukan tarif tagihan yang sudah terbit. Nominal SPP khusus diatur di menu SPP. **Nama** hanya bisa diubah oleh admin atau pemegang hak Ubah Data Santri (Ubah), dan perubahannya tercatat di Jejak Audit. NIS boleh dikoreksi bila salah ketik, asal tidak sama dengan santri lain. Butuh hak Calon Santri & Santri (Ubah) atau Ubah Data Santri (Ubah).
+Yang **tidak** bisa diubah di sini: status (punya tahapnya sendiri), gelombang, tahun ajaran masuk, dan nomor pendaftaran — karena menentukan tarif tagihan yang sudah terbit. Nominal SPP khusus diatur di menu SPP. **Nama** dan **Jalur pendaftaran** hanya bisa diubah oleh admin atau pemegang hak Ubah Data Santri (Ubah), dan perubahannya tercatat di Jejak Audit. Mengubah jalur wajib disertai alasan; tagihan registrasi, uang pangkal, dan perlengkapan yang sudah terbit TIDAK ikut berubah (daftarnya ditampilkan di formulir) — bila nominalnya harus mengikuti jalur baru, sesuaikan lewat Koreksi Nominal Tagihan. NIS boleh dikoreksi bila salah ketik, asal tidak sama dengan santri lain. Butuh hak Calon Santri & Santri (Ubah) atau Ubah Data Santri (Ubah).
 
 ## Bagaimana mencatat calon yang mengundurkan diri?
 kata kunci: calon mundur, batal daftar, mengundurkan diri calon, tidak jadi masuk, hapus calon, calon batal
