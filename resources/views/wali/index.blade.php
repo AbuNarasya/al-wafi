@@ -28,7 +28,8 @@
             <tbody class="divide-y divide-gray-100">
                 @forelse ($rows as $r)
                     <tr data-row class="hover:bg-gray-50">
-                        <td class="px-4 py-3 font-medium text-gray-900">{{ $r->nama }}<div class="text-xs text-gray-400">Kontak: {{ ucfirst($r->kontak_utama) }}</div></td>
+                        <td class="px-4 py-3 font-medium text-gray-900">{{ $r->nama }}@if ($r->akun_uji) <span class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">AKUN UJI</span>@endif
+                            <div class="text-xs text-gray-400">Kontak: {{ ucfirst($r->kontak_utama) }}</div></td>
                         <td class="px-4 py-3 text-gray-600">{{ $r->telepon }}</td>
                         <td class="px-4 py-3">
                             @forelse ($r->santri as $s)

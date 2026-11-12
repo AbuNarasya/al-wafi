@@ -60,5 +60,21 @@
                 <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">{{ $baru ? 'Simpan' : 'Perbarui' }}</button>
             </div>
         </form>
+
+        {{-- Akun uji portal (12 Nov 2026): form TERPISAH (form tak boleh bersarang), khusus admin. --}}
+        @if (! $baru && auth()->user()?->is_admin)
+            <form method="POST" action="{{ route('wali.akun_uji', $wali->id) }}" data-no-confirm
+                  class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+                @csrf
+                <input type="hidden" name="akun_uji" value="{{ $wali->akun_uji ? 0 : 1 }}">
+                <div class="text-amber-900">
+                    <b>Akun uji portal:</b> {{ $wali->akun_uji ? 'YA' : 'tidak' }}
+                    <div class="text-xs text-amber-800">Selama masa uji coba portal wali, hanya akun uji yang bisa memakai seluruh fungsi (bayar, dompet, perizinan, …). Keluarga lain hanya bisa memperbarui data &amp; mengunggah berkas.</div>
+                </div>
+                <button class="rounded-lg border border-amber-400 bg-white px-3 py-1.5 font-semibold text-amber-800 hover:bg-amber-100">
+                    {{ $wali->akun_uji ? 'Lepas tanda akun uji' : 'Jadikan akun uji' }}
+                </button>
+            </form>
+        @endif
     </div>
 @endsection

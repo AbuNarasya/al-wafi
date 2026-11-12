@@ -12,4 +12,13 @@
  */
 return [
     'domain' => env('PORTAL_DOMAIN', ''),
+
+    // MASA DEMO (keputusan user 12 Nov 2026): portal resmi dipakai mulai tanggal ini. Sebelumnya, wali yang masuk
+    // melihat pengumuman "masih demo" (jendela sekali per sesi + pita di tiap halaman) — tanggalnya SENGAJA tak
+    // disebut ke wali (keputusan user). Kosong = pengumuman mati.
+    'demo_sampai' => env('PORTAL_DEMO_SAMPAI', '2027-01-01'),
+
+    // MODE TERBATAS (keputusan user 12 Nov 2026) — saklar MANUAL: wali biasa hanya Data Wali & Santri, berkas,
+    // akun, & alur PPSB; keluarga bertanda akun uji tetap bisa semua. Lihat App\Services\PortalWali\PortalTerbatas.
+    'terbatas' => (bool) env('PORTAL_TERBATAS', true),
 ];

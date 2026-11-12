@@ -76,6 +76,7 @@ class Wali extends Model implements AuthenticatableContract
         return [
             'auto_debet' => 'boolean',
             'telepon_verified' => 'boolean',
+            'akun_uji' => 'boolean',
         ];
     }
 

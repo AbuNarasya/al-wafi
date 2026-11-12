@@ -29,6 +29,8 @@
         <x-portal.ikon nama="kanan" kelas="h-4 w-4 text-slate-400" />
     </a>
 
+    {{-- PIN transaksi hanya berguna bagi dompet/pembayaran — disembunyikan selama mode terbatas (12 Nov 2026). --}}
+    @if (\App\Services\PortalWali\PortalTerbatas::bebas(\App\Services\PortalWali\SesiWali::wali()))
     <a href="{{ route('portal.pin') }}" class="mt-4 flex items-center gap-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"><x-portal.ikon nama="kartu" kelas="h-5 w-5" /></span>
         <span class="min-w-0 flex-1 text-sm">
@@ -37,6 +39,7 @@
         </span>
         <x-portal.ikon nama="kanan" kelas="h-4 w-4 text-slate-400" />
     </a>
+    @endif
 
     {{-- Tampilan gelap / terang — per perangkat, tersimpan di HP ini --}}
     <div x-data="{ pilihan: modeGelap.pilihan() }" class="mt-4 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">

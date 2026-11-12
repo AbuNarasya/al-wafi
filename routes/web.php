@@ -1586,6 +1586,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [$w, 'store'])->name('store')->middleware('hakakses:wali,buat');
         Route::get('/{id}/edit', [$w, 'edit'])->name('edit')->middleware('hakakses:wali,ubah')->whereNumber('id');
         Route::put('/{id}', [$w, 'update'])->name('update')->middleware('hakakses:wali,ubah')->whereNumber('id');
+        // Akun uji portal (mode terbatas masa uji coba, 12 Nov 2026) — admin saja, diperiksa di controller.
+        Route::post('/{id}/akun-uji', [$w, 'akunUji'])->name('akun_uji')->middleware('hakakses:wali,ubah')->whereNumber('id');
         Route::delete('/{id}', [$w, 'destroy'])->name('destroy')->middleware('hakakses:wali,hapus')->whereNumber('id');
     });
 

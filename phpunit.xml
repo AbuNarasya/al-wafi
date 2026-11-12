@@ -22,6 +22,9 @@
         <!-- Layar staf berbahasa Indonesia; portal wali memilih sendiri (App\Support\BahasaPortal). -->
         <env name="APP_LOCALE" value="id"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <!-- Mode terbatas portal wali (masa uji coba) dimatikan untuk suite: test portal menguji SEMUA fitur;
+             PortalModeTerbatasTest menyalakannya sendiri. -->
+        <env name="PORTAL_TERBATAS" value="false"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>

@@ -41,6 +41,11 @@ class NotifikasiWali extends Model
     protected static function booted(): void
     {
         static::creating(function (self $n) {
+            // Mode terbatas masa uji coba (12 Nov 2026): wali biasa hanya menerima kabar berkas & data; kabar lain
+            // TIDAK disimpan (berarti juga tak didorong ke HP). Akun uji tetap menerima semuanya.
+            if (! \App\Services\PortalWali\PortalTerbatas::kabarBoleh($n->id_wali ? (int) $n->id_wali : null, $n->jenis)) {
+                return false;
+            }
             if (! $n->kategori || $n->kategori === 'lainnya') {
                 $n->kategori = self::JENIS_KATEGORI[$n->jenis] ?? ($n->kategori ?: 'lainnya');
             }

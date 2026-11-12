@@ -57,6 +57,12 @@ class PortalWali
             }
         }
 
+        // Mode terbatas masa uji coba (12 Nov 2026): wali biasa hanya data, berkas, akun, & alur PPSB; akun uji bebas.
+        if ($wali && \App\Services\PortalWali\PortalTerbatas::aktif()
+            && ! \App\Services\PortalWali\PortalTerbatas::alamatBoleh($request, $wali)) {
+            return redirect()->route('portal.beranda')->with('error', \App\Services\PortalWali\PortalTerbatas::pesan());
+        }
+
         if (($wali && SesiWali::peran($request)) || ($mode === 'pendaftar' && SesiWali::emailPendaftar($request))) {
             return $this->tanpaCache($next($request));
         }

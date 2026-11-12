@@ -7,7 +7,13 @@
     // Wajib membuat password dulu: menu disembunyikan — semua tujuannya dialihkan kembali ke sini.
     $wajibSandi = $masuk && (bool) request()->session()->get(\App\Services\PortalWali\SesiWali::WAJIB_SANDI);
     $diBeranda = request()->routeIs('portal.beranda', 'portal.masuk', 'portal.kode', 'portal.verifikasi.ringkasan', 'portal.sandi.buat');
-    $menu = $wajibSandi ? [] : ($verifikasi ? [
+    // Mode terbatas masa uji coba (12 Nov 2026): wali biasa hanya Beranda, Data, Akun. Akun uji tetap menu penuh.
+    $terbatas = $masuk && ! $verifikasi && ! \App\Services\PortalWali\PortalTerbatas::bebas(\App\Services\PortalWali\SesiWali::wali());
+    $menu = $wajibSandi ? [] : ($terbatas ? [
+        ['portal.beranda', 'portal.beranda', __('Beranda'), 'beranda'],
+        ['portal.data', 'portal.data*', __('Data Wali & Santri'), 'data'],
+        ['portal.akun', 'portal.akun', __('Akun'), 'profil'],
+    ] : ($verifikasi ? [
         ['portal.verifikasi.ringkasan', 'portal.verifikasi.*', __('Verifikasi'), 'absensi'],
         ['portal.data', 'portal.data*', __('Data Wali & Santri'), 'data'],
     ] : ($masuk ? array_values(array_filter([
@@ -16,8 +22,16 @@
         \App\Http\Controllers\PortalKeluargaController::punyaDompet() ? ['portal.dompet', 'portal.dompet*', __('Dompet'), 'dompet'] : null,
         ['portal.data', 'portal.data*', __('Data Wali & Santri'), 'data'],
         ['portal.akun', 'portal.akun', __('Akun'), 'profil'],
-    ])) : []));
-    $belumDibaca = $masuk && ! $verifikasi && ! $wajibSandi ? \App\Http\Controllers\PortalKeluargaController::kabarBelumDibaca() : 0;
+    ])) : [])));
+    // Masa demo (12 Nov 2026): pengumuman sampai tanggal resmi. Tak tampil di mode verifikasi link WA (proses
+    // sungguhan) & saat wajib membuat password. Jendelanya sekali per sesi; pitanya di setiap halaman.
+    $resmiMulai = filled(config('portal.demo_sampai')) ? \Illuminate\Support\Carbon::parse(config('portal.demo_sampai'))->startOfDay() : null;
+    $masaDemo = $masuk && ! $verifikasi && ! $wajibSandi && $resmiMulai && now()->lt($resmiMulai);
+    $jendelaDemo = $masaDemo && ! request()->session()->has('portal.demo_dilihat');
+    if ($jendelaDemo) {
+        request()->session()->put('portal.demo_dilihat', true);
+    }
+    $belumDibaca = $masuk && ! $verifikasi && ! $wajibSandi && ! $terbatas ?\App\Http\Controllers\PortalKeluargaController::kabarBelumDibaca() : 0;
     $namaMasuk = $masuk ? (\App\Services\PortalWali\SesiWali::wali()->{'nama_'.\App\Services\PortalWali\SesiWali::peran(request())} ?: \App\Services\PortalWali\SesiWali::wali()->nama) : '';
 @endphp
 <!DOCTYPE html>
@@ -191,6 +205,7 @@
             @if ($verifikasi || $wajibSandi)
                 <span class="w-10 shrink-0"></span>
             @elseif ($masuk)
+                @unless ($terbatas)
                 <a href="{{ route('portal.kabar') }}" class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
                    aria-label="{{ $belumDibaca ? __('Kabar, :jumlah belum dibaca', ['jumlah' => $belumDibaca]) : __('Kabar') }}">
                     <x-portal.ikon nama="lonceng" />
@@ -198,6 +213,7 @@
                         <span class="absolute end-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">{{ $belumDibaca > 99 ? '99+' : $belumDibaca }}</span>
                     @endif
                 </a>
+                @endunless
                 <a href="{{ route('portal.akun') }}" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-sm font-bold text-white" aria-label="{{ __('Akun') }}">
                     {{ mb_strtoupper(mb_substr($namaMasuk, 0, 1)) }}
                 </a>
@@ -208,6 +224,32 @@
     </header>
 
     <main @class(['mx-auto max-w-lg px-4 pt-4', 'pb-28' => $masuk, 'pb-10' => ! $masuk])>
+        @if ($masaDemo)
+            <div class="mb-4 rounded-2xl bg-amber-100 px-4 py-2.5 text-xs text-amber-900 ring-1 ring-amber-300" data-pita-demo>
+                <b>{{ __('Versi demo.') }}</b>
+                {{ __('Aplikasi ini masih dalam tahap uji coba dan belum resmi digunakan.') }}
+                @if ($terbatas)
+                    {{ __('Saat ini Anda bisa memperbarui data keluarga dan mengunggah berkas santri.') }}
+                @endif
+            </div>
+        @endif
+        @if ($jendelaDemo)
+            <div x-data="{ buka: true }" x-show="buka" x-cloak data-jendela-demo
+                 class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4" role="dialog" aria-modal="true">
+                <div class="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-xl">
+                    <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-2xl">📢</div>
+                    <h2 class="text-lg font-bold text-slate-900">{{ __('Aplikasi masih versi demo') }}</h2>
+                    <p class="mt-2 text-sm leading-relaxed text-slate-600">
+                        {{ __('SANAD Wali masih dalam tahap uji coba (demo) dan belum resmi digunakan.') }}
+                    </p>
+                    <p class="mt-2 text-sm leading-relaxed text-slate-600">
+                        {{ __('Data yang tampil bisa belum lengkap atau masih berubah. Semua urusan dengan pesantren tetap melalui jalur yang biasa.') }}
+                    </p>
+                    <button type="button" @click="buka = false"
+                            class="mt-5 w-full rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white hover:bg-brand-dark">{{ __('Saya mengerti') }}</button>
+                </div>
+            </div>
+        @endif
         @if (session('status'))
             <div class="mb-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-200">{{ session('status') }}</div>
         @endif
@@ -241,7 +283,7 @@
 
         {{-- Tombol Bantuan melayang (11 Nov 2026): ikon Bantuan tak ada di 7 ikon Beranda bawaan, wali tak menemukannya
              di Menu Lengkap. Tampil hanya bila asisten wali menyala & bukan mode verifikasi link WA. --}}
-        @if (\App\Services\PortalWali\AsistenWali::aktif() && ! \App\Services\PortalWali\SesiWali::modeVerifikasi(request()) && ! request()->routeIs('portal.bantuan'))
+        @if (\App\Services\PortalWali\AsistenWali::aktif() && ! $terbatas && ! \App\Services\PortalWali\SesiWali::modeVerifikasi(request()) && ! request()->routeIs('portal.bantuan'))
             <a href="{{ route('portal.bantuan') }}" aria-label="{{ __('Bantuan') }}" title="{{ __('Bantuan') }}"
                class="fixed right-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-brand text-white shadow-lg ring-4 ring-white"
                style="bottom: calc(4.75rem + env(safe-area-inset-bottom))">

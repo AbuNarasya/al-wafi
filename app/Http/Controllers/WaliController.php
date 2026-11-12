@@ -64,6 +64,23 @@ class WaliController extends Controller
         return redirect()->route($kembali)->with('status', "Wali {$wali->nama} berhasil diperbarui.");
     }
 
+    /**
+     * Tandai / lepas AKUN UJI portal (12 Nov 2026): selama mode terbatas hanya keluarga bertanda ini yang bisa
+     * memakai seluruh fungsi portal (bayar, dompet, perizinan, …). KHUSUS ADMIN — sama dengan membuka fitur uang.
+     */
+    public function akunUji(Request $request, int $id): RedirectResponse
+    {
+        abort_unless($request->user()?->is_admin, 403, 'Hanya administrator yang bisa menandai akun uji.');
+        $wali = \App\Models\Wali::findOrFail($id);
+        $wali->forceFill(['akun_uji' => $request->boolean('akun_uji')])->save();
+        \App\Support\Audit\Jejak::catat('akun_uji_portal', ['modul' => 'wali', 'ref_jenis' => 'Wali', 'ref_id' => $wali->id,
+            'detail' => ['nama' => $wali->nama, 'akun_uji' => $wali->akun_uji]]);
+
+        return redirect()->route('wali.edit', $wali->id)->with('status', $wali->akun_uji
+            ? "Keluarga {$wali->nama} kini AKUN UJI: bisa memakai seluruh fungsi portal selama masa uji coba."
+            : "Tanda akun uji keluarga {$wali->nama} dilepas.");
+    }
+
     public function kesiapanPortal(KesiapanPortalWaliService $kesiapan): View
     {
         return view('wali.kesiapan-portal', $kesiapan->ringkasan());
