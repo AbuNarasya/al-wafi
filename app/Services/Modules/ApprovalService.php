@@ -583,6 +583,11 @@ class ApprovalService
             if ($s->scope === 'bagian' && $user->kode_bagian !== $i->kode_bagian) {
                 return false;
             }
+            // `induk` (12 Nov 2026): dulu tak disaring di sini, sehingga mudir direktorat LAIN ikut melihat
+            // (dan menghitung) pengajuan yang akan ditolak bila ia klik Setujui. Aturannya = bolehMemutuskan().
+            if ($s->scope === 'induk' && ! $this->penyetujuTahap($s, $i)->contains('id_pengguna', $user->id_pengguna)) {
+                return false;
+            }
 
             return true;
         })->values();

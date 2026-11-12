@@ -3,13 +3,44 @@
 @section('title', 'Persetujuan Saya')
 
 @section('content')
-    <p class="mb-4 text-sm text-gray-500">Pengajuan yang menunggu persetujuan Anda pada tahap sekarang.</p>
+    <p class="mb-4 text-sm text-gray-500">Semua yang menunggu keputusan atau tindakan Anda. Klik sebuah baris untuk membuka halamannya.</p>
 
-    @if ($items->isEmpty())
+    @if ($items->isEmpty() && $pintasan->isEmpty())
         <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-16 text-center text-gray-400">
-            Tidak ada pengajuan yang menunggu persetujuan Anda. 🎉
+            Tidak ada yang menunggu persetujuan atau tindakan Anda. 🎉
         </div>
-    @else
+    @endif
+
+    {{-- Pintasan per bidang (12 Nov 2026): angkanya sama dengan penanda di menu modulnya. --}}
+    @if ($pintasan->isNotEmpty())
+        <div class="mb-6 grid gap-4 md:grid-cols-2">
+            @foreach ($pintasan as $bidang => $baris)
+                <div class="rounded-xl border border-gray-200 bg-white shadow-sm" data-bidang="{{ $bidang }}">
+                    <div class="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
+                        <h3 class="text-sm font-semibold text-gray-800">{{ $bidang }}</h3>
+                        <span class="rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">{{ $baris->sum('jumlah') }}</span>
+                    </div>
+                    <ul class="divide-y divide-gray-100">
+                        @foreach ($baris as $b)
+                            <li>
+                                <a href="{{ url($b['tautan']) }}" class="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50">
+                                    <span class="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-bold text-amber-800">{{ $b['jumlah'] }}</span>
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block text-gray-800">{{ $b['label'] }}</span>
+                                        <span class="block text-xs text-gray-400">{{ \App\Support\Navigation::labelUrl($b['url']) ?? '' }}</span>
+                                    </span>
+                                    <span class="shrink-0 text-gray-400">&rarr;</span>
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endforeach
+        </div>
+    @endif
+
+    @if ($items->isNotEmpty())
+        <h3 class="mb-3 text-sm font-semibold text-gray-800">Usulan Anggaran &amp; Pengajuan Pembayaran</h3>
         <div class="space-y-4">
             @foreach ($items as $inst)
                 {{-- Kunci JENIS + id: dua jenis dokumen berbeda bisa punya id yang

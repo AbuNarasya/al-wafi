@@ -45,7 +45,8 @@
     // Kolom centang hanya di daftar Siap Aktivasi — satu-satunya daftar yang
     // punya tindakan massal.
     $adaKolomPilih = $lingkup === 'siap_aktivasi' && \App\Support\Akses::boleh('santri', 'ubah');
-    $jumlahKolom = 10 + (int) $adaKolomSpp + (int) $adaKolomLulus + (int) $adaKolomPilih;
+    $bolehDokumen = \App\Support\Akses::boleh('dokumen-santri', 'lihat');
+    $jumlahKolom = 11 + (int) $adaKolomSpp + (int) $adaKolomLulus + (int) $adaKolomPilih;
 @endphp
 
 @if ($adaKolomPilih)
@@ -95,7 +96,7 @@
                 <tr>@if ($adaKolomPilih)<th class="px-4 py-3"><input type="checkbox" x-data @change="document.querySelectorAll('[data-pilih-santri]').forEach(c => c.checked = $event.target.checked)" class="rounded border-gray-300"></th>@endif {{-- spasi WAJIB sesudah @endif --}}
                     <th class="px-4 py-3">No. Daftar / NIS</th><th class="px-4 py-3">Nama</th><th class="px-4 py-3">L/P</th><th class="px-4 py-3">Jenjang</th><th class="px-4 py-3">{{ $adaKolomLulus ? 'Tingkat Akhir' : 'Tingkat' }}</th><th class="px-4 py-3">Jalur</th><th class="px-4 py-3">Wali</th>@if ($adaKolomSpp)<th class="px-4 py-3 text-right">SPP / bulan</th>@endif {{-- spasi WAJIB: Blade tak mengenali direktif yang menempel langsung sesudah huruf, jadi "@endif@if" membuat @if kedua tak terkompilasi & @endif-nya jadi yatim --}}
                     @if ($adaKolomLulus)<th class="px-4 py-3">Tanggal Lulus</th>@endif
-                    <th class="px-4 py-3">Status</th><th class="px-4 py-3">Pembayaran</th><th class="px-4 py-3 text-right">Aksi</th></tr>
+                    <th class="px-4 py-3">Status</th><th class="px-4 py-3">Pembayaran</th><th class="px-4 py-3">Dokumen</th><th class="px-4 py-3 text-right">Aksi</th></tr>
                 {{-- Baris filter per kolom (server-side). --}}
                 <tr class="bg-white">
                     @if ($adaKolomPilih)<x-scol type="blank" />@endif {{-- spasi WAJIB sesudah @endif --}}
@@ -115,6 +116,7 @@
                         <x-scol type="blank" />
                     @endif
                     <x-scol name="bayar" :options="['lunas' => 'Lunas', 'menunggu' => 'Menunggu verifikasi', 'sebagian' => 'Sebagian', 'belum' => 'Belum bayar', 'tanpa_tagihan' => 'Belum ditagih']" :value="$filter['bayar']" />
+                    <x-scol name="berkas" :options="['menunggu' => 'Perlu diperiksa']" :value="$filter['berkas']" />
                     <x-scol type="blank" />
                 </tr>
             </thead>
@@ -172,6 +174,29 @@
                         @endif
                         <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $c[$r->status] ?? 'bg-gray-100 text-gray-500' }}">{{ \App\Services\Ppsb\Tahap::labelStatus($r->status) }}</span></td>
                         <td class="px-4 py-3"><x-status-bayar :info="$bayar[$r->id] ?? null" /></td>
+                        {{-- Kelengkapan berkas wajib (12 Nov 2026); diklik membuka daftar berkas santri itu. --}}
+                        <td class="px-4 py-3">
+                            @php
+                                $dok = $dokumen[$r->id] ?? null;
+                                $warnaDok = ['lengkap' => 'bg-emerald-100 text-emerald-700', 'sebagian' => 'bg-amber-100 text-amber-700', 'belum' => 'bg-gray-100 text-gray-500'];
+                                $labelDok = ['lengkap' => 'Lengkap', 'sebagian' => 'Sebagian', 'belum' => 'Belum'];
+                            @endphp
+                            @if ($dok)
+                                @php
+                                    $judulDok = $dok['ada'].' dari '.$dok['wajib'].' berkas wajib'.($dok['menunggu'] ? ', '.$dok['menunggu'].' menunggu diperiksa' : '');
+                                    $isiDok = $labelDok[$dok['status']].($dok['status'] === 'sebagian' ? ' '.$dok['ada'].'/'.$dok['wajib'] : '');
+                                @endphp
+                                @if ($bolehDokumen)
+                                    <a href="{{ route('dokumen_santri.index', $r->id) }}" title="{{ $judulDok }}"
+                                       class="whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium hover:ring-2 hover:ring-brand/40 {{ $warnaDok[$dok['status']] }}">{{ $isiDok }}</a>
+                                @else
+                                    <span title="{{ $judulDok }}" class="whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium {{ $warnaDok[$dok['status']] }}">{{ $isiDok }}</span>
+                                @endif
+                                @if ($dok['menunggu'])
+                                    <div class="mt-0.5 text-[11px] text-sky-700">{{ $dok['menunggu'] }} perlu diperiksa</div>
+                                @endif
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-right"><a href="{{ route('santri.show', $r->id) }}" class="text-brand hover:underline">Detail</a></td>
                     </tr>
                 @empty

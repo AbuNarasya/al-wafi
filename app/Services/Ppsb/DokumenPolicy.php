@@ -48,6 +48,22 @@ final class DokumenPolicy
 
     private const SUDAH_LULUS = ['diterima', 'lolos_kesehatan', 'siap_aktivasi', 'aktif', 'alumni'];
 
+    /**
+     * Berkas yang DIHITUNG untuk penanda kelengkapan di daftar santri (12 Nov 2026) — keenam berkas
+     * registrasi, sama dengan hitungan "x dari 6 berkas registrasi" di portal wali. Tak dihitung: berkas
+     * pindahan (opsional) dan "Dokumen Lainnya". Berkas pasca-lulus baru dihitung setelah calon lulus.
+     */
+    public const WAJIB_REGISTRASI = ['ktp_ayah', 'ktp_ibu', 'ktp_wali', 'akta_kelahiran', 'kartu_keluarga', 'foto'];
+
+    public const WAJIB_PASCA_LULUS = ['surat_keterangan_sekolah', 'hasil_medcheck'];
+
+    /** @return list<string> */
+    public static function wajib(string $statusSantri): array
+    {
+        return in_array($statusSantri, self::SUDAH_LULUS, true)
+            ? [...self::WAJIB_REGISTRASI, ...self::WAJIB_PASCA_LULUS] : self::WAJIB_REGISTRASI;
+    }
+
     /** @return array{boleh:bool,alasan?:string} */
     public static function bolehUnggah(string $jenis, string $statusSantri): array
     {

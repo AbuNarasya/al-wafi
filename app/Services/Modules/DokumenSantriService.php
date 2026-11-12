@@ -191,6 +191,58 @@ class DokumenSantriService
         Storage::disk(self::DISK)->delete($path);
     }
 
+    /**
+     * Penanda kelengkapan untuk DAFTAR santri (12 Nov 2026) — 2 query untuk satu halaman.
+     * Satu jenis wajib dianggap ADA bila diterima (termasuk diterima fisik tanpa unggahan) atau sudah
+     * diunggah dan belum diputus; yang ditandai "perlu diganti" dianggap belum ada.
+     *
+     * @param  iterable<Santri>  $santri
+     * @return array<int, array{status:string, ada:int, wajib:int, menunggu:int}>  status: lengkap|sebagian|belum
+     */
+    public function ringkasMassal(iterable $santri): array
+    {
+        $santri = collect($santri);
+        $ids = $santri->pluck('id')->all();
+        if ($ids === []) {
+            return [];
+        }
+        $unggah = DokumenSantri::whereIn('id_santri', $ids)->select('id_santri', 'jenis')->distinct()->get()
+            ->groupBy('id_santri')->map(fn ($g) => $g->pluck('jenis')->flip());
+        $putusan = StatusBerkasSantri::whereIn('id_santri', $ids)->get(['id_santri', 'jenis', 'status'])
+            ->groupBy('id_santri')->map(fn ($g) => $g->pluck('status', 'jenis'));
+
+        $hasil = [];
+        foreach ($santri as $s) {
+            $wajib = DokumenPolicy::wajib((string) $s->status);
+            $ada = 0;
+            foreach ($wajib as $jenis) {
+                $p = $putusan[$s->id][$jenis] ?? null;
+                if ($p === 'diterima' || ($p === null && isset($unggah[$s->id][$jenis]))) {
+                    $ada++;
+                }
+            }
+            // Yang menunggu diperiksa dihitung atas SEMUA jenis (termasuk pindahan & lainnya) — sama dengan
+            // saringan "berkas menunggu" (saringBerkasMenunggu).
+            $menunggu = collect(array_keys(($unggah[$s->id] ?? collect())->all()))
+                ->filter(fn ($jenis) => ! isset($putusan[$s->id][$jenis]))->count();
+            $hasil[$s->id] = ['status' => $ada === 0 ? 'belum' : ($ada === count($wajib) ? 'lengkap' : 'sebagian'),
+                'ada' => $ada, 'wajib' => count($wajib), 'menunggu' => $menunggu];
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Santri yang punya unggahan belum diputus staf (unggahan ulang menghapus putusan lama, jadi ikut).
+     * Dipakai saringan daftar santri DAN hitungan tugas — definisinya satu.
+     */
+    public static function saringBerkasMenunggu(\Illuminate\Database\Eloquent\Builder $q): \Illuminate\Database\Eloquent\Builder
+    {
+        return $q->whereExists(fn ($d) => $d->from('dokumen_santri as d')->whereColumn('d.id_santri', 'santri.id')
+            ->whereNotExists(fn ($s) => $s->from('status_berkas_santri as sb')
+                ->whereColumn('sb.id_santri', 'd.id_santri')->whereColumn('sb.jenis', 'd.jenis')));
+    }
+
     /** Ringkasan kelengkapan untuk layar verifikasi berkas. */
     public function kelengkapan(int $idSantri): array
     {

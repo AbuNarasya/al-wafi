@@ -37,7 +37,11 @@ class ApprovalController extends Controller
         $docs = PengajuanPembayaran::with('bagian')->whereIn('id', $pengajuanIds)->get()
             ->keyBy(fn ($d) => PengajuanPembayaranService::SUMBER.'|'.$d->id);
 
-        return view('approvals.inbox', compact('items', 'docs'));
+        // Pintasan ke SEMUA pekerjaan lain yang menunggu pengguna ini (12 Nov 2026) — dari sumber yang sama
+        // dengan angka di menu (TugasSaya), dikelompokkan per bidang. Keputusannya tetap di halaman modulnya.
+        $pintasan = collect(\App\Support\TugasSaya::persetujuan())->groupBy('bidang');
+
+        return view('approvals.inbox', compact('items', 'docs', 'pintasan'));
     }
 
     public function approve(Request $request, int $id): RedirectResponse

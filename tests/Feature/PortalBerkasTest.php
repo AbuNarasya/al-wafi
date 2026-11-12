@@ -147,4 +147,28 @@ class PortalBerkasTest extends TestCase
         $sesiLain->delete(route('portal.berkas.hapus', $dok->id))->assertSessionHas('error');
         $this->assertSame(1, DokumenSantri::count());
     }
+
+    /** Kolom Dokumen di daftar santri (12 Nov 2026): Belum → Sebagian x/6 (+ perlu diperiksa) → Lengkap, bertaut ke halaman berkas. */
+    public function test_daftar_santri_menampilkan_kelengkapan_berkas_bertaut(): void
+    {
+        $tautan = 'href="'.route('dokumen_santri.index', $this->ahmad->id).'"';
+        $this->actingAs($this->admin)->get(route('santri.calon'))->assertOk()
+            ->assertSee('>Dokumen</th>', false)->assertSee($tautan, false)->assertSee('0 dari 6 berkas wajib');
+
+        $this->unggah('kartu_keluarga');
+        $svc = new \App\Services\Modules\DokumenSantriService;
+        $svc->putuskan($this->ahmad->id, 'foto', 'diterima', null, $this->admin->id_pengguna);
+        $svc->putuskan($this->ahmad->id, 'akta_kelahiran', 'perlu_diganti', 'buram', $this->admin->id_pengguna);
+        $this->actingAs($this->admin)->get(route('santri.calon'))
+            ->assertSee('Sebagian 2/6')->assertSee('2 dari 6 berkas wajib, 1 menunggu diperiksa')->assertSee('1 perlu diperiksa');
+
+        foreach (\App\Services\Ppsb\DokumenPolicy::WAJIB_REGISTRASI as $jenis) {
+            $svc->putuskan($this->ahmad->id, $jenis, 'diterima', null, $this->admin->id_pengguna);
+        }
+        $this->actingAs($this->admin)->get(route('santri.calon'))->assertSee('6 dari 6 berkas wajib')->assertSee('>Lengkap</a>', false);
+
+        // Setelah lulus, berkas pasca-lulus ikut dihitung.
+        $this->ahmad->update(['status' => 'diterima']);
+        $this->assertSame(['status' => 'sebagian', 'ada' => 6, 'wajib' => 8, 'menunggu' => 0], $svc->ringkasMassal([$this->ahmad->refresh()])[$this->ahmad->id]);
+    }
 }

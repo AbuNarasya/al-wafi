@@ -133,6 +133,8 @@ class SantriController extends Controller
             // Status pembayaran mutakhir per baris (termasuk setoran yang belum
             // diverifikasi keuangan) — 2 query agregat untuk seluruh halaman.
             'bayar' => (new RekapPembayaranService)->ringkasMassal($rows->pluck('id')),
+            // Kelengkapan berkas wajib per baris (12 Nov 2026) — 2 query untuk seluruh halaman.
+            'dokumen' => (new \App\Services\Modules\DokumenSantriService)->ringkasMassal($rows->getCollection()),
             // Nominal SPP hanya bermakna bagi santri yang sudah bersekolah, jadi
             // kolomnya cuma muncul di daftar Kependidikan — bukan di Calon Santri.
             'spp' => $lingkup === 'aktif'
@@ -191,6 +193,7 @@ class SantriController extends Controller
             'jalur' => trim((string) $request->query('jalur', '')),
             'status' => trim((string) $request->query('status', '')),
             'bayar' => trim((string) $request->query('bayar', '')),
+            'berkas' => trim((string) $request->query('berkas', '')),
         ];
     }
 
@@ -219,7 +222,9 @@ class SantriController extends Controller
             ->when($f['tingkat'] !== '', fn ($query) => $query->where('tingkat', (int) $f['tingkat']))
             ->when($f['jalur'] !== '', fn ($query) => $query->where('jalur', $f['jalur']))
             ->when($f['status'] !== '' && in_array($f['status'], $statusLingkup, true), fn ($query) => $query->where('status', $f['status']))
-            ->when($f['bayar'] !== '', fn ($query) => $this->saringStatusBayar($query, $f['bayar']));
+            ->when($f['bayar'] !== '', fn ($query) => $this->saringStatusBayar($query, $f['bayar']))
+            // Berkas unggahan wali yang belum diperiksa (12 Nov 2026) — tujuan pintasan di Persetujuan Saya.
+            ->when($f['berkas'] === 'menunggu', fn ($query) => \App\Services\Modules\DokumenSantriService::saringBerkasMenunggu($query));
     }
 
     /**

@@ -34,6 +34,12 @@ final class TugasSaya
     /** @var array<string,array{url:string,jumlah:int,label:string,rincian:list<array{jumlah:int,label:string}>}>|null */
     private static ?array $memo = null;
 
+    /** @var list<array{url:string,jumlah:int,label:string,bidang:string,tautan:string}> */
+    private static array $baris = [];
+
+    /** Menu hub: angkanya = SELURUH pekerjaan yang punya pintasan di sana (lihat untukUrl). */
+    public const HUB = '/approvals';
+
     /**
      * Semua pekerjaan menunggu, dikunci per URL menu (0 tidak ikut).
      *
@@ -51,9 +57,15 @@ final class TugasSaya
         }
 
         $hasil = [];
-        foreach (self::sumber($user) as [$url, $jumlah, $label]) {
+        self::$baris = [];
+        foreach ([...self::sumber($user), ...TugasPersetujuan::sumber($user)] as $b) {
+            [$url, $jumlah, $label] = $b;
             if ($jumlah <= 0) {
                 continue;
+            }
+            // Baris mentah (tak digabung per URL) untuk pintasan di Persetujuan Saya.
+            if (($b[3] ?? null) !== null) {
+                self::$baris[] = ['url' => $url, 'jumlah' => $jumlah, 'label' => $label, 'bidang' => $b[3], 'tautan' => $b[4] ?? $url];
             }
             // Satu modul bisa punya dua macam pekerjaan sekaligus — mis. halaman
             // Pembayaran PPSB memuat setoran menunggu verifikasi DAN tagihan yang
@@ -75,59 +87,64 @@ final class TugasSaya
     }
 
     /**
-     * @return list<array{0:string,1:int,2:string}>
+     * Baris ke-4 = BIDANG di Persetujuan Saya (null = tak dipintas di sana: kotak persetujuan keuangan
+     * sendiri & tagihan jatuh tempo yang bukan keputusan). Baris ke-5 = tautan bila beda dari URL menu.
+     * Sumber tambahan (pengunduran diri, persediaan, laundry, …) ada di TugasPersetujuan.
+     *
+     * @return list<array{0:string,1:int,2:string,3?:?string,4?:string}>
      */
     private static function sumber($user): array
     {
         $keuangan = $user->is_admin || $user->tim_keuangan;
+        [$K, $S, $W] = [TugasPersetujuan::KEUANGAN, TugasPersetujuan::KESANTRIAN, TugasPersetujuan::PERSEDIAAN];
 
         return [
             // Menu "Persetujuan Saya" terbuka untuk semua; isinya sendiri yang
             // sudah menyaring — inbox() hanya memuat tahap yang jadi giliran user.
-            ['/approvals', (new ApprovalService)->inbox($user->id_pengguna)->count(), 'menunggu persetujuan Anda'],
+            [self::HUB, (new ApprovalService)->inbox($user->id_pengguna)->count(), 'menunggu persetujuan Anda', null],
 
             ['/ppsb/pembayaran', Akses::boleh('pembayaran-ppsb', 'ubah')
-                ? self::pembayaranMenunggu(['registrasi', 'uang_pangkal', 'perlengkapan']) : 0, 'menunggu verifikasi'],
+                ? self::pembayaranMenunggu(['registrasi', 'uang_pangkal', 'perlengkapan']) : 0, 'pembayaran PPSB menunggu verifikasi', $K],
 
             ['/kesantrian/pembayaran', Akses::boleh('pembayaran-kesantrian', 'ubah')
-                ? self::pembayaranMenunggu(['spp', 'daftar_ulang', 'lain']) : 0, 'menunggu verifikasi'],
+                ? self::pembayaranMenunggu(['spp', 'daftar_ulang', 'lain']) : 0, 'pembayaran SPP & lainnya menunggu verifikasi', $K],
 
-            ['/pengajuan-pembayaran', $keuangan ? self::pengajuanMenungguKeuangan() : 0, 'menunggu verifikasi keuangan'],
+            ['/pengajuan-pembayaran', $keuangan ? self::pengajuanMenungguKeuangan() : 0, 'pengajuan pembayaran menunggu verifikasi keuangan', $K],
 
             ['/kesantrian/dompet', $keuangan && Akses::boleh('dompet', 'ubah')
-                ? MutasiDompet::where('status', 'menunggu_verifikasi')->count() : 0, 'top-up menunggu verifikasi'],
+                ? MutasiDompet::where('status', 'menunggu_verifikasi')->count() : 0, 'top-up menunggu verifikasi', $K],
 
             // Penarikan tunai kegiatan: kesantrian memutus pengajuan; keuangan mengambil dana
             // (sesudah batas persetujuan) lalu membagikan & menutup sesi.
             ['/kesantrian/tarik-tunai', Akses::boleh('penarikan-tunai', 'ubah')
                 ? \App\Models\PengajuanTarikTunai::where('status', 'diajukan')
                     ->whereHas('sesi', fn ($q) => $q->where('status', 'berjalan')->where('batas_persetujuan', '>=', now()))->count() : 0,
-                'pengajuan uang saku kegiatan menunggu'],
+                'pengajuan uang saku kegiatan menunggu', $S],
 
             ['/tarik-tunai', Akses::boleh('sesi-tarik-tunai', 'ubah')
                 ? \App\Models\SesiTarikTunai::where(fn ($q) => $q->where('status', 'dana_diambil')
                     ->orWhere(fn ($w) => $w->where('status', 'berjalan')->where('batas_persetujuan', '<', now())))->count() : 0,
-                'sesi tarik tunai menunggu diambil/dibagikan'],
+                'sesi tarik tunai menunggu diambil/dibagikan', $K],
 
             // Perizinan Insidental yang menunggu keputusan tingkat pengguna ini.
-            ['/kesantrian/perizinan', \App\Services\Modules\PerizinanService::jumlahMenungguSaya(), 'pengajuan izin menunggu persetujuan'],
-            ['/kesantrian/perizinan-rutin', \App\Services\Modules\PerizinanService::jumlahMenungguSaya(rutin: true), 'pengajuan penjengukan/kepulangan menunggu'],
+            ['/kesantrian/perizinan', \App\Services\Modules\PerizinanService::jumlahMenungguSaya(), 'pengajuan izin menunggu persetujuan', $S],
+            ['/kesantrian/perizinan-rutin', \App\Services\Modules\PerizinanService::jumlahMenungguSaya(rutin: true), 'pengajuan penjengukan/kepulangan menunggu', $S],
             ['/kesantrian/perizinan-rutin/jadwal', Akses::boleh('perizinan-jadwal', 'ubah')
-                ? \App\Services\Modules\PerizinanRutinService::jadwalBulanDepanBelumAda() : 0, 'jenis perizinan rutin belum berjadwal bulan depan'],
+                ? \App\Services\Modules\PerizinanRutinService::jadwalBulanDepanBelumAda() : 0, 'jenis perizinan rutin belum berjadwal bulan depan', $S],
 
             // Janji bayar wali yang sudah lewat sementara tagihannya belum lunas — saatnya menagih lagi.
             ['/kesantrian/penagihan-tunggakan', Akses::boleh('penagihan-tunggakan', 'buat')
-                ? \App\Services\Modules\PenagihanTunggakanService::jumlahJanjiLewat() : 0, 'santri janji bayarnya sudah lewat'],
+                ? \App\Services\Modules\PenagihanTunggakanService::jumlahJanjiLewat() : 0, 'santri janji bayarnya sudah lewat', $K],
 
             // ---- Wafi Mart & pencairan antar-entitas (10 Nov 2026) ----
             // Akses::boleh sudah menyaring per instans: modulnya mati di instans yang tak memakainya.
             ['/mitra-kantin', Akses::boleh('mitra-kantin', 'ubah')
-                ? \App\Models\PenarikanMitra::where('status', 'diajukan')->count() : 0, 'penarikan saldo mitra menunggu diproses'],
+                ? \App\Models\PenarikanMitra::where('status', 'diajukan')->count() : 0, 'penarikan saldo mitra menunggu diproses', $W],
             ['/penerimaan-al-wafi', Akses::boleh('penerimaan-al-wafi', 'buat')
-                ? count(\App\Services\Modules\KabarKantin::pencairanMenunggu()) : 0, 'pencairan dari Al Wafi belum dicatat diterima'],
+                ? count(\App\Services\Modules\KabarKantin::pencairanMenunggu()) : 0, 'pencairan dari Al Wafi belum dicatat diterima', $W],
             ['/rekonsiliasi-kartu', Akses::boleh('rekonsiliasi-kartu', 'ubah')
                 ? \App\Models\RekonsiliasiDompetToko::where('status', 'perlu_diputus')->whereNull('ditangani_pada')->count() : 0,
-                'tanggal rekonsiliasi kartu perlu diputus'],
+                'tanggal rekonsiliasi kartu perlu diputus', $W],
             ...self::pencairanTerlambat(),
 
             ...self::jatuhTempo(),
@@ -142,7 +159,7 @@ final class TugasSaya
         }
 
         return [['/pencairan-toko', 1, 'belanja kartu Rp '.number_format((float) $t['total'], 0, ',', '.')
-            .' belum dicairkan ke Wafi Mart sejak '.\Illuminate\Support\Carbon::parse($t['sejak'])->format('d/m/Y')]];
+            .' belum dicairkan ke Wafi Mart sejak '.\Illuminate\Support\Carbon::parse($t['sejak'])->format('d/m/Y'), TugasPersetujuan::KEUANGAN]];
     }
 
     /**
@@ -271,16 +288,43 @@ final class TugasSaya
         return PengajuanPembayaran::whereIn('id', $siap)->where('status', 'diajukan')->count();
     }
 
-    /** Jumlah pekerjaan menunggu pada satu menu (0 bila tak ada). */
+    /**
+     * Jumlah pekerjaan menunggu pada satu menu (0 bila tak ada). Menu hub (Persetujuan Saya) menjumlah
+     * kotak persetujuannya + SEMUA pintasan di sana — sengaja TIDAK lewat semua(), supaya total() (lonceng,
+     * ikon aplikasi) tak menghitung pekerjaan yang sama dua kali.
+     */
     public static function untukUrl(string $url): int
     {
+        if ($url === self::HUB) {
+            return (self::semua()[self::HUB]['jumlah'] ?? 0) + array_sum(array_column(self::persetujuan(), 'jumlah'));
+        }
+
         return self::semua()[$url]['jumlah'] ?? 0;
     }
 
     /** Label pendek pekerjaan pada satu menu, mis. "menunggu verifikasi". */
     public static function labelUrl(string $url): ?string
     {
+        if ($url === self::HUB) {
+            return self::untukUrl(self::HUB) > 0 ? 'menunggu tindakan Anda' : null;
+        }
+
         return self::semua()[$url]['label'] ?? null;
+    }
+
+    /**
+     * Pintasan di Persetujuan Saya: tiap pekerjaan (tak digabung per menu), urut bidang lalu terbanyak.
+     *
+     * @return list<array{url:string,jumlah:int,label:string,bidang:string,tautan:string}>
+     */
+    public static function persetujuan(): array
+    {
+        self::semua();
+        $urutan = array_flip(TugasPersetujuan::URUTAN);
+        $baris = self::$baris;
+        usort($baris, fn ($a, $b) => [$urutan[$a['bidang']] ?? 99, $b['jumlah']] <=> [$urutan[$b['bidang']] ?? 99, $a['jumlah']]);
+
+        return $baris;
     }
 
     public static function total(): int
@@ -308,5 +352,6 @@ final class TugasSaya
     public static function lupakan(): void
     {
         self::$memo = null;
+        self::$baris = [];
     }
 }
