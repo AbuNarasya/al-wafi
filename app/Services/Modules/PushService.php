@@ -6,6 +6,7 @@ use App\Exceptions\AppException;
 use App\Models\Notification;
 use App\Models\PushLangganan;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Sleep;
 use Minishlink\WebPush\Subscription;
 use Minishlink\WebPush\WebPush;
 
@@ -205,22 +206,13 @@ class PushService
             return $ringkas;
         }
 
-        $webPush = $this->webPush();
-        foreach ($antreanKirim as [$l, $muatan]) {
-            $webPush->queueNotification(
-                new Subscription($l->endpoint, $l->p256dh, $l->auth),
-                $muatan,
-                ['TTL' => (int) config('push.ttl', 43200)],
-            );
-        }
-
-        // Ditandai SEBELUM hasil dibaca, dan itu disengaja: kalau pengiriman
+        // Ditandai SEBELUM dikirim, dan itu disengaja: kalau pengiriman
         // meledak di tengah, notifikasi yang sudah telanjur terkirim tak boleh
         // ikut terdorong ulang pada sapuan berikutnya. Notifikasi ganda jauh
         // lebih merusak kepercayaan daripada satu yang tak sampai.
         Notification::whereIn('id', $segar->pluck('id'))->update(['didorong_pada' => now()]);
 
-        foreach ($webPush->flush() as $laporan) {
+        foreach ($this->kirimBerjeda($antreanKirim) as $laporan) {
             $l = $perEndpoint[$laporan->getEndpoint()] ?? null;
 
             if ($laporan->isSuccess()) {
@@ -385,6 +377,48 @@ class PushService
     }
 
     /** Juga dipakai pengirim push wali ([[App\Services\PortalWali\PushWaliService]]). */
+    /** Gelombang ke berapa yang masih diberi jeda — penjaga supaya satu lonjakan tak menahan sapuan terlalu lama. */
+    public const GELOMBANG_BERJEDA = 10;
+
+    /**
+     * Kirim antrean push dalam GELOMBANG: gelombang ke-n memuat kabar ke-n untuk tiap perangkat, dan antar-gelombang
+     * diberi jeda `push.jeda_detik`. Dipakai push staf & wali (keputusan user 12 Nov 2026).
+     *
+     * Sebabnya: HP Android (teruji Xiaomi) hanya menampilkan SATU dari dua notifikasi yang tiba pada detik yang sama
+     * dari aplikasi yang sama — yang lain hilang dari panel walau layanan push menerimanya. Perangkat yang hanya
+     * punya satu kabar tak ikut menunggu: semuanya ada di gelombang pertama.
+     *
+     * @param  list<array{0:object, 1:string}>  $antrean  pasangan (langganan ber-endpoint/p256dh/auth, muatan JSON)
+     * @return list<\Minishlink\WebPush\MessageSentReport>
+     */
+    public function kirimBerjeda(array $antrean): array
+    {
+        $gelombang = [];
+        $urutan = [];
+        foreach ($antrean as [$l, $muatan]) {
+            $ke = $urutan[$l->endpoint] = ($urutan[$l->endpoint] ?? -1) + 1;
+            $gelombang[$ke][] = [$l, $muatan];
+        }
+
+        $webPush = $this->webPush();
+        $jeda = max(0, (int) config('push.jeda_detik', 3));
+        $laporan = [];
+        foreach ($gelombang as $ke => $isi) {
+            if ($ke > 0 && $ke <= self::GELOMBANG_BERJEDA && $jeda > 0) {
+                Sleep::for($jeda)->seconds();
+            }
+            foreach ($isi as [$l, $muatan]) {
+                $webPush->queueNotification(new Subscription($l->endpoint, $l->p256dh, $l->auth), $muatan,
+                    ['TTL' => (int) config('push.ttl', 43200)]);
+            }
+            foreach ($webPush->flush() as $r) {
+                $laporan[] = $r;
+            }
+        }
+
+        return $laporan;
+    }
+
     public function webPush(): WebPush
     {
         return new WebPush(['VAPID' => [

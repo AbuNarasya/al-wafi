@@ -9,7 +9,6 @@ use App\Models\PushLanggananWali;
 use App\Models\PushLangganan;
 use App\Services\Modules\PushService;
 use Illuminate\Support\Facades\Log;
-use Minishlink\WebPush\Subscription;
 
 /**
  * PUSH NOTIFICATION UNTUK WALI (keputusan user 21 Okt 2026) — mendorong kabar portal (`notifikasi_wali`) ke perangkat
@@ -107,11 +106,8 @@ class PushWaliService
             return $ringkas;
         }
 
-        $webPush = $this->push->webPush();
-        foreach ($antreanKirim as [$l, $muatan]) {
-            $webPush->queueNotification(new Subscription($l->endpoint, $l->p256dh, $l->auth), $muatan, ['TTL' => (int) config('push.ttl', 43200)]);
-        }
-        foreach ($webPush->flush() as $laporan) {
+        // Berjeda per perangkat (12 Nov 2026) — lihat PushService::kirimBerjeda.
+        foreach ($this->push->kirimBerjeda($antreanKirim) as $laporan) {
             $l = $perEndpoint[$laporan->getEndpoint()] ?? null;
             if ($laporan->isSuccess()) {
                 $ringkas['terkirim']++;

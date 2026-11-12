@@ -96,6 +96,49 @@ class PushNotifikasiTest extends TestCase
         (new PushService)->simpanLangganan($this->staf->id_pengguna, ['endpoint' => 'https://a.b/c'], null);
     }
 
+    // ---- Pengiriman berjeda (12 Nov 2026) ----
+
+    /** Kabar ke-2 untuk perangkat yang sama dikirim pada gelombang berikutnya, sesudah jeda; perangkat lain tak menunggu. */
+    public function test_kabar_beruntun_ke_perangkat_yang_sama_dikirim_bergelombang_berjeda(): void
+    {
+        \Illuminate\Support\Sleep::fake();
+        $gelombang = new \ArrayObject;
+        $palsu = new class($gelombang) extends \Minishlink\WebPush\WebPush
+        {
+            private array $antre = [];
+
+            public function __construct(private \ArrayObject $catatan) {}
+
+            public function queueNotification(\Minishlink\WebPush\SubscriptionInterface $s, ?string $payload = null, array $options = [], array $auth = []): void
+            {
+                $this->antre[] = $s->getEndpoint();
+            }
+
+            public function flush(?int $batchSize = null): \Generator
+            {
+                $this->catatan[] = $this->antre;
+                $this->antre = [];
+                yield from [];
+            }
+        };
+        $layanan = new class($palsu) extends PushService
+        {
+            public function __construct(private \Minishlink\WebPush\WebPush $palsu) {}
+
+            public function webPush(): \Minishlink\WebPush\WebPush
+            {
+                return $this->palsu;
+            }
+        };
+        $a = (object) ['endpoint' => 'https://push/a', 'p256dh' => 'x', 'auth' => 'y'];
+        $b = (object) ['endpoint' => 'https://push/b', 'p256dh' => 'x', 'auth' => 'y'];
+
+        $layanan->kirimBerjeda([[$a, '1'], [$a, '2'], [$b, '1']]);
+
+        $this->assertSame([['https://push/a', 'https://push/b'], ['https://push/a']], $gelombang->getArrayCopy());
+        \Illuminate\Support\Sleep::assertSleptTimes(1);
+    }
+
     // ---- Penyaringan antrean ----
 
     public function test_hanya_jenis_tugas_yang_masuk_antrean_dorongan(): void

@@ -61,4 +61,16 @@ return [
     |
     */
     'ttl' => (int) env('PUSH_TTL', 43200),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Jeda antar-kabar ke perangkat yang sama dalam satu sapuan (12 Nov 2026)
+    |--------------------------------------------------------------------------
+    |
+    | HP Android (teruji Xiaomi) membuang notifikasi yang tiba pada detik yang
+    | sama dari aplikasi yang sama. Kabar ke-2, ke-3, … untuk satu perangkat
+    | dikirim bergelombang dengan jeda ini (lihat PushService::kirimBerjeda).
+    |
+    */
+    'jeda_detik' => (int) env('PUSH_JEDA_DETIK', 3),
 ];
