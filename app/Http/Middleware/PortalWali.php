@@ -57,10 +57,15 @@ class PortalWali
             }
         }
 
-        // Mode terbatas masa uji coba (12 Nov 2026): wali biasa hanya data, berkas, akun, & alur PPSB; akun uji bebas.
+        // Mode terbatas masa uji coba (12 Nov 2026): semua halaman bisa dilihat, tetapi tindakan hanya untuk data,
+        // berkas, akun, & alur PPSB; akun uji bebas. Ditolak → kembali ke halaman asal dengan pesan.
         if ($wali && \App\Services\PortalWali\PortalTerbatas::aktif()
             && ! \App\Services\PortalWali\PortalTerbatas::alamatBoleh($request, $wali)) {
-            return redirect()->route('portal.beranda')->with('error', \App\Services\PortalWali\PortalTerbatas::pesan());
+            if ($request->expectsJson()) { // mis. asisten bantuan (fetch) — pesannya tampil di layarnya sendiri
+                return response()->json(['message' => \App\Services\PortalWali\PortalTerbatas::pesan()], 403);
+            }
+
+            return redirect()->back(fallback: route('portal.beranda'))->with('error', \App\Services\PortalWali\PortalTerbatas::pesan());
         }
 
         if (($wali && SesiWali::peran($request)) || ($mode === 'pendaftar' && SesiWali::emailPendaftar($request))) {

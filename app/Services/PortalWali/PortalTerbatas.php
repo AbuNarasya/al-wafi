@@ -7,24 +7,27 @@ use App\Models\Wali;
 /**
  * MODE TERBATAS PORTAL WALI (keputusan user 12 Nov 2026, masa uji coba sebelum portal resmi dipakai).
  *
- * Selama saklar `portal.terbatas` menyala, wali biasa hanya bisa: masuk/keluar & urusan password, Data Wali
- * & Santri (termasuk verifikasi link WA), berkas santri, pengaturan akun (perangkat & notifikasi), dan
- * pendaftaran santri baru (PPSB tetap berjalan). Pembayaran, dompet, kartu/PIN, perizinan, penarikan,
- * pengunduran diri, kehadiran, klinik, laundry, kabar, & asisten TERTUTUP — pembukuan ERP baru mulai
- * 1 Jan 2027 dan data uang belum final.
+ * Tampilan TETAP LENGKAP: semua menu & halaman bisa DIBUKA untuk melihat fungsinya (koreksi user 12 Nov 2026:
+ * "ditampilkan lengkap, bisa dibuka, tetapi tidak bisa digunakan"). Yang dikunci adalah TINDAKANNYA (setiap
+ * permintaan selain GET/HEAD): bayar, isi/pindah dompet, kartu, perizinan, penarikan, pengunduran diri,
+ * asisten, … — pembukuan ERP baru mulai 1 Jan 2027 dan data uang belum final.
  *
- * Keluarga bertanda `wali.akun_uji` (dicentang admin di Data Wali) tetap bisa memakai SEMUA fungsi.
- * Saklarnya MANUAL (bukan tanggal): dibuka saat user memintanya.
+ * Tindakan yang tetap berfungsi: Data Wali & Santri (termasuk verifikasi link WA), berkas santri, akun
+ * (password, PIN, perangkat, notifikasi, tata menu, bahasa), pendaftaran santri baru, dan pembayaran
+ * tagihan PPSB calon santri (alur PPSB tetap berjalan).
+ *
+ * Keluarga bertanda `wali.akun_uji` (dicentang admin di Data Wali) bisa menggunakan SEMUA fungsi.
+ * Saklarnya MANUAL (`portal.terbatas`), bukan tanggal: dibuka saat user memintanya.
  */
 final class PortalTerbatas
 {
     /**
-     * Alamat yang tetap terbuka bagi wali biasa. Dicocokkan lewat ALAMAT (seperti mode verifikasi),
-     * supaya rute POST/PUT tak bernama ikut tercakup.
+     * Tindakan (POST/PUT/DELETE) yang tetap berfungsi bagi wali biasa. Dicocokkan lewat ALAMAT (seperti mode
+     * verifikasi), supaya rute tak bernama ikut tercakup.
      */
-    public const RUTE_TERBUKA = [
-        'wali', 'wali/beranda', 'wali/keluar', 'wali/bahasa',
-        'wali/akun', 'wali/akun/*', 'wali/sandi', 'wali/sandi/*',
+    public const TINDAKAN_TERBUKA = [
+        'wali/keluar', 'wali/bahasa', 'wali/menu',
+        'wali/akun/*', 'wali/sandi', 'wali/sandi/*', 'wali/pin/*',
         'wali/data', 'wali/data/*', 'wali/verifikasi', 'wali/verifikasi/*', 'wali/v', 'wali/v/*',
         'wali/anak/*/berkas', 'wali/berkas/*',
         'wali/daftar', 'wali/daftar-baru',
@@ -32,6 +35,11 @@ final class PortalTerbatas
 
     /** Kabar yang tetap dikirim ke wali biasa: hanya soal berkas & data. */
     public const JENIS_KABAR_TERBUKA = ['berkas_perlu_diganti', UbahDataWali::JENIS_NOTIF];
+
+    /** Status santri yang masih di alur PPSB — pembayaran tagihan PPSB-nya tetap berfungsi. */
+    public const STATUS_PPSB = [...\App\Models\Santri::CALON, 'siap_aktivasi'];
+
+    public const PERILAKU_PPSB = ['registrasi', 'uang_pangkal', 'perlengkapan'];
 
     public static function aktif(): bool
     {
@@ -53,38 +61,28 @@ final class PortalTerbatas
         return $idWali !== null && (bool) Wali::whereKey($idWali)->value('akun_uji');
     }
 
-    /** Status santri yang masih di alur PPSB — alurnya (termasuk bayar tagihan PPSB) tetap jalan. */
-    public const STATUS_PPSB = [...\App\Models\Santri::CALON, 'siap_aktivasi'];
-
-    public const PERILAKU_PPSB = ['registrasi', 'uang_pangkal', 'perlengkapan'];
-
-    /** Alamat ini boleh dibuka keluarga ini? (dipanggil middleware bila mode terbatas menyala) */
+    /** Permintaan ini boleh dijalankan keluarga ini? (dipanggil middleware bila mode terbatas menyala) */
     public static function alamatBoleh(\Illuminate\Http\Request $request, Wali $wali): bool
     {
-        if (self::bebas($wali) || $request->is(...self::RUTE_TERBUKA)) {
+        // Melihat selalu boleh — tampilan portal tetap lengkap.
+        if (self::bebas($wali) || $request->isMethodSafe() || $request->is(...self::TINDAKAN_TERBUKA)) {
             return true;
         }
-        $p = explode('/', trim($request->path(), '/'));
-        $id = (int) ($p[2] ?? 0);
-
-        // Pendaftaran PPSB tetap berjalan seperti biasa: halaman anak calon, kartu ujian, tagihan PPSB & pembayarannya.
-        if ($request->is('wali/anak/*', 'wali/anak/*/kartu-ujian')) {
-            return \App\Models\Santri::whereKey($id)->where('id_wali', $wali->id)->whereIn('status', self::STATUS_PPSB)->exists();
-        }
-        if ($request->is('wali/bayar/*', 'wali/bayar/*/transfer', 'wali/online/tagihan/*')) {
-            $id = (int) ($request->is('wali/online/tagihan/*') ? ($p[3] ?? 0) : $id);
+        // Alur PPSB: membayar tagihan PPSB calon santri (transfer / online) tetap berfungsi.
+        if ($request->is('wali/bayar/*/transfer', 'wali/online/tagihan/*')) {
+            $p = explode('/', trim($request->path(), '/'));
+            $id = (int) ($request->is('wali/online/tagihan/*') ? ($p[3] ?? 0) : ($p[2] ?? 0));
 
             return \App\Models\TagihanSantri::whereKey($id)->whereIn('perilaku', self::PERILAKU_PPSB)
                 ->whereHas('santri', fn ($s) => $s->where('id_wali', $wali->id)->whereIn('status', self::STATUS_PPSB))->exists();
         }
 
-        // Melihat/membatalkan pembayaran online & kuitansi yang SUDAH ada (hanya bisa lahir dari tagihan PPSB di atas).
-        // `wali/online/dompet` = isi dompet lewat online — tetap tertutup.
-        return ! $request->is('wali/online/dompet') && $request->is('wali/online/*', 'wali/receipt/*');
+        // Membatalkan pembayaran online yang SUDAH ada (lahir dari tagihan PPSB di atas) tetap boleh.
+        return $request->is('wali/online/*/batal');
     }
 
     public static function pesan(): string
     {
-        return __('Fitur ini belum dibuka — aplikasi masih versi demo. Saat ini Anda bisa memperbarui data keluarga dan mengunggah berkas santri.');
+        return __('Fitur ini belum bisa digunakan — aplikasi masih versi demo. Saat ini Anda bisa memperbarui data keluarga dan mengunggah berkas santri.');
     }
 }

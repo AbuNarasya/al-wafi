@@ -1,10 +1,7 @@
 @extends('layouts.portal')
 
 @section('title', __('Berkas Pendaftaran'))
-{{-- Mode terbatas (12 Nov 2026): halaman anak santri aktif tertutup → kembali ke beranda. --}}
-@section('kembali', \App\Services\PortalWali\PortalTerbatas::bebas(\App\Services\PortalWali\SesiWali::wali())
-    || in_array($santri->status, \App\Services\PortalWali\PortalTerbatas::STATUS_PPSB, true)
-    ? route('portal.anak', $santri->id) : route('portal.beranda'))
+@section('kembali', route('portal.anak', $santri->id))
 
 @php
     $perKelompok = collect($daftar)->groupBy('kelompok');

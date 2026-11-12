@@ -237,18 +237,6 @@ class PortalWaliController extends Controller
         $wali = SesiWali::wali();
         $peran = SesiWali::peran($request);
 
-        // Mode terbatas masa uji coba (12 Nov 2026): beranda ringkas — per anak hanya Data & Berkas (+ alur PPSB).
-        if (! \App\Services\PortalWali\PortalTerbatas::bebas($wali)) {
-            return view('portal.beranda-terbatas', [
-                'nama' => $wali->{"nama_{$peran}"} ?: $wali->nama,
-                'anak' => Santri::with('jenjang:kode,nama')->where('id_wali', $wali->id)
-                    ->whereNotIn('status', ['keluar', 'alumni', 'mengundurkan_diri', 'tidak_lulus', 'gagal_medcheck'])->orderBy('nama')->get()
-                    ->map(fn (Santri $s) => ['id' => $s->id, 'nama' => $s->nama, 'jenjang' => $s->jenjang?->nama ?? $s->kode_jenjang,
-                        'label' => \App\Support\BahasaPortal::statusSantri((string) $s->status),
-                        'ppsb' => in_array($s->status, \App\Services\PortalWali\PortalTerbatas::STATUS_PPSB, true)]),
-            ]);
-        }
-
         $kuotaLaundry = $monitorLaundry = null;
         $anak = Santri::with(['jenjang:kode,nama', 'kelas:id,nama', 'tagihan' => fn ($q) => $q->where('perilaku', 'registrasi')
             ->whereNotIn('status', ['batal', 'dihapus'])])

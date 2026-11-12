@@ -46,21 +46,27 @@ class PortalModeTerbatasTest extends TestCase
         return $this->actingAs($this->wali, 'wali')->withSession(['portal.peran' => 'ibu', 'portal.punya_sandi' => true]);
     }
 
-    public function test_wali_biasa_hanya_data_berkas_akun_dan_alur_ppsb(): void
+    /** Koreksi user 12 Nov 2026: tampilan & menu LENGKAP dan bisa dibuka; hanya TINDAKANNYA yang dikunci. */
+    public function test_semua_halaman_bisa_dibuka_tetapi_tindakan_dikunci(): void
     {
-        $this->sebagaiIbu()->get(route('portal.beranda'))->assertOk()
-            ->assertSee('data-anak="'.$this->aktif->id.'"', false)->assertSee(route('portal.berkas', $this->aktif->id), false)
-            ->assertDontSee(route('portal.tagihan'), false)->assertDontSee(route('portal.kabar'), false);
+        $this->sebagaiIbu()->get(route('portal.beranda'))->assertOk()->assertSee(route('portal.tagihan'), false)
+            ->assertSee('data-pita-demo', false)->assertSee('Semua menu bisa dilihat');
 
-        foreach ([route('portal.data'), route('portal.berkas', $this->aktif->id), route('portal.akun'), route('portal.anak', $this->calon->id)] as $url) {
+        foreach ([route('portal.tagihan'), route('portal.dompet'), route('portal.perizinan'), route('portal.kabar'), route('portal.akun'),
+            route('portal.anak', $this->aktif->id), route('portal.mundur', $this->aktif->id), route('portal.data'),
+            route('portal.berkas', $this->aktif->id)] as $url) {
             $this->sebagaiIbu()->get($url)->assertOk();
         }
-        foreach ([route('portal.tagihan'), route('portal.dompet'), route('portal.perizinan'), route('portal.kabar'),
-            route('portal.anak', $this->aktif->id), route('portal.mundur', $this->aktif->id), route('portal.pin')] as $url) {
-            $this->sebagaiIbu()->get($url)->assertRedirect(route('portal.beranda'))->assertSessionHas('error');
+
+        $pesan = \App\Services\PortalWali\PortalTerbatas::pesan();
+        foreach ([route('portal.online.dompet'), route('portal.perizinan.kirim'), route('portal.tarik_tunai.ajukan'),
+            route('portal.mundur.ajukan', $this->aktif->id), route('portal.dompet.tabungan')] as $url) {
+            $this->sebagaiIbu()->from(route('portal.tagihan'))->post($url)->assertRedirect(route('portal.tagihan'))->assertSessionHas('error', $pesan);
         }
-        $this->sebagaiIbu()->post(route('portal.online.dompet'))->assertRedirect(route('portal.beranda'));
-        $this->sebagaiIbu()->get(route('portal.akun'))->assertDontSee(route('portal.pin'), false);
+        // Asisten (fetch JSON) mendapat pesannya sendiri.
+        $this->sebagaiIbu()->postJson(route('portal.bantuan.tanya'), ['tanya' => 'halo'])->assertForbidden()->assertJson(['message' => $pesan]);
+        // Tindakan yang tetap berfungsi tidak dihadang (mis. ganti bahasa).
+        $this->sebagaiIbu()->post(route('portal.bahasa'), ['bahasa' => 'en'])->assertSessionMissing('error');
     }
 
     public function test_kabar_hanya_berkas_dan_data_kecuali_akun_uji(): void
@@ -88,13 +94,17 @@ class PortalModeTerbatasTest extends TestCase
         $this->assertTrue($this->wali->refresh()->akun_uji);
         $this->actingAs($admin)->get(route('wali.index'))->assertSee('AKUN UJI');
 
-        $this->sebagaiIbu()->get(route('portal.tagihan'))->assertOk();
-        $this->sebagaiIbu()->get(route('portal.anak', $this->aktif->id))->assertOk();
+        // Akun uji: tindakan tak dihadang middleware (pesan demo tak muncul).
+        $this->sebagaiIbu()->from(route('portal.tagihan'))->post(route('portal.online.dompet'))
+            ->assertSessionMissing('error', \App\Services\PortalWali\PortalTerbatas::pesan());
+        $this->assertNotSame(\App\Services\PortalWali\PortalTerbatas::pesan(), session('error'));
     }
 
     public function test_saklar_mati_semua_terbuka(): void
     {
         config(['portal.terbatas' => false]);
-        $this->sebagaiIbu()->get(route('portal.tagihan'))->assertOk();
+        $this->sebagaiIbu()->from(route('portal.tagihan'))->post(route('portal.perizinan.kirim'));
+        $this->assertNotSame(\App\Services\PortalWali\PortalTerbatas::pesan(), session('error'));
+        $this->sebagaiIbu()->get(route('portal.beranda'))->assertDontSee('Semua menu bisa dilihat');
     }
 }
