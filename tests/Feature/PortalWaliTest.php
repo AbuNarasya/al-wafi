@@ -212,7 +212,11 @@ class PortalWaliTest extends TestCase
 
     public function test_kirim_ulang_tanpa_email_menunggu_kembali_ke_masuk(): void
     {
-        $this->post(route('portal.kode.ulang'))->assertRedirect(route('portal.masuk'));
+        // 12 Nov 2026: tak lagi diam — wali diberi tahu sesinya habis.
+        $this->post(route('portal.kode.ulang'))->assertRedirect(route('portal.masuk'))
+            ->assertSessionHas('error', 'Sesi habis, masukkan email lagi.');
+        $this->post(route('portal.kode'), ['kode' => '123456'])->assertRedirect(route('portal.masuk'))
+            ->assertSessionHas('error', 'Sesi habis, masukkan email lagi.');
     }
 
     /** Mode uji dev.erp: kode tampil di layar HANYA bila saklar menyala DAN surel mode log. */
@@ -252,6 +256,23 @@ class PortalWaliTest extends TestCase
 
         $this->get(route('portal.daftar'))->assertOk()->assertSee('Data keluarga')->assertSee('baru@contoh.id')->assertSee('Patuh tata tertib.');
         $this->get(route('portal.beranda'))->assertRedirect(route('portal.masuk'));
+    }
+
+    /** 12 Nov 2026: pintu "wali terdaftar" & lupa password menolak email tak terdaftar SEBELUM kode dikirim. */
+    public function test_pintu_wali_terdaftar_dan_lupa_sandi_menolak_email_tak_terdaftar(): void
+    {
+        $pesan = 'Email yang Anda masukkan tidak terdaftar. Pastikan penulisan alamat email sudah benar.';
+        $this->keluarga();
+
+        foreach (['lewat_kode', 'lupa'] as $pintu) {
+            $this->from(route('portal.masuk'))->post(route('portal.masuk'), ['email' => 'hasan@contoh.con', $pintu => '1'])
+                ->assertRedirect(route('portal.masuk'))->assertSessionHas('error', $pesan);
+        }
+        Notification::assertNothingSent();
+
+        // Email terdaftar lewat pintu yang sama tetap dikirimi kode.
+        $this->post(route('portal.masuk'), ['email' => 'hasan@contoh.id', 'lewat_kode' => '1'])->assertRedirect(route('portal.kode'));
+        Notification::assertSentOnDemandTimes(KodeMasukWali::class, 1);
     }
 
     public function test_email_kembar_ditolak(): void

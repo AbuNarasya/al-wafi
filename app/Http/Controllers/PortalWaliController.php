@@ -88,9 +88,11 @@ class PortalWaliController extends Controller
     public function kirimKode(Request $request): RedirectResponse
     {
         $data = $request->validate(['email' => ['required', 'email', 'max:255'], 'lupa' => ['nullable', 'boolean']]);
+        // Pintu wali terdaftar & lupa password menolak email tak terdaftar; pintu daftar baru (PSB) tidak.
+        $wajibTerdaftar = $request->boolean('lewat_kode') || $request->boolean('lupa');
 
         try {
-            $kodeUji = $this->masuk->mintaKode($data['email'], 'masuk', $request->ip());
+            $kodeUji = $this->masuk->mintaKode($data['email'], 'masuk', $request->ip(), $wajibTerdaftar);
         } catch (AppException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
@@ -141,7 +143,8 @@ class PortalWaliController extends Controller
     {
         $email = $request->session()->get(SesiWali::MENUNGGU);
         if (! $email) {
-            return redirect()->route('portal.masuk');
+            // Dulu kembali ke halaman masuk TANPA pesan — wali mengira kodenya sudah dikirim ulang (12 Nov 2026).
+            return redirect()->route('portal.masuk')->with('error', __('Sesi habis, masukkan email lagi.'));
         }
         try {
             $kodeUji = $this->masuk->mintaKode($email, 'masuk', $request->ip());
@@ -156,7 +159,7 @@ class PortalWaliController extends Controller
     {
         $email = $request->session()->get(SesiWali::MENUNGGU);
         if (! $email) {
-            return redirect()->route('portal.masuk');
+            return redirect()->route('portal.masuk')->with('error', __('Sesi habis, masukkan email lagi.'));
         }
         $data = $request->validate(['kode' => ['required', 'string', 'max:10'], 'ingat' => ['nullable', 'boolean']]);
 

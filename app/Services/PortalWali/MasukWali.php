@@ -14,9 +14,10 @@ use Illuminate\Support\Facades\RateLimiter;
 /**
  * MASUK PORTAL WALI — email → kode 6 angka → masuk.
  *
- * SATU PINTU untuk masuk & mendaftar: kode dikirim ke email apa pun yang sah,
- * terdaftar atau tidak. Layar tak pernah mengatakan "email ini belum terdaftar"
- * sebelum kodenya benar — kalau tidak, portal bisa dipakai menebak email wali.
+ * Pintu daftar baru: kode dikirim ke email apa pun yang sah. Pintu "wali terdaftar,
+ * pertama kali masuk" & lupa password: email yang tak tercatat ditolak sebelum kode
+ * dikirim (keputusan user 12 Nov 2026 — membantu salah ketik; menebak email dibatasi
+ * jatah per IP). Masuk dengan password tetap tak pernah menyebut terdaftar atau tidak.
  * Sesudah kode benar barulah ditentukan: masuk, mendaftar, atau ditolak.
  *
  * Kode dikirim ke email yang DIKETIK, dan memasukkan kode yang benar adalah
@@ -60,7 +61,7 @@ class MasukWali
      *
      * @throws AppException
      */
-    public function mintaKode(string $email, string $tujuan, ?string $ip): ?string
+    public function mintaKode(string $email, string $tujuan, ?string $ip, bool $wajibTerdaftar = false): ?string
     {
         $email = self::normalEmail($email);
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -77,6 +78,12 @@ class MasukWali
                 throw new AppException(429, __('Terlalu banyak permintaan kode. Coba lagi dalam :menit menit.', ['menit' => $menit]));
             }
             RateLimiter::hit($kunci, $detik);
+        }
+        // Pintu "wali terdaftar" & lupa password (keputusan user 12 Nov 2026): email yang tak tercatat di keluarga mana pun
+        // ditolak SEBELUM kode dikirim, supaya salah ketik (gmail.con) langsung ketahuan. Diperiksa SESUDAH pembatas di atas,
+        // jadi menebak-nebak email tetap terhitung jatah per IP. Pintu daftar baru (PSB) tak memakai saklar ini.
+        if ($wajibTerdaftar && $this->cariKeluarga($email)['status'] === 'baru') {
+            throw new AppException(422, __('Email yang Anda masukkan tidak terdaftar. Pastikan penulisan alamat email sudah benar.'));
         }
 
         $kode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
