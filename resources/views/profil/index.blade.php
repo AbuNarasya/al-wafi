@@ -46,6 +46,12 @@
             @method('PUT')
 
             <h2 class="text-sm font-semibold text-gray-900">Ganti Kata Sandi</h2>
+            @if ($user->harus_ganti_sandi)
+                <p class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 ring-1 ring-amber-200">
+                    Kata sandi Anda dibuat oleh administrator. Isi <strong>Kata Sandi Lama</strong> dengan kata sandi dari administrator,
+                    lalu buat kata sandi Anda sendiri. Layar lain terbuka setelah ini disimpan.
+                </p>
+            @endif
 
             <x-field name="password_lama" label="Kata Sandi Lama" type="password" required />
 
@@ -60,6 +66,31 @@
                 <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
                     Simpan Kata Sandi
                 </button>
+            </div>
+        </form>
+
+        {{-- Email akun = tujuan tautan "Lupa kata sandi" (12 Nov 2026). Kata sandi akun wajib; alamat lama dikabari. --}}
+        <form method="POST" action="{{ route('profil.email') }}" data-no-confirm
+              class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            @csrf
+            @method('PUT')
+
+            <div>
+                <h2 class="text-sm font-semibold text-gray-900">Email untuk Lupa Kata Sandi</h2>
+                <p class="mt-1 text-xs text-gray-500">
+                    Bila lupa kata sandi, tautan untuk membuat kata sandi baru dikirim ke email ini.
+                    @if (! $user->email)<span class="font-semibold text-amber-700">Belum diisi — tanpa email, Anda harus meminta administrator mengganti kata sandi.</span>@endif
+                </p>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+                <x-field name="email" label="Email" type="email" :value="$user->email" />
+                <x-field name="password_akun_email" label="Kata Sandi Akun" type="password" required
+                         hint="Untuk memastikan ini memang Anda." />
+            </div>
+
+            <div class="flex items-center justify-end border-t border-gray-100 pt-4">
+                <button class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">Simpan Email</button>
             </div>
         </form>
 

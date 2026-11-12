@@ -26,8 +26,13 @@
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-field name="jabatan" label="Jabatan" :value="$user->jabatan" />
-                <x-field name="password" label="{{ $baru ? 'Kata Sandi' : 'Kata Sandi Baru' }}" type="password"
-                         :required="$baru" hint="{{ $baru ? 'Minimal 6 karakter.' : 'Kosongkan bila tidak diubah.' }}" />
+                <x-field name="password" label="{{ $baru ? 'Kata Sandi Sementara' : 'Kata Sandi Baru (sementara)' }}" type="password"
+                         :required="$baru" hint="{{ $baru ? 'Minimal 6 karakter. Pengguna wajib menggantinya sendiri saat pertama masuk.' : 'Kosongkan bila tidak diubah. Bila diisi, pengguna wajib menggantinya sendiri saat masuk berikutnya, dan semua perangkatnya dikeluarkan.' }}" />
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+                <x-field name="email" label="Email" type="email" :value="$user->email"
+                         hint="Tujuan tautan Lupa Kata Sandi. Satu email hanya untuk satu akun." />
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">

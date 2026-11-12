@@ -54,6 +54,43 @@ class ProfilController extends Controller
         return redirect()->route('profil.index')->with('status', 'PIN pengawas kasir tersimpan.');
     }
 
+    /**
+     * Email akun sendiri — tujuan tautan reset kata sandi (12 Nov 2026). Kata sandi akun wajib (sesi yang ditinggal
+     * terbuka tak cukup untuk membelokkan pemulihan akun), dan alamat LAMA diberi tahu.
+     */
+    public function ubahEmail(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'email' => ['nullable', 'email', 'max:255', function ($attr, $nilai, $gagal) use ($user) {
+                if (filled($nilai) && \App\Models\User::whereRaw('lower(email) = ?', [mb_strtolower(trim($nilai))])
+                    ->where('id_pengguna', '!=', $user->id_pengguna)->exists()) {
+                    $gagal('Email ini sudah dipakai akun lain.');
+                }
+            }],
+            'password_akun_email' => ['required', 'string', 'current_password'],
+        ], [
+            'password_akun_email.required' => 'Isi kata sandi akun Anda.',
+            'password_akun_email.current_password' => 'Kata sandi akun tidak cocok.',
+            'email.email' => 'Alamat email tidak sah.',
+        ]);
+
+        $lama = $user->email;
+        $baru = filled($data['email']) ? mb_strtolower(trim($data['email'])) : null;
+        if ($baru === ($lama === null ? null : mb_strtolower($lama))) {
+            return redirect()->route('profil.index')->with('status', 'Email tidak berubah.');
+        }
+        $user->update(['email' => $baru]);
+        \App\Support\Audit\Jejak::catat('ubah_email_akun', ['modul' => 'user', 'ref_jenis' => 'users', 'ref_id' => $user->id_pengguna,
+            'detail' => ['oleh' => 'sendiri', 'lama' => $lama, 'baru' => $baru]]);
+        if (filled($lama)) {
+            \App\Services\Modules\ResetSandiStafService::kabari($lama, 'Email akun diubah',
+                'Email akun Anda di aplikasi ini baru saja diubah menjadi '.($baru ?? '(kosong)').'. Tautan reset kata sandi kini dikirim ke alamat itu.', $user->username);
+        }
+
+        return redirect()->route('profil.index')->with('status', 'Email akun tersimpan.');
+    }
+
     public function ubahKataSandi(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -70,6 +107,8 @@ class ProfilController extends Controller
 
         $user = $request->user();
         $user->password_hash = Hash::make($data['password_baru']);
+        // Sandi sementara dari admin selesai digantikan sandi buatan sendiri (12 Nov 2026).
+        $user->harus_ganti_sandi = false;
         $user->save();
 
         // Kredensial berubah → id sesi diperbarui, tapi pengguna tetap masuk

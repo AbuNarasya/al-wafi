@@ -29,7 +29,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Rute yang tak berlaku di instans ini (Portal Wali di Wafi Mart, dst.) → 404.
         $middleware->web(append: [\App\Http\Middleware\SaklarInstans::class, \App\Http\Middleware\BahasaPortal::class,
             // Akun mitra kantin Wafi Mart hanya ke /mitra (9 Nov 2026).
-            \App\Http\Middleware\AkunMitra::class]);
+            \App\Http\Middleware\AkunMitra::class,
+            // Sandi buatan admin wajib diganti sendiri dulu (12 Nov 2026).
+            \App\Http\Middleware\WajibGantiSandi::class]);
 
         // Domain portal wali sendiri (config/portal.php): di sana hanya /wali/…; /wali/… di domain staf dialihkan.
         // Paling depan — pengalihan tak perlu membuka sesi.

@@ -20,6 +20,9 @@
         <form method="POST" action="{{ url('/login') }}" data-no-confirm class="space-y-4 rounded-xl bg-white p-6 shadow-xl">
             @csrf
 
+            @if (session('status'))
+                <div class="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ session('status') }}</div>
+            @endif
             @if ($errors->any())
                 <div class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                     {{ $errors->first() }}
@@ -46,10 +49,13 @@
                 </div>
             </div>
 
-            <label class="flex items-center gap-2 text-sm text-gray-600">
-                <input type="checkbox" name="remember" class="rounded border-gray-300 text-brand focus:ring-brand">
-                Ingat saya
-            </label>
+            <div class="flex items-center justify-between gap-2">
+                <label class="flex items-center gap-2 text-sm text-gray-600">
+                    <input type="checkbox" name="remember" class="rounded border-gray-300 text-brand focus:ring-brand">
+                    Ingat saya
+                </label>
+                <a href="{{ route('sandi_staf.lupa') }}" class="text-sm text-brand hover:underline">Lupa kata sandi?</a>
+            </div>
 
             <button type="submit"
                     class="w-full rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">

@@ -7,6 +7,8 @@ use App\Models\Bagian;
 use App\Models\Level;
 use App\Models\LevelPengajuan;
 use App\Models\User;
+use App\Services\Modules\ResetSandiStafService;
+use App\Support\Audit\Jejak;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -50,6 +52,8 @@ class UserController extends Controller
         $data['tim_keuangan'] = $request->boolean('tim_keuangan');
 
         $user = User::create($data);
+        // Sandi buatan admin hanya sementara: wajib diganti sendiri saat pertama masuk (12 Nov 2026).
+        $user->forceFill(['harus_ganti_sandi' => true])->save();
 
         // Akun baru belum punya satu baris pun di matriks — artinya ia belum
         // bisa membuka apa pun. Admin langsung dibawa ke matriksnya supaya
@@ -74,13 +78,34 @@ class UserController extends Controller
     {
         $data = $request->safe()->except('password');
         $data['tim_keuangan'] = $request->boolean('tim_keuangan');
-        if ($request->filled('password')) {
-            $data['password_hash'] = Hash::make($request->input('password'));
-        }
+        $emailLama = $user->email;
 
         $user->update($data);
 
-        return redirect()->route('users.index')->with('status', 'Pengguna berhasil diperbarui.');
+        $pesan = 'Pengguna berhasil diperbarui.';
+        if ($request->filled('password')) {
+            // Jejak + sesi akun itu gugur + wajib ganti sendiri saat masuk berikutnya (12 Nov 2026). Mengganti
+            // sandi akun SENDIRI lewat layar ini tak mewajibkan ganti lagi & tak mengeluarkan sesi ini.
+            $sendiri = $user->id_pengguna === Auth::id();
+            if ($sendiri) {
+                $user->forceFill(['password_hash' => Hash::make($request->input('password'))])->save();
+            } else {
+                ResetSandiStafService::gantiSandi($user, (string) $request->input('password'), true);
+                $pesan = "Pengguna diperbarui. Kata sandi {$user->username} diganti — ia wajib membuat kata sandinya sendiri saat masuk berikutnya, dan semua perangkatnya sudah dikeluarkan.";
+            }
+            Jejak::catat('ganti_sandi_oleh_admin', ['modul' => 'user', 'ref_jenis' => 'users', 'ref_id' => $user->id_pengguna,
+                'detail' => ['username' => $user->username, 'akun_sendiri' => $sendiri]]);
+        }
+        if ($emailLama !== $user->email) {
+            Jejak::catat('ubah_email_akun', ['modul' => 'user', 'ref_jenis' => 'users', 'ref_id' => $user->id_pengguna,
+                'detail' => ['oleh' => 'admin', 'username' => $user->username, 'lama' => $emailLama, 'baru' => $user->email]]);
+            if (filled($emailLama)) {
+                ResetSandiStafService::kabari($emailLama, 'Email akun diubah', 'Administrator mengubah email akun Anda menjadi '
+                    .($user->email ?? '(kosong)').'. Tautan reset kata sandi kini dikirim ke alamat itu.', $user->username);
+            }
+        }
+
+        return redirect()->route('users.index')->with('status', $pesan);
     }
 
     public function destroy(User $user): RedirectResponse

@@ -41,7 +41,17 @@
                                 <span class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">ADMIN</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3">{{ $u->nama }}<div class="text-xs text-gray-400">{{ $u->jabatan }}</div></td>
+                        <td class="px-4 py-3">{{ $u->nama }}<div class="text-xs text-gray-400">{{ $u->jabatan }}</div>
+                            {{-- Email = tujuan tautan Lupa Kata Sandi (12 Nov 2026). --}}
+                            @if ($u->email)
+                                <div class="text-xs text-gray-500">{{ $u->email }}</div>
+                            @else
+                                <div class="text-xs text-amber-700">Belum ada email</div>
+                            @endif
+                            @if ($u->harus_ganti_sandi)
+                                <div class="text-xs text-amber-700">Wajib ganti kata sandi</div>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-gray-600">{{ $u->level?->nama_level ?? $u->kode_level }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ $u->bagian?->nama_bagian ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-600">{{ $u->levelPengajuan?->nama ?? '—' }}</td>

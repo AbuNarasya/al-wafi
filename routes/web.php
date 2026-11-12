@@ -130,6 +130,13 @@ if (! function_exists('crudModul')) {
 Route::get('/login', [LoginController::class, 'showLogin'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:10,1');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+// Lupa kata sandi staf lewat email (12 Nov 2026) — ResetSandiStafService.
+Route::name('sandi_staf.')->controller(\App\Http\Controllers\Auth\LupaSandiController::class)->group(function () {
+    Route::get('/lupa-sandi', 'form')->name('lupa');
+    Route::post('/lupa-sandi', 'kirim')->name('kirim')->middleware('throttle:10,1');
+    Route::get('/reset-sandi/{token}', 'formReset')->name('reset')->where('token', '[A-Za-z0-9]{64}');
+    Route::post('/reset-sandi/{token}', 'simpan')->name('simpan')->where('token', '[A-Za-z0-9]{64}')->middleware('throttle:10,1');
+});
 
 // ---- Cek keaslian dokumen (publik, tanpa login) — 11 Nov 2026 ----
 // Berita acara clearance pengunduran diri: QR di PDF membuka /cek-dokumen/clearance/{nomor}/{kode}.
@@ -423,6 +430,9 @@ Route::middleware('auth')->group(function () {
     Route::put('/profil/kata-sandi', [ProfilController::class, 'ubahKataSandi'])
         ->middleware('throttle:10,1')
         ->name('profil.kata_sandi');
+    Route::put('/profil/email', [ProfilController::class, 'ubahEmail'])
+        ->middleware('throttle:10,1')
+        ->name('profil.email');
     Route::put('/profil/pin-pengawas', [ProfilController::class, 'setelPinPengawas'])
         ->middleware('throttle:10,1')
         ->name('profil.pin_pengawas');

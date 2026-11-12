@@ -32,10 +32,14 @@ class User extends Authenticatable
         'status',
         // Akun MITRA kantin Wafi Mart (9 Nov 2026): hanya bisa membuka /mitra miliknya — middleware AkunMitra.
         'id_mitra',
+        // Tujuan tautan reset kata sandi (12 Nov 2026). `harus_ganti_sandi` sengaja TIDAK fillable — diubah lewat
+        // ResetSandiStafService::gantiSandi / Profil saja.
+        'email',
     ];
 
     protected $hidden = [
         'password_hash',
+        'remember_token',
     ];
 
     protected function casts(): array
@@ -43,6 +47,7 @@ class User extends Authenticatable
         return [
             'is_admin' => 'boolean',
             'tim_keuangan' => 'boolean',
+            'harus_ganti_sandi' => 'boolean',
         ];
     }
 

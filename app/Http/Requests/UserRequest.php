@@ -28,6 +28,13 @@ class UserRequest extends FormRequest
             'username' => ['required', 'string', 'min:3', 'max:255', Rule::unique('users', 'username')->ignore($id, 'id_pengguna')],
             'nama' => ['required', 'string', 'max:255'],
             'jabatan' => ['nullable', 'string', 'max:255'],
+            // Tujuan tautan reset kata sandi (12 Nov 2026); unik tanpa membedakan huruf besar (indeks users_email_unik).
+            'email' => ['nullable', 'email', 'max:255', function ($attr, $nilai, $gagal) use ($id) {
+                if (filled($nilai) && \App\Models\User::whereRaw('lower(email) = ?', [mb_strtolower(trim($nilai))])
+                    ->when($id, fn ($q) => $q->where('id_pengguna', '!=', $id))->exists()) {
+                    $gagal('Email ini sudah dipakai akun lain.');
+                }
+            }],
             'password' => $isCreate ? ['required', 'string', 'min:6'] : ['nullable', 'string', 'min:6'],
             'kode_level' => ['required', 'string', Rule::exists('levels', 'kode_level')],
             'kode_bagian' => ['nullable', 'string', Rule::exists('bagian', 'kode_bagian')],
@@ -43,6 +50,7 @@ class UserRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $this->merge(['email' => filled($this->input('email')) ? mb_strtolower(trim((string) $this->input('email'))) : null]);
         if ($this->input('kode_bagian') === '') {
             $this->merge(['kode_bagian' => null]);
         }
