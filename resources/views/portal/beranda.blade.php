@@ -11,6 +11,21 @@
         <p class="text-sm text-slate-500">{{ now()->locale(app()->getLocale())->translatedFormat('l, j F Y') }}</p>
     </div>
 
+    {{-- 12 Nov 2026: langganan notifikasi pindah ke pekerja layanan berlingkup /wali/ — wali yang dulu sudah
+         menyalakan notifikasi di HP ini diajak menyalakannya ulang (lihat ajakanPushUlang di app.js). --}}
+    <div x-data="ajakanPushUlang()" x-show="tampil" x-cloak
+         class="mt-4 flex items-start gap-3 rounded-3xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700"><x-portal.ikon nama="lonceng" kelas="h-5 w-5" /></span>
+        <div class="min-w-0 flex-1">
+            <p class="font-semibold">{{ __('Nyalakan ulang notifikasi') }}</p>
+            <p class="mt-0.5 text-xs">{{ __('Notifikasi portal diperbarui. Nyalakan sekali lagi di HP ini supaya kabar tetap masuk.') }}</p>
+            <div class="mt-2 flex items-center gap-4">
+                <a href="{{ route('portal.akun') }}" class="rounded-full bg-amber-600 px-3 py-1.5 text-xs font-bold text-white">{{ __('Nyalakan') }}</a>
+                <button type="button" @click="nanti()" class="text-xs font-semibold text-amber-800">{{ __('Nanti') }}</button>
+            </div>
+        </div>
+    </div>
+
     {{-- Kartu sorotan: status tagihan & saldo dompet BERDAMPINGAN. Bila hanya satu
          yang ada (keluarga calon belum berdompet), kartunya selebar layar. --}}
     @php $berdua = $adaTagihan && $saldoDompet !== null; @endphp

@@ -58,7 +58,7 @@
     <section class="mt-5">
         <h2 class="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800"><span class="h-4 w-1 rounded-full bg-brand"></span> {{ __('Notifikasi') }}</h2>
         <div class="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200"
-             x-data="pushLangganan({ kunciPublik: @js($pushKunci), url: @js(route('portal.push.langganan')) })">
+             x-data="pushLangganan({ kunciPublik: @js($pushKunci), url: @js(route('portal.push.langganan')), lingkup: '/wali/' })">
             <div class="flex items-center gap-3">
                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"><x-portal.ikon nama="lonceng" kelas="h-5 w-5" /></span>
                 <div class="min-w-0 flex-1 text-sm">

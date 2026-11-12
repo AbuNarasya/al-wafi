@@ -688,7 +688,101 @@ window.inputRupiah = function ({ value = '' } = {}) {
  * di sebagian peramban penolakan semacam itu dihitung sebagai "ditolak pengguna"
  * — sekali terjadi, tombolnya tak akan pernah berhasil lagi.
  */
-window.pushLangganan = function ({ kunciPublik = '', url = '' } = {}) {
+/**
+ * Pendaftaran pekerja layanan tempat langganan push dibuat.
+ *
+ * Tanpa `lingkup` (ERP staf): pendaftaran yang menguasai halaman ini ("/").
+ * Dengan `lingkup` (portal wali, "/wali/" — 12 Nov 2026): pendaftaran BERLINGKUP ITU, dibuat bila belum ada.
+ * Chrome Android menyerahkan notifikasi ke aplikasi terpasang (WebAPK) hanya bila lingkup pekerja layanannya
+ * berada di dalam scope manifest aplikasi itu. Manifest wali ber-scope /wali/, jadi langganan yang dibuat dari
+ * pekerja berlingkup "/" tampil atas nama Chrome dan ikon "SANAD Wali" tak pernah mendapat angka.
+ */
+async function pendaftaranPush(lingkup = '') {
+    if (! lingkup) {
+        return navigator.serviceWorker.ready;
+    }
+
+    let reg = await navigator.serviceWorker.getRegistration(lingkup);
+    // getRegistration mengembalikan pendaftaran yang MENGUASAI alamat itu — bisa jadi yang berlingkup "/".
+    if (! reg || new URL(reg.scope).pathname !== lingkup) {
+        reg = await navigator.serviceWorker.register('/sw.js?sw=5', { scope: lingkup });
+    }
+    if (reg.active) {
+        return reg;
+    }
+    const pekerja = reg.installing || reg.waiting;
+    await new Promise((selesai) => {
+        if (! pekerja) {
+            return selesai();
+        }
+        pekerja.addEventListener('statechange', () => pekerja.state === 'activated' && selesai());
+    });
+
+    return reg;
+}
+
+/**
+ * Langganan wali LAMA (dibuat dari pekerja berlingkup "/" sebelum 12 Nov 2026) dilepas dari SERVER, sekali per
+ * perangkat, supaya kabar tak terkirim dua kali (atas nama Chrome DAN atas nama aplikasi) setelah wali menyalakan
+ * ulang. Langganan di peramban sengaja TIDAK dibatalkan: di dev.erp staf & portal berbagi alamat, dan langganan
+ * yang sama bisa jadi milik akun staf di peramban itu. Server hanya menghapus baris milik wali yang sedang masuk.
+ */
+async function pindahkanPushLama(lingkup) {
+    const url = document.querySelector('meta[name="push-pindah"]')?.content;
+    if (! url) {
+        return;
+    }
+    const akar = await navigator.serviceWorker.getRegistration('/');
+    if (! akar || new URL(akar.scope).pathname === lingkup) {
+        return;
+    }
+    const lama = await akar.pushManager.getSubscription();
+    if (! lama) {
+        return;
+    }
+    try {
+        if (localStorage.getItem('push-wali-dipindah') === lama.endpoint) {
+            return;
+        }
+    } catch (e) { /* penyimpanan diblokir: kirim saja, server memaafkan pengulangan */ }
+
+    const r = await fetch(url, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' },
+        body: JSON.stringify({ endpoint: lama.endpoint }),
+    });
+    if (r.ok) {
+        try { localStorage.setItem('push-wali-dipindah', lama.endpoint); } catch (e) { /* abaikan */ }
+    }
+}
+
+/**
+ * Ajakan di beranda portal: izin notifikasi sudah pernah diberikan di perangkat ini, tetapi belum ada langganan
+ * di pekerja berlingkup /wali/ — wali yang menyalakan notifikasi sebelum 12 Nov 2026 perlu menyalakannya ulang.
+ * Tak muncul bila wali sendiri yang mematikannya, atau ia menekan "Nanti".
+ */
+window.ajakanPushUlang = function ({ lingkup = '/wali/' } = {}) {
+    return {
+        tampil: false,
+
+        async init() {
+            if (! ('serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window)) return;
+            if (Notification.permission !== 'granted') return;
+            try {
+                if (localStorage.getItem('push-wali-mati') || localStorage.getItem('push-wali-nanti')) return;
+            } catch (e) { /* abaikan */ }
+            const reg = await pendaftaranPush(lingkup).catch(() => null);
+            this.tampil = !! reg && ! (await reg.pushManager.getSubscription());
+        },
+
+        nanti() {
+            this.tampil = false;
+            try { localStorage.setItem('push-wali-nanti', '1'); } catch (e) { /* abaikan */ }
+        },
+    };
+};
+
+window.pushLangganan = function ({ kunciPublik = '', url = '', lingkup = '' } = {}) {
     return {
         didukung: false,
         aktif: false,
@@ -723,7 +817,7 @@ window.pushLangganan = function ({ kunciPublik = '', url = '' } = {}) {
                 this.halangan = 'Izin notifikasi pernah ditolak di perangkat ini. Pulihkan lewat pengaturan situs di peramban — dari dalam aplikasi tak bisa.';
             }
 
-            const reg = await navigator.serviceWorker.ready.catch(() => null);
+            const reg = await pendaftaranPush(lingkup).catch(() => null);
             this.aktif = !! (reg && await reg.pushManager.getSubscription());
         },
 
@@ -745,7 +839,7 @@ window.pushLangganan = function ({ kunciPublik = '', url = '' } = {}) {
                 }
 
                 langkah = 'menunggu pekerja layanan siap';
-                const reg = await navigator.serviceWorker.ready;
+                const reg = await pendaftaranPush(lingkup);
 
                 langkah = 'mendaftar ke layanan push';
                 const langganan = await reg.pushManager.subscribe({
@@ -774,6 +868,9 @@ window.pushLangganan = function ({ kunciPublik = '', url = '' } = {}) {
 
                 this.aktif = true;
                 this.halangan = '';
+                if (lingkup) {
+                    try { localStorage.removeItem('push-wali-mati'); } catch (e) { /* abaikan */ }
+                }
                 this.pesan = 'Notifikasi dinyalakan untuk perangkat ini (' + (j.perangkat || 'perangkat ini') + ').';
             } catch (e) {
                 // Nama DAN kalimat galatnya ikut ditampilkan. Keduanya berbeda
@@ -794,7 +891,7 @@ window.pushLangganan = function ({ kunciPublik = '', url = '' } = {}) {
             this.pesan = '';
 
             try {
-                const reg = await navigator.serviceWorker.ready;
+                const reg = await pendaftaranPush(lingkup);
                 const langganan = await reg.pushManager.getSubscription();
 
                 if (langganan) {
@@ -808,6 +905,9 @@ window.pushLangganan = function ({ kunciPublik = '', url = '' } = {}) {
 
                 this.aktif = false;
                 this.pesan = 'Notifikasi dimatikan untuk perangkat ini.';
+                if (lingkup) {
+                    try { localStorage.setItem('push-wali-mati', '1'); } catch (e) { /* abaikan */ }
+                }
             } finally {
                 this.sibuk = false;
             }
@@ -1227,6 +1327,12 @@ Alpine.start();
         // kelak ada salinan basi lagi yang perlu dilangkahi — bukan tiap deploy,
         // karena `no-cache` sudah menjaga kesegarannya.
         navigator.serviceWorker.register('/sw.js?sw=5').catch(() => {});
+
+        // Portal wali: pekerja layanan kedua berlingkup /wali/ — lihat `pendaftaranPush`.
+        const lingkup = document.querySelector('meta[name="pwa-lingkup"]')?.content;
+        if (lingkup) {
+            pendaftaranPush(lingkup).then(() => pindahkanPushLama(lingkup)).catch(() => {});
+        }
     });
 
     // Ajakan memasang. Peramban menahan tawarannya sampai syaratnya terpenuhi,

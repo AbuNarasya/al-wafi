@@ -40,6 +40,14 @@
          Manifest sendiri → terpasang sebagai aplikasi "SANAD Wali". --}}
     {{-- Portal Wali = aplikasi "SANAD Wali" (10 Nov 2026): ikon & nama sendiri, terpisah dari ERP staf. --}}
     <x-kepala-pwa manifest="/manifest-wali.json" judul="SANAD Wali" ikon-apple="/ikon/wali-apple-touch-icon.png?v=1" />
+    {{-- 12 Nov 2026: pekerja layanan SENDIRI berlingkup /wali/ (= scope manifest). Chrome Android hanya menyerahkan
+         notifikasi ke aplikasi terpasang bila lingkup pekerja layanannya di dalam scope aplikasi; dengan pekerja
+         berlingkup "/" notifikasi wali tampil atas nama Chrome & ikon "SANAD Wali" tak pernah berangka. --}}
+    <meta name="pwa-lingkup" content="/wali/">
+    @if ($masuk && ! $verifikasi)
+        {{-- Langganan lama (pekerja berlingkup "/") dilepas dari server sekali per perangkat — lihat app.js. --}}
+        <meta name="push-pindah" content="{{ route('portal.push.langganan') }}">
+    @endif
     <link rel="icon" type="image/png" href="/ikon/wali-any-192.png?v=2">
 
     {{-- Mode gelap per perangkat (pilihan di Akun; kosong = ikut setelan HP). Dipasang
