@@ -16,6 +16,18 @@ export default defineConfig({
         }),
         tailwindcss(),
     ],
+    build: {
+        rollupOptions: {
+            output: {
+                // Worker PDF (pdf.worker.min.mjs) dikeluarkan ber-akhiran .js (13 Nov 2026): nginx VPS mengirim .mjs
+                // sebagai application/octet-stream, dan browser MENOLAK modul ber-MIME itu → pratinjau PDF gagal
+                // ("Setting up fake worker failed"). .js selalu dikirim sebagai JavaScript di server mana pun.
+                assetFileNames: (aset) => ((aset.names?.[0] ?? aset.name ?? '').endsWith('.mjs')
+                    ? 'assets/[name]-[hash].js'
+                    : 'assets/[name]-[hash][extname]'),
+            },
+        },
+    },
     server: {
         watch: {
             ignored: ['**/storage/framework/views/**'],
