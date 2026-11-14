@@ -153,6 +153,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-full bg-slate-100 text-slate-800 antialiased">
+@include('partials.pita-uji')
     {{-- LAYAR PEMBUKA SANAD Wali (10 Nov 2026). Layar pembuka bawaan Android hanya memuat warna, ikon & nama —
          keterangan kepanjangan SANAD ditampilkan di sini, tepat sesudahnya, dengan latar biru yang sama.
          Hanya saat dibuka sebagai APLIKASI dari layar utama HP (standalone), sekali per pembukaan; di peramban biasa

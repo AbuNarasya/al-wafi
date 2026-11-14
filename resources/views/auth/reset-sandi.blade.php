@@ -11,6 +11,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="flex h-full items-center justify-center bg-brand-dark p-4">
+@include('partials.pita-uji')
     <div class="w-full max-w-sm">
         <div class="mb-6 text-center">
             <x-logo class="mx-auto mb-3 h-20 w-20 rounded-2xl text-3xl" />

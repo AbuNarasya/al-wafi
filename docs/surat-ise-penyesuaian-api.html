@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Permintaan Penyesuaian API My Al Wafi untuk Integrasi ERP</title>
+<style>
+  @page { margin: 22mm 20mm 20mm 22mm; }
+  body { font-family: "DejaVu Serif", serif; font-size: 10.5pt; line-height: 1.5; color: #111; }
+  .kop { text-align: center; border-bottom: 3px double #1f2a44; padding-bottom: 8px; margin-bottom: 14px; }
+  .kop .y { font-size: 16pt; font-weight: bold; letter-spacing: 1px; }
+  .kop .s { font-size: 10pt; margin-top: 2px; }
+  .kop .a { font-size: 8pt; color: #444; margin-top: 2px; }
+  table.meta td { padding: 1px 0; vertical-align: top; }
+  table.meta td.k { width: 80px; }
+  .tgl { text-align: right; margin: 6px 0 12px; }
+  h2 { font-size: 10.5pt; margin: 14px 0 4px; }
+  h3 { font-size: 10.5pt; margin: 10px 0 2px; font-weight: bold; }
+  p { margin: 0 0 6px; text-align: justify; }
+  ol, ul { margin: 0 0 6px 0; padding-left: 18px; }
+  li { margin-bottom: 3px; text-align: justify; }
+  table.t { width: 100%; border-collapse: collapse; margin: 4px 0 8px; font-size: 9.5pt; }
+  table.t th, table.t td { border: 1px solid #888; padding: 4px 6px; vertical-align: top; text-align: left; }
+  table.t th { background: #eef0f4; }
+  code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.8pt; }
+  .ttd { margin-top: 26px; width: 100%; }
+  .ttd td { width: 50%; vertical-align: top; }
+  .kecil { font-size: 8.5pt; color: #444; }
+</style>
+</head>
+<body>
+
+<div class="kop">
+  <div class="y">YAYASAN AL SUDAIS INDONESIA</div>
+  <div class="s">AL WAFI ISLAMIC BOARDING SCHOOL</div>
+  <div class="a">Jl. Raya Pengasinan RT 003 RW 002, Kel. Pengasinan, Kec. Sawangan, Kota Depok, Jawa Barat 16518 · Telp. +628119153444</div>
+</div>
+
+<table class="meta">
+  <tr><td class="k">Nomor</td><td>: ........../ERP-AW/XI/2026</td></tr>
+  <tr><td class="k">Lampiran</td><td>: –</td></tr>
+  <tr><td class="k">Perihal</td><td>: <b>Permintaan Penyesuaian API My Al Wafi untuk Integrasi ERP</b></td></tr>
+</table>
+
+<div class="tgl">Depok, 13 November 2026</div>
+
+<p>Yth. Administrator Sistem<br>Sistem Informasi Al Wafi (my.al-wafi.sch.id)<br>di tempat</p>
+
+<p>Dengan hormat,</p>
+
+<p>Terima kasih atas dokumentasi <b>API Histori Siswa</b> (No. 001/AWS/API/XI/2026) dan <b>API Update Data Santri</b> (No. 002/AWS/API/XI/2026). Setelah kami pelajari, kami bermaksud menghubungkan ERP Al Wafi (erp.al-wafi.sch.id) dengan My Al Wafi secara otomatis. Agar hubungan ini aman dan tidak menimbulkan data ganda, kami mohon beberapa penyesuaian sebagaimana diuraikan di bawah ini.</p>
+
+<h2>1. Pembagian peran yang kami usulkan</h2>
+<table class="t">
+  <tr><th style="width:34%">Data</th><th style="width:22%">Sumber utama</th><th>Arah</th></tr>
+  <tr><td>Biodata santri, status, jenjang, kelas</td><td>ERP</td><td>ERP mengirim ke My Al Wafi setiap ada perubahan (API Update Data Santri)</td></tr>
+  <tr><td>Absensi, penilaian, rapor, halaqah, ekskul, sertifikat, asrama, dll.</td><td>My Al Wafi</td><td>Portal Wali di ERP membaca langsung (API Histori Siswa), tanpa disimpan di ERP</td></tr>
+  <tr><td>Data wali / orang tua</td><td>ERP</td><td>Tidak dikirim. Pembatasan wali hanya melihat anaknya dilakukan di ERP.</td></tr>
+  <tr><td>Keuangan santri (dompet, saldo)</td><td>ERP</td><td>Mini bank My Al Wafi tidak digunakan.</td></tr>
+  <tr><td>Kartu RFID santri</td><td>ERP</td><td>ERP mengirim nomor kartu ke My Al Wafi hanya untuk keperluan absensi.</td></tr>
+</table>
+<p>Dengan pembagian ini, biodata santri di My Al Wafi mohon tidak lagi diubah langsung dari layar My Al Wafi, karena akan tertimpa oleh kiriman ERP berikutnya. Bila memungkinkan, isian biodata di layar My Al Wafi dikunci (hanya baca).</p>
+
+<h2>2. Penyesuaian yang kami mohon</h2>
+
+<h3>A. Penanda tetap santri (<code>id_erp</code>)</h3>
+<p>NIS di ERP diterbitkan ulang setiap kali santri masuk jenjang baru, sehingga NIS tidak dapat dijadikan satu-satunya penanda. Kami mohon:</p>
+<ol>
+  <li>Kolom baru <code>id_erp</code> (bilangan bulat, unik) pada data santri My Al Wafi.</li>
+  <li>Seluruh endpoint (biodata, kelas, RFID, dan histori) dapat mencari santri berdasarkan <code>id_erp</code>, selain NIS.</li>
+  <li><code>POST /santri/baru</code> yang membawa <code>id_erp</code> yang sudah ada <b>memperbarui</b> santri tersebut, bukan membuat santri baru. Ini mencegah data ganda bila kiriman diulang karena gangguan jaringan.</li>
+  <li>Perubahan NIS cukup dengan mengirim <code>id_erp</code> + <code>nis</code> baru. Mohon konfirmasi bahwa histori lama (absensi, nilai, dll.) tetap melekat pada santri yang sama dan tetap muncul saat dibaca dengan NIS baru atau <code>id_erp</code>.</li>
+</ol>
+
+<h3>B. Keamanan API key</h3>
+<ol>
+  <li><b>Dua kunci terpisah</b>: satu khusus <b>baca</b> (API Histori), satu khusus <b>ubah</b> (API Update Data Santri).</li>
+  <li>Kunci hanya berlaku dari alamat IP server ERP: <code>31.97.108.145</code>.</li>
+  <li>Bentuk <code>?api_key=</code> pada alamat dinonaktifkan; kunci hanya melalui header <code>X-Api-Key</code>, agar tidak tercatat di log.</li>
+  <li>Kunci diserahkan melalui jalur pribadi kepada pengelola ERP, tidak melalui grup percakapan.</li>
+  <li>Bila tersedia, mohon lingkungan uji (sandbox) beserta kunci ujinya, agar pengujian tidak menyentuh data sungguhan.</li>
+</ol>
+
+<h3>C. Status dan jenjang</h3>
+<ol>
+  <li>ERP hanya akan mengirim status <code>aktif</code> atau <code>alumni</code> (santri yang lulus atau keluar dikirim sebagai <code>alumni</code>), agar daftar kelas dan absensi di My Al Wafi tidak memuat santri yang sudah tidak belajar. Pemilahan status yang lebih rinci tetap di ERP.</li>
+  <li>Jenjang mengacu pada ERP. Mohon daftar kode jenjang yang berlaku di My Al Wafi (mis. SD, SMP, SMA) agar kami petakan dari kode ERP; atau, bila lebih mudah, My Al Wafi menerima kode jenjang ERP apa adanya.</li>
+</ol>
+
+<h3>D. Kelas</h3>
+<p>Nama kelas diinput oleh admin sekolah di ERP. Kami mohon:</p>
+<ol>
+  <li><code>POST /santri/kelas</code> mencari kelas berdasarkan <b><code>kode</code></b> (kode kelas ERP yang tetap), bukan nama. Bila nama kelas diganti di ERP, kelas yang sama di My Al Wafi ikut berganti nama, bukan membuat kelas baru, sehingga riwayat absensi dan nilai tidak terpecah.</li>
+  <li><code>tahun_ajaran</code> dapat dikirim dalam bentuk teks (mis. <code>2026/2027</code>), karena ERP tidak mengetahui ID tahun ajaran internal My Al Wafi.</li>
+  <li>Kesepakatan urutan pergantian tahun ajaran: kenaikan kelas di ERP biasanya dijalankan bulan Juni. Mohon arahan apakah tahun ajaran baru di My Al Wafi perlu dibuka lebih dulu, atau kiriman dengan <code>tahun_ajaran</code> eksplisit sudah cukup.</li>
+  <li>Penugasan wali kelas dan guru tetap diatur di My Al Wafi.</li>
+</ol>
+
+<h3>E. Asrama</h3>
+<p>Data asrama dan kamar tetap dikelola di My Al Wafi. ERP tidak akan mengirim <code>dormitory_id</code>. Portal Wali membaca kamar terkini dari histori <code>mutasi-asrama</code>.</p>
+
+<h3>F. Wali</h3>
+<p><code>POST /santri/wali</code> tidak akan digunakan. Bila My Al Wafi memiliki fitur atau akun untuk orang tua, mohon tidak digunakan untuk wali, agar wali hanya memakai satu aplikasi (Portal Wali) dengan data yang selalu sama.</p>
+
+<h3>G. Mini bank dan kartu RFID</h3>
+<p>Mini bank My Al Wafi tidak digunakan; seluruh keuangan santri dikelola di ERP. Namun absen harian My Al Wafi memakai kartu RFID, sementara nomor RFID saat ini disimpan pada akun mini bank. Kami mohon:</p>
+<ol>
+  <li>Endpoint terpisah, misalnya <code>POST /santri/rfid</code> (<code>id_erp</code>/<code>nis</code>, <code>rfid</code>), yang hanya menyimpan nomor kartu untuk absensi, tanpa membuat akun mini bank. Mengirim nomor baru menggantikan nomor lama (kartu hilang/diganti), dan mengirim nilai kosong menonaktifkan kartu.</li>
+  <li>Bila endpoint terpisah tidak memungkinkan, mohon konfirmasi bahwa <code>POST /santri/minibank</code> boleh dipakai semata untuk menyimpan nomor kartu, dengan fitur saldo mini bank dinonaktifkan.</li>
+</ol>
+
+<h3>H. Pemasangan data awal</h3>
+<p>My Al Wafi sudah berisi data santri. Sebelum pengiriman otomatis dinyalakan, setiap santri perlu dipasangkan satu kali dengan santri di ERP agar tidak tercipta data ganda. Kami mohon:</p>
+<ol>
+  <li>Daftar seluruh santri My Al Wafi (ID internal, NIS, NISN, nama, tanggal lahir, kelas) dalam bentuk berkas atau endpoint baca.</li>
+  <li>Cara mengisi <code>id_erp</code> untuk santri yang sudah ada (mis. melalui <code>POST /santri/biodata</code> berdasarkan NIS).</li>
+  <li>Santri yang tidak dapat dipasangkan akan kami kirimkan daftarnya untuk dibereskan bersama.</li>
+</ol>
+
+<h3>I. Kapasitas dan informasi lain</h3>
+<ol>
+  <li>Batas jumlah panggilan per menit yang diizinkan, karena pemasangan awal dan pengiriman ulang akan memanggil API satu kali per santri. Bila memungkinkan, endpoint kiriman massal (mis. hingga 100 santri per panggilan).</li>
+  <li>Contoh isi lengkap respons setiap area API Histori, agar kami dapat memilih kolom yang layak ditampilkan kepada wali (catatan internal staf tidak akan ditampilkan).</li>
+  <li>Apakah nilai pada <code>nilai-semester</code> dan <code>penilaian</code> sudah pasti final, atau ada penanda draf/terbit.</li>
+</ol>
+
+<h2>3. Penutup</h2>
+<p>Kami mohon tanggapan atas butir A sampai I beserta perkiraan waktu penyelesaiannya. Bagian yang memerlukan pembahasan dapat kita diskusikan bersama. Pengiriman otomatis dari ERP baru akan kami nyalakan setelah butir A, B, dan H selesai.</p>
+<p>Demikian permohonan ini kami sampaikan. Atas perhatian dan kerja samanya kami ucapkan terima kasih.</p>
+
+<table class="ttd">
+  <tr>
+    <td></td>
+    <td>
+      Depok, 13 November 2026<br>
+      Pengelola ERP Al Wafi<br><br><br><br>
+      ( ............................................. )
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

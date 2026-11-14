@@ -23,6 +23,10 @@ return [
     // & test (yang masih menguji kasir di instans bawaan) tak berubah; nyalakan di .env server.
     'wafimart_terpisah' => (bool) env('WAFIMART_TERPISAH', false),
 
+    // PITA INSTANS UJI (14 Nov 2026): teks yang tampil melayang di semua halaman staf, portal, & kasir — supaya
+    // instans uji ber-salinan data produksi (uji.erp.al-wafi.sch.id) tak tertukar dengan produksi. Kosong = tak tampil.
+    'pita_uji' => env('PITA_UJI', ''),
+
     'daftar' => [
         'alwafi' => [
             'nama' => 'Al Wafi ERP',

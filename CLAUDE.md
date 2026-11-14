@@ -25,6 +25,7 @@ npm run build                                   # wajib setelah menyunting app.j
 serve.bat                                       # jalankan server dev (port 8123)
 bash deploy/ke-dev.sh                           # kirim commit HEAD ke dev.erp (lihat di bawah)
 bash deploy/ke-vps.sh wafimart_dev              # Wafi Mart DEV di VPS (wafimart.erp.al-wafi.sch.id), sesudah ke-dev.sh
+bash deploy/ke-vps.sh erp_dev                   # ERP UJI di VPS (uji.erp.al-wafi.sch.id), sesudah ke-dev.sh
 bash deploy/ke-vps.sh erp main                  # ERP PRODUKSI — hanya saat user bilang "rilis"
 bash deploy/ke-vps.sh wafimart main             # Wafi Mart PRODUKSI — hanya saat user bilang "rilis"
 ```
@@ -33,8 +34,12 @@ bash deploy/ke-vps.sh wafimart main             # Wafi Mart PRODUKSI — hanya s
 DAN `bash deploy/ke-vps.sh wafimart main`.** Sejak 20 Okt 2026 erp.al-wafi.sch.id (produksi) berjalan di VPS mengikuti
 cabang `main` dan TIDAK ikut "commit"; Wafi Mart produksi (wafimart.al-wafi.sch.id) ikut `main` sejak 22 Okt 2026.
 
-**"Commit" dari user = commit LALU `bash deploy/ke-dev.sh` LALU `bash deploy/ke-vps.sh wafimart_dev`**
-(keputusan 14 Okt 2026; Wafi Mart dev terpisah sejak 22 Okt 2026). VPS = `ssh vps-alwafi` (deploy@31.97.108.145,
+**"Commit" dari user = commit LALU `bash deploy/ke-dev.sh` LALU `bash deploy/ke-vps.sh wafimart_dev` LALU
+`bash deploy/ke-vps.sh erp_dev`** (keputusan 14 Okt 2026; Wafi Mart dev terpisah sejak 22 Okt 2026; erp_dev sejak 14 Nov 2026).
+**erp_dev (uji.erp.al-wafi.sch.id)** = instans uji ERP di VPS untuk integrasi ISE (kunci ISE hanya berlaku dari IP VPS):
+salinan DB erp produksi 14 Nov (push/sesi/OTP/perangkat dikosongkan), seluruh situs ber-basic auth (kredensial di
+`~deploy/kredensial-erp_dev.txt`), MAIL=log, tanpa VAPID/Midtrans/AI/penghubung, OTP tampil di layar. Kirim ke ISE dari
+sini WAJIB dibatasi santri berawalan "UJI" (saklar `ISE_SINKRON=uji`). VPS = `ssh vps-alwafi` (deploy@31.97.108.145,
 akun Hostinger pemilik al-wafi.sch.id). Penghubung RFID: Wafi Mart DEV (`/var/www/wafimart_dev`, cabang `dev-coba`,
 salinan DB produksi 22 Okt) → dev.erp; Wafi Mart PRODUKSI (`/var/www/wafimart`) → erp produksi. ke-dev.sh: skripnya
 membangun aset, mem-push cabang kerja + menimpa paksa cabang `dev-coba`, mengirim `public/build`,

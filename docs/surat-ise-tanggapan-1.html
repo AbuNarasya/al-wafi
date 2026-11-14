@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Tanggapan atas Implementasi Integrasi ERP – My Al Wafi</title>
+<style>
+  @page { margin: 22mm 20mm 20mm 22mm; }
+  body { font-family: "DejaVu Serif", serif; font-size: 10.5pt; line-height: 1.5; color: #111; }
+  .kop { text-align: center; border-bottom: 3px double #1f2a44; padding-bottom: 8px; margin-bottom: 14px; }
+  .kop .y { font-size: 16pt; font-weight: bold; letter-spacing: 1px; }
+  .kop .s { font-size: 10pt; margin-top: 2px; }
+  .kop .a { font-size: 8pt; color: #444; margin-top: 2px; }
+  table.meta td { padding: 1px 0; vertical-align: top; }
+  table.meta td.k { width: 80px; }
+  .tgl { text-align: right; margin: 6px 0 12px; }
+  h2 { font-size: 10.5pt; margin: 14px 0 4px; }
+  h3 { font-size: 10.5pt; margin: 10px 0 2px; }
+  p { margin: 0 0 6px; text-align: justify; }
+  ol, ul { margin: 0 0 6px 0; padding-left: 18px; }
+  li { margin-bottom: 3px; text-align: justify; }
+  table.t { width: 100%; border-collapse: collapse; margin: 4px 0 8px; font-size: 9.5pt; }
+  table.t th, table.t td { border: 1px solid #888; padding: 4px 6px; vertical-align: top; text-align: left; }
+  table.t th { background: #eef0f4; }
+  code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.8pt; }
+  .ttd { margin-top: 26px; width: 100%; }
+  .ttd td { width: 50%; vertical-align: top; }
+</style>
+</head>
+<body>
+
+<div class="kop">
+  <div class="y">YAYASAN AL SUDAIS INDONESIA</div>
+  <div class="s">AL WAFI ISLAMIC BOARDING SCHOOL</div>
+  <div class="a">Jl. Raya Pengasinan RT 003 RW 002, Kel. Pengasinan, Kec. Sawangan, Kota Depok, Jawa Barat 16518 · Telp. +628119153444</div>
+</div>
+
+<table class="meta">
+  <tr><td class="k">Nomor</td><td>: ........../ERP-AW/XI/2026</td></tr>
+  <tr><td class="k">Lampiran</td><td>: –</td></tr>
+  <tr><td class="k">Perihal</td><td>: <b>Tanggapan atas Implementasi Integrasi ERP – My Al Wafi</b></td></tr>
+</table>
+
+<div class="tgl">Depok, 14 November 2026</div>
+
+<p>Yth. Administrator Sistem<br>Sistem Informasi Al Wafi (my.al-wafi.sch.id)<br>di tempat</p>
+
+<p>Dengan hormat,</p>
+
+<p>Terima kasih atas dokumen <b>Integrasi ERP ↔ My Al Wafi — Implementasi &amp; Konfirmasi</b> tertanggal 14 November 2026 dan atas penyelesaian yang sangat cepat. Kami telah mempelajarinya dan menyampaikan tanggapan sebagai berikut.</p>
+
+<h2>1. Yang kami terima dan setujui</h2>
+<table class="t">
+  <tr><th style="width:30%">Butir</th><th>Tanggapan</th></tr>
+  <tr><td>A. Penanda tetap <code>id_erp</code></td><td>Diterima, termasuk upsert <code>/santri/baru</code> dan konfirmasi histori tetap utuh saat NIS berganti (dengan satu catatan pada butir 2.D).</td></tr>
+  <tr><td>B. Keamanan</td><td>Diterima: kunci baca &amp; ubah terpisah, header saja, IP whitelist, dan batas laju. Kunci telah kami terima dan akan disimpan hanya di konfigurasi server ERP.</td></tr>
+  <tr><td>C. Kelas &amp; tahun ajaran</td><td>Diterima. ERP akan mengirim <code>kelas_kode</code> tetap dan <code>tahun_ajaran</code> berupa teks, dengan urutan biodata lalu kelas.</td></tr>
+  <tr><td>D. RFID</td><td>Diterima. ERP akan memakai <code>/santri/rfid</code>.</td></tr>
+  <tr><td>E. Kiriman massal</td><td>Diterima dan akan dipakai untuk pemasangan data awal.</td></tr>
+  <tr><td>H. Data awal</td><td>Diterima. Ekspor <code>santri-export</code> akan kami pakai untuk pemasangan <code>id_erp</code>.</td></tr>
+  <tr><td>Kode jenjang</td><td>ERP akan memetakan jenjangnya ke <code>SD</code>, <code>SMP</code>, <code>SMA</code>.</td></tr>
+  <tr><td>Status nilai</td><td>Dapat diterima. Flag draf/terbit belum diperlukan untuk saat ini.</td></tr>
+</table>
+
+<h2>2. Permohonan lanjutan</h2>
+
+<h3>A. Penguncian biodata ditunda sampai sinkron ERP aktif</h3>
+<p>Pengiriman otomatis dari ERP <b>belum kami nyalakan</b>. Bila biodata di My Al Wafi sudah dikunci sejak sekarang, staf tidak dapat membetulkan biodata atau menambah santri baru sampai sinkron ERP berjalan. Kami mohon penguncian form Edit Siswa (dan penambahan santri, bila ikut terkunci) <b>dibuka kembali untuk sementara</b>, lalu diaktifkan lagi pada tanggal yang akan kami beritahukan setelah pemasangan data awal selesai.</p>
+
+<h3>B. Fitur wali di My Al Wafi tetap berjalan</h3>
+<p>Fitur dan akun wali pada layar My Al Wafi mohon <b>tidak dimatikan</b> sampai Portal Wali ERP (SANAD Wali) resmi digunakan; kami akan memberitahukan waktunya secara tertulis. Penonaktifan <code>/santri/wali</code> di tingkat API tetap kami setujui. Mohon penautan wali secara manual di layar My Al Wafi tetap dapat dilakukan selama masa peralihan, karena santri baru dari ERP tidak membawa data wali.</p>
+
+<h3>C. Unduh berkas rapor dan sertifikat</h3>
+<p>Rapor ternyata tersimpan sebagai berkas PDF pada area <code>sertifikat</code>, sedangkan API saat ini hanya mengembalikan <code>file_path</code>. Kami mohon endpoint unduh berkas, misalnya:</p>
+<p style="margin-left:18px"><code>GET /histori/sertifikat/{id}/berkas?id_erp=…</code> (atau <code>nis</code>), memakai kunci baca,</p>
+<p>yang mengirim isi PDF hanya bila record tersebut milik santri yang dimaksud (404 bila bukan). Berkas tidak perlu dibuka ke alamat publik; ERP akan meneruskannya kepada wali setelah memeriksa kepemilikan.</p>
+
+<h3>D. Pencegahan tertimpanya santri lain</h3>
+<p>Pada <code>/santri/baru</code>, <code>/santri/bulk</code>, dan <code>/santri/biodata</code>: bila <code>id_erp</code> tidak ditemukan tetapi <code>nis</code> cocok dengan santri yang <b>sudah memiliki <code>id_erp</code> lain</b>, mohon permintaan ditolak (mis. <code>409 Conflict</code>) dan tidak memperbarui data. Pengisian <code>id_erp</code> melalui NIS hanya berlaku bagi santri yang <code>id_erp</code>-nya masih kosong.</p>
+
+<h3>E. Nama pada data histori</h3>
+<p>Beberapa area hanya mengembalikan ID, misalnya <code>dormitory_id</code> dan <code>attendance_type_id</code> pada absen asrama. Agar dapat ditampilkan kepada wali, mohon disertakan juga namanya (mis. <code>dormitory_name</code>, <code>attendance_type_name</code>) beserta arti setiap nilai <code>status</code> (mis. <code>present</code>). Hal yang sama untuk area lain yang memuat ID rujukan (kelas, ekskul, halaqah, event, kamar pada <code>mutasi-asrama</code>).</p>
+
+<h3>F. Penyelarasan dokumentasi</h3>
+<p>Bagian 2 dokumen (Referensi API Histori) masih menyebut <code>nis</code> wajib dan <code>?api_key=</code> diperbolehkan, berbeda dengan Bagian 1. Mohon konfirmasi bahwa API Histori menerima <code>id_erp</code> sebagai pengganti NIS, dan dokumentasinya diperbarui.</p>
+
+<h3>G. Pengujian dari server ERP dan santri uji</h3>
+<p>Karena sandbox belum tersedia, pengujian akan kami lakukan dari <b>instans uji ERP di server yang sama</b> (IP <code>31.97.108.145</code>), dengan pengiriman data <b>dibatasi hanya untuk santri uji</b>. Santri uji akan bernama berawalan <b>"UJI"</b>. Karena API tidak menyediakan fungsi hapus, mohon kesediaan menghapus santri uji tersebut setelah pengujian selesai; daftarnya akan kami kirimkan.</p>
+
+<h3>H. Batas laju</h3>
+<p>ERP akan memakai cache singkat agar tidak memanggil API berulang-ulang. Bila setelah diukur batas 120 permintaan per menit belum mencukupi pada jam ramai, kami akan mengajukan penyesuaian.</p>
+
+<h3>I. Penyerahan kunci berikutnya</h3>
+<p>Dokumen yang kami terima memuat kunci API pada halaman pertama. Untuk penggantian kunci selanjutnya, mohon kunci dikirim terpisah dari dokumen teknis, agar dokumen teknis dapat dibagikan kepada pengembang tanpa ikut menyebarkan kunci.</p>
+
+<h2>3. Penutup</h2>
+<p>Butir 2.A, 2.B, dan 2.D kami mohon ditindaklanjuti lebih dahulu karena memengaruhi pekerjaan harian staf dan keamanan data. Butir 2.C dan 2.E diperlukan sebelum menu rapor dan asrama di Portal Wali dapat ditampilkan. Kami akan memberitahukan jadwal pemasangan data awal dan penyalaan sinkron sebelum dilaksanakan.</p>
+<p>Demikian tanggapan ini kami sampaikan. Atas perhatian dan kerja samanya kami ucapkan terima kasih.</p>
+
+<table class="ttd">
+  <tr>
+    <td></td>
+    <td>
+      Depok, 14 November 2026<br>
+      Pengelola ERP Al Wafi<br><br><br><br>
+      ( ............................................. )
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

@@ -16,6 +16,7 @@
   Kepala layar selalu menyebut toko, shift, dan kasirnya: struk & uang laci melekat ke sana.
 --}}
 <body class="h-full bg-slate-100 text-gray-800 antialiased">
+@include('partials.pita-uji')
 <div class="flex min-h-full flex-col">
     <header class="flex flex-wrap items-center justify-between gap-2 bg-brand-dark px-4 py-2 text-white">
         <div class="flex items-center gap-3">
