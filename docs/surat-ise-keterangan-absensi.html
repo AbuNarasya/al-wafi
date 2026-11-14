@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Permintaan Kelengkapan Data Absensi dan Keterangan Ketidakhadiran</title>
+<style>
+  @page { margin: 22mm 20mm 20mm 22mm; }
+  body { font-family: "DejaVu Serif", serif; font-size: 10.5pt; line-height: 1.5; color: #111; }
+  .kop { text-align: center; border-bottom: 3px double #1f2a44; padding-bottom: 8px; margin-bottom: 14px; }
+  .kop .y { font-size: 16pt; font-weight: bold; letter-spacing: 1px; }
+  .kop .s { font-size: 10pt; margin-top: 2px; }
+  .kop .a { font-size: 8pt; color: #444; margin-top: 2px; }
+  table.meta td { padding: 1px 0; vertical-align: top; }
+  table.meta td.k { width: 80px; }
+  .tgl { text-align: right; margin: 6px 0 12px; }
+  h2 { font-size: 10.5pt; margin: 14px 0 4px; }
+  h3 { font-size: 10.5pt; margin: 10px 0 2px; }
+  p { margin: 0 0 6px; text-align: justify; }
+  ol, ul { margin: 0 0 6px 0; padding-left: 18px; }
+  li { margin-bottom: 3px; text-align: justify; }
+  table.t { width: 100%; border-collapse: collapse; margin: 4px 0 8px; font-size: 9.3pt; }
+  table.t th, table.t td { border: 1px solid #888; padding: 4px 6px; vertical-align: top; text-align: left; }
+  table.t th { background: #eef0f4; }
+  code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.6pt; }
+  .ttd { margin-top: 26px; width: 100%; }
+  .ttd td { width: 50%; vertical-align: top; }
+</style>
+</head>
+<body>
+
+<div class="kop">
+  <div class="y">YAYASAN AL SUDAIS INDONESIA</div>
+  <div class="s">AL WAFI ISLAMIC BOARDING SCHOOL</div>
+  <div class="a">Jl. Raya Pengasinan RT 003 RW 002, Kel. Pengasinan, Kec. Sawangan, Kota Depok, Jawa Barat 16518 · Telp. +628119153444</div>
+</div>
+
+<table class="meta">
+  <tr><td class="k">Nomor</td><td>: ........../ERP-AW/XI/2026</td></tr>
+  <tr><td class="k">Lampiran</td><td>: –</td></tr>
+  <tr><td class="k">Perihal</td><td>: <b>Permintaan Kelengkapan Data Absensi dan Keterangan Ketidakhadiran</b></td></tr>
+</table>
+
+<div class="tgl">Depok, 15 November 2026</div>
+
+<p>Yth. Administrator Sistem<br>Sistem Informasi Al Wafi (my.al-wafi.sch.id)<br>di tempat</p>
+
+<p>Dengan hormat,</p>
+
+<p>Terima kasih atas dukungan tim My Al Wafi sehingga API Histori Siswa kini sudah terhubung dengan Portal Wali (SANAD Wali) di lingkungan uji ERP. Menu <b>Absensi</b> di Portal Wali sudah menampilkan absen harian sekolah dan absen asrama per bulan, dikelompokkan per hari, langsung dari My Al Wafi.</p>
+
+<h2>1. Latar belakang permasalahan</h2>
+<p>Dalam pengujian bersama data sungguhan, kami menemukan beberapa hal yang membuat informasi absensi <b>sulit dipahami wali, bahkan berpotensi menimbulkan salah paham</b>:</p>
+<ol>
+  <li><b>Kegiatan hanya tampil sebagai nomor.</b> Absen asrama hanya membawa <code>attendance_type_id</code> dan <code>dormitory_id</code>, sehingga wali melihat "Sesi #4 — Tidak hadir" dan "Asrama #15" tanpa tahu kegiatan atau asrama yang dimaksud. Hal serupa terjadi pada ekstrakurikuler, event, dan umpan balik guru.</li>
+  <li><b>Jam absen bisa menyesatkan.</b> Pada satu santri tanggal 6 November 2026, sesi #23 tercatat pukul 17:48 lewat kartu RFID, sedangkan sepuluh sesi lain tercatat pukul 21:39–21:45 dengan selisih ±20 detik. Ternyata jam tersebut adalah <b>jam musyrif mengisi aplikasi</b>, bukan jam kegiatan. Wali sempat menyangka santri "tidak hadir pukul 21:39 padahal sudah tap kartu". Untuk sementara, jam input manual kami sembunyikan.</li>
+  <li><b>Status disederhanakan.</b> Lewat jalur kiriman lama, My Al Wafi mengirim status rinci seperti "Setelah Adzan", "Masbuq", atau "Tidak Jama'ah". Lewat API Histori, status hanya <code>present</code>/<code>absent</code>, sehingga rinciannya hilang.</li>
+  <li><b>Hari tanpa absen tidak punya penjelasan.</b> Bila santri tidak tercatat sama sekali pada hari sekolah, API tidak mengirim apa pun untuk tanggal itu. Kami tidak dapat membedakan apakah santri sakit, izin, bolos, sedang tugas sekolah, atau absennya memang belum tercatat. Saat ini Portal Wali hanya bisa menulis "<i>Tidak ada data absen &amp; keterangan</i>", yang tentu mengkhawatirkan bagi wali.</li>
+  <li><b>Saringan tanggal tidak menyertakan tanggal akhir.</b> Permintaan <code>date_from=2026-11-06&amp;date_to=2026-11-06</code> menghasilkan 0 catatan, padahal ada 11 catatan pada tanggal itu. Di sisi ERP sudah kami siasati, tetapi lebih baik diperbaiki di sumbernya.</li>
+</ol>
+<p>Untuk hari libur, ERP kini memiliki <b>Kalender Libur</b> per jenjang (Sabtu–Ahad otomatis libur sekolah), dan untuk izin pulang serta sakit yang ditangani klinik, ERP memakai data Perizinan dan Klinik miliknya sendiri. Yang belum dapat ditangani adalah alasan ketidakhadiran di luar itu, yang tercatat oleh musyrif atau wali kelas.</p>
+
+<h2>2. Permohonan</h2>
+
+<h3>A. Keterangan ketidakhadiran (prioritas utama)</h3>
+<p>Karena administrasi absensi dilakukan di My Al Wafi, kami mohon wali kelas dan musyrif dapat <b>mencatat alasan ketidakhadiran</b> di My Al Wafi, dan alasannya dikirim lewat API:</p>
+<ol>
+  <li>Pencatatan <b>per santri per tanggal</b> (boleh rentang tanggal, misalnya sakit tiga hari), untuk absen <b>sekolah (harian)</b> dan <b>asrama</b>, <b>termasuk untuk hari ketika santri sama sekali tidak menempelkan kartu</b>.</li>
+  <li>Jenis keterangan yang jelas, misalnya: <b>Sakit</b>, <b>Izin</b>, <b>Alpa/Tanpa keterangan</b>, <b>Tugas/Dispensasi sekolah</b> (lomba, kegiatan resmi), <b>Lainnya</b>.</li>
+  <li>Catatan singkat yang <b>boleh dibaca wali</b>, dipisahkan dari catatan internal staf.</li>
+  <li>Disajikan lewat API, misalnya area baru <code>keterangan-absen</code> yang berisi <code>tanggal_mulai</code>, <code>tanggal_selesai</code>, <code>cakupan</code> (sekolah/asrama), <code>jenis</code>, <code>catatan_wali</code>, dan nama pencatat. Bentuk lain yang setara juga dapat diterima.</li>
+</ol>
+
+<h3>B. Nama pada data histori</h3>
+<table class="t">
+  <tr><th style="width:38%">Area</th><th>Kolom nama yang dimohon</th></tr>
+  <tr><td><code>asrama</code>, <code>mutasi-asrama</code></td><td><code>dormitory_name</code> (nama asrama/kamar)</td></tr>
+  <tr><td><code>asrama</code></td><td><code>attendance_type_name</code> (nama kegiatan, mis. "Shalat Subuh Berjamaah")</td></tr>
+  <tr><td><code>ekstrakurikuler-absen</code>, <code>ekstrakurikuler-nilai</code></td><td><code>extracurricular_name</code>, <code>assessment_type_name</code></td></tr>
+  <tr><td><code>event</code></td><td><code>event_name</code></td></tr>
+  <tr><td><code>feedback</code></td><td><code>teacher_name</code></td></tr>
+</table>
+
+<h3>C. Jam kegiatan dan cara pencatatan</h3>
+<ol>
+  <li><b>Jam jadwal</b> setiap jenis kegiatan asrama (mis. <code>attendance_type_time</code> = 04:30 untuk Subuh), agar wali melihat jam kegiatan, bukan jam pengisian.</li>
+  <li>Kolom penanda <b>cara pencatatan</b>, mis. <code>metode</code> = <code>rfid</code> / <code>manual</code>. Saat ini kami membedakannya dari teks catatan "Terminal: …", yang rawan berubah.</li>
+</ol>
+
+<h3>D. Status rinci dan artinya</h3>
+<ol>
+  <li>Selain <code>present</code>/<code>absent</code>, mohon disertakan <b>status aslinya</b> (mis. "Setelah Adzan", "Masbuq", "Tidak Jama'ah", "Haid").</li>
+  <li>Daftar <b>seluruh nilai status</b> beserta artinya untuk absen harian, asrama, ekskul, dan event.</li>
+  <li>Untuk <code>laporan-asrama</code> dan <code>feedback</code>: status mana yang berarti sudah final dan boleh dilihat wali. Saat ini yang berstatus <code>draft</code> kami sembunyikan.</li>
+</ol>
+
+<h3>E. Hal lain yang masih terbuka</h3>
+<ol>
+  <li>Saringan <code>date_to</code> agar <b>menyertakan</b> tanggal akhir (butir 1.5).</li>
+  <li>Endpoint <b>unduh berkas PDF</b> rapor/sertifikat dengan kunci baca (sebelumnya butir 2.C surat tanggapan kami).</li>
+  <li>Konfirmasi apakah modul <b>nilai semester</b>, <b>penilaian</b>, dan <b>halaqah</b> memang belum dipakai (selalu kosong pada santri yang kami coba).</li>
+  <li>Informasi: server ERP kadang keluar lewat IPv6 <code>2a02:4780:59:9108::1</code> dan ditolak (403). Di sisi ERP sudah dipaksa IPv4, sehingga penambahan ke daftar izin bersifat opsional.</li>
+</ol>
+
+<h2>3. Penutup</h2>
+<p>Butir <b>A</b> dan <b>B</b> kami mohon didahulukan, karena paling memengaruhi kejelasan informasi bagi wali. Kami terbuka untuk membahas bentuk teknis yang paling mudah diterapkan di My Al Wafi. Kami mohon tanggapan beserta perkiraan waktu penyelesaiannya.</p>
+<p>Demikian permohonan ini kami sampaikan. Atas perhatian dan kerja samanya kami ucapkan terima kasih.</p>
+
+<table class="ttd">
+  <tr>
+    <td></td>
+    <td>
+      Depok, 15 November 2026<br>
+      Pengelola ERP Al Wafi<br><br><br><br>
+      ( ............................................. )
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

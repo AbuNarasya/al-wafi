@@ -25,6 +25,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Hari pertama pekan disebut "Ahad", bukan "Minggu" (permintaan user 15 Nov 2026) — berlaku untuk semua
+        // tanggal berbahasa Indonesia yang dibentuk Carbon (translatedFormat('l'/'D'), isoFormat).
+        \Carbon\Carbon::getTranslator()->setMessages('id', [
+            'weekdays' => ['Ahad', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'],
+            'weekdays_short' => ['Ahd', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'],
+            'weekdays_min' => ['Ah', 'Sn', 'Sl', 'Rb', 'Km', 'Jm', 'Sb'],
+        ]);
+
         $this->daftarApprovalPengajuan();
         $this->daftarApprovalAnggaran();
 

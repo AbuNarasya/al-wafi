@@ -20,7 +20,7 @@ use Tests\TestCase;
 
 /**
  * Kalender Libur + keterangan hari tanpa absen di menu Absensi portal (keputusan user 14 Nov 2026):
- * libur kalender (per jenjang & cakupan) / Sabtu–Minggu untuk absen sekolah → "Hari Libur"; izin ERP → "Izin: …";
+ * libur kalender (per jenjang & cakupan) / Sabtu–Ahad untuk absen sekolah → "Hari Libur"; izin ERP → "Izin: …";
  * klinik ERP → "Sakit — …"; selain itu "Tidak ada data absen & keterangan".
  */
 class KalenderLiburAbsensiTest extends TestCase
@@ -88,13 +88,13 @@ class KalenderLiburAbsensiTest extends TestCase
         $this->assertSame('Izin: Sakit (Izin Pulang)', $k['Kamis, 5 Nov 2026']);
         $this->assertSame('Izin: Sakit (Izin Pulang)', $k['Jumat, 6 Nov 2026']);
         $this->assertSame('Hari Libur', $k['Sabtu, 7 Nov 2026']);
-        $this->assertSame('Hari Libur', $k['Minggu, 8 Nov 2026']);
+        $this->assertSame('Hari Libur', $k['Ahad, 8 Nov 2026'], 'hari pertama pekan bernama Ahad (user 15 Nov 2026)');
         $this->assertSame('Sakit — Dirawat di klinik', $k['Senin, 9 Nov 2026']);
         $this->assertSame('Tidak ada data absen & keterangan',$k['Selasa, 10 Nov 2026']);
         $this->assertArrayNotHasKey('Kamis, 12 Nov 2026', $k, 'hari bercatatan tak diberi keterangan');
         $this->assertStringNotContainsString('Sabtu, 14 Nov 2026', $html, 'hari ini tanpa catatan belum ditampilkan');
         $this->assertSame(1, substr_count($html, 'Kamis, 12 Nov 2026'));
-        // Blok warna hari libur (15 Nov 2026): Minggu 1, Selasa 3 (kalender), Sabtu 7, Minggu 8 Nov.
+        // Blok warna hari libur (15 Nov 2026): Ahad 1, Selasa 3 (kalender), Sabtu 7, Ahad 8 Nov.
         $this->assertSame(4, substr_count($html, 'data-hari-libur'));
         $this->assertMatchesRegularExpression('/bg-rose-50 ring-rose-200"\s+data-hari-libur/', $html);
 

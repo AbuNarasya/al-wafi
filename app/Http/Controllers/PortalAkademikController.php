@@ -136,7 +136,7 @@ class PortalAkademikController extends Controller
 
     /**
      * Tanggal TANPA catatan absen diberi keterangan (keputusan user 14 Nov 2026), urutan kekuatan:
-     *  1. Hari libur — Kalender Libur (per jenjang & cakupan); untuk absen SEKOLAH, Sabtu–Minggu otomatis libur.
+     *  1. Hari libur — Kalender Libur (per jenjang & cakupan); untuk absen SEKOLAH, Sabtu–Ahad otomatis libur.
      *  2. Izin — Perizinan Insidental yang disetujui ERP meliputi tanggal itu (nama jenis izinnya).
      *  3. Sakit — kunjungan Klinik ERP hari itu yang berujung istirahat/dirawat/dirujuk/dijemput.
      *  4. Selain itu "Tidak ada data absen & keterangan" (sebab tak tercatat di mana pun — mis. bolos belum bisa dibedakan).
