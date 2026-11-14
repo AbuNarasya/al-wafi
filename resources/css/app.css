@@ -20,6 +20,15 @@
 .wali-gelap .bg-amber-50 { background-color: #3a2a06; }
 .wali-gelap .bg-red-50 { background-color: #3b0d0d; }
 .wali-gelap .bg-blue-50 { background-color: #0f2547; }
+/* Lencana status (Hadir/Terlambat/Tidak hadir/Izin/Uzur, 14 Nov 2026): latar -100 terang + tulisan yang dicerahkan di atas
+   = tak terbaca. Latarnya digelapkan; tulisan sky/violet ikut dicerahkan. */
+.wali-gelap .bg-emerald-100 { background-color: #064e3b; }
+.wali-gelap .bg-amber-100 { background-color: #4a3507; }
+.wali-gelap .bg-red-100 { background-color: #4c1414; }
+.wali-gelap .bg-sky-100 { background-color: #0c3a52; }
+.wali-gelap .bg-violet-100 { background-color: #2e1a5c; }
+.wali-gelap .text-sky-800 { color: #7dd3fc; }
+.wali-gelap .text-violet-800 { color: #c4b5fd; }
 .wali-gelap .text-emerald-800, .wali-gelap .text-emerald-700 { color: #6ee7b7; }
 .wali-gelap .text-amber-900, .wali-gelap .text-amber-800, .wali-gelap .text-amber-700 { color: #fcd34d; }
 .wali-gelap .text-red-800, .wali-gelap .text-red-700 { color: #fca5a5; }
