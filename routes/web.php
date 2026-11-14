@@ -1534,6 +1534,14 @@ Route::middleware('auth')->group(function () {
     // Absensi asrama kiriman ISE — data masuk, tak tercocok, log kiriman.
     Route::get('kesantrian/absensi-asrama', [\App\Http\Controllers\AbsensiAsramaController::class, 'index'])->name('absensi_asrama.index')->middleware('hakakses:absensi-asrama,lihat');
 
+    // Kalender Libur (14 Nov 2026) — diisi admin, per jenjang; dibaca menu Absensi portal wali.
+    Route::prefix('kesantrian/kalender-libur')->name('kalender_libur.')->controller(\App\Http\Controllers\KalenderLiburController::class)->group(function () {
+        Route::get('/', 'index')->name('index')->middleware('hakakses:kalender-libur,lihat');
+        Route::post('/', 'store')->name('store')->middleware('hakakses:kalender-libur,buat');
+        Route::put('/{id}', 'update')->name('update')->middleware('hakakses:kalender-libur,ubah')->whereNumber('id');
+        Route::delete('/{id}', 'destroy')->name('destroy')->middleware('hakakses:kalender-libur,hapus')->whereNumber('id');
+    });
+
     // Perizinan Insidental (4 Nov 2026) — persetujuan bertingkat, atas nama wali, pos keluar/masuk, pengaturan.
     Route::prefix('kesantrian/perizinan')->name('perizinan.')->controller(\App\Http\Controllers\PerizinanController::class)->group(function () {
         Route::get('/', 'index')->name('index')->middleware('hakakses:perizinan|perizinan-tingkat-1|perizinan-tingkat-2,lihat');

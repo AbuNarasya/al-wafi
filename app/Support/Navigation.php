@@ -214,6 +214,7 @@ final class Navigation
         ['url' => '/kesantrian/alumni', 'label' => 'Alumni', 'group' => 'DATA SISWA/SANTRI', 'modulAny' => ['santri', 'santri-data']],
         ['url' => '/kesantrian/santri-keluar', 'label' => 'Santri Keluar', 'group' => 'DATA SISWA/SANTRI', 'modulAny' => ['santri', 'santri-data']],
         ['url' => '/kesantrian/absensi-asrama', 'label' => 'Absensi Asrama (ISE)', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modul' => 'absensi-asrama'],
+        ['url' => '/kesantrian/kalender-libur', 'label' => 'Kalender Libur', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modul' => 'kalender-libur'],
         ['url' => '/kesantrian/perizinan', 'label' => 'Perizinan Insidental', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modulAny' => ['perizinan', 'perizinan-tingkat-1', 'perizinan-tingkat-2']],
         ['url' => '/kesantrian/perizinan-rutin', 'label' => 'Perizinan Rutin', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modulAny' => ['perizinan', 'perizinan-tingkat-1', 'perizinan-tingkat-2', 'perizinan-jadwal']],
         ['url' => '/kesantrian/perizinan-rutin/jadwal', 'label' => 'Jadwal Perizinan Rutin', 'group' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan', 'modul' => 'perizinan-jadwal'],

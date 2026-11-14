@@ -173,6 +173,7 @@ final class ModulRegistry
         // Pengunduran diri santri aktif: lihat = membuka daftar. Wali kelas & kepala sekolah ditetapkan di
         // master Kelas/Jenjang; clearance per pihak lewat tiga modul di bawah (admin: ubah = mengeluarkan santri).
         ['kode' => 'absensi-asrama', 'nama' => 'Absensi Asrama dari ISE (data masuk & log kiriman)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan'],
+        ['kode' => 'kalender-libur', 'nama' => 'Kalender Libur (per jenjang; dipakai menu Absensi portal wali)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan'],
         ['kode' => 'perizinan', 'nama' => 'Perizinan Insidental (lihat · buat = atas nama wali · ubah = pos keluar/masuk)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan'],
         ['kode' => 'perizinan-tingkat-1', 'nama' => 'Perizinan — persetujuan tingkat 1 (centang Ubah)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan'],
         ['kode' => 'perizinan-tingkat-2', 'nama' => 'Perizinan — persetujuan tingkat 2 (centang Ubah)', 'grup' => 'KEPENDIDIKAN', 'sub' => 'Absensi dan Perizinan'],

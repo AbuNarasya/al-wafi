@@ -1360,5 +1360,14 @@
     "Berkas PDF belum bisa dibuka dari aplikasi ini. Fitur unduh menyusul.": "لا يمكن فتح ملفات PDF من هذا التطبيق بعد. ستتوفر خاصية التنزيل قريبًا.",
     "Sebelumnya": "السابق",
     "Berikutnya": "التالي",
-    "Halaman :a dari :b": "الصفحة :a من :b"
+    "Halaman :a dari :b": "الصفحة :a من :b",
+    "Tanpa tanggal": "بدون تاريخ",
+    "Bulan sebelumnya": "الشهر السابق",
+    "Bulan berikutnya": "الشهر التالي",
+    "Bulan": "الشهر",
+    "Tahun": "السنة",
+    "Tidak ada catatan pada bulan ini.": "لا توجد سجلات هذا الشهر.",
+    "Hari Libur": "عطلة",
+    "Sakit": "مريض",
+    "Tidak ada data absen": "لا يوجد سجل حضور"
 }

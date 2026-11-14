@@ -152,6 +152,38 @@ class PortalAkademikIseTest extends TestCase
         $this->assertStringContainsString('bg-red-100 text-red-700">Tidak hadir', $html);
     }
 
+    /** Permintaan user 14 Nov 2026: absensi per BULAN pilihan wali (seluruh catatan, semua halaman ISE), dikelompokkan per hari. */
+    public function test_absensi_sebulan_penuh_dikelompokkan_per_hari(): void
+    {
+        \Illuminate\Support\Carbon::setTestNow('2026-11-14 10:00:00');
+        $a = fn ($id, $sesi, $tgl, $jam, $st = 'present') => ['id' => $id, 'attendance_type_name' => $sesi, 'attendance_date' => "$tgl 00:00:00", 'attendance_time' => $jam, 'status' => $st];
+        Http::fake([
+            // Dua halaman ISE — keduanya harus diambil.
+            '*/histori/asrama*' => fn (PermintaanHttp $r) => (int) $r['page'] === 2
+                ? Http::response(['success' => true, 'data' => ['current_page' => 2, 'last_page' => 2, 'total' => 4,
+                    'data' => [$a(4, 'Shalat Dzuhur', '2026-11-02', '12:10')]]])
+                : Http::response(['success' => true, 'data' => ['current_page' => 1, 'last_page' => 2, 'total' => 4, 'data' => [
+                    $a(1, 'Shalat Isya', '2026-11-12', '20:16'), $a(2, 'Shalat Subuh', '2026-11-12', '04:07', 'late'), $a(3, 'Shalat Maghrib', '2026-11-13', '17:49')]]]),
+            '*/histori/mutasi-asrama*' => Http::response(self::halaman([])),
+            '*' => Http::response(self::halaman([])),
+        ]);
+
+        $html = $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'asrama']))->assertOk()
+            ->assertSee('data-pilih-bulan', false)->assertSee('<option value="11" selected', false)->assertSee('<option value="2026" selected', false)
+            ->assertSeeInOrder(['Jumat, 13 Nov 2026', 'Shalat Maghrib', 'Kamis, 12 Nov 2026', 'Shalat Subuh', 'Shalat Isya', 'Senin, 2 Nov 2026', 'Shalat Dzuhur'])
+            ->getContent();
+        // Setiap tanggal 1–13 Nov tampil (14 Nov = hari ini tanpa catatan, belum); 3 hari bercatatan, 10 diberi keterangan.
+        $this->assertSame(13, substr_count($html, '<section class="rounded-3xl bg-white shadow-sm'), 'satu kartu per tanggal');
+        $this->assertSame(10, substr_count($html, 'data-keterangan-hari='));
+        Http::assertSent(fn (PermintaanHttp $r) => str_contains($r->url(), '/histori/asrama?') && $r['date_from'] === '2026-11-01' && $r['date_to'] === '2026-11-30' && (int) $r['page'] === 2);
+
+        // Pilih Agustus 2026 lewat formulir; bulan depan (Desember) ditolak → kembali ke bulan berjalan.
+        $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'harian', 'bln' => 8, 'thn' => 2026]))->assertOk()->assertSee('<option value="8" selected', false);
+        Http::assertSent(fn (PermintaanHttp $r) => str_contains($r->url(), '/histori/harian?') && $r['date_from'] === '2026-08-01' && $r['date_to'] === '2026-08-31');
+        $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'harian', 'bulan' => '2026-12']))->assertOk()->assertSee('<option value="11" selected', false);
+        \Illuminate\Support\Carbon::setTestNow();
+    }
+
     public function test_halaman_kehadiran_lama_dialihkan_saat_menu_ise_menyala(): void
     {
         $this->sebagaiIbu()->get(route('portal.kehadiran', ['anak' => $this->ahmad->id]))

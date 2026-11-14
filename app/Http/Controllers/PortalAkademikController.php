@@ -30,11 +30,13 @@ class PortalAkademikController extends Controller
             'penilaian' => ['Penilaian', 'penilaian', null, 20],
             'ekskul' => ['Nilai ekskul', 'ekstrakurikuler-nilai', null, 20],
         ]],
+        // Absensi PER BULAN, dikelompokkan PER HARI (permintaan user 14 Nov 2026): wali memilih bulan & tahun, lalu SELURUH
+        // catatan bulan itu ditampilkan (saringan tanggal ISE; semua halaman ISE diambil). Elemen ke-5 = 'bulan'.
         'absensi' => ['Absensi', 'absensi', '#15803d', [
-            'harian' => ['Harian', 'harian', null, 20],
-            'asrama' => ['Asrama', 'asrama', null, 30],
-            'halaqah' => ['Halaqah', 'halaqah', null, 20],
-            'ekskul' => ['Ekskul', 'ekstrakurikuler-absen', null, 20],
+            'harian' => ['Harian', 'harian', null, 200, 'bulan'],
+            'asrama' => ['Asrama', 'asrama', null, 200, 'bulan'],
+            'halaqah' => ['Halaqah', 'halaqah', null, 200, 'bulan'],
+            'ekskul' => ['Ekskul', 'ekstrakurikuler-absen', null, 200, 'bulan'],
         ]],
         'prestasi' => ['Prestasi', 'prestasi', '#b45309', [
             'sertifikat' => ['Sertifikat & prestasi', 'sertifikat', 'prestasi', 100],
@@ -87,22 +89,38 @@ class PortalAkademikController extends Controller
         [$judul, $ikon, $warna, $tabs] = self::MENU[$menu];
         $tab = array_key_exists((string) $r->query('tab'), $tabs) ? (string) $r->query('tab') : array_key_first($tabs);
         [, $area, $saringan, $per] = $tabs[$tab];
+        $kelompok = $tabs[$tab][4] ?? null;
 
         // Penjaga kepemilikan: hanya anak AKTIF keluarga ini; id dari alamat hanya memilih di antara mereka.
-        $anak = Santri::where('id_wali', $wali->id)->where('status', 'aktif')->orderBy('nama')->get(['id', 'nama', 'nis', 'id_wali', 'status']);
+        $anak = Santri::where('id_wali', $wali->id)->where('status', 'aktif')->orderBy('nama')->get(['id', 'nama', 'nis', 'id_wali', 'status', 'kode_jenjang']);
         $pilih = $anak->firstWhere('id', (int) $r->query('anak')) ?? $anak->first();
         $halaman = max(1, (int) $r->query('hal', 1));
 
         $hasil = null;
         $kamar = null;
+        $hari = null;
+        // Bulan dari ?bulan=YYYY-MM (tautan panah) atau dari dua pilihan ?bln=&thn= (formulir).
+        $kodeBulan = (string) $r->query('bulan') ?: ($r->filled(['bln', 'thn']) ? sprintf('%04d-%02d', (int) $r->query('thn'), (int) $r->query('bln')) : '');
+        $bulan = $kelompok === 'bulan' ? $this->bulanDipilih($kodeBulan) : null;
         $gagal = false;
         if ($pilih) {
             $svc = new HistoriIse;
             try {
-                $hasil = $svc->daftar($pilih, $area, $saringan ? 1 : $halaman, $per);
+                if ($bulan) {
+                    $hasil = $this->sebulan($svc, $pilih, $area, $per, $bulan['awal'], $bulan['akhir']);
+                } else {
+                    $hasil = $svc->daftar($pilih, $area, $saringan ? 1 : $halaman, $per);
+                }
                 $hasil['baris'] = $this->rapikan($area, $this->saring($hasil['baris'], $saringan), $pilih);
                 if ($saringan) {
                     $hasil['halaman'] = $hasil['halaman_akhir'] = 1;
+                }
+                if ($kelompok) {
+                    $hari = $this->perHari($hasil['baris']);
+                    // Harian & Asrama: SETIAP tanggal bulan itu tampil; yang tanpa catatan diberi keterangan (user 14 Nov 2026).
+                    if ($bulan && in_array($tab, ['harian', 'asrama'], true)) {
+                        $hari = $this->lengkapiHari($hari, $pilih, $tab === 'harian' ? 'sekolah' : 'asrama', $bulan['awal'], $bulan['akhir']);
+                    }
                 }
                 if ($area === 'asrama') {
                     $kamar = $this->kamar($svc->daftar($pilih, 'mutasi-asrama', 1, 10)['baris']);
@@ -113,7 +131,112 @@ class PortalAkademikController extends Controller
             }
         }
 
-        return view('portal.akademik', compact('menu', 'judul', 'ikon', 'warna', 'tabs', 'tab', 'anak', 'pilih', 'hasil', 'kamar', 'gagal'));
+        return view('portal.akademik', compact('menu', 'judul', 'ikon', 'warna', 'tabs', 'tab', 'anak', 'pilih', 'hasil', 'kamar', 'gagal', 'hari', 'bulan'));
+    }
+
+    /**
+     * Tanggal TANPA catatan absen diberi keterangan (keputusan user 14 Nov 2026), urutan kekuatan:
+     *  1. Hari libur — Kalender Libur (per jenjang & cakupan); untuk absen SEKOLAH, Sabtu–Minggu otomatis libur.
+     *  2. Izin — Perizinan Insidental yang disetujui ERP meliputi tanggal itu (nama jenis izinnya).
+     *  3. Sakit — kunjungan Klinik ERP hari itu yang berujung istirahat/dirawat/dirujuk/dijemput.
+     *  4. Selain itu "Tidak ada data absen" (sebab tak tercatat di mana pun — mis. bolos belum bisa dibedakan).
+     * Hari ini ikut hanya bila sudah ada catatannya (pagi hari belum tentu sudah absen).
+     */
+    private function lengkapiHari(array $hari, Santri $santri, string $cakupan, Carbon $awal, Carbon $akhir): array
+    {
+        $kemarin = now('Asia/Jakarta')->startOfDay()->subDay();
+        $sampai = $akhir->lt($kemarin) ? $akhir->copy() : $kemarin;
+        $ada = collect($hari)->keyBy(fn ($h) => $h['tanggal']?->format('Y-m-d'));
+        if ($sampai->lt($awal)) {
+            return $hari;
+        }
+
+        $libur = \App\Models\KalenderLibur::query()->berlaku($santri->kode_jenjang, $cakupan, $awal->format('Y-m-d'), $sampai->format('Y-m-d'))->get();
+        $izin = \App\Models\Perizinan::with('tipe:kode,nama')->where('id_santri', $santri->id)->whereIn('status', ['disetujui', 'keluar', 'kembali'])
+            ->whereRaw('coalesce(keluar_pada, rencana_keluar) <= ?', [$sampai->copy()->endOfDay()->utc()])
+            ->whereRaw('coalesce(kembali_pada, rencana_kembali) >= ?', [$awal->copy()->utc()])->get();
+        $klinik = \App\Models\KunjunganKlinik::where('id_santri', $santri->id)
+            ->whereIn('tindak_lanjut', ['istirahat_asrama', 'dirawat', 'dirujuk', 'dijemput'])
+            ->where('datang_pada', '<=', $sampai->copy()->endOfDay()->utc())
+            ->whereRaw('coalesce(selesai_pada, datang_pada) >= ?', [$awal->copy()->utc()])->get();
+
+        for ($t = $awal->copy(); $t->lte($sampai); $t->addDay()) {
+            $kunci = $t->format('Y-m-d');
+            if ($ada->has($kunci)) {
+                continue;
+            }
+            $ujung = $t->copy()->endOfDay();
+            $l = $libur->first(fn ($x) => $x->mulai->format('Y-m-d') <= $kunci && $x->selesai->format('Y-m-d') >= $kunci);
+            $z = $izin->first(fn ($x) => ($x->keluar_pada ?? $x->rencana_keluar)->lte($ujung) && ($x->kembali_pada ?? $x->rencana_kembali)->gte($t));
+            $k = $klinik->first(fn ($x) => $x->datang_pada->lte($ujung) && ($x->selesai_pada ?? $x->datang_pada)->gte($t));
+            $keterangan = match (true) {
+                $l !== null => [__('Hari Libur').' — '.$l->nama, 'libur'],
+                $cakupan === 'sekolah' && $t->isWeekend() => [__('Hari Libur'), 'libur'],
+                $z !== null => [__('Izin').': '.($z->tipe?->nama ?? $z->kode_tipe), 'izin'],
+                $k !== null => [__('Sakit').' — '.__(\App\Models\KunjunganKlinik::TINDAK_LANJUT[$k->tindak_lanjut] ?? $k->tindak_lanjut), 'uzur'],
+                default => [__('Tidak ada data absen'), 'kosong'],
+            };
+            $ada->put($kunci, ['tanggal' => $t->copy(), 'baris' => [], 'keterangan_hari' => $keterangan]);
+        }
+
+        return $ada->sortKeysDesc()->values()->all();
+    }
+
+    /** Batas paling awal yang bisa dipilih wali (data ISE paling tua yang diketahui: 2025). */
+    private const BULAN_PALING_AWAL = '2025-01';
+
+    /**
+     * ?bulan=YYYY-MM → rentang bulan itu. Bawaan & batas atas = bulan berjalan; tak boleh sebelum BULAN_PALING_AWAL.
+     *
+     * @return array{kode:string, awal:Carbon, akhir:Carbon, sebelum:?string, sesudah:?string, tahun:list<int>}
+     */
+    private function bulanDipilih(string $kode): array
+    {
+        $kini = now('Asia/Jakarta')->startOfMonth();
+        $paling = Carbon::createFromFormat('Y-m-d', self::BULAN_PALING_AWAL.'-01', 'Asia/Jakarta')->startOfMonth();
+        $awal = preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $kode)
+            ? Carbon::createFromFormat('Y-m-d', $kode.'-01', 'Asia/Jakarta')->startOfMonth() : $kini->copy();
+        $awal = $awal->gt($kini) ? $kini->copy() : ($awal->lt($paling) ? $paling->copy() : $awal);
+
+        return [
+            'kode' => $awal->format('Y-m'), 'awal' => $awal, 'akhir' => $awal->copy()->endOfMonth()->startOfDay(),
+            'sebelum' => $awal->gt($paling) ? $awal->copy()->subMonth()->format('Y-m') : null,
+            'sesudah' => $awal->lt($kini) ? $awal->copy()->addMonth()->format('Y-m') : null,
+            'tahun' => range((int) $kini->format('Y'), (int) $paling->format('Y')),
+        ];
+    }
+
+    /** SELURUH catatan satu bulan: semua halaman ISE dalam rentang itu (paling banyak 10 × $per, pengaman). */
+    private function sebulan(HistoriIse $svc, Santri $santri, string $area, int $per, Carbon $awal, Carbon $akhir): array
+    {
+        $hasil = $svc->daftar($santri, $area, 1, $per, $awal->format('Y-m-d'), $akhir->format('Y-m-d'));
+        for ($h = 2; $hasil['dikenal'] && $h <= min(10, $hasil['halaman_akhir']); $h++) {
+            $hasil['baris'] = [...$hasil['baris'], ...$svc->daftar($santri, $area, $h, $per, $awal->format('Y-m-d'), $akhir->format('Y-m-d'))['baris']];
+        }
+        $hasil['halaman'] = $hasil['halaman_akhir'] = 1;
+
+        return $hasil;
+    }
+
+    /**
+     * Kelompok per tanggal (terbaru dulu); di dalam satu hari berurutan menurut jam.
+     *
+     * @return list<array{tanggal: Carbon, baris: list<array>}>
+     */
+    private function perHari(array $baris): array
+    {
+        $kelompok = [];
+        foreach ($baris as $b) {
+            $kunci = $b['waktu']?->format('Y-m-d') ?? '0000-00-00';
+            $kelompok[$kunci] ??= ['tanggal' => $b['waktu']?->copy()->startOfDay(), 'baris' => []];
+            $kelompok[$kunci]['baris'][] = $b;
+        }
+        krsort($kelompok);
+        foreach ($kelompok as &$k) {
+            usort($k['baris'], fn ($a, $b) => ($a['waktu']?->timestamp ?? 0) <=> ($b['waktu']?->timestamp ?? 0));
+        }
+
+        return array_values($kelompok);
     }
 
     /** @param list<array> $baris */

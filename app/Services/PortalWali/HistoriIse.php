@@ -37,24 +37,26 @@ final class HistoriIse
      *
      * @throws HistoriIseGagal bila ISE mati, lambat, menolak kunci, atau jawabannya tak terbaca
      */
-    public function daftar(Santri $santri, string $area, int $halaman = 1, int $perHalaman = 20): array
+    public function daftar(Santri $santri, string $area, int $halaman = 1, int $perHalaman = 20, ?string $dari = null, ?string $sampai = null): array
     {
         $halaman = max(1, $halaman);
-        $kunci = "ise:histori:{$area}:{$santri->id}:{$halaman}:{$perHalaman}";
+        $kunci = "ise:histori:{$area}:{$santri->id}:{$halaman}:{$perHalaman}:{$dari}:{$sampai}";
 
         // remember tak menyimpan pengecualian — kegagalan ISE tak ikut ter-cache.
         return Cache::remember($kunci, max(0, (int) config('services.ise.cache_menit')) * 60,
-            fn () => $this->ambil($santri, $area, $halaman, $perHalaman));
+            fn () => $this->ambil($santri, $area, $halaman, $perHalaman, $dari, $sampai));
     }
 
-    private function ambil(Santri $santri, string $area, int $halaman, int $perHalaman): array
+    /** $dari/$sampai = YYYY-MM-DD (date_from/date_to ISE, inklusif). */
+    private function ambil(Santri $santri, string $area, int $halaman, int $perHalaman, ?string $dari, ?string $sampai): array
     {
         $url = rtrim((string) config('services.ise.url'), '/').'/histori/'.rawurlencode($area);
         try {
             $jawab = Http::withHeaders(['X-Api-Key' => (string) config('services.ise.kunci_baca'), 'Accept' => 'application/json'])
                 ->timeout(max(1, (int) config('services.ise.batas_detik')))->connectTimeout(3)
                 ->withOptions(['curl' => [CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4]])
-                ->get($url, array_filter(['id_erp' => $santri->id, 'nis' => $santri->nis, 'page' => $halaman, 'per_page' => $perHalaman],
+                ->get($url, array_filter(['id_erp' => $santri->id, 'nis' => $santri->nis, 'page' => $halaman, 'per_page' => $perHalaman,
+                    'date_from' => $dari, 'date_to' => $sampai],
                     fn ($v) => $v !== null && $v !== ''));
         } catch (\Throwable $e) {
             throw new HistoriIseGagal('ISE tak terjangkau: '.$e->getMessage(), previous: $e);

@@ -1360,5 +1360,14 @@
     "Berkas PDF belum bisa dibuka dari aplikasi ini. Fitur unduh menyusul.": "PDF files cannot be opened from this app yet. Downloads are coming soon.",
     "Sebelumnya": "Previous",
     "Berikutnya": "Next",
-    "Halaman :a dari :b": "Page :a of :b"
+    "Halaman :a dari :b": "Page :a of :b",
+    "Tanpa tanggal": "No date",
+    "Bulan sebelumnya": "Previous month",
+    "Bulan berikutnya": "Next month",
+    "Bulan": "Month",
+    "Tahun": "Year",
+    "Tidak ada catatan pada bulan ini.": "No records this month.",
+    "Hari Libur": "Holiday",
+    "Sakit": "Sick",
+    "Tidak ada data absen": "No attendance record"
 }
