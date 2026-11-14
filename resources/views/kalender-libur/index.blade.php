@@ -12,7 +12,7 @@
     <div class="mx-auto max-w-5xl space-y-4">
         <div class="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-600 shadow-sm">
             Hari libur dipakai menu <b>Absensi</b> di Portal Wali: tanggal tanpa catatan absen pada hari libur tampil
-            <b>"Hari Libur"</b> beserta namanya, bukan "Tidak ada data absen". <b>Sabtu &amp; Minggu sudah otomatis libur sekolah</b> — tidak perlu diisi.
+            <b>"Hari Libur"</b> beserta namanya, bukan "Tidak ada data absen &amp; keterangan". <b>Sabtu &amp; Minggu sudah otomatis libur sekolah</b> — tidak perlu diisi.
             Isi di sini libur nasional, libur semester, kepulangan santri, dan sejenisnya. Kosongkan jenjang bila berlaku untuk semua jenjang.
         </div>
 

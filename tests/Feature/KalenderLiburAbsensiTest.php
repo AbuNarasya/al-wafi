@@ -21,7 +21,7 @@ use Tests\TestCase;
 /**
  * Kalender Libur + keterangan hari tanpa absen di menu Absensi portal (keputusan user 14 Nov 2026):
  * libur kalender (per jenjang & cakupan) / Sabtu–Minggu untuk absen sekolah → "Hari Libur"; izin ERP → "Izin: …";
- * klinik ERP → "Sakit — …"; selain itu "Tidak ada data absen".
+ * klinik ERP → "Sakit — …"; selain itu "Tidak ada data absen & keterangan".
  */
 class KalenderLiburAbsensiTest extends TestCase
 {
@@ -82,15 +82,15 @@ class KalenderLiburAbsensiTest extends TestCase
         $html = $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'harian']))->assertOk()->getContent();
         $k = $this->keterangan($html);
 
-        $this->assertSame('Tidak ada data absen', $k['Senin, 2 Nov 2026'], 'libur cakupan asrama tak berlaku untuk absen sekolah');
+        $this->assertSame('Tidak ada data absen & keterangan',$k['Senin, 2 Nov 2026'], 'libur cakupan asrama tak berlaku untuk absen sekolah');
         $this->assertSame('Hari Libur — Libur Uji SMP', $k['Selasa, 3 Nov 2026']);
-        $this->assertSame('Tidak ada data absen', $k['Rabu, 4 Nov 2026'], 'libur jenjang lain tak berlaku');
+        $this->assertSame('Tidak ada data absen & keterangan',$k['Rabu, 4 Nov 2026'], 'libur jenjang lain tak berlaku');
         $this->assertSame('Izin: Sakit (Izin Pulang)', $k['Kamis, 5 Nov 2026']);
         $this->assertSame('Izin: Sakit (Izin Pulang)', $k['Jumat, 6 Nov 2026']);
         $this->assertSame('Hari Libur', $k['Sabtu, 7 Nov 2026']);
         $this->assertSame('Hari Libur', $k['Minggu, 8 Nov 2026']);
         $this->assertSame('Sakit — Dirawat di klinik', $k['Senin, 9 Nov 2026']);
-        $this->assertSame('Tidak ada data absen', $k['Selasa, 10 Nov 2026']);
+        $this->assertSame('Tidak ada data absen & keterangan',$k['Selasa, 10 Nov 2026']);
         $this->assertArrayNotHasKey('Kamis, 12 Nov 2026', $k, 'hari bercatatan tak diberi keterangan');
         $this->assertStringNotContainsString('Sabtu, 14 Nov 2026', $html, 'hari ini tanpa catatan belum ditampilkan');
         $this->assertSame(1, substr_count($html, 'Kamis, 12 Nov 2026'));
@@ -101,8 +101,8 @@ class KalenderLiburAbsensiTest extends TestCase
         // Absen ASRAMA: akhir pekan bukan libur, tapi kepulangan (cakupan asrama) libur.
         $k = $this->keterangan($this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'asrama']))->assertOk()->getContent());
         $this->assertSame('Hari Libur — Kepulangan Santri', $k['Senin, 2 Nov 2026']);
-        $this->assertSame('Tidak ada data absen', $k['Sabtu, 7 Nov 2026']);
-        $this->assertSame('Tidak ada data absen', $k['Selasa, 3 Nov 2026'], 'libur sekolah saja tak berlaku untuk asrama');
+        $this->assertSame('Tidak ada data absen & keterangan',$k['Sabtu, 7 Nov 2026']);
+        $this->assertSame('Tidak ada data absen & keterangan',$k['Selasa, 3 Nov 2026'], 'libur sekolah saja tak berlaku untuk asrama');
     }
 
     public function test_kalender_libur_hanya_pemegang_hak(): void

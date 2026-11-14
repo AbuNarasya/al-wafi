@@ -139,7 +139,7 @@ class PortalAkademikController extends Controller
      *  1. Hari libur — Kalender Libur (per jenjang & cakupan); untuk absen SEKOLAH, Sabtu–Minggu otomatis libur.
      *  2. Izin — Perizinan Insidental yang disetujui ERP meliputi tanggal itu (nama jenis izinnya).
      *  3. Sakit — kunjungan Klinik ERP hari itu yang berujung istirahat/dirawat/dirujuk/dijemput.
-     *  4. Selain itu "Tidak ada data absen" (sebab tak tercatat di mana pun — mis. bolos belum bisa dibedakan).
+     *  4. Selain itu "Tidak ada data absen & keterangan" (sebab tak tercatat di mana pun — mis. bolos belum bisa dibedakan).
      * Hari ini ikut hanya bila sudah ada catatannya (pagi hari belum tentu sudah absen).
      */
     private function lengkapiHari(array $hari, Santri $santri, string $cakupan, Carbon $awal, Carbon $akhir): array
@@ -174,7 +174,7 @@ class PortalAkademikController extends Controller
                 $cakupan === 'sekolah' && $t->isWeekend() => [__('Hari Libur'), 'libur'],
                 $z !== null => [__('Izin').': '.($z->tipe?->nama ?? $z->kode_tipe), 'izin'],
                 $k !== null => [__('Sakit').' — '.__(\App\Models\KunjunganKlinik::TINDAK_LANJUT[$k->tindak_lanjut] ?? $k->tindak_lanjut), 'uzur'],
-                default => [__('Tidak ada data absen'), 'kosong'],
+                default => [__('Tidak ada data absen & keterangan'), 'kosong'],
             };
             $ada->put($kunci, ['tanggal' => $t->copy(), 'baris' => [], 'keterangan_hari' => $keterangan]);
         }
