@@ -34,7 +34,15 @@ final class MenuPortal
         'data' => ['portal.data', 'Data wali & santri', 'data', '#475569', 'administrasi', null],
         'perizinan' => ['portal.perizinan', 'Perizinan Insidental', 'keluar', '#0f766e', 'administrasi', null],
         'perizinan_rutin' => ['portal.perizinan_rutin', 'Perizinan Rutin', 'kalender', '#4338ca', 'administrasi', null],
-        'kehadiran' => ['portal.kehadiran', 'Kehadiran asrama', 'absensi', '#15803d', 'akademik', null],
+        // Menu lama (data kiriman ISE) — disembunyikan saat menu dari API Histori ISE menyala (keputusan user 14 Nov 2026);
+        // kabar "tidak hadir" tetap dari jalur kiriman ini, dan alamatnya dialihkan ke Absensi → Asrama.
+        'kehadiran' => ['portal.kehadiran', 'Kehadiran asrama', 'absensi', '#15803d', 'akademik', 'kehadiran_lama'],
+        // Dari API Histori ISE (PortalAkademikController) — hanya bila HistoriIse::aktifUntuk().
+        'akademik' => ['portal.akademik', 'Akademik', 'akademik', '#1d4ed8', 'akademik', 'ise'],
+        'absensi' => ['portal.absensi', 'Absensi', 'absensi', '#15803d', 'akademik', 'ise'],
+        'prestasi' => ['portal.prestasi', 'Prestasi', 'prestasi', '#b45309', 'akademik', 'ise'],
+        'umpan_balik' => ['portal.umpan_balik', 'Umpan Balik Guru', 'umpan_balik', '#7c3aed', 'akademik', 'ise'],
+        'kegiatan' => ['portal.kegiatan', 'Kegiatan', 'kegiatan', '#0e7490', 'akademik', 'ise'],
         'pendaftaran' => ['portal.daftar', 'Pendaftaran', 'psb', '#9b7bb0', 'administrasi', null],
         'klinik' => ['portal.klinik', 'Riwayat klinik', 'klinik', '#b91c1c', 'lainnya', null],
         'laundry' => ['portal.laundry', 'Laundry', 'laundry', '#0891b2', 'lainnya', null],
@@ -50,7 +58,8 @@ final class MenuPortal
     public static function tersedia(Wali $wali): array
     {
         $berdompet = \App\Services\PortalWali\PembayaranPortal::keluargaBerdompet((int) $wali->id);
-        $syarat = ['dompet' => $berdompet, 'bantuan' => AsistenWali::aktif()];
+        $ise = HistoriIse::aktifUntuk($wali);
+        $syarat = ['dompet' => $berdompet, 'bantuan' => AsistenWali::aktif(), 'ise' => $ise, 'kehadiran_lama' => ! $ise];
 
         // Label diterjemahkan di sini (bahasa portal wali) — semua layar pemakai menerima nama menu siap tampil.
         return array_map(function ($m) {

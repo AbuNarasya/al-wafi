@@ -28,6 +28,11 @@
         'klinik' => 'M16.36 4.52A9.5 9.5 0 1 0 16.36 19.48A7.6 7.6 0 1 1 16.36 4.52Z',
         'menu' => 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
         'bantuan' => 'M4 5h16v11H10l-5 4v-4H4zM10 9a2 2 0 113 1.7c-.6.4-1 .8-1 1.5M12 14h.01',
+        // Menu akademik dari ISE (14 Nov 2026).
+        'akademik' => 'M4 19V5a2 2 0 012-2h13v16H6a2 2 0 00-2 2zM19 19v2H6M8 7h7M8 11h5',
+        'prestasi' => 'M12 15a6 6 0 100-12 6 6 0 000 12zM8.5 14L7 21l5-3 5 3-1.5-7',
+        'umpan_balik' => 'M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12zM8 11h8M8 14h5',
+        'kegiatan' => 'M5 21V4M5 4h11l-2 4 2 4H5',
     ];
 @endphp
 @php $penuh = in_array($nama, ['klinik'], true); @endphp

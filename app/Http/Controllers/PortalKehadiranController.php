@@ -13,8 +13,12 @@ use Illuminate\View\View;
 /** Menu KEHADIRAN ASRAMA di portal wali (4 Nov 2026) — dari kiriman ISE; ringkasan 7/30 hari & riwayat per hari. */
 class PortalKehadiranController extends Controller
 {
-    public function index(Request $request, AbsensiAsramaService $svc): View
+    public function index(Request $request, AbsensiAsramaService $svc): View|\Illuminate\Http\RedirectResponse
     {
+        // Saat menu dari API Histori ISE menyala, halaman lama (juga tujuan kabar "tidak hadir") pindah ke Absensi → Asrama.
+        if (\App\Services\PortalWali\HistoriIse::aktifUntuk(SesiWali::wali())) {
+            return redirect()->route('portal.absensi', array_filter(['tab' => 'asrama', 'anak' => $request->query('anak')]));
+        }
         $anak = Santri::where('id_wali', SesiWali::wali()->id)->where('status', 'aktif')->orderBy('nama')->get(['id', 'nama', 'id_wali', 'status']);
         $pilih = $anak->firstWhere('id', (int) $request->query('anak')) ?? $anak->first();
         $tanggal = rescue(fn () => Carbon::createFromFormat('Y-m-d', (string) $request->query('tanggal'), 'Asia/Jakarta'), null, false)

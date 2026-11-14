@@ -268,6 +268,14 @@ Route::prefix('wali/bantuan')->name('portal.bantuan')->middleware('portal.wali')
     Route::get('/', 'index')->name('');
     Route::post('/tanya', 'tanya')->name('.tanya')->middleware('throttle:10,1');
 });
+// Menu akademik dari API Histori ISE (14 Nov 2026) — hanya GET; BUKAN di bawah /wali/data. 404 bila saklar ISE_HISTORI mati.
+Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\App\Http\Controllers\PortalAkademikController::class)->group(function () {
+    Route::get('/akademik', 'akademik')->name('akademik');
+    Route::get('/absensi', 'absensi')->name('absensi');
+    Route::get('/prestasi', 'prestasi')->name('prestasi');
+    Route::get('/umpan-balik', 'umpanBalik')->name('umpan_balik');
+    Route::get('/kegiatan', 'kegiatan')->name('kegiatan');
+});
 // Kehadiran Asrama (4 Nov 2026) — absen kiriman ISE; di /wali/kehadiran, BUKAN /wali/data.
 Route::get('/wali/kehadiran', [\App\Http\Controllers\PortalKehadiranController::class, 'index'])->name('portal.kehadiran')->middleware('portal.wali');
 // Perizinan Insidental (4 Nov 2026) — wali mengajukan izin anak; di /wali/perizinan, BUKAN /wali/data.

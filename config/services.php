@@ -59,6 +59,18 @@ return [
     'ise' => [
         'token' => env('ISE_TOKEN'),
         'ip' => env('ISE_IP'),
+
+        // API My Al Wafi (keputusan user 13–14 Nov 2026): portal wali MEMBACA LANGSUNG histori ISE (tanpa disimpan),
+        // ERP MENGIRIM biodata santri. Kunci hanya di .env server — tak pernah ke browser. Lihat App\Services\PortalWali\HistoriIse.
+        'url' => env('ISE_URL', 'https://my.al-wafi.sch.id/api/all'),
+        'kunci_baca' => env('ISE_KUNCI_BACA'),
+        'kunci_ubah' => env('ISE_KUNCI_UBAH'),
+        // Menu akademik portal: mati | uji (hanya keluarga bertanda akun uji) | semua.
+        'histori' => env('ISE_HISTORI', 'mati'),
+        // Pengiriman biodata ERP → ISE: mati | uji (hanya santri bernama berawalan "UJI") | semua.
+        'sinkron' => env('ISE_SINKRON', 'mati'),
+        'batas_detik' => (int) env('ISE_BATAS_DETIK', 5),
+        'cache_menit' => (int) env('ISE_CACHE_MENIT', 5),
     ],
 
     'slack' => [
