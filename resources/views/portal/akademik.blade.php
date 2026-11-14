@@ -8,7 +8,7 @@
     @php
         $warnaLencana = ['hadir' => 'bg-emerald-100 text-emerald-800', 'terlambat' => 'bg-amber-100 text-amber-800', 'tidak_hadir' => 'bg-red-100 text-red-700',
             'izin' => 'bg-sky-100 text-sky-800', 'uzur' => 'bg-violet-100 text-violet-800', 'lainnya' => 'bg-slate-100 text-slate-600',
-            'libur' => 'bg-slate-200 text-slate-700', 'kosong' => 'bg-amber-100 text-amber-800'];
+            'libur' => 'bg-rose-100 text-rose-700', 'kosong' => 'bg-amber-100 text-amber-800'];
         $rute = 'portal.'.$menu;
         $q = fn (array $x = []) => route($rute, array_filter($x + ['anak' => $pilih?->id, 'tab' => $tab, 'bulan' => $bulan['kode'] ?? null]));
     @endphp
@@ -102,8 +102,10 @@
             {{-- Absensi per hari (permintaan user 14 Nov 2026): satu kartu per tanggal, sesi berurutan menurut jam. --}}
             <div class="space-y-3" data-per-hari>
                 @forelse ($hari as $h)
-                    <section class="rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
-                        <h2 class="border-b border-slate-100 px-4 py-2.5 text-sm font-bold text-slate-800">{{ $h['tanggal']?->translatedFormat('l, j M Y') ?? __('Tanpa tanggal') }}</h2>
+                    {{-- Hari libur diberi blok warna sendiri (permintaan user 15 Nov 2026) supaya beda dari hari sekolah. --}}
+                    @php $libur = ($h['keterangan_hari'][1] ?? null) === 'libur'; @endphp
+                    <section @class(['rounded-3xl shadow-sm ring-1', 'bg-white ring-slate-200' => ! $libur, 'bg-rose-50 ring-rose-200' => $libur]) @if ($libur) data-hari-libur @endif>
+                        <h2 @class(['border-b px-4 py-2.5 text-sm font-bold', 'border-slate-100 text-slate-800' => ! $libur, 'border-rose-100 text-rose-700' => $libur])>{{ $h['tanggal']?->translatedFormat('l, j M Y') ?? __('Tanpa tanggal') }}</h2>
                         <div class="divide-y divide-slate-100">
                             @if (! empty($h['keterangan_hari']))
                                 <div class="px-4 py-2.5 text-sm" data-keterangan-hari="{{ $h['keterangan_hari'][1] }}">

@@ -206,13 +206,25 @@ class PortalAkademikController extends Controller
         ];
     }
 
-    /** SELURUH catatan satu bulan: semua halaman ISE dalam rentang itu (paling banyak 10 × $per, pengaman). */
+    /**
+     * SELURUH catatan satu bulan: semua halaman ISE dalam rentang itu (paling banyak 10 × $per, pengaman).
+     * date_to ISE ternyata TIDAK menyertakan tanggal itu sendiri (diukur 15 Nov 2026: 6→6 Nov = 0 catatan, 6→7 Nov =
+     * 11 catatan tgl 6) — jadi diminta s.d. HARI SESUDAHNYA, lalu disaring sendiri ke dalam bulan ini.
+     */
     private function sebulan(HistoriIse $svc, Santri $santri, string $area, int $per, Carbon $awal, Carbon $akhir): array
     {
-        $hasil = $svc->daftar($santri, $area, 1, $per, $awal->format('Y-m-d'), $akhir->format('Y-m-d'));
+        $dari = $awal->format('Y-m-d');
+        $sampai = $akhir->copy()->addDay()->format('Y-m-d');
+        $hasil = $svc->daftar($santri, $area, 1, $per, $dari, $sampai);
         for ($h = 2; $hasil['dikenal'] && $h <= min(10, $hasil['halaman_akhir']); $h++) {
-            $hasil['baris'] = [...$hasil['baris'], ...$svc->daftar($santri, $area, $h, $per, $awal->format('Y-m-d'), $akhir->format('Y-m-d'))['baris']];
+            $hasil['baris'] = [...$hasil['baris'], ...$svc->daftar($santri, $area, $h, $per, $dari, $sampai)['baris']];
         }
+        $batas = $akhir->format('Y-m-d');
+        $hasil['baris'] = array_values(array_filter($hasil['baris'], function (array $b) use ($dari, $batas) {
+            $tgl = substr((string) ($b['date'] ?? $b['attendance_date'] ?? $b['check_in_at'] ?? ''), 0, 10);
+
+            return $tgl === '' || ($tgl >= $dari && $tgl <= $batas);
+        }));
         $hasil['halaman'] = $hasil['halaman_akhir'] = 1;
 
         return $hasil;
@@ -273,7 +285,10 @@ class PortalAkademikController extends Controller
             'asrama' => [
                 'judul' => $this->nama($b, 'attendance_type_name', 'attendance_type_id', __('Sesi')),
                 'keterangan' => $this->nama($b, 'dormitory_name', 'dormitory_id', __('Asrama')),
-                'waktu' => $this->waktu($this->gabung($b['attendance_date'] ?? null, $b['attendance_time'] ?? null)), 'hanya_tanggal' => false,
+                // Jam hanya untuk absen KARTU RFID (catatan "Terminal: …") = jam tempel kartu. Absen input musyrif
+                // jamnya = jam MENGISI aplikasi (sering sekaligus malam hari), bukan jam kegiatan → disembunyikan (user 15 Nov 2026).
+                'waktu' => $this->waktu($this->gabung($b['attendance_date'] ?? null, $b['attendance_time'] ?? null)),
+                'hanya_tanggal' => ! str_starts_with(trim((string) ($b['notes'] ?? '')), 'Terminal'),
                 'lencana' => array_values(array_filter([$this->lencana($b['status'] ?? null)])), 'nilai' => null, 'isi' => null,
             ],
             'ekstrakurikuler-absen' => [

@@ -135,7 +135,8 @@ class PortalAkademikIseTest extends TestCase
             '*/histori/asrama*' => Http::response(self::halaman([
                 ['id' => 1, 'dormitory_id' => 15, 'attendance_type_id' => 23, 'attendance_type_name' => 'Shalat Maghrib',
                     'attendance_date' => '2026-11-05 00:00:00', 'attendance_time' => '17:49:43', 'status' => 'absent'],
-                ['id' => 2, 'dormitory_id' => 15, 'attendance_type_id' => 5, 'attendance_date' => '2026-11-01 00:00:00', 'attendance_time' => '20:16', 'status' => 'absent'],
+                ['id' => 2, 'dormitory_id' => 15, 'attendance_type_id' => 5, 'attendance_date' => '2026-11-01 00:00:00', 'attendance_time' => '20:16', 'status' => 'absent',
+                    'notes' => 'Terminal: Masjid Kuwait (masjid_kuwait)'],
             ])),
             '*/histori/mutasi-asrama*' => Http::response(self::halaman([
                 ['id' => 538, 'dormitory_id' => 15, 'dormitory_name' => 'DAMASCUS 1C', 'start_date' => '2026-07-11 11:53:42', 'end_date' => null],
@@ -150,6 +151,10 @@ class PortalAkademikIseTest extends TestCase
         // 5 Nov (dalam izin) → Izin; 1 Nov (di luar izin) → Tidak hadir.
         $this->assertStringContainsString('bg-sky-100 text-sky-800">'.__('Izin'), $html);
         $this->assertStringContainsString('bg-red-100 text-red-700">Tidak hadir', $html);
+        // Jam hanya untuk absen kartu RFID (Terminal); jam input musyrif disembunyikan (user 15 Nov 2026).
+        $this->assertStringContainsString('>20:16<', $html);
+        $this->assertStringNotContainsString('17:49', $html);
+        $this->assertStringNotContainsString('Masjid Kuwait', $html);
     }
 
     /** Permintaan user 14 Nov 2026: absensi per BULAN pilihan wali (seluruh catatan, semua halaman ISE), dikelompokkan per hari. */
@@ -173,13 +178,13 @@ class PortalAkademikIseTest extends TestCase
             ->assertSeeInOrder(['Jumat, 13 Nov 2026', 'Shalat Maghrib', 'Kamis, 12 Nov 2026', 'Shalat Subuh', 'Shalat Isya', 'Senin, 2 Nov 2026', 'Shalat Dzuhur'])
             ->getContent();
         // Setiap tanggal 1–13 Nov tampil (14 Nov = hari ini tanpa catatan, belum); 3 hari bercatatan, 10 diberi keterangan.
-        $this->assertSame(13, substr_count($html, '<section class="rounded-3xl bg-white shadow-sm'), 'satu kartu per tanggal');
+        $this->assertSame(13, substr_count($html, '<section class="rounded-3xl shadow-sm ring-1'), 'satu kartu per tanggal');
         $this->assertSame(10, substr_count($html, 'data-keterangan-hari='));
-        Http::assertSent(fn (PermintaanHttp $r) => str_contains($r->url(), '/histori/asrama?') && $r['date_from'] === '2026-11-01' && $r['date_to'] === '2026-11-30' && (int) $r['page'] === 2);
+        Http::assertSent(fn (PermintaanHttp $r) => str_contains($r->url(), '/histori/asrama?') && $r['date_from'] === '2026-11-01' && $r['date_to'] === '2026-12-01' && (int) $r['page'] === 2);
 
         // Pilih Agustus 2026 lewat formulir; bulan depan (Desember) ditolak → kembali ke bulan berjalan.
         $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'harian', 'bln' => 8, 'thn' => 2026]))->assertOk()->assertSee('<option value="8" selected', false);
-        Http::assertSent(fn (PermintaanHttp $r) => str_contains($r->url(), '/histori/harian?') && $r['date_from'] === '2026-08-01' && $r['date_to'] === '2026-08-31');
+        Http::assertSent(fn (PermintaanHttp $r) => str_contains($r->url(), '/histori/harian?') && $r['date_from'] === '2026-08-01' && $r['date_to'] === '2026-09-01');
         $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'harian', 'bulan' => '2026-12']))->assertOk()->assertSee('<option value="11" selected', false);
         \Illuminate\Support\Carbon::setTestNow();
     }

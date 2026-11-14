@@ -94,6 +94,9 @@ class KalenderLiburAbsensiTest extends TestCase
         $this->assertArrayNotHasKey('Kamis, 12 Nov 2026', $k, 'hari bercatatan tak diberi keterangan');
         $this->assertStringNotContainsString('Sabtu, 14 Nov 2026', $html, 'hari ini tanpa catatan belum ditampilkan');
         $this->assertSame(1, substr_count($html, 'Kamis, 12 Nov 2026'));
+        // Blok warna hari libur (15 Nov 2026): Minggu 1, Selasa 3 (kalender), Sabtu 7, Minggu 8 Nov.
+        $this->assertSame(4, substr_count($html, 'data-hari-libur'));
+        $this->assertMatchesRegularExpression('/bg-rose-50 ring-rose-200"\s+data-hari-libur/', $html);
 
         // Absen ASRAMA: akhir pekan bukan libur, tapi kepulangan (cakupan asrama) libur.
         $k = $this->keterangan($this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'asrama']))->assertOk()->getContent());
