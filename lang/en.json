@@ -1357,7 +1357,6 @@
     "sekarang": "now",
     "Data santri ini belum tersedia di sistem sekolah.": "This student's data is not yet available in the school system.",
     "Belum ada data.": "No data yet.",
-    "Berkas PDF belum bisa dibuka dari aplikasi ini. Fitur unduh menyusul.": "PDF files cannot be opened from this app yet. Downloads are coming soon.",
     "Sebelumnya": "Previous",
     "Berikutnya": "Next",
     "Halaman :a dari :b": "Page :a of :b",
@@ -1369,5 +1368,8 @@
     "Tidak ada catatan pada bulan ini.": "No records this month.",
     "Hari Libur": "Holiday",
     "Sakit": "Sick",
-    "Tidak ada data absen & keterangan": "No attendance record or note"
+    "Tidak ada data absen & keterangan": "No attendance record or note",
+    "Tempel kartu :jam": "Card tapped :jam",
+    "Jam kegiatan": "Activity time",
+    "Lihat PDF": "View PDF"
 }

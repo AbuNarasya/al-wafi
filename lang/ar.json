@@ -1357,7 +1357,6 @@
     "sekarang": "الآن",
     "Data santri ini belum tersedia di sistem sekolah.": "بيانات هذا الطالب غير متوفرة بعد في نظام المدرسة.",
     "Belum ada data.": "لا توجد بيانات بعد.",
-    "Berkas PDF belum bisa dibuka dari aplikasi ini. Fitur unduh menyusul.": "لا يمكن فتح ملفات PDF من هذا التطبيق بعد. ستتوفر خاصية التنزيل قريبًا.",
     "Sebelumnya": "السابق",
     "Berikutnya": "التالي",
     "Halaman :a dari :b": "الصفحة :a من :b",
@@ -1369,5 +1368,8 @@
     "Tidak ada catatan pada bulan ini.": "لا توجد سجلات هذا الشهر.",
     "Hari Libur": "عطلة",
     "Sakit": "مريض",
-    "Tidak ada data absen & keterangan": "لا يوجد سجل حضور ولا ملاحظة"
+    "Tidak ada data absen & keterangan": "لا يوجد سجل حضور ولا ملاحظة",
+    "Tempel kartu :jam": "تم تمرير البطاقة :jam",
+    "Jam kegiatan": "وقت النشاط",
+    "Lihat PDF": "عرض PDF"
 }

@@ -152,7 +152,7 @@ class PortalAkademikIseTest extends TestCase
         $this->assertStringContainsString('bg-sky-100 text-sky-800">'.__('Izin'), $html);
         $this->assertStringContainsString('bg-red-100 text-red-700">Tidak hadir', $html);
         // Jam hanya untuk absen kartu RFID (Terminal); jam input musyrif disembunyikan (user 15 Nov 2026).
-        $this->assertStringContainsString('>20:16<', $html);
+        $this->assertStringContainsString('Tempel kartu 20:16', $html);
         $this->assertStringNotContainsString('17:49', $html);
         $this->assertStringNotContainsString('Masjid Kuwait', $html);
     }
@@ -187,6 +187,49 @@ class PortalAkademikIseTest extends TestCase
         Http::assertSent(fn (PermintaanHttp $r) => str_contains($r->url(), '/histori/harian?') && $r['date_from'] === '2026-08-01' && $r['date_to'] === '2026-09-01');
         $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'harian', 'bulan' => '2026-12']))->assertOk()->assertSee('<option value="11" selected', false);
         \Illuminate\Support\Carbon::setTestNow();
+    }
+
+    /** Data ISE v2 (15 Nov 2026): jam JADWAL kegiatan, status rinci, metode; Haid tetap "Uzur". */
+    public function test_absen_asrama_memakai_jam_jadwal_dan_status_rinci(): void
+    {
+        $a = fn ($sesi, $jadwal, $catat, $st, $rinci, $metode) => ['attendance_type_name' => $sesi, 'attendance_type_time' => $jadwal,
+            'attendance_date' => now('Asia/Jakarta')->format('Y-m-d').' 00:00:00', 'attendance_time' => $catat, 'status' => $st, 'status_raw' => $rinci, 'method' => $metode];
+        Http::fake(['*/histori/asrama*' => Http::response(self::halaman([
+            $a('Fajr Congregational Prayer', '04:30:00', '21:39', 'late', 'Masbuq', 'manual'),
+            $a('Maghrib Congregational Prayer', '17:45:00', '17:48:52', 'present', 'Sebelum Adzan', 'rfid'),
+            $a('Morning Dzikir', '05:15:00', '21:41', 'excused', 'Haid', 'manual'),
+        ])), '*' => Http::response(self::halaman([]))]);
+
+        $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'asrama']))->assertOk()
+            ->assertSeeInOrder(['Fajr Congregational Prayer', '04:30', 'Terlambat · Masbuq', 'Morning Dzikir', '05:15', 'Uzur', 'Maghrib Congregational Prayer', 'Tempel kartu 17:48', '17:45', 'Hadir · Sebelum Adzan'])
+            ->assertDontSee('21:39')->assertDontSee('Haid');
+    }
+
+    /** PDF rapor/sertifikat (ISE 15 Nov 2026): diteruskan ERP, hanya anak aktif sendiri, kunci tak bocor. */
+    public function test_pdf_rapor_diteruskan_hanya_untuk_anak_sendiri(): void
+    {
+        Http::fake([
+            '*/histori/sertifikat/1479/file*' => Http::response('%PDF-1.4 isi-rapor', 200, ['Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="RAPOR AHMAD.pdf"']),
+            '*/histori/sertifikat/999/file*' => Http::response(['success' => false], 404),
+            '*/histori/sertifikat*' => Http::response(self::halaman([
+                ['id' => 1479, 'type_name' => 'Rapor PTS Semester Gasal TP 2026/2027', 'issued_at' => '2026-10-26 00:00:00', 'file_url' => 'https://ise.contoh/x.pdf'],
+            ])),
+        ]);
+
+        $this->sebagaiIbu()->get(route('portal.akademik', ['tab' => 'rapor']))->assertOk()
+            ->assertSee(route('portal.berkas_sekolah', ['id' => 1479, 'anak' => $this->ahmad->id]), false)->assertDontSee('https://ise.contoh/x.pdf');
+
+        $r = $this->sebagaiIbu()->get(route('portal.berkas_sekolah', ['id' => 1479, 'anak' => $this->ahmad->id]))->assertOk();
+        $this->assertSame('%PDF-1.4 isi-rapor', $r->getContent());
+        $this->assertSame('application/pdf', $r->headers->get('Content-Type'));
+        $this->assertStringContainsString('inline; filename="RAPOR AHMAD.pdf"', $r->headers->get('Content-Disposition'));
+        Http::assertSent(fn (PermintaanHttp $q) => str_contains($q->url(), '/histori/sertifikat/1479/file') && $q['nis'] === '2425010541' && $q->hasHeader('X-Api-Key', self::KUNCI));
+
+        // Anak keluarga lain → 404 tanpa memanggil ISE; berkas yang ditolak ISE → 404.
+        $this->sebagaiIbu()->get(route('portal.berkas_sekolah', ['id' => 1479, 'anak' => $this->lain->id]))->assertNotFound();
+        Http::assertNotSent(fn (PermintaanHttp $q) => ($q['nis'] ?? null) === '9999999999');
+        $this->sebagaiIbu()->get(route('portal.berkas_sekolah', ['id' => 999, 'anak' => $this->ahmad->id]))->assertNotFound();
     }
 
     public function test_halaman_kehadiran_lama_dialihkan_saat_menu_ise_menyala(): void

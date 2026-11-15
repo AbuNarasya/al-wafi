@@ -81,6 +81,33 @@ class PortalAkademikController extends Controller
         return $this->tampil($r, 'kegiatan');
     }
 
+    /**
+     * PDF rapor/sertifikat dari ISE, diteruskan ERP (kunci baca tak pernah ke browser). Hanya untuk anak AKTIF keluarga
+     * yang masuk; ISE sendiri juga menolak id milik santri lain. Dibuka di tab baru (inline).
+     */
+    public function berkas(Request $r, int $id): \Symfony\Component\HttpFoundation\Response
+    {
+        $wali = SesiWali::wali();
+        abort_unless(HistoriIse::aktifUntuk($wali), 404);
+        $santri = Santri::where('id_wali', $wali->id)->where('status', 'aktif')->findOrFail((int) $r->query('anak'));
+        try {
+            $berkas = (new HistoriIse)->berkas($santri, $id);
+        } catch (HistoriIseGagal $e) {
+            Log::warning('Berkas ISE gagal diambil', ['id' => $id, 'santri' => $santri->id, 'pesan' => $e->getMessage()]);
+
+            return back()->with('error', __('Data dari sistem sekolah sedang tidak bisa dimuat.').' '.__('Silakan coba lagi beberapa saat lagi.'));
+        }
+        abort_if($berkas === null, 404);
+        $nama = preg_replace('/[^\w .()-]+/u', '_', $berkas['nama']) ?: "berkas-{$id}.pdf";
+
+        return response($berkas['isi'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$nama.'"',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     private function tampil(Request $r, string $menu): View
     {
         $wali = SesiWali::wali();
@@ -245,7 +272,8 @@ class PortalAkademikController extends Controller
         }
         krsort($kelompok);
         foreach ($kelompok as &$k) {
-            usort($k['baris'], fn ($a, $b) => ($a['waktu']?->timestamp ?? 0) <=> ($b['waktu']?->timestamp ?? 0));
+            // Urut menurut jam kegiatan bila ada (asrama), selain itu jam catatan.
+            usort($k['baris'], fn ($a, $b) => (($a['urut'] ?? $a['waktu'])?->timestamp ?? 0) <=> (($b['urut'] ?? $b['waktu'])?->timestamp ?? 0));
         }
 
         return array_values($kelompok);
@@ -285,11 +313,15 @@ class PortalAkademikController extends Controller
             'asrama' => [
                 'judul' => $this->nama($b, 'attendance_type_name', 'attendance_type_id', __('Sesi')),
                 'keterangan' => $this->nama($b, 'dormitory_name', 'dormitory_id', __('Asrama')),
-                // Jam hanya untuk absen KARTU RFID (catatan "Terminal: …") = jam tempel kartu. Absen input musyrif
-                // jamnya = jam MENGISI aplikasi (sering sekaligus malam hari), bukan jam kegiatan → disembunyikan (user 15 Nov 2026).
+                // attendance_time = jam PENCATATAN (input musyrif sering sekaligus malam hari) → tak ditampilkan sebagai jam
+                // kegiatan. Yang ditampilkan: jam JADWAL kegiatan (attendance_type_time, ISE 15 Nov 2026); untuk absen kartu
+                // RFID juga jam tempel kartunya. `method` dari ISE; cadangan: catatan "Terminal: …".
                 'waktu' => $this->waktu($this->gabung($b['attendance_date'] ?? null, $b['attendance_time'] ?? null)),
-                'hanya_tanggal' => ! str_starts_with(trim((string) ($b['notes'] ?? '')), 'Terminal'),
-                'lencana' => array_values(array_filter([$this->lencana($b['status'] ?? null)])), 'nilai' => null, 'isi' => null,
+                'hanya_tanggal' => true,
+                'jam' => $this->jamPendek($b['attendance_type_time'] ?? null),
+                'jam_kartu' => $this->metode($b) === 'rfid' ? $this->jamPendek($b['attendance_time'] ?? null) : null,
+                'urut' => $this->waktu($this->gabung($b['attendance_date'] ?? null, $b['attendance_type_time'] ?? $b['attendance_time'] ?? null)),
+                'lencana' => array_values(array_filter([$this->lencanaRinci($b['status'] ?? null, $b['status_raw'] ?? null)])), 'nilai' => null, 'isi' => null,
             ],
             'ekstrakurikuler-absen' => [
                 'judul' => $this->nama($b, 'extracurricular_name', 'extracurricular_id', __('Ekskul')), 'keterangan' => null,
@@ -305,6 +337,9 @@ class PortalAkademikController extends Controller
             'sertifikat' => [
                 'judul' => (string) ($b['type_name'] ?? __('Sertifikat')), 'keterangan' => null,
                 'waktu' => $this->waktu($b['issued_at'] ?? null), 'hanya_tanggal' => true, 'lencana' => [], 'nilai' => null, 'isi' => null,
+                // PDF diambil lewat ERP (kunci baca tak pernah ke browser) — PortalAkademikController::berkas.
+                'berkas' => filled($b['id'] ?? null) && (filled($b['file_url'] ?? null) || filled($b['file_path'] ?? null))
+                    ? route('portal.berkas_sekolah', ['id' => $b['id'], 'anak' => $santri->id]) : null,
             ],
             'feedback' => [
                 'judul' => (string) ($b['title'] ?? __('Umpan balik')),
@@ -398,6 +433,42 @@ class PortalAkademikController extends Controller
         $jamTeks = filled($jam) ? ' '.rescue(fn () => Carbon::parse($jam, 'Asia/Jakarta')->format('H:i'), '', false) : '';
 
         return [trim(($awalan ? $awalan.': ' : '').$label.$jamTeks), $kategori];
+    }
+
+    /**
+     * Lencana absen asrama dengan status RINCI ISE (status_raw: "Setelah Adzan", "Masbuq", "Tidak Jama'ah", "Haid", …):
+     * kategori dari status rinci bila dikenali, label "Terlambat · Masbuq". Haid tetap tampil "Uzur" saja.
+     */
+    private function lencanaRinci(?string $status, ?string $rinci): ?array
+    {
+        $dasar = $this->lencana($status);
+        if (! filled($rinci)) {
+            return $dasar;
+        }
+        $kategori = AbsensiAsramaService::kategori($rinci);
+        $kategori = $kategori === 'lainnya' ? ($dasar[1] ?? 'lainnya') : $kategori;
+        $label = __(AbsensiAsramaService::LABEL_KATEGORI[$kategori] ?? 'Lainnya');
+        $umum = ['present', 'absent', 'late', 'excused', 'hadir', 'tidak hadir', 'terlambat', 'izin'];
+        if ($kategori !== 'uzur' && ! in_array(mb_strtolower(trim($rinci)), $umum, true) && mb_strtolower(trim($rinci)) !== mb_strtolower($label)) {
+            $label .= ' · '.trim($rinci);
+        }
+
+        return [$label, $kategori];
+    }
+
+    /** rfid | manual — kolom `method` ISE; cadangan dari catatan "Terminal: …". */
+    private function metode(array $b): string
+    {
+        if (in_array($b['method'] ?? null, ['rfid', 'manual'], true)) {
+            return $b['method'];
+        }
+
+        return str_starts_with(trim((string) ($b['notes'] ?? '')), 'Terminal') ? 'rfid' : 'manual';
+    }
+
+    private function jamPendek(?string $jam): ?string
+    {
+        return filled($jam) && preg_match('/^(\d{1,2}):(\d{2})/', trim($jam), $m) ? sprintf('%02d:%s', $m[1], $m[2]) : null;
     }
 
     private function nama(array $b, string $kolomNama, string $kolomId, string $jenis): string

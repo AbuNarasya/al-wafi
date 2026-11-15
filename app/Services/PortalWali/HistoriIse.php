@@ -47,6 +47,37 @@ final class HistoriIse
             fn () => $this->ambil($santri, $area, $halaman, $perHalaman, $dari, $sampai));
     }
 
+    /**
+     * Berkas PDF sertifikat/rapor (GET /histori/sertifikat/{id}/file, ISE 15 Nov 2026). ISE menolak (404) bila id bukan
+     * milik santri itu; PEMANGGIL tetap wajib memastikan santri milik wali. Tak di-cache.
+     *
+     * @return array{isi:string, jenis:string, nama:string}|null  null = berkas tak ada / bukan milik santri
+     *
+     * @throws HistoriIseGagal
+     */
+    public function berkas(Santri $santri, int $id): ?array
+    {
+        $url = rtrim((string) config('services.ise.url'), '/')."/histori/sertifikat/{$id}/file";
+        try {
+            $jawab = Http::withHeaders(['X-Api-Key' => (string) config('services.ise.kunci_baca')])
+                ->timeout(30)->connectTimeout(3)
+                ->withOptions(['curl' => [CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4]])
+                ->get($url, array_filter(['id_erp' => $santri->id, 'nis' => $santri->nis], fn ($v) => filled($v)));
+        } catch (\Throwable $e) {
+            throw new HistoriIseGagal('ISE tak terjangkau: '.$e->getMessage(), previous: $e);
+        }
+        if (in_array($jawab->status(), [404, 422], true)) {
+            return null;
+        }
+        $jenis = strtolower(trim(explode(';', (string) $jawab->header('Content-Type'))[0]));
+        if (! $jawab->successful() || $jenis !== 'application/pdf') {
+            throw new HistoriIseGagal("ISE menjawab {$jawab->status()} ({$jenis}) untuk berkas {$id}.");
+        }
+        preg_match('/filename="?([^";]+)"?/i', (string) $jawab->header('Content-Disposition'), $m);
+
+        return ['isi' => $jawab->body(), 'jenis' => 'application/pdf', 'nama' => trim($m[1] ?? "berkas-{$id}.pdf")];
+    }
+
     /** $dari/$sampai = YYYY-MM-DD (date_from/date_to ISE, inklusif). */
     private function ambil(Santri $santri, string $area, int $halaman, int $perHalaman, ?string $dari, ?string $sampai): array
     {

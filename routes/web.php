@@ -275,6 +275,8 @@ Route::prefix('wali')->name('portal.')->middleware('portal.wali')->controller(\A
     Route::get('/prestasi', 'prestasi')->name('prestasi');
     Route::get('/umpan-balik', 'umpanBalik')->name('umpan_balik');
     Route::get('/kegiatan', 'kegiatan')->name('kegiatan');
+    // PDF rapor/sertifikat dari ISE (15 Nov 2026) — diteruskan ERP; ?anak= wajib anak aktif keluarga ini.
+    Route::get('/berkas-sekolah/{id}', 'berkas')->name('berkas_sekolah')->whereNumber('id')->middleware('throttle:30,1');
 });
 // Kehadiran Asrama (4 Nov 2026) — absen kiriman ISE; di /wali/kehadiran, BUKAN /wali/data.
 Route::get('/wali/kehadiran', [\App\Http\Controllers\PortalKehadiranController::class, 'index'])->name('portal.kehadiran')->middleware('portal.wali');

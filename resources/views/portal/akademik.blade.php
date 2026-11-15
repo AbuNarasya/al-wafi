@@ -116,6 +116,7 @@
                                 <div class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                                     <div class="min-w-0">
                                         @if ($tab !== 'harian')<p class="truncate font-medium text-slate-900">{{ $b['judul'] }}</p>@endif
+                                        @if (! empty($b['jam_kartu']))<p class="text-xs text-slate-500">{{ __('Tempel kartu :jam', ['jam' => $b['jam_kartu']]) }}</p>@endif
                                         @if ($b['keterangan'] && $tab !== 'asrama')<p class="truncate text-xs text-slate-500">{{ $b['keterangan'] }}</p>@endif
                                         @if ($b['lencana'] && $tab === 'harian')
                                             <div class="flex flex-wrap gap-1.5">
@@ -127,7 +128,11 @@
                                     </div>
                                     @if ($tab !== 'harian')
                                         <div class="flex shrink-0 items-center gap-2">
-                                            @if ($b['waktu'] && ! $b['hanya_tanggal'])<span class="text-xs tabular-nums text-slate-500">{{ $b['waktu']->format('H:i') }}</span>@endif
+                                            @if (! empty($b['jam']))
+                                                <span class="text-xs tabular-nums text-slate-500" title="{{ __('Jam kegiatan') }}">{{ $b['jam'] }}</span>
+                                            @elseif ($b['waktu'] && ! $b['hanya_tanggal'])
+                                                <span class="text-xs tabular-nums text-slate-500">{{ $b['waktu']->format('H:i') }}</span>
+                                            @endif
                                             @foreach ($b['lencana'] as [$teks, $kategori])
                                                 <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $warnaLencana[$kategori] ?? $warnaLencana['lainnya'] }}">{{ $teks }}</span>
                                             @endforeach
@@ -183,15 +188,18 @@
                         @if ($b['isi'])
                             <p class="mt-2 whitespace-pre-line text-slate-700">{{ $b['isi'] }}</p>
                         @endif
+                        @if (! empty($b['berkas']))
+                            <a href="{{ $b['berkas'] }}" target="_blank" rel="noopener" data-berkas-sekolah
+                               class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white">
+                                <x-portal.ikon nama="unggah" kelas="h-4 w-4 rotate-180" /> {{ __('Lihat PDF') }}
+                            </a>
+                        @endif
                     </div>
                 @empty
                     <p class="p-6 text-center text-sm text-slate-500">{{ __('Belum ada data.') }}</p>
                 @endforelse
             </div>
 
-            @if (in_array($tab, ['rapor', 'sertifikat'], true) && $hasil['baris'])
-                <p class="mt-2 px-2 text-xs text-slate-500">{{ __('Berkas PDF belum bisa dibuka dari aplikasi ini. Fitur unduh menyusul.') }}</p>
-            @endif
 
             @if ($hasil['halaman_akhir'] > 1)
                 <div class="mt-3 flex items-center justify-between text-sm" data-halaman-ise>
