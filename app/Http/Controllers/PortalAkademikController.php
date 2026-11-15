@@ -373,9 +373,10 @@ class PortalAkademikController extends Controller
                 'waktu' => $this->waktu($this->gabung($b['attendance_date'] ?? null, $b['attendance_time'] ?? null)),
                 'hanya_tanggal' => true,
                 'jam' => $this->jamPendek($b['attendance_type_time'] ?? null),
-                // Jam tap kartu TIDAK ditampilkan (user 15 Nov 2026): attendance_time ISE ikut berubah saat catatan disunting
-                // dan status tak dicocokkan dengan jam (enforce_time 0) → menyesatkan. Yang ditampilkan hanya SUMBERNYA.
                 'sumber' => $this->metode($b) === 'rfid' ? __('Kartu RFID') : __('Dicatat musyrif'),
+                // Jam tap kartu = created_at (saat catatan DIBUAT oleh terminal), BUKAN attendance_time yang ikut berubah saat
+                // musyrif menyunting (contoh: tap 03:54 → attendance_time 15:00). Hanya untuk absen kartu RFID (user 15 Nov 2026).
+                'jam_kartu' => $this->metode($b) === 'rfid' ? $this->jamPendek(substr((string) ($b['created_at'] ?? ''), 11)) : null,
                 'urut' => $this->waktu($this->gabung($b['attendance_date'] ?? null, $b['attendance_type_time'] ?? $b['attendance_time'] ?? null)),
                 'lencana' => array_values(array_filter([self::kelompokAsrama($b) === 'perizinan'
                     ? $this->lencanaNetral($b['status_raw'] ?? $b['status'] ?? null)

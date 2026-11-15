@@ -199,14 +199,17 @@ class PortalAkademikIseTest extends TestCase
             'attendance_date' => now('Asia/Jakarta')->format('Y-m-d').' 00:00:00', 'attendance_time' => $catat, 'status' => $st, 'status_raw' => $rinci, 'method' => $metode];
         Http::fake(['*/histori/asrama*' => Http::response(self::halaman([
             $a('Fajr Congregational Prayer', '04:30:00', '21:39', 'late', 'Masbuq', 'manual'),
-            $a('Maghrib Congregational Prayer', '17:45:00', '17:48:52', 'present', 'Sebelum Adzan', 'rfid'),
+            // Disunting belakangan: attendance_time berubah (17:48), created_at = jam tap asli (17:46).
+            $a('Maghrib Congregational Prayer', '17:45:00', '17:48:52', 'present', 'Sebelum Adzan', 'rfid') + ['created_at' => now('Asia/Jakarta')->format('Y-m-d').' 17:46:13'],
             $a('Morning Dzikir', '05:15:00', '21:41', 'excused', 'Haid', 'manual'),
         ])), '*' => Http::response(self::halaman([]))]);
 
         $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'asrama']))->assertOk()
             // Di bawah nama: Jadwal + sumber (Kartu RFID / Dicatat musyrif); jam tap kartu tak ditampilkan (user 15 Nov 2026).
-            ->assertSeeInOrder(['Fajr Congregational Prayer', 'Jadwal', '04:30', 'Dicatat musyrif', 'Terlambat · Masbuq', 'Morning Dzikir', 'Jadwal', '05:15', 'Uzur',
-                'Maghrib Congregational Prayer', 'Jadwal', '17:45', 'Kartu RFID', 'Hadir · Sebelum Adzan'])
+            // Urut menurut jadwal (04:30, 05:15, 17:45) tapi jam jadwal tak ditampilkan (user 15 Nov 2026).
+            ->assertSeeInOrder(['Fajr Congregational Prayer', 'Dicatat musyrif', 'Terlambat · Masbuq', 'Morning Dzikir', 'Uzur',
+                'Maghrib Congregational Prayer', 'Kartu RFID', 'Waktu Kehadiran', '17:46', 'Hadir · Sebelum Adzan'])
+            ->assertDontSee('data-jadwal', false)->assertDontSee('04:30')
             ->assertDontSee('17:48')
             ->assertDontSee('21:39')->assertDontSee('Haid');
     }
