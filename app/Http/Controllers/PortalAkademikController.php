@@ -57,10 +57,12 @@ class PortalAkademikController extends Controller
     ];
 
     /** Arti kategori/jenis umpan balik dari ISE → label wali. Nilai lain ditampilkan apa adanya. */
-    private const JENIS_UMPAN_BALIK = ['positive' => 'Apresiasi', 'negative' => 'Perlu perhatian', 'neutral' => 'Catatan'];
+    private const JENIS_UMPAN_BALIK = ['positive' => 'Apresiasi', 'negative' => 'Perlu perhatian', 'neutral' => 'Catatan',
+        'improvement' => 'Perlu ditingkatkan', 'concern' => 'Perlu perhatian'];
 
     private const KATEGORI_UMPAN_BALIK = ['behavior' => 'Perilaku', 'academic' => 'Akademik', 'attendance' => 'Kehadiran',
-        'discipline' => 'Kedisiplinan', 'social' => 'Sosial', 'health' => 'Kesehatan'];
+        'discipline' => 'Kedisiplinan', 'social' => 'Sosial', 'health' => 'Kesehatan', 'general' => 'Umum',
+        'participation' => 'Partisipasi', 'assignment' => 'Tugas'];
 
     public function akademik(Request $r): View
     {
@@ -405,7 +407,7 @@ class PortalAkademikController extends Controller
                 ])) ?: null,
                 'waktu' => $this->waktu($b['created_at'] ?? null), 'hanya_tanggal' => true,
                 'lencana' => filled($b['type'] ?? null) ? [[__(self::JENIS_UMPAN_BALIK[$b['type']] ?? ucfirst((string) $b['type'])),
-                    match ($b['type']) { 'positive' => 'hadir', 'negative' => 'terlambat', default => 'lainnya' }]] : [],
+                    match ($b['type']) { 'positive' => 'hadir', 'negative', 'concern', 'improvement' => 'terlambat', default => 'lainnya' }]] : [],
                 'nilai' => null, 'isi' => $this->teks($b['content'] ?? null),
             ],
             'laporan-asrama' => [
