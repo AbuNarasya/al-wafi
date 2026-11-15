@@ -43,6 +43,7 @@ final class MenuPortal
         'prestasi' => ['portal.prestasi', 'Prestasi', 'prestasi', '#b45309', 'akademik', 'ise'],
         'umpan_balik' => ['portal.umpan_balik', 'Umpan Balik Guru', 'umpan_balik', '#7c3aed', 'akademik', 'ise'],
         'kegiatan' => ['portal.kegiatan', 'Kegiatan', 'kegiatan', '#0e7490', 'akademik', 'ise'],
+        'penilaian_asrama' => ['portal.penilaian_asrama', 'Penilaian Asrama', 'penilaian', '#be185d', 'akademik', 'ise'],
         'pendaftaran' => ['portal.daftar', 'Pendaftaran', 'psb', '#9b7bb0', 'administrasi', null],
         'klinik' => ['portal.klinik', 'Riwayat klinik', 'klinik', '#b91c1c', 'lainnya', null],
         'laundry' => ['portal.laundry', 'Laundry', 'laundry', '#0891b2', 'lainnya', null],

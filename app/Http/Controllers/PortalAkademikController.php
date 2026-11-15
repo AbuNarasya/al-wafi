@@ -34,7 +34,8 @@ class PortalAkademikController extends Controller
         // catatan bulan itu ditampilkan (saringan tanggal ISE; semua halaman ISE diambil). Elemen ke-5 = 'bulan'.
         'absensi' => ['Absensi', 'absensi', '#15803d', [
             'harian' => ['Harian', 'harian', null, 200, 'bulan'],
-            'asrama' => ['Asrama', 'asrama', null, 200, 'bulan'],
+            // Tanpa kegiatan berjenis PENILAIAN (config ise_asrama) — itu di menu Penilaian Asrama.
+            'asrama' => ['Asrama', 'asrama', 'absen_asrama', 200, 'bulan'],
             'halaqah' => ['Halaqah', 'halaqah', null, 200, 'bulan'],
             'ekskul' => ['Ekskul', 'ekstrakurikuler-absen', null, 200, 'bulan'],
         ]],
@@ -47,6 +48,11 @@ class PortalAkademikController extends Controller
         ]],
         'kegiatan' => ['Kegiatan', 'kegiatan', '#0e7490', [
             'kegiatan' => ['Kegiatan', 'event', null, 20],
+        ]],
+        // Penilaian asrama (permintaan user 15 Nov 2026): kebersihan, adab, kedisiplinan, ujian bahasa — dari area
+        // `asrama` ISE yang jenisnya berkelompok `penilaian` (config ise_asrama). Per bulan, per hari + ringkasan.
+        'penilaian_asrama' => ['Penilaian Asrama', 'penilaian', '#be185d', [
+            'penilaian' => ['Penilaian', 'asrama', 'penilaian', 200, 'bulan'],
         ]],
     ];
 
@@ -79,6 +85,17 @@ class PortalAkademikController extends Controller
     public function kegiatan(Request $r): View
     {
         return $this->tampil($r, 'kegiatan');
+    }
+
+    public function penilaianAsrama(Request $r): View
+    {
+        return $this->tampil($r, 'penilaian_asrama');
+    }
+
+    /** absen | penilaian | perizinan — kelompok jenis kegiatan asrama ISE (config ise_asrama); tak terdaftar = absen. */
+    public static function kelompokAsrama(array $b): string
+    {
+        return config('ise_asrama.kegiatan.'.(int) ($b['attendance_type_id'] ?? 0).'.1') ?? 'absen';
     }
 
     /**
@@ -149,8 +166,11 @@ class PortalAkademikController extends Controller
                         $hari = $this->lengkapiHari($hari, $pilih, $tab === 'harian' ? 'sekolah' : 'asrama', $bulan['awal'], $bulan['akhir']);
                     }
                 }
-                if ($area === 'asrama') {
+                if ($tab === 'asrama') {
                     $kamar = $this->kamar($svc->daftar($pilih, 'mutasi-asrama', 1, 10)['baris']);
+                }
+                if ($tab === 'penilaian') {
+                    $ringkasan = $this->ringkasPenilaian($hasil['baris']);
                 }
             } catch (HistoriIseGagal $e) {
                 Log::warning('Histori ISE gagal dibaca', ['area' => $area, 'santri' => $pilih->id, 'pesan' => $e->getMessage()]);
@@ -158,7 +178,30 @@ class PortalAkademikController extends Controller
             }
         }
 
-        return view('portal.akademik', compact('menu', 'judul', 'ikon', 'warna', 'tabs', 'tab', 'anak', 'pilih', 'hasil', 'kamar', 'gagal', 'hari', 'bulan'));
+        $ringkasan ??= null;
+
+        return view('portal.akademik', compact('menu', 'judul', 'ikon', 'warna', 'tabs', 'tab', 'anak', 'pilih', 'hasil', 'kamar', 'gagal', 'hari', 'bulan', 'ringkasan'));
+    }
+
+    /**
+     * Ringkasan sebulan per kegiatan penilaian: berapa kali tiap nilai, urut nilai terbaik dulu.
+     *
+     * @return list<array{kegiatan:string, nilai:list<array{0:string,1:string,2:int}>}>
+     */
+    private function ringkasPenilaian(array $baris): array
+    {
+        $kelompok = [];
+        foreach ($baris as $b) {
+            [$label, $warna] = $b['lencana'][0] ?? [__('Belum dinilai'), 'lainnya'];
+            $kelompok[$b['judul']][$label] ??= [$label, $warna, 0];
+            $kelompok[$b['judul']][$label][2]++;
+        }
+        ksort($kelompok);
+
+        $peringkat = ['hadir' => 0, 'izin' => 1, 'terlambat' => 2, 'tidak_hadir' => 3];
+
+        return array_map(fn ($k, $v) => ['kegiatan' => $k, 'nilai' => collect($v)
+            ->sortBy(fn ($n) => sprintf('%d-%s', $peringkat[$n[1]] ?? 9, $n[0]))->values()->all()], array_keys($kelompok), $kelompok);
     }
 
     /**
@@ -289,6 +332,8 @@ class PortalAkademikController extends Controller
             'prestasi' => array_filter($baris, fn ($b) => ! $rapor($b)),
             // Laporan musyrif & umpan balik guru yang masih draf belum untuk wali.
             'final' => array_filter($baris, fn ($b) => mb_strtolower((string) ($b['status'] ?? '')) !== 'draft'),
+            'absen_asrama' => array_filter($baris, fn ($b) => self::kelompokAsrama($b) !== 'penilaian'),
+            'penilaian' => array_filter($baris, fn ($b) => self::kelompokAsrama($b) === 'penilaian'),
             default => $baris,
         });
     }
@@ -310,8 +355,15 @@ class PortalAkademikController extends Controller
                 ])),
                 'nilai' => null, 'isi' => null,
             ],
-            'asrama' => [
-                'judul' => $this->nama($b, 'attendance_type_name', 'attendance_type_id', __('Sesi')),
+            'asrama' => self::kelompokAsrama($b) === 'penilaian' ? [
+                // PENILAIAN: nilai apa adanya (A–D / predikat ujian) dengan warna tingkatnya — BUKAN kehadiran.
+                'judul' => $this->namaKegiatan($b),
+                'keterangan' => $this->nama($b, 'dormitory_name', 'dormitory_id', __('Asrama')),
+                'waktu' => $this->waktu($this->gabung($b['attendance_date'] ?? null, $b['attendance_time'] ?? null)),
+                'hanya_tanggal' => true,
+                'lencana' => array_values(array_filter([$this->lencanaNilai($b['status_raw'] ?? $b['status'] ?? null)])), 'nilai' => null, 'isi' => null,
+            ] : [
+                'judul' => $this->namaKegiatan($b),
                 'keterangan' => $this->nama($b, 'dormitory_name', 'dormitory_id', __('Asrama')),
                 // attendance_time = jam PENCATATAN (input musyrif sering sekaligus malam hari) → tak ditampilkan sebagai jam
                 // kegiatan. Yang ditampilkan: jam JADWAL kegiatan (attendance_type_time, ISE 15 Nov 2026); untuk absen kartu
@@ -319,9 +371,13 @@ class PortalAkademikController extends Controller
                 'waktu' => $this->waktu($this->gabung($b['attendance_date'] ?? null, $b['attendance_time'] ?? null)),
                 'hanya_tanggal' => true,
                 'jam' => $this->jamPendek($b['attendance_type_time'] ?? null),
-                'jam_kartu' => $this->metode($b) === 'rfid' ? $this->jamPendek($b['attendance_time'] ?? null) : null,
+                // Jam tap kartu TIDAK ditampilkan (user 15 Nov 2026): attendance_time ISE ikut berubah saat catatan disunting
+                // dan status tak dicocokkan dengan jam (enforce_time 0) → menyesatkan. Yang ditampilkan hanya SUMBERNYA.
+                'sumber' => $this->metode($b) === 'rfid' ? __('Kartu RFID') : __('Dicatat musyrif'),
                 'urut' => $this->waktu($this->gabung($b['attendance_date'] ?? null, $b['attendance_type_time'] ?? $b['attendance_time'] ?? null)),
-                'lencana' => array_values(array_filter([$this->lencanaRinci($b['status'] ?? null, $b['status_raw'] ?? null)])), 'nilai' => null, 'isi' => null,
+                'lencana' => array_values(array_filter([self::kelompokAsrama($b) === 'perizinan'
+                    ? $this->lencanaNetral($b['status_raw'] ?? $b['status'] ?? null)
+                    : $this->lencanaRinci($b['status'] ?? null, $b['status_raw'] ?? null)])), 'nilai' => null, 'isi' => null,
             ],
             'ekstrakurikuler-absen' => [
                 'judul' => $this->nama($b, 'extracurricular_name', 'extracurricular_id', __('Ekskul')), 'keterangan' => null,
@@ -445,15 +501,63 @@ class PortalAkademikController extends Controller
         if (! filled($rinci)) {
             return $dasar;
         }
-        $kategori = AbsensiAsramaService::kategori($rinci);
+        $kecil = mb_strtolower(trim($rinci));
+        // Sebagian status rinci dipetakan ISE ke enum yang keliru ("Tidak Hadir" → excused) — kategori ditetapkan di sini.
+        $kategori = config('ise_asrama.kategori_tambahan.'.$kecil) ?? AbsensiAsramaService::kategori($rinci);
         $kategori = $kategori === 'lainnya' ? ($dasar[1] ?? 'lainnya') : $kategori;
         $label = __(AbsensiAsramaService::LABEL_KATEGORI[$kategori] ?? 'Lainnya');
+        $rinciId = $this->terjemahStatus($rinci);
         $umum = ['present', 'absent', 'late', 'excused', 'hadir', 'tidak hadir', 'terlambat', 'izin'];
-        if ($kategori !== 'uzur' && ! in_array(mb_strtolower(trim($rinci)), $umum, true) && mb_strtolower(trim($rinci)) !== mb_strtolower($label)) {
-            $label .= ' · '.trim($rinci);
+        if ($kategori !== 'uzur' && ! in_array($kecil, $umum, true) && mb_strtolower($rinciId) !== mb_strtolower($label)) {
+            $label .= ' · '.$rinciId;
         }
 
         return [$label, $kategori];
+    }
+
+    /**
+     * Nilai PENILAIAN asrama → [label, warna]. Warna dari tingkat nilainya (A hijau · B biru · C kuning · D merah;
+     * ujian Mumtaz…Rasib), BUKAN dari enum kehadiran ISE yang keliru untuk jenis ini.
+     */
+    private function lencanaNilai(?string $nilai): ?array
+    {
+        if (! filled($nilai)) {
+            return null;
+        }
+        $teks = trim($nilai);
+        $ujian = ['excellent' => ['Mumtaz', 'hadir'], 'very good' => ['Jayyid Jiddan', 'izin'], 'good' => ['Jayyid', 'izin'],
+            'passable' => ['Maqbul', 'terlambat'], 'failed' => ['Rasib', 'tidak_hadir']];
+        foreach ($ujian as $kunci => [$nama, $warna]) {
+            if (preg_match('/\b'.preg_quote($kunci, '/').'\b\s*\(([^)]*)\)/i', $teks, $m)) {
+                return [__($nama).' ('.str_replace('-', '–', $m[1]).')', $warna];
+            }
+        }
+        if (preg_match('/^([A-D])\b/i', $teks, $m)) {
+            return [$teks, ['A' => 'hadir', 'B' => 'izin', 'C' => 'terlambat', 'D' => 'tidak_hadir'][strtoupper($m[1])]];
+        }
+
+        return [$this->terjemahStatus($teks), $this->lencana($teks)[1] ?? 'lainnya'];
+    }
+
+    /** Kunjungan/kepulangan: label apa adanya (diterjemahkan), warna netral — enum ISE-nya tak bermakna kehadiran. */
+    private function lencanaNetral(?string $status): ?array
+    {
+        return filled($status) ? [$this->terjemahStatus($status), 'lainnya'] : null;
+    }
+
+    private function terjemahStatus(string $status): string
+    {
+        $id = config('ise_asrama.status.'.mb_strtolower(trim($status)));
+
+        return $id !== null ? __($id) : trim($status);
+    }
+
+    /** Nama kegiatan asrama berbahasa Indonesia (config ise_asrama); jenis tak terdaftar = nama asli ISE. */
+    private function namaKegiatan(array $b): string
+    {
+        $nama = config('ise_asrama.kegiatan.'.(int) ($b['attendance_type_id'] ?? 0).'.0');
+
+        return $nama !== null ? __($nama) : $this->nama($b, 'attendance_type_name', 'attendance_type_id', __('Sesi'));
     }
 
     /** rfid | manual — kolom `method` ISE; cadangan dari catatan "Terminal: …". */

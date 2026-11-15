@@ -33,6 +33,7 @@
         'prestasi' => 'M12 15a6 6 0 100-12 6 6 0 000 12zM8.5 14L7 21l5-3 5 3-1.5-7',
         'umpan_balik' => 'M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12zM8 11h8M8 14h5',
         'kegiatan' => 'M5 21V4M5 4h11l-2 4 2 4H5',
+        'penilaian' => 'M9 4h6v3H9zM7 5.5H5V21h14V5.5h-2M9 13l2 2 4-4',
     ];
 @endphp
 @php $penuh = in_array($nama, ['klinik'], true); @endphp

@@ -147,12 +147,15 @@ class PortalAkademikIseTest extends TestCase
             'rencana_keluar' => '2026-11-04 08:00:00', 'rencana_kembali' => '2026-11-06 08:00:00', 'keluar_pada' => '2026-11-04 07:00:00', 'id_wali' => $this->wali->id]);
 
         $html = $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'asrama']))->assertOk()
-            ->assertSee('DAMASCUS 1C')->assertSee('Asrama #9')->assertSee('Shalat Maghrib')->assertSee('Sesi #5')->getContent();
+            ->assertSee('DAMASCUS 1C')->assertSee('Asrama #9')->assertSee('Shalat Maghrib Berjamaah')->assertSee('Puasa Sunnah')->getContent();
         // 5 Nov (dalam izin) → Izin; 1 Nov (di luar izin) → Tidak hadir.
         $this->assertStringContainsString('bg-sky-100 text-sky-800">'.__('Izin'), $html);
         $this->assertStringContainsString('bg-red-100 text-red-700">Tidak hadir', $html);
         // Jam hanya untuk absen kartu RFID (Terminal); jam input musyrif disembunyikan (user 15 Nov 2026).
-        $this->assertStringContainsString('Tempel kartu 20:16', $html);
+        // Sumber catatan ditampilkan, jam tap kartu tidak (jam ISE ikut berubah saat disunting) — user 15 Nov 2026.
+        $this->assertStringContainsString('Kartu RFID', $html);
+        $this->assertStringContainsString('Dicatat musyrif', $html);
+        $this->assertStringNotContainsString('20:16', $html);
         $this->assertStringNotContainsString('17:49', $html);
         $this->assertStringNotContainsString('Masjid Kuwait', $html);
     }
@@ -201,8 +204,44 @@ class PortalAkademikIseTest extends TestCase
         ])), '*' => Http::response(self::halaman([]))]);
 
         $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'asrama']))->assertOk()
-            ->assertSeeInOrder(['Fajr Congregational Prayer', '04:30', 'Terlambat · Masbuq', 'Morning Dzikir', '05:15', 'Uzur', 'Maghrib Congregational Prayer', 'Tempel kartu 17:48', '17:45', 'Hadir · Sebelum Adzan'])
+            // Di bawah nama: Jadwal + sumber (Kartu RFID / Dicatat musyrif); jam tap kartu tak ditampilkan (user 15 Nov 2026).
+            ->assertSeeInOrder(['Fajr Congregational Prayer', 'Jadwal', '04:30', 'Dicatat musyrif', 'Terlambat · Masbuq', 'Morning Dzikir', 'Jadwal', '05:15', 'Uzur',
+                'Maghrib Congregational Prayer', 'Jadwal', '17:45', 'Kartu RFID', 'Hadir · Sebelum Adzan'])
+            ->assertDontSee('17:48')
             ->assertDontSee('21:39')->assertDontSee('Haid');
+    }
+
+    /**
+     * Penilaian Asrama (user 15 Nov 2026): jenis berkelompok penilaian (config ise_asrama) keluar dari Absensi →
+     * menu sendiri; nilai B TIDAK tampil "Izin" (enum ISE keliru); nama diterjemahkan; ringkasan sebulan.
+     */
+    public function test_penilaian_asrama_terpisah_dari_absensi(): void
+    {
+        $tgl = now('Asia/Jakarta')->format('Y-m-d').' 00:00:00';
+        Http::fake(['*/histori/asrama*' => Http::response(self::halaman([
+            ['attendance_type_id' => 13, 'attendance_type_name' => 'Bed Cleanliness', 'attendance_date' => $tgl, 'attendance_time' => '07:10', 'status' => 'excused', 'status_raw' => 'B'],
+            ['attendance_type_id' => 16, 'attendance_type_name' => 'Dressing Manners', 'attendance_date' => $tgl, 'attendance_time' => '07:11', 'status' => 'present', 'status_raw' => 'A - Sangat Rapi'],
+            ['attendance_type_id' => 25, 'attendance_type_name' => 'International Language Oral Examination', 'attendance_date' => $tgl, 'attendance_time' => '08:00', 'status' => 'late', 'status_raw' => 'جيد /Good (76-85)'],
+            ['attendance_type_id' => 20, 'attendance_type_name' => 'Fajr Congregational Prayer', 'attendance_type_time' => '03:30', 'attendance_date' => $tgl, 'attendance_time' => '21:39', 'status' => 'present', 'status_raw' => 'Sebelum Adzan'],
+            ['attendance_type_id' => 2, 'attendance_type_name' => 'Absen Pagi', 'attendance_date' => $tgl, 'attendance_time' => '07:00', 'status' => 'excused', 'status_raw' => 'Tidak Hadir'],
+            ['attendance_type_id' => 28, 'attendance_type_name' => 'Monthly Home Leave', 'attendance_date' => $tgl, 'attendance_time' => '10:00', 'status' => 'excused', 'status_raw' => 'Check In Tepat Waktu'],
+        ])), '*' => Http::response(self::halaman([]))]);
+
+        // Absensi → Asrama: tanpa penilaian; "Tidak Hadir" bukan Izin; kepulangan berwarna netral.
+        $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'asrama']))->assertOk()
+            ->assertSee('Shalat Subuh Berjamaah')->assertSee('Hadir · Sebelum Adzan')
+            ->assertSee('bg-red-100 text-red-700">Tidak hadir', false)
+            ->assertSee('bg-slate-100 text-slate-600">Kembali tepat waktu', false)
+            ->assertDontSee('Kebersihan Ranjang')->assertDontSee('Adab Berpakaian')->assertDontSee('Fajr Congregational Prayer');
+
+        // Penilaian Asrama: nilai dengan warna tingkatnya, B tak pernah "Izin".
+        $html = $this->sebagaiIbu()->get(route('portal.penilaian_asrama'))->assertOk()
+            ->assertSee('data-ringkasan-penilaian', false)
+            ->assertSee('Kebersihan Ranjang')->assertSee('Adab Berpakaian')->assertSee('Ujian Lisan Bahasa Asing')
+            ->assertSee('bg-sky-100 text-sky-800">B<', false)->assertSee('bg-emerald-100 text-emerald-800">A - Sangat Rapi', false)
+            ->assertSee('Jayyid (76–85)')->assertDontSee('Shalat Subuh Berjamaah')->getContent();
+        $this->assertStringNotContainsString('>Izin<', $html);
+        $this->assertArrayHasKey('penilaian_asrama', MenuPortal::tersedia($this->wali->refresh()));
     }
 
     /** PDF rapor/sertifikat (ISE 15 Nov 2026): diteruskan ERP, hanya anak aktif sendiri, kunci tak bocor. */

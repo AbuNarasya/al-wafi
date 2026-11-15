@@ -76,6 +76,25 @@
             <a href="{{ $q(['hal' => request('hal')]) }}" class="mt-3 inline-block rounded-full bg-white px-4 py-1.5 font-semibold text-amber-900 ring-1 ring-amber-300">{{ __('Coba lagi') }}</a>
         </div>
     @else
+        @if ($ringkasan)
+            {{-- Ringkasan penilaian sebulan per kegiatan (15 Nov 2026). --}}
+            <section class="mb-4 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200" data-ringkasan-penilaian>
+                <h2 class="mb-2 text-sm font-bold text-slate-800">{{ __('Ringkasan bulan ini') }}</h2>
+                <div class="space-y-2">
+                    @foreach ($ringkasan as $r)
+                        <div class="rounded-2xl bg-slate-50 px-3 py-2 text-sm">
+                            <p class="font-medium text-slate-800">{{ $r['kegiatan'] }}</p>
+                            <div class="mt-1 flex flex-wrap gap-1.5">
+                                @foreach ($r['nilai'] as [$label, $kategori, $jumlah])
+                                    <span class="rounded-full px-2 py-0.5 text-[11px] font-semibold {{ $warnaLencana[$kategori] ?? $warnaLencana['lainnya'] }}">{{ $label }} × {{ $jumlah }}</span>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
         @if ($kamar)
             <section class="mb-4 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200" x-data="{ buka: false }" data-kamar>
                 <div class="flex items-center justify-between gap-2">
@@ -116,8 +135,16 @@
                                 <div class="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                                     <div class="min-w-0">
                                         @if ($tab !== 'harian')<p class="truncate font-medium text-slate-900">{{ $b['judul'] }}</p>@endif
-                                        @if (! empty($b['jam_kartu']))<p class="text-xs text-slate-500">{{ __('Tempel kartu :jam', ['jam' => $b['jam_kartu']]) }}</p>@endif
-                                        @if ($b['keterangan'] && $tab !== 'asrama')<p class="truncate text-xs text-slate-500">{{ $b['keterangan'] }}</p>@endif
+                                        {{-- Di bawah nama: jam JADWAL kegiatan + SUMBER catatan (kartu RFID / dicatat musyrif) — user 15 Nov 2026.
+                                             Jam tap kartu sengaja tak ditampilkan: jam ISE ikut berubah saat catatan disunting. --}}
+                                        @if (! empty($b['jam']) || ! empty($b['sumber']))
+                                            <p class="text-xs text-slate-500" data-jadwal>
+                                                @if (! empty($b['jam'])){{ __('Jadwal') }} <span class="tabular-nums">{{ $b['jam'] }}</span>@endif
+                                                @if (! empty($b['jam']) && ! empty($b['sumber'])) · @endif
+                                                @if (! empty($b['sumber']))<span data-sumber>{{ $b['sumber'] }}</span>@endif
+                                            </p>
+                                        @endif
+                                        @if ($b['keterangan'] && ! in_array($tab, ['asrama', 'penilaian'], true))<p class="truncate text-xs text-slate-500">{{ $b['keterangan'] }}</p>@endif
                                         @if ($b['lencana'] && $tab === 'harian')
                                             <div class="flex flex-wrap gap-1.5">
                                                 @foreach ($b['lencana'] as [$teks, $kategori])
@@ -128,9 +155,7 @@
                                     </div>
                                     @if ($tab !== 'harian')
                                         <div class="flex shrink-0 items-center gap-2">
-                                            @if (! empty($b['jam']))
-                                                <span class="text-xs tabular-nums text-slate-500" title="{{ __('Jam kegiatan') }}">{{ $b['jam'] }}</span>
-                                            @elseif ($b['waktu'] && ! $b['hanya_tanggal'])
+                                            @if ($b['waktu'] && ! $b['hanya_tanggal'])
                                                 <span class="text-xs tabular-nums text-slate-500">{{ $b['waktu']->format('H:i') }}</span>
                                             @endif
                                             @foreach ($b['lencana'] as [$teks, $kategori])
