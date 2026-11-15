@@ -10,7 +10,8 @@
             'izin' => 'bg-sky-100 text-sky-800', 'uzur' => 'bg-violet-100 text-violet-800', 'lainnya' => 'bg-slate-100 text-slate-600',
             'libur' => 'bg-rose-100 text-rose-700', 'kosong' => 'bg-amber-100 text-amber-800'];
         $rute = 'portal.'.$menu;
-        $q = fn (array $x = []) => route($rute, array_filter($x + ['anak' => $pilih?->id, 'tab' => $tab, 'bulan' => $bulan['kode'] ?? null]));
+        $q = fn (array $x = []) => route($rute, array_filter($x + ['anak' => $pilih?->id, 'tab' => $tab, 'bulan' => $bulan['kode'] ?? null,
+            'keg' => $filter['keg'] ?: null, 'st' => $filter['st'] ?: null]));
     @endphp
 
     <div class="mb-4 flex items-center gap-3">
@@ -43,6 +44,8 @@
         <form method="GET" action="{{ route($rute) }}" class="mb-4 flex items-center gap-2" data-pilih-bulan>
             <input type="hidden" name="anak" value="{{ $pilih->id }}">
             <input type="hidden" name="tab" value="{{ $tab }}">
+            @if ($filter['keg'] !== '')<input type="hidden" name="keg" value="{{ $filter['keg'] }}">@endif
+            @if ($filter['st'] !== '')<input type="hidden" name="st" value="{{ $filter['st'] }}">@endif
             @if ($bulan['sebelum'])
                 <a href="{{ $q(['bulan' => $bulan['sebelum']]) }}" class="shrink-0 rounded-full bg-white px-3 py-2 text-sm text-slate-600 ring-1 ring-slate-200" aria-label="{{ __('Bulan sebelumnya') }}"><span class="inline-block rtl:-scale-x-100">&larr;</span></a>
             @else
@@ -65,6 +68,35 @@
             @endif
             <noscript><button class="rounded-2xl bg-brand px-3 py-2 text-sm font-semibold text-white">{{ __('Tampilkan') }}</button></noscript>
         </form>
+
+        {{-- Saringan jenis kehadiran (user 15 Nov 2026): kegiatan (Asrama, Penilaian) & status (Harian, Asrama). --}}
+        @if ($pilihanFilter['kegiatan'] || $pilihanFilter['status'] || $filter['keg'] !== '' || $filter['st'] !== '')
+            <form method="GET" action="{{ route($rute) }}" class="-mt-2 mb-4 flex flex-wrap items-center gap-2" data-saring-kehadiran>
+                <input type="hidden" name="anak" value="{{ $pilih->id }}">
+                <input type="hidden" name="tab" value="{{ $tab }}">
+                <input type="hidden" name="bulan" value="{{ $bulan['kode'] }}">
+                @if ($pilihanFilter['kegiatan'])
+                    <select name="keg" onchange="this.form.submit()" aria-label="{{ __('Kegiatan') }}" class="min-w-0 flex-1 rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm">
+                        <option value="">{{ __('Semua kegiatan') }}</option>
+                        @foreach ($pilihanFilter['kegiatan'] as $k)
+                            <option value="{{ $k }}" @selected($filter['keg'] === $k)>{{ $k }}</option>
+                        @endforeach
+                    </select>
+                @endif
+                @if ($pilihanFilter['status'])
+                    <select name="st" onchange="this.form.submit()" aria-label="{{ __('Status') }}" class="min-w-0 flex-1 rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm">
+                        <option value="">{{ __('Semua status') }}</option>
+                        @foreach ($pilihanFilter['status'] as $k => $l)
+                            <option value="{{ $k }}" @selected($filter['st'] === $k)>{{ $l }}</option>
+                        @endforeach
+                    </select>
+                @endif
+                @if ($filter['keg'] !== '' || $filter['st'] !== '')
+                    <a href="{{ route($rute, ['anak' => $pilih->id, 'tab' => $tab, 'bulan' => $bulan['kode']]) }}" class="shrink-0 text-sm font-semibold text-brand">{{ __('Hapus saringan') }}</a>
+                @endif
+                <noscript><button class="rounded-2xl bg-brand px-3 py-2 text-sm font-semibold text-white">{{ __('Tampilkan') }}</button></noscript>
+            </form>
+        @endif
     @endif
 
     @if (! $pilih)
@@ -168,7 +200,7 @@
                         </div>
                     </section>
                 @empty
-                    <p class="rounded-3xl bg-white p-6 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">{{ $bulan ? __('Tidak ada catatan pada bulan ini.') : __('Belum ada data.') }}</p>
+                    <p class="rounded-3xl bg-white p-6 text-center text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">{{ ($filter['keg'] !== '' || $filter['st'] !== '') ? __('Tidak ada catatan yang cocok dengan saringan.') : ($bulan ? __('Tidak ada catatan pada bulan ini.') : __('Belum ada data.')) }}</p>
                 @endforelse
             </div>
 

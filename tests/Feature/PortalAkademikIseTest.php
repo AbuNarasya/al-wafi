@@ -247,6 +247,38 @@ class PortalAkademikIseTest extends TestCase
         $this->assertArrayHasKey('penilaian_asrama', MenuPortal::tersedia($this->wali->refresh()));
     }
 
+    /** Saringan jenis kehadiran (user 15 Nov 2026): kegiatan & status; hari kosong/libur tak ditampilkan saat menyaring. */
+    public function test_saringan_kegiatan_dan_status(): void
+    {
+        \Illuminate\Support\Carbon::setTestNow('2026-11-14 03:00:00');
+        $a = fn ($id, $tgl, $st, $rinci) => ['attendance_type_id' => $id, 'attendance_date' => "$tgl 00:00:00", 'attendance_time' => '05:00', 'status' => $st, 'status_raw' => $rinci];
+        Http::fake(['*/histori/asrama*' => Http::response(self::halaman([
+            $a(20, '2026-11-12', 'absent', "Tidak Jama'ah"), $a(20, '2026-11-11', 'present', 'Sebelum Adzan'),
+            $a(8, '2026-11-12', 'present', 'Dzikir'), $a(8, '2026-11-10', 'absent', 'Tidak Dzikir'),
+        ])), '*' => Http::response(self::halaman([]))]);
+
+        $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'asrama']))->assertOk()
+            ->assertSee('data-saring-kehadiran', false)->assertSee('<option value="Shalat Subuh Berjamaah"', false)
+            ->assertSee('<option value="tidak_hadir"', false);
+
+        // Kegiatan: hanya Subuh; hari tanpa Subuh & hari kosong tak tampil.
+        $html = $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'asrama', 'keg' => 'Shalat Subuh Berjamaah']))->assertOk()
+            ->assertSee('Rabu, 11 Nov 2026')->assertDontSee('Selasa, 10 Nov 2026')->assertDontSee('Dzikir Pagi</p>', false)
+            ->assertDontSee('data-keterangan-hari', false)->assertSee('Hapus saringan')->getContent();
+        $this->assertSame(2, substr_count($html, '<section class="rounded-3xl shadow-sm ring-1'));
+
+        // Status: hanya Tidak hadir (Subuh 12 Nov & Dzikir 10 Nov).
+        $html = $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'asrama', 'st' => 'tidak_hadir']))->assertOk()
+            ->assertSee('Kamis, 12 Nov 2026')->assertSee('Selasa, 10 Nov 2026')->assertDontSee('Rabu, 11 Nov 2026')->getContent();
+        $this->assertSame(2, substr_count($html, '<section class="rounded-3xl shadow-sm ring-1'));
+
+        // Gabungan & nilai tak dikenal diabaikan.
+        $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'asrama', 'keg' => 'Dzikir Pagi', 'st' => 'hadir']))->assertOk()
+            ->assertSee('Kamis, 12 Nov 2026')->assertDontSee('Selasa, 10 Nov 2026');
+        $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'asrama', 'keg' => 'Ngawur']))->assertOk()->assertDontSee('Hapus saringan');
+        \Illuminate\Support\Carbon::setTestNow();
+    }
+
     /** PDF rapor/sertifikat (ISE 15 Nov 2026): diteruskan ERP, hanya anak aktif sendiri, kunci tak bocor. */
     public function test_pdf_rapor_diteruskan_hanya_untuk_anak_sendiri(): void
     {

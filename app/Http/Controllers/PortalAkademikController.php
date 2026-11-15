@@ -161,10 +161,37 @@ class PortalAkademikController extends Controller
                 if ($saringan) {
                     $hasil['halaman'] = $hasil['halaman_akhir'] = 1;
                 }
+                // SARINGAN jenis kehadiran (user 15 Nov 2026): kegiatan (asrama, penilaian) & status (harian, asrama).
+                // Pilihan disusun dari catatan bulan itu SEBELUM disaring, supaya daftar pilihannya tetap lengkap.
+                if ($bulan) {
+                    $filter = ['keg' => (string) $r->query('keg'), 'st' => (string) $r->query('st')];
+                    $pilihanFilter = [
+                        'kegiatan' => in_array($tab, ['asrama', 'penilaian'], true)
+                            ? collect($hasil['baris'])->pluck('judul')->unique()->sort()->values()->all() : [],
+                        'status' => in_array($tab, ['harian', 'asrama'], true)
+                            ? collect($hasil['baris'])->pluck('lencana')->flatten(1)->pluck(1)->unique()
+                                ->filter(fn ($k) => isset(AbsensiAsramaService::LABEL_KATEGORI[$k]) && $k !== 'lainnya')
+                                ->sortBy(fn ($k) => array_search($k, array_keys(AbsensiAsramaService::LABEL_KATEGORI), true))
+                                ->mapWithKeys(fn ($k) => [$k => __(AbsensiAsramaService::LABEL_KATEGORI[$k])])->all() : [],
+                    ];
+                    if ($filter['keg'] !== '' && in_array($filter['keg'], $pilihanFilter['kegiatan'], true)) {
+                        $hasil['baris'] = array_values(array_filter($hasil['baris'], fn ($b) => $b['judul'] === $filter['keg']));
+                    } else {
+                        $filter['keg'] = '';
+                    }
+                    if ($filter['st'] !== '' && isset($pilihanFilter['status'][$filter['st']])) {
+                        $hasil['baris'] = array_values(array_filter($hasil['baris'],
+                            fn ($b) => in_array($filter['st'], array_column($b['lencana'], 1), true)));
+                    } else {
+                        $filter['st'] = '';
+                    }
+                }
+                $menyaring = isset($filter) && ($filter['keg'] !== '' || $filter['st'] !== '');
                 if ($kelompok) {
                     $hari = $this->perHari($hasil['baris']);
                     // Harian & Asrama: SETIAP tanggal bulan itu tampil; yang tanpa catatan diberi keterangan (user 14 Nov 2026).
-                    if ($bulan && in_array($tab, ['harian', 'asrama'], true)) {
+                    // Saat disaring, hanya hari yang punya catatan cocok.
+                    if ($bulan && ! $menyaring && in_array($tab, ['harian', 'asrama'], true)) {
                         $hari = $this->lengkapiHari($hari, $pilih, $tab === 'harian' ? 'sekolah' : 'asrama', $bulan['awal'], $bulan['akhir']);
                     }
                 }
@@ -181,8 +208,11 @@ class PortalAkademikController extends Controller
         }
 
         $ringkasan ??= null;
+        $filter ??= ['keg' => '', 'st' => ''];
+        $pilihanFilter ??= ['kegiatan' => [], 'status' => []];
 
-        return view('portal.akademik', compact('menu', 'judul', 'ikon', 'warna', 'tabs', 'tab', 'anak', 'pilih', 'hasil', 'kamar', 'gagal', 'hari', 'bulan', 'ringkasan'));
+        return view('portal.akademik', compact('menu', 'judul', 'ikon', 'warna', 'tabs', 'tab', 'anak', 'pilih', 'hasil', 'kamar', 'gagal', 'hari', 'bulan',
+            'ringkasan', 'filter', 'pilihanFilter'));
     }
 
     /**
