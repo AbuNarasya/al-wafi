@@ -279,6 +279,36 @@ class PortalAkademikIseTest extends TestCase
         \Illuminate\Support\Carbon::setTestNow();
     }
 
+    /**
+     * Absensi per mapel (ISE 15 Nov 2026): group_by=date + include_empty; unmarked = "Belum ada absen mapel" (bukan alpa);
+     * tanggal sesudah hari ini dibuang; hari libur kalender tanpa isian = Hari Libur; saringan mapel & status.
+     */
+    public function test_absensi_mapel_per_hari(): void
+    {
+        \Illuminate\Support\Carbon::setTestNow('2026-11-14 03:00:00');
+        \App\Models\KalenderLibur::create(['nama' => 'Libur Uji', 'mulai' => '2026-11-11', 'selesai' => '2026-11-11', 'kode_jenjang' => null, 'cakupan' => 'sekolah']);
+        $m = fn ($mapel, $mulai, $selesai, $st, $tiba = null, $catatan = null) => ['subject_name' => $mapel, 'schedule_start_time' => $mulai,
+            'schedule_end_time' => $selesai, 'teacher_name' => 'USTADZ FULAN', 'status' => $st, 'check_in_time' => $tiba, 'notes' => $catatan];
+        Http::fake(['*/histori/absensi-mapel*' => Http::response(['success' => true, 'grouped' => true, 'data' => ['current_page' => 1, 'last_page' => 1, 'total' => 4, 'data' => [
+            ['tanggal' => '2026-11-20', 'mapel' => [$m('Fisika', '07:31', '08:50', 'unmarked')]],
+            ['tanggal' => '2026-11-13', 'mapel' => [$m('Matematika', '10:20', '11:40', 'unmarked'), $m('Nahwu', '08:51', '10:10', 'late', '09:05', 'Terlambat dari asrama')]],
+            ['tanggal' => '2026-11-12', 'mapel' => [$m('Fisika', '07:31', '08:50', 'absent')]],
+            ['tanggal' => '2026-11-11', 'mapel' => [$m('Fisika', '07:31', '08:50', 'unmarked')]],
+        ]]])]);
+
+        $html = $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'mapel']))->assertOk()
+            ->assertSeeInOrder(['Jumat, 13 Nov 2026', 'Nahwu', '08:51–10:10 · USTADZ FULAN', 'Terlambat dari asrama', 'Terlambat · tiba 09:05',
+                'Matematika', 'Belum ada absen mapel', 'Kamis, 12 Nov 2026', 'Fisika', 'Alpa', 'Rabu, 11 Nov 2026', 'Hari Libur — Libur Uji'])
+            ->assertDontSee('20 Nov 2026')->getContent();
+        Http::assertSent(fn (PermintaanHttp $r) => str_contains($r->url(), '/histori/absensi-mapel?') && $r['group_by'] === 'date'
+            && $r['include_empty'] === 'true' && $r['date_from'] === '2026-11-01' && $r['date_to'] === '2026-11-30');
+        $this->assertStringContainsString('<option value="Nahwu"', $html);
+
+        $this->sebagaiIbu()->get(route('portal.absensi', ['tab' => 'mapel', 'st' => 'tidak_hadir']))->assertOk()
+            ->assertSee('Kamis, 12 Nov 2026')->assertDontSee('Jumat, 13 Nov 2026');
+        \Illuminate\Support\Carbon::setTestNow();
+    }
+
     /** PDF rapor/sertifikat (ISE 15 Nov 2026): diteruskan ERP, hanya anak aktif sendiri, kunci tak bocor. */
     public function test_pdf_rapor_diteruskan_hanya_untuk_anak_sendiri(): void
     {

@@ -37,14 +37,16 @@ final class HistoriIse
      *
      * @throws HistoriIseGagal bila ISE mati, lambat, menolak kunci, atau jawabannya tak terbaca
      */
-    public function daftar(Santri $santri, string $area, int $halaman = 1, int $perHalaman = 20, ?string $dari = null, ?string $sampai = null): array
+    /** @param array<string,string> $tambahan parameter khusus area, mis. absensi-mapel: group_by=date, include_empty=true */
+    public function daftar(Santri $santri, string $area, int $halaman = 1, int $perHalaman = 20, ?string $dari = null, ?string $sampai = null, array $tambahan = []): array
     {
         $halaman = max(1, $halaman);
-        $kunci = "ise:histori:{$area}:{$santri->id}:{$halaman}:{$perHalaman}:{$dari}:{$sampai}";
+        ksort($tambahan);
+        $kunci = "ise:histori:{$area}:{$santri->id}:{$halaman}:{$perHalaman}:{$dari}:{$sampai}:".http_build_query($tambahan);
 
         // remember tak menyimpan pengecualian — kegagalan ISE tak ikut ter-cache.
         return Cache::remember($kunci, max(0, (int) config('services.ise.cache_menit')) * 60,
-            fn () => $this->ambil($santri, $area, $halaman, $perHalaman, $dari, $sampai));
+            fn () => $this->ambil($santri, $area, $halaman, $perHalaman, $dari, $sampai, $tambahan));
     }
 
     /**
@@ -79,7 +81,7 @@ final class HistoriIse
     }
 
     /** $dari/$sampai = YYYY-MM-DD (date_from/date_to ISE, inklusif). */
-    private function ambil(Santri $santri, string $area, int $halaman, int $perHalaman, ?string $dari, ?string $sampai): array
+    private function ambil(Santri $santri, string $area, int $halaman, int $perHalaman, ?string $dari, ?string $sampai, array $tambahan = []): array
     {
         $url = rtrim((string) config('services.ise.url'), '/').'/histori/'.rawurlencode($area);
         try {
@@ -87,7 +89,7 @@ final class HistoriIse
                 ->timeout(max(1, (int) config('services.ise.batas_detik')))->connectTimeout(3)
                 ->withOptions(['curl' => [CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4]])
                 ->get($url, array_filter(['id_erp' => $santri->id, 'nis' => $santri->nis, 'page' => $halaman, 'per_page' => $perHalaman,
-                    'date_from' => $dari, 'date_to' => $sampai],
+                    'date_from' => $dari, 'date_to' => $sampai] + $tambahan,
                     fn ($v) => $v !== null && $v !== ''));
         } catch (\Throwable $e) {
             throw new HistoriIseGagal('ISE tak terjangkau: '.$e->getMessage(), previous: $e);

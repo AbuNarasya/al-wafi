@@ -1436,5 +1436,11 @@
     "Semua kegiatan": "All activities",
     "Semua status": "All statuses",
     "Hapus saringan": "Clear filter",
-    "Tidak ada catatan yang cocok dengan saringan.": "No records match the filter."
+    "Tidak ada catatan yang cocok dengan saringan.": "No records match the filter.",
+    "Mapel": "Subjects",
+    "Izin/Sakit": "Excused/Sick",
+    "Alpa": "Absent without notice",
+    "Belum ada absen mapel": "No subject attendance yet",
+    "tiba :jam": "arrived :jam",
+    "Mata pelajaran": "Subject"
 }

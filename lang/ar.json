@@ -1436,5 +1436,11 @@
     "Semua kegiatan": "كل الأنشطة",
     "Semua status": "كل الحالات",
     "Hapus saringan": "إزالة التصفية",
-    "Tidak ada catatan yang cocok dengan saringan.": "لا توجد سجلات مطابقة للتصفية."
+    "Tidak ada catatan yang cocok dengan saringan.": "لا توجد سجلات مطابقة للتصفية.",
+    "Mapel": "المواد",
+    "Izin/Sakit": "إذن/مرض",
+    "Alpa": "غياب بدون عذر",
+    "Belum ada absen mapel": "لم يُسجَّل حضور المادة بعد",
+    "tiba :jam": "وصل :jam",
+    "Mata pelajaran": "المادة"
 }

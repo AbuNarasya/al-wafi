@@ -34,6 +34,8 @@ class PortalAkademikController extends Controller
         // catatan bulan itu ditampilkan (saringan tanggal ISE; semua halaman ISE diambil). Elemen ke-5 = 'bulan'.
         'absensi' => ['Absensi', 'absensi', '#15803d', [
             'harian' => ['Harian', 'harian', null, 200, 'bulan'],
+            // Absensi per mata pelajaran, diisi guru (ISE 15 Nov 2026) — mode group_by=date + include_empty.
+            'mapel' => ['Mapel', 'absensi-mapel', null, 31, 'bulan'],
             // Tanpa kegiatan berjenis PENILAIAN (config ise_asrama) — itu di menu Penilaian Asrama.
             'asrama' => ['Asrama', 'asrama', 'absen_asrama', 200, 'bulan'],
             'halaqah' => ['Halaqah', 'halaqah', null, 200, 'bulan'],
@@ -152,7 +154,9 @@ class PortalAkademikController extends Controller
         if ($pilih) {
             $svc = new HistoriIse;
             try {
-                if ($bulan) {
+                if ($bulan && $area === 'absensi-mapel') {
+                    $hasil = $this->mapelSebulan($svc, $pilih, $bulan['awal'], $bulan['akhir']);
+                } elseif ($bulan) {
                     $hasil = $this->sebulan($svc, $pilih, $area, $per, $bulan['awal'], $bulan['akhir']);
                 } else {
                     $hasil = $svc->daftar($pilih, $area, $saringan ? 1 : $halaman, $per);
@@ -166,9 +170,9 @@ class PortalAkademikController extends Controller
                 if ($bulan) {
                     $filter = ['keg' => (string) $r->query('keg'), 'st' => (string) $r->query('st')];
                     $pilihanFilter = [
-                        'kegiatan' => in_array($tab, ['asrama', 'penilaian'], true)
+                        'kegiatan' => in_array($tab, ['asrama', 'penilaian', 'mapel'], true)
                             ? collect($hasil['baris'])->pluck('judul')->unique()->sort()->values()->all() : [],
-                        'status' => in_array($tab, ['harian', 'asrama'], true)
+                        'status' => in_array($tab, ['harian', 'asrama', 'mapel'], true)
                             ? collect($hasil['baris'])->pluck('lencana')->flatten(1)->pluck(1)->unique()
                                 ->filter(fn ($k) => isset(AbsensiAsramaService::LABEL_KATEGORI[$k]) && $k !== 'lainnya')
                                 ->sortBy(fn ($k) => array_search($k, array_keys(AbsensiAsramaService::LABEL_KATEGORI), true))
@@ -193,6 +197,10 @@ class PortalAkademikController extends Controller
                     // Saat disaring, hanya hari yang punya catatan cocok.
                     if ($bulan && ! $menyaring && in_array($tab, ['harian', 'asrama'], true)) {
                         $hari = $this->lengkapiHari($hari, $pilih, $tab === 'harian' ? 'sekolah' : 'asrama', $bulan['awal'], $bulan['akhir']);
+                    }
+                    // Mapel: hari LIBUR (Kalender Libur, cakupan sekolah) yang jadwalnya belum diisi guru = "Hari Libur".
+                    if ($bulan && ! $menyaring && $tab === 'mapel') {
+                        $hari = $this->liburMapel($hari, $pilih, $bulan['awal'], $bulan['akhir']);
                     }
                 }
                 if ($tab === 'asrama') {
@@ -282,6 +290,67 @@ class PortalAkademikController extends Controller
         }
 
         return $ada->sortKeysDesc()->values()->all();
+    }
+
+    /**
+     * Absensi MAPEL sebulan (ISE 15 Nov 2026): group_by=date + include_empty=true (jadwal yang belum diisi guru ikut,
+     * berstatus unmarked), maks 31 hari — date_to inklusif. Diratakan jadi satu baris per mapel per tanggal.
+     * Tanggal SESUDAH hari ini dibuang (ISE juga mengirim jadwal yang belum lewat).
+     */
+    private function mapelSebulan(HistoriIse $svc, Santri $santri, Carbon $awal, Carbon $akhir): array
+    {
+        $hasil = $svc->daftar($santri, 'absensi-mapel', 1, 31, $awal->format('Y-m-d'), $akhir->format('Y-m-d'),
+            ['group_by' => 'date', 'include_empty' => 'true']);
+        $hariIni = now('Asia/Jakarta')->format('Y-m-d');
+        $baris = [];
+        foreach ($hasil['baris'] as $hari) {
+            $tgl = substr((string) ($hari['tanggal'] ?? ''), 0, 10);
+            if ($tgl === '' || $tgl > $hariIni) {
+                continue;
+            }
+            foreach ((array) ($hari['mapel'] ?? []) as $m) {
+                if (is_array($m)) {
+                    $baris[] = $m + ['attendance_date' => $tgl];
+                }
+            }
+        }
+        $hasil['baris'] = $baris;
+        $hasil['halaman'] = $hasil['halaman_akhir'] = 1;
+
+        return $hasil;
+    }
+
+    /** Status absensi mapel → [label, kategori]. unmarked = guru belum mengisi — BUKAN alpa (pesan ISE). */
+    private function lencanaMapel(string $status, ?string $tiba): array
+    {
+        return match ($status) {
+            'present' => [__('Hadir'), 'hadir'],
+            'late' => [__('Terlambat').(filled($tiba) ? ' · '.__('tiba :jam', ['jam' => $this->jamPendek($tiba)]) : ''), 'terlambat'],
+            'excused' => [__('Izin/Sakit'), 'izin'],
+            'absent' => [__('Alpa'), 'tidak_hadir'],
+            default => [__('Belum ada absen mapel'), 'lainnya'],
+        };
+    }
+
+    /** Hari libur sekolah (Kalender Libur) yang jadwal mapelnya belum diisi sama sekali → kartu "Hari Libur". */
+    private function liburMapel(array $hari, Santri $santri, Carbon $awal, Carbon $akhir): array
+    {
+        $libur = \App\Models\KalenderLibur::query()->berlaku($santri->kode_jenjang, 'sekolah', $awal->format('Y-m-d'), $akhir->format('Y-m-d'))->get();
+        if ($libur->isEmpty()) {
+            return $hari;
+        }
+
+        return array_map(function (array $h) use ($libur) {
+            $kunci = $h['tanggal']?->format('Y-m-d');
+            $l = $kunci ? $libur->first(fn ($x) => $x->mulai->format('Y-m-d') <= $kunci && $x->selesai->format('Y-m-d') >= $kunci) : null;
+            $semuaKosong = collect($h['baris'])->every(fn ($b) => ($b['lencana'][0][1] ?? null) === 'lainnya');
+            if ($l && $semuaKosong) {
+                $h['baris'] = [];
+                $h['keterangan_hari'] = [__('Hari Libur').' — '.$l->nama, 'libur'];
+            }
+
+            return $h;
+        }, $hari);
     }
 
     /** Batas paling awal yang bisa dipilih wali (data ISE paling tua yang diketahui: 2025). */
@@ -411,6 +480,19 @@ class PortalAkademikController extends Controller
                 'lencana' => array_values(array_filter([self::kelompokAsrama($b) === 'perizinan'
                     ? $this->lencanaNetral($b['status_raw'] ?? $b['status'] ?? null)
                     : $this->lencanaRinci($b['status'] ?? null, $b['status_raw'] ?? null)])), 'nilai' => null, 'isi' => null,
+            ],
+            // Satu mapel pada satu tanggal (sudah diratakan oleh mapelSebulan). Jam = jadwal pelajaran, bukan created_at.
+            'absensi-mapel' => [
+                'judul' => (string) ($b['subject_name'] ?? $b['subject']['name'] ?? __('Mata pelajaran')),
+                'keterangan' => null,
+                'sumber' => implode(' · ', array_filter([
+                    filled($b['schedule_start_time'] ?? null) ? $this->jamPendek($b['schedule_start_time']).'–'.$this->jamPendek($b['schedule_end_time'] ?? null) : null,
+                    $b['teacher_name'] ?? $b['teacher']['name'] ?? null,
+                ])) ?: null,
+                'waktu' => $this->waktu($b['attendance_date'] ?? null), 'hanya_tanggal' => true,
+                'urut' => $this->waktu($this->gabung($b['attendance_date'] ?? null, $b['schedule_start_time'] ?? null)),
+                'lencana' => [$this->lencanaMapel((string) ($b['status'] ?? ''), $b['check_in_time'] ?? null)],
+                'nilai' => null, 'isi' => $this->teks($b['notes'] ?? null),
             ],
             'ekstrakurikuler-absen' => [
                 'judul' => $this->nama($b, 'extracurricular_name', 'extracurricular_id', __('Ekskul')), 'keterangan' => null,

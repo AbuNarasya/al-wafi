@@ -171,6 +171,7 @@
                                              Jam tap kartu ("Waktu Kehadiran", dari created_at ISE) di sebelah status. --}}
                                         {{-- Jam jadwal tak ditampilkan (user 15 Nov 2026) — hanya dipakai untuk urutan. --}}
                                         @if (! empty($b['sumber']))<p class="text-xs text-slate-500" data-sumber>{{ $b['sumber'] }}</p>@endif
+                                        @if (! empty($b['isi']))<p class="mt-0.5 whitespace-pre-line text-xs text-slate-600">{{ $b['isi'] }}</p>@endif
                                         @if ($b['keterangan'] && ! in_array($tab, ['asrama', 'penilaian'], true))<p class="truncate text-xs text-slate-500">{{ $b['keterangan'] }}</p>@endif
                                         @if ($b['lencana'] && $tab === 'harian')
                                             <div class="flex flex-wrap gap-1.5">
